@@ -200,6 +200,7 @@ int sdl_list_monitors([[maybe_unused]] SdlContext* sdl)
 				return FALSE;
 			const auto id = sdl->monitorIds().front();
 			auto monitor = sdl->getDisplay(id);
+			sdl->applyMonitorScaleOverride(monitor);
 			monitor.is_primary = true;
 			monitor.x = 0;
 			monitor.y = 0;
@@ -211,7 +212,8 @@ int sdl_list_monitors([[maybe_unused]] SdlContext* sdl)
 	}
 	for (const auto& id : sdl->monitorIds())
 	{
-		const auto monitor = sdl->getDisplay(id);
+		auto monitor = sdl->getDisplay(id);
+		sdl->applyMonitorScaleOverride(monitor);
 		monitors.emplace_back(monitor);
 	}
 	// With an explicit /monitors: list the first entry is the primary (like xfreerdp),
@@ -277,6 +279,9 @@ BOOL sdl_detect_monitors(SdlContext* sdl, UINT32* pMaxWidth, UINT32* pMaxHeight)
 	WINPR_ASSERT(settings);
 
 	const auto& ids = sdl->getDisplayIds();
+	if (!sdl->validateMonitorScaleOverrides())
+		return FALSE;
+
 	auto nr = freerdp_settings_get_uint32(settings, FreeRDP_NumMonitorIds);
 	/* Announce all monitors in RemoteApp mode so windows can maximize on secondary displays. */
 	if ((nr == 0) && freerdp_settings_get_bool(settings, FreeRDP_RemoteApplicationMode) &&
