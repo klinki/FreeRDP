@@ -2,19 +2,20 @@
 
 Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
-Latest review: 2026-09-05 (commit `1354c6e2a`)
-Resolved: 2026-09-06 — U1 fixed in working tree (see below); all findings closed.
+Latest review: 2026-09-05 (commit `6fefaf21e`)
+Review result: U1 verified fixed; no new actionable findings in this commit.
 
-Latest scope: commit `1354c6e2a` against its parent, with relevant UDP and DVC integration paths. Earlier sections retain the original review history.
+Latest scope: commit `6fefaf21e` against its parent, with relevant UDP and DVC integration paths. Earlier sections retain the original review history.
 
 The original review identified eight P1 correctness issues. Re-review of commit
 `a9eb02727` found three blocking issues: an encoder/protector integration regression,
 incomplete Soft-Sync handling, and loss of partial tunnel receive state.
 
 Commit `1354c6e2a` fixes T1's map-capacity and fragmented-request failures.
-The U1 finding below is now FIXED in the working tree: there is a single shared
-strict Soft-Sync parser used by the DVC handler, the server, and the
-multitransport layer, so the no-list trailing case is rejected everywhere.
+Commit `6fefaf21e` fixes U1 by sharing request validation between the DVC
+handler and multitransport layer. The server also uses the shared response
+helper. The review harness confirms that the handler rejects both historical
+trailing-byte fixtures before sending a response.
 
 The original buffer-length, header-decoding, invalid-free, worker-join, and socket
 readiness fixes are present. Earlier sections preserve the review history; the
@@ -421,7 +422,7 @@ handler's no-list branch as well.
 - T1–T2 line numbers refer to `444b698b3`; earlier findings retain historical
   locations and validation results.
 
-## Latest findings for `1354c6e2a`
+## Re-review findings for `1354c6e2a`
 
 ### U1. [P2] [FIXED] Reject trailing bytes when channel lists are absent
 
@@ -456,9 +457,10 @@ parser can drift): the DVC handler rewinds one byte and calls the shared
 validate/offers on the identical PDU bytes core snooping sees; `server.c` uses
 the shared response helper. The U1 reproducer is rejected by the shared parser
 (no-list requires exactly ten bytes), as are listed-trailing variants.
-`test_soft_sync_shared_parity` runs every fixture through both the utils and
-`rdpeudp_*` APIs asserting identical verdicts — handler and core cannot disagree
-by construction.
+`test_soft_sync_shared_parity` checks request validation/offers through the
+utils API and response offers through both APIs. The independent review harness
+also exercises the current handler body with the stream positioned after the
+header, confirming the rewind and validation integration (see latest validation).
 
 ### Validation of `1354c6e2a`
 
@@ -480,10 +482,31 @@ by construction.
 - U1 locations refer to `1354c6e2a`; historical findings retain their earlier
   locations and validation results.
 
-**Follow-up verification (working tree):** full build green;
-`TestRdpeUdp` (incl. shared-parity with the U1 reproducer), `TestVersion`,
-`TestUtils` pass. U1's listed/no-list trailing fixtures are rejected by the
-single shared implementation exercised from both API layers.
+## Latest review of `6fefaf21e`
+
+No new actionable findings were identified in this commit. U1 is verified fixed.
+The shared request parser preserves the previous strict core checks, and the
+client now validates the whole PDU before generating a response. Both client
+and server callers provide bounded whole-PDU streams and consume the header
+before the new one-byte rewind.
+
+### Validation
+
+- `cmake --build /tmp/freerdp-build --target TestCore --parallel 4` succeeded.
+- `cmake --build /tmp/freerdp-build --target drdynvc-client --parallel 4` succeeded.
+- `ctest --test-dir /tmp/freerdp-build/libfreerdp/core/test -R '^(TestRdpeUdp|TestVersion|TestUtils)$' --output-on-failure` passed all three selected tests.
+- Refreshed the isolated handler harness with the unchanged current function
+  body, logging/send stubs, and the rebuilt library. Streams contain the whole
+  PDU and start one byte past the header, matching the production caller.
+  Both listed and no-list trailing-byte fixtures returned `ERROR_INVALID_DATA`
+  without sending a response. Valid listed and no-list reliable requests sent
+  accepting responses; a valid lossy-only request declined reliable UDP.
+  The core offer helper agreed with all five outcomes.
+- Inspected the moved parser, public declarations, core wrappers, server response
+  call site, and added tests. No implementation files were changed.
+- This is focused build, static, and extracted-handler validation. No full
+  application build, live-peer/TLS session, allocation-failure injection, or
+  ASAN run was performed. Earlier integration limitations remain open.
 
 ## Earlier validation and limitations
 
@@ -511,7 +534,7 @@ Recommended verification after fixes:
 
 - [x] Build `TestCore` and run `TestRdpeUdp`, core `TestVersion`, `TestUtils`, and `TestSettings`.
 - [x] Verify the production encode/protect path preserves packet bytes (R1: `test_v2_encode_protect_roundtrip`).
-- [ ] Test complete Soft-Sync processing, allocation failures, and consistent malformed-request rejection. Extracted-function checks cover fragmented 257-ID installation and the response gate; U1 still reproduces, and live-peer verification remains pending.
+- [ ] Test complete Soft-Sync processing, allocation failures, and consistent malformed-request rejection. Extracted-function checks cover fragmented 257-ID installation and the response gate; U1 is now rejected by the current handler harness; allocation-failure and live-peer verification remain pending.
 - [ ] Test the actual receive function with real TLS and timeouts between fragments. The isolated zero-timeout harness passes; live transport remains unverified.
 - [ ] Exercise client/server tunnel establishment and exchange actual TLS-protected data (loopback + Windows peer, Wireshark `rdp-udp.lua` + `/tls:secrets-file`).
 - [ ] Verify receive-buffer behavior before the first packet and after draining and refilling it.

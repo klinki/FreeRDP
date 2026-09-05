@@ -958,17 +958,16 @@ static void udp_compute_cookie_hash(const BYTE* cookie, BYTE* out)
 {
 	WINPR_ASSERT(cookie);
 	WINPR_ASSERT(out);
-	/* cookieHash = SHA256(securityCookie), each 4-byte word in network order.
-	 * SHA256 output bytes preserved; per-word BE write is a memcpy on the
-	 * byte stream. */
+	/* cookieHash = SHA256(securityCookie) interpreted as eight 4-byte words,
+	 * each transmitted in network byte order ([MS-RDPEUDP] 2.2.2.9). */
 	BYTE digest[SHA256_DIGEST_LENGTH] = { 0 };
 	SHA256(cookie, RDPEUDP_COOKIE_LEN, digest);
 	for (int i = 0; i < 8; i++)
 	{
-		out[i * 4 + 0] = digest[i * 4 + 0];
-		out[i * 4 + 1] = digest[i * 4 + 1];
-		out[i * 4 + 2] = digest[i * 4 + 2];
-		out[i * 4 + 3] = digest[i * 4 + 3];
+		out[i * 4 + 0] = digest[i * 4 + 3];
+		out[i * 4 + 1] = digest[i * 4 + 2];
+		out[i * 4 + 2] = digest[i * 4 + 1];
+		out[i * 4 + 3] = digest[i * 4 + 0];
 	}
 }
 
