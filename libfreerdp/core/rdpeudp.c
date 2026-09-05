@@ -551,6 +551,78 @@ BOOL rdpemt_next_subheader(const BYTE* subheaders, size_t subheadersLen, size_t*
 	return TRUE;
 }
 
+#define SOFT_SYNC_CMD_REQUEST 0x08
+#define SOFT_SYNC_CMD_RESPONSE 0x09
+#define SOFT_SYNC_FLAG_CHANNELLIST 0x02
+#define SOFT_SYNC_TUNNEL_UDPFECR 0x00000001
+
+BOOL rdpeudp_soft_sync_request_offers_udp(const BYTE* pdu, size_t len)
+{
+	UINT32 length = 0;
+	UINT16 flags = 0;
+	UINT16 numTunnels = 0;
+	size_t off = 0;
+	if (!pdu || (len < 10))
+		return FALSE;
+	if (((pdu[0] >> 4) & 0x0F) != SOFT_SYNC_CMD_REQUEST)
+		return FALSE;
+	if (pdu[1] != 0x00) /* Pad */
+		return FALSE;
+	length = (UINT32)pdu[2] | ((UINT32)pdu[3] << 8) | ((UINT32)pdu[4] << 16) |
+	         ((UINT32)pdu[5] << 24);
+	flags = (UINT16)(pdu[6] | ((UINT16)pdu[7] << 8));
+	numTunnels = (UINT16)(pdu[8] | ((UINT16)pdu[9] << 8));
+	if (length < 8)
+		return FALSE;
+	off = 10;
+	if (!(flags & SOFT_SYNC_FLAG_CHANNELLIST))
+		return numTunnels > 0;
+	for (UINT16 ti = 0; ti < numTunnels; ti++)
+	{
+		UINT32 tunnelType = 0;
+		UINT16 numDvcs = 0;
+		if (off + 6 > len)
+			return FALSE;
+		tunnelType = (UINT32)pdu[off] | ((UINT32)pdu[off + 1] << 8) |
+		             ((UINT32)pdu[off + 2] << 16) | ((UINT32)pdu[off + 3] << 24);
+		numDvcs = (UINT16)(pdu[off + 4] | ((UINT16)pdu[off + 5] << 8));
+		if (numDvcs > 1024)
+			return FALSE;
+		if (off + 6 + (size_t)numDvcs * 4 > len)
+			return FALSE;
+		if (tunnelType == SOFT_SYNC_TUNNEL_UDPFECR)
+			return TRUE;
+		off += 6 + (size_t)numDvcs * 4;
+	}
+	return FALSE;
+}
+
+BOOL rdpeudp_soft_sync_response_offers_udp(const BYTE* pdu, size_t len)
+{
+	UINT32 numTunnels = 0;
+	if (!pdu || (len < 6))
+		return FALSE;
+	if (((pdu[0] >> 4) & 0x0F) != SOFT_SYNC_CMD_RESPONSE)
+		return FALSE;
+	if (pdu[1] != 0x00) /* Pad */
+		return FALSE;
+	numTunnels = (UINT32)pdu[2] | ((UINT32)pdu[3] << 8) | ((UINT32)pdu[4] << 16) |
+	             ((UINT32)pdu[5] << 24);
+	if (numTunnels > 16)
+		return FALSE;
+	if (len < 6 + (size_t)numTunnels * 4)
+		return FALSE;
+	for (UINT32 i = 0; i < numTunnels; i++)
+	{
+		const size_t o = 6 + (size_t)i * 4;
+		const UINT32 tt = (UINT32)pdu[o] | ((UINT32)pdu[o + 1] << 8) |
+		                  ((UINT32)pdu[o + 2] << 16) | ((UINT32)pdu[o + 3] << 24);
+		if (tt == SOFT_SYNC_TUNNEL_UDPFECR)
+			return TRUE;
+	}
+	return FALSE;
+}
+
 /* ------------------------------------------------------------------ */
 /* ACK vector codec ([MS-RDPEUDP2] 2.2.1.2.6)                           */
 /* ------------------------------------------------------------------ */
@@ -812,6 +884,10 @@ struct rdp_udp_transport
 	UdpRecvSlot recvMap[RDPEUDP2_RECV_MAP];
 	wStream* recvStream; /* reassembled byte stream for TLS */
 	size_t recvPos;      /* read cursor inside recvStream */
+	/* Tunnel TLS byte reassembly (R3): preserves partial Tunnel DATA PDUs
+	 * across non-blocking polls. Length = buffered bytes, Position always 0
+	 * except transiently during append. */
+	wStream* tunnelBuf;
 	CRITICAL_SECTION lock;
 
 	/* TLS over UDP */
@@ -998,6 +1074,24 @@ rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port
 		free(udp);
 		return nullptr;
 	}
+	udp->tunnelBuf = Stream_New(nullptr, 131072);
+	if (!udp->tunnelBuf)
+	{
+		(void)CloseHandle(udp->udpEvent);
+		Stream_Release(udp->recvStream);
+		free(udp->hostname);
+		free(udp);
+		return nullptr;
+	}
+	if (!Stream_SetPosition(udp->tunnelBuf, 0) || !Stream_SetLength(udp->tunnelBuf, 0))
+	{
+		(void)CloseHandle(udp->udpEvent);
+		Stream_Release(udp->recvStream);
+		Stream_Release(udp->tunnelBuf);
+		free(udp->hostname);
+		free(udp);
+		return nullptr;
+	}
 
 	InitializeCriticalSection(&udp->lock);
 	return udp;
@@ -1026,6 +1120,10 @@ void rdpeudp_free(rdpUdpTransport* udp)
 	for (size_t i = 0; i < ARRAYSIZE(udp->recvMap); i++)
 		free(udp->recvMap[i].data);
 	Stream_Release(udp->recvStream);
+	udp->recvStream = nullptr;
+	if (udp->tunnelBuf)
+		Stream_Release(udp->tunnelBuf);
+	udp->tunnelBuf = nullptr;
 	if (udp->udpEvent && (udp->udpEvent != INVALID_HANDLE_VALUE))
 		(void)CloseHandle(udp->udpEvent);
 	udp->udpEvent = nullptr;
@@ -1313,6 +1411,13 @@ static wStream* rdpeudp2_build_packet_ex(rdpUdpTransport* udp, UINT16 flags, UIN
 	if (!s)
 		return nullptr;
 
+	/* encode_layout returns sealed with cursor rewound; protect requires
+	 * cursor at end (Position == Length) to append padding/prefix. */
+	if (!Stream_SetPosition(s, Stream_Length(s)))
+	{
+		Stream_Release(s);
+		return nullptr;
+	}
 	if (!rdpeudp2_protect(s, dummy))
 	{
 		Stream_Release(s);
@@ -2649,48 +2754,191 @@ SSIZE_T rdpeudp_tunnel_send_autodetect(rdpUdpTransport* udp, BYTE subHeaderType,
 	return (rc == 0) ? (SSIZE_T)pduLen : -1;
 }
 
+static SSIZE_T tls_recv_some(rdpUdpTransport* udp, BYTE* buffer, size_t len)
+{
+	WINPR_ASSERT(udp);
+	WINPR_ASSERT(udp->tls);
+	if (!buffer && (len != 0))
+		return -1;
+	if (len == 0)
+		return 0;
+	if (udp_aborted(udp))
+		return -1;
+	ERR_clear_error();
+	const int r = (len > (size_t)INT_MAX) ? INT_MAX : (int)len;
+	const int rc = BIO_read(udp->tlsBio, buffer, r);
+	if (rc > 0)
+		return rc;
+	if (!BIO_should_retry(udp->tlsBio))
+		return -1;
+	return 0; /* no data within BIO's internal wait */
+}
+
 int rdpeudp_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf, size_t subBufLen,
                              size_t* subLenOut, BYTE* payloadBuf, size_t payloadBufLen,
                              size_t* payloadLenOut, DWORD timeoutMs)
 {
-	BYTE hdr[4] = { 0 };
-	BYTE action = 0;
-	UINT16 plen = 0;
-	UINT8 hlen = 0;
-	size_t subLen = 0;
+	BYTE tmp[16384] = { 0 };
+	UINT64 deadline = 0;
 	if (!udp || !udp->tunnelEstablished)
 		return -1;
-	const SSIZE_T hr = tls_recv_all(udp, hdr, sizeof(hdr), timeoutMs);
-	if (hr == 0)
-		return 0; /* timeout, no PDU */
-	if (hr != (SSIZE_T)sizeof(hdr))
-		return -1;
-	if (!rdpemt_decode_header(hdr, sizeof(hdr), &action, &plen, &hlen))
-		return -1;
-	if (action != RDPTUNNEL_ACTION_DATA)
-		return -1;
-	if (hlen < 4)
-		return -1;
-	subLen = (size_t)hlen - 4;
-	if (subLen > subBufLen)
-		return -1;
-	if ((size_t)plen > payloadBufLen)
-		return -1;
-	if ((subLen > 0) && !subBuf)
-		return -1;
-	if (((size_t)plen > 0) && !payloadBuf)
-		return -1;
-	if ((subLen > 0) &&
-	    (tls_recv_all(udp, subBuf, subLen, timeoutMs) != (SSIZE_T)subLen))
-		return -1;
-	if (((size_t)plen > 0) &&
-	    (tls_recv_all(udp, payloadBuf, plen, timeoutMs) != (SSIZE_T)plen))
-		return -1;
-	if (subLenOut)
-		*subLenOut = subLen;
-	if (payloadLenOut)
-		*payloadLenOut = plen;
-	return 1;
+	deadline = udp_now_ms() + timeoutMs;
+
+	while (TRUE)
+	{
+		BYTE action = 0;
+		UINT16 plen = 0;
+		UINT8 hlen = 0;
+		size_t total = 0;
+		size_t subLen = 0;
+		size_t buffered = 0;
+		BYTE* base = nullptr;
+
+		/* 1. Check for a complete PDU in the reassembly buffer. */
+		EnterCriticalSection(&udp->lock);
+		if (!udp->tunnelBuf)
+		{
+			LeaveCriticalSection(&udp->lock);
+			return -1;
+		}
+		buffered = Stream_Length(udp->tunnelBuf);
+		base = Stream_Buffer(udp->tunnelBuf);
+		if (buffered >= 4 && base &&
+		    rdpemt_decode_header(base, buffered, &action, &plen, &hlen))
+		{
+			if ((action != RDPTUNNEL_ACTION_DATA) || (hlen < 4))
+			{
+				/* Corrupt stream; resync by dropping buffered bytes. */
+				(void)Stream_SetPosition(udp->tunnelBuf, 0);
+				(void)Stream_SetLength(udp->tunnelBuf, 0);
+				LeaveCriticalSection(&udp->lock);
+				return -1;
+			}
+			subLen = (size_t)hlen - 4;
+			total = (size_t)hlen + plen;
+			if (buffered >= total)
+			{
+				if ((subLen > subBufLen) || ((size_t)plen > payloadBufLen))
+				{
+					LeaveCriticalSection(&udp->lock);
+					return -1; /* caller buffers too small; preserve bytes */
+				}
+				if ((subLen > 0) && subBuf)
+					memcpy(subBuf, base + 4, subLen);
+				if (((size_t)plen > 0) && payloadBuf)
+					memcpy(payloadBuf, base + hlen, plen);
+				/* Consume total bytes from front. */
+				const size_t remain = buffered - total;
+				if (remain > 0)
+					memmove(base, base + total, remain);
+				(void)Stream_SetPosition(udp->tunnelBuf, 0);
+				(void)Stream_SetLength(udp->tunnelBuf, remain);
+				(void)Stream_SetPosition(udp->tunnelBuf, 0);
+				LeaveCriticalSection(&udp->lock);
+				if (subLenOut)
+					*subLenOut = subLen;
+				if (payloadLenOut)
+					*payloadLenOut = plen;
+				return 1;
+			}
+		}
+		else if (buffered >= 4)
+		{
+			/* Header present but undecodable -> resync. */
+			(void)Stream_SetPosition(udp->tunnelBuf, 0);
+			(void)Stream_SetLength(udp->tunnelBuf, 0);
+			LeaveCriticalSection(&udp->lock);
+			return -1;
+		}
+		/* Incomplete: capture buffered count for fast-path check below. */
+		buffered = Stream_Length(udp->tunnelBuf);
+		LeaveCriticalSection(&udp->lock);
+
+		/* 2. Timeout? Preserve progress and return "no PDU yet". */
+		if (udp_now_ms() >= deadline)
+			return 0;
+		if (udp_aborted(udp))
+			return -1;
+
+		/* 3. Fast path for non-blocking drain: if nothing is buffered in TLS
+		 * and the socket has nothing readable, avoid the BIO's internal wait
+		 * and return immediately (progress preserved in tunnelBuf). */
+		if (timeoutMs == 0)
+		{
+			BOOL tlsBuffered = FALSE;
+			BOOL sockReadable = FALSE;
+			int fd = -1;
+			EnterCriticalSection(&udp->lock);
+			if (udp->recvStream)
+				tlsBuffered = (Stream_Length(udp->recvStream) > udp->recvPos);
+			fd = udp->sockfd;
+			LeaveCriticalSection(&udp->lock);
+			if (!tlsBuffered && (buffered == 0))
+			{
+				if (fd >= 0)
+					sockReadable = freerdp_udp_wait_readable(fd, 0);
+				if (!sockReadable)
+					return 0;
+			}
+			else if (!tlsBuffered && (buffered > 0))
+			{
+				/* Partial PDU buffered but TLS has nothing new yet; still try
+				 * one read in case a record is mid-reassembly, else return. */
+				if (fd >= 0)
+					sockReadable = freerdp_udp_wait_readable(fd, 0);
+				if (!sockReadable)
+					return 0;
+			}
+		}
+
+		/* 4. Read more TLS bytes (single attempt) and append to reassembly. */
+		{
+			UINT64 now = udp_now_ms();
+			DWORD chunkWait = 0;
+			if (deadline > now)
+			{
+				UINT64 left = deadline - now;
+				chunkWait = (left > 50) ? 50 : (DWORD)left;
+				WINPR_UNUSED(chunkWait);
+			}
+			/* tls_recv_some does one BIO_read (internal ~100ms max when data
+			 * is pending; returns 0 quickly-ish otherwise). */
+			const SSIZE_T got = tls_recv_some(udp, tmp, sizeof(tmp));
+			if (got < 0)
+				return -1;
+			if (got == 0)
+			{
+				if (udp_now_ms() >= deadline)
+					return 0;
+				/* No progress; poll briefly before retrying (unless non-blocking
+				 * drain, where one attempt suffices). */
+				if (timeoutMs == 0)
+					return 0;
+				continue;
+			}
+			EnterCriticalSection(&udp->lock);
+			if (!udp->tunnelBuf)
+			{
+				LeaveCriticalSection(&udp->lock);
+				return -1;
+			}
+			if (Stream_Length(udp->tunnelBuf) + (size_t)got > (1u << 20))
+			{
+				LeaveCriticalSection(&udp->lock);
+				return -1; /* runaway peer; avoid OOM */
+			}
+			if (!Stream_SetPosition(udp->tunnelBuf, Stream_Length(udp->tunnelBuf)) ||
+			    !Stream_EnsureRemainingCapacity(udp->tunnelBuf, (size_t)got))
+			{
+				LeaveCriticalSection(&udp->lock);
+				return -1;
+			}
+			Stream_Write(udp->tunnelBuf, tmp, (size_t)got);
+			Stream_SealLength(udp->tunnelBuf);
+			(void)Stream_SetPosition(udp->tunnelBuf, 0);
+			LeaveCriticalSection(&udp->lock);
+		}
+	}
 }
 
 /* ------------------------------------------------------------------ */
@@ -2917,6 +3165,24 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 	{
 		(void)CloseHandle(udp->udpEvent);
 		Stream_Release(udp->recvStream);
+		free(udp->hostname);
+		free(udp);
+		return nullptr;
+	}
+	udp->tunnelBuf = Stream_New(nullptr, 131072);
+	if (!udp->tunnelBuf)
+	{
+		(void)CloseHandle(udp->udpEvent);
+		Stream_Release(udp->recvStream);
+		free(udp->hostname);
+		free(udp);
+		return nullptr;
+	}
+	if (!Stream_SetPosition(udp->tunnelBuf, 0) || !Stream_SetLength(udp->tunnelBuf, 0))
+	{
+		(void)CloseHandle(udp->udpEvent);
+		Stream_Release(udp->recvStream);
+		Stream_Release(udp->tunnelBuf);
 		free(udp->hostname);
 		free(udp);
 		return nullptr;

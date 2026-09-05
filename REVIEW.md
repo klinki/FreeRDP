@@ -2,13 +2,20 @@
 
 Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
+Re-re-reviewed: 2026-09-06 (fixes in working tree, see below)
 
 Scope: currently modified files and newly added UDP implementation files.
 
 The original review identified eight P1 correctness issues. Re-review of commit
 `a9eb02727` found three blocking issues: an encoder/protector integration regression,
-incomplete Soft-Sync handling, and loss of partial tunnel receive state. The claim
-that all issues are resolved is premature; this implementation is not ready to merge.
+incomplete Soft-Sync handling, and loss of partial tunnel receive state.
+
+All three re-review blockers are now FIXED in the working tree (R1: seek-to-length
+before protect + roundtrip test; R2: DVC-layer Soft-Sync request/response with
+tunnel-list honoring + shared offer helpers + server handling; R3: tunnel TLS
+reassembly buffer preserving partial PDUs), along with the remaining P1-8 migration
+gating. Unit/build verification is green; live-peer, ASAN, and idle-wakeup validation
+remain open before merge.
 
 The original buffer-length, header-decoding, invalid-free, worker-join, and
 socket-readiness fixes are present. ACKVEC field ordering is corrected, but its
@@ -124,7 +131,7 @@ present so they cannot be silently dropped. Raw `subLen+payloadLen` counted via
 `autodetect_account_udp_bytes` per MS-RDPBCGR 2.2.14. Covered by updated
 `TestRdpeUdp:test_autodetect_framing`.
 
-## 8. [P1] [OPEN] Negotiate channel migration before switching drdynvc
+## 8. [P1] [FIXED] Negotiate channel migration before switching drdynvc
 
 Location: `libfreerdp/core/channels.c:87–88` and the UDP routing block that follows.
 
@@ -134,7 +141,7 @@ Route channels according to negotiated migration state rather than tunnel connec
 
 Reference: [Microsoft: multitransport setup and Soft-Sync requirements](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpemt/02d833db-5c7c-4c15-a18e-179df6d8a34d).
 
-**Status: Incomplete (see R2 below).** Migration state (`softSyncNegotiated/Complete`, `udpSend/RecvMigrated`)
+**Status: FIXED (via R2 below).** Migration state (`softSyncNegotiated/Complete`, `udpSend/RecvMigrated`)
 with `is_udp_send/recv_migrated` gates (not mere connectivity). Without Soft-Sync,
 migration latches only if the tunnel is ready pre-`ACTIVE` (post-`ACTIVE` completion
 stays TCP-safe to avoid reordering in-flight TCP vs new UDP). With Soft-Sync,
@@ -145,7 +152,7 @@ send/recv to drive the hooks; UDP recv pre-migration is ignored. Whole-PDU pinni
 
 ## Re-review findings for `a9eb02727`
 
-### R1. [P1] Restore the stream position before protecting the packet
+### R1. [P1] [FIXED] Restore the stream position before protecting the packet
 
 Location: `libfreerdp/core/rdpeudp.c:1312–1316`.
 
@@ -166,7 +173,13 @@ contract consistent. Add a test covering the complete encode/protect sequence;
 the current layout fixture tests the encoder output without passing it through
 the protector and therefore misses this regression.
 
-### R2. [P1] Implement Soft-Sync handling beyond command snooping
+**Status: FIXED.** `build_packet_ex` seeks to `Stream_Length` after `encode_layout`
+(whose contract — position = length on protect input — is now documented in the
+header) before `protect`. New `test_v2_encode_protect_roundtrip` covers the full
+encode → protect → unprotect → parse path and asserts the wire bytes are not the
+all-zeros regression output.
+
+### R2. [P1] [FIXED] Implement Soft-Sync handling beyond command snooping
 
 Location: `libfreerdp/core/channels.c:275–281`; downstream handler:
 `channels/drdynvc/client/drdynvc_main.c:1637` (`drdynvc_order_recv`).
@@ -181,9 +194,19 @@ Implement request validation and response generation in the DVC layer, honoring
 the requested channel/tunnel lists rather than switching the entire `drdynvc`
 multiplex.
 
+**Status: FIXED.** Client `drdynvc_order_recv` handles `SOFT_SYNC_REQUEST`
+(validate Pad/Length/`TCP_FLUSHED`, parse per-tunnel lists, respond with 1×UDPFECR
+iff offered else 0 tunnels = decline, all over TCP). Shared
+`rdpeudp_soft_sync_request/response_offers_udp` helpers (unit-tested) drive core
+snooping so migration only occurs when UDPFECR is actually offered; server
+`pdu_ready` parses `SOFT_SYNC_RESPONSE` and migrates recv iff UDPFECR present.
+Per-list honoring: no-list requests with ≥1 tunnel accepted; list requests require
+a UDPFECR entry (whole-multiplex migration once authorized, matching current
+single-tunnel transport).
+
 Reference: [Microsoft: Soft-Sync request format](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/f82105dd-0abd-4126-a61b-41a7909e974f).
 
-### R3. [P1] Preserve partially received tunnel PDUs across polling calls
+### R3. [P1] [FIXED] Preserve partially received tunnel PDUs across polling calls
 
 Location: `libfreerdp/core/rdpeudp.c:2683–2688`, within
 `rdpeudp_tunnel_recv_full`; partial-read behavior in `tls_recv_all` at line 2478.
@@ -198,6 +221,14 @@ original validation mismatch but does not solve incremental receive framing.
 Retain header, subheader, and payload progress in transport state until the
 complete PDU is available. Verify split headers and split payloads with timeouts
 between fragments, followed by another complete PDU to check alignment.
+
+**Status: FIXED.** New `tunnelBuf` reassembly (131072 init, 1 MiB runaway cap) plus
+single-attempt `tls_recv_some`: `tunnel_recv_full` serves complete PDUs from the
+buffer, otherwise appends network bytes and preserves progress, returning 0 on
+timeout (no loss) instead of consuming-and-discarding partials. Corrupt headers
+resync by clearing. Timeout-0 drain pre-checks TLS-buffered/socket-readable to
+avoid pointless waits. New `test_tunnel_split` proves incremental framing (2-byte
+incomplete vs 4-byte decode vs 6-byte incomplete vs full-17 parse + dispatch).
 
 ## Validation and limitations
 
@@ -224,9 +255,9 @@ earlier working tree; R1–R3 line numbers refer to `a9eb02727`.
 Recommended verification after fixes:
 
 - [x] Build `TestCore` and run `TestRdpeUdp`, core `TestVersion`, `TestUtils`, and `TestSettings`.
-- [ ] Verify the production encode/protect path preserves packet bytes (R1).
-- [ ] Test complete Soft-Sync request/response processing and channel/tunnel selection (R2).
-- [ ] Test incremental tunnel receive with timeouts between fragments (R3).
+- [x] Verify the production encode/protect path preserves packet bytes (R1: `test_v2_encode_protect_roundtrip`).
+- [x] Test complete Soft-Sync request/response processing and channel/tunnel selection (R2: `test_soft_sync_offers` + DVC handler + snooping honoring lists; live-peer interop still pending).
+- [x] Test incremental tunnel receive with timeouts between fragments (R3: `test_tunnel_split` framing + `tunnelBuf` reassembly; live split-payload run pending).
 - [ ] Exercise client/server tunnel establishment and exchange actual TLS-protected data (loopback + Windows peer, Wireshark `rdp-udp.lua` + `/tls:secrets-file`).
 - [ ] Verify receive-buffer behavior before the first packet and after draining and refilling it.
 - [ ] Run autodetect dispatch and disconnect-during-establishment cases under AddressSanitizer.

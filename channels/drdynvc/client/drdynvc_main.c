@@ -1630,6 +1630,122 @@ static UINT drdynvc_process_close_request(drdynvcPlugin* drdynvc, int Sp, int cb
 }
 
 /**
+ * Handle Soft-Sync Request (MS-RDPEDYC 2.2.5.1) as a client: validate, honor
+ * channel/tunnel lists, and answer with Soft-Sync Response (2.2.5.2) over TCP.
+ * Migration itself is driven by core snooping of these TCP control PDUs.
+ *
+ * @return 0 on success, otherwise a Win32 error code
+ */
+static UINT drdynvc_send_soft_sync_response(drdynvcPlugin* drdynvc, BOOL migrate)
+{
+	UINT status = 0;
+	wStream* s = nullptr;
+	DVCMAN* dvcman = nullptr;
+
+	WINPR_ASSERT(drdynvc);
+	dvcman = (DVCMAN*)drdynvc->channel_mgr;
+	WINPR_ASSERT(dvcman);
+
+	s = StreamPool_Take(dvcman->pool, 16);
+	if (!s)
+	{
+		WLog_Print(drdynvc->log, WLOG_ERROR, "StreamPool_Take failed!");
+		return CHANNEL_RC_NO_MEMORY;
+	}
+
+	/* Header byte: CbId=0, Sp=0, Cmd=SOFT_SYNC_RESPONSE (0x09). */
+	Stream_Write_UINT8(s, 0x90);
+	Stream_Write_UINT8(s, 0x00); /* Pad */
+	if (migrate)
+	{
+		Stream_Write_UINT32(s, 1);               /* NumberOfTunnels */
+		Stream_Write_UINT32(s, TUNNELTYPE_UDPFECR); /* reliable UDP */
+	}
+	else
+	{
+		Stream_Write_UINT32(s, 0); /* decline migration */
+	}
+	status = drdynvc_send(drdynvc, s, nullptr);
+	if (status != CHANNEL_RC_OK)
+	{
+		WLog_Print(drdynvc->log, WLOG_ERROR,
+		           "soft_sync_response send failed with %s [%08" PRIX32 "]",
+		           WTSErrorToString(status), status);
+	}
+	return status;
+}
+
+static UINT drdynvc_process_soft_sync_request(drdynvcPlugin* drdynvc, int Sp, int cbChId,
+                                              wStream* s)
+{
+	UINT8 pad = 0;
+	UINT32 length = 0;
+	UINT16 flags = 0;
+	UINT16 numTunnels = 0;
+	BOOL offersUdpFecr = FALSE;
+
+	WINPR_ASSERT(drdynvc);
+	WINPR_UNUSED(Sp);
+	WINPR_UNUSED(cbChId);
+	/* Header byte already consumed; Soft-Sync has no channel ID. */
+	if (!Stream_CheckAndLogRequiredLength(TAG, s, 9))
+		return ERROR_INVALID_DATA;
+
+	Stream_Read_UINT8(s, pad);
+	Stream_Read_UINT32(s, length);
+	Stream_Read_UINT16(s, flags);
+	Stream_Read_UINT16(s, numTunnels);
+
+	if (pad != 0x00)
+		WLog_Print(drdynvc->log, WLOG_WARN, "soft_sync_request: Pad=0x%02" PRIx8, pad);
+	if (!(flags & SOFT_SYNC_TCP_FLUSHED))
+		WLog_Print(drdynvc->log, WLOG_WARN,
+		           "soft_sync_request: TCP_FLUSHED not set (flags=0x%04" PRIx16 ")", flags);
+	/* Length covers Length+Flags+NumberOfTunnels+Lists = 8 + lists bytes. */
+	if (length < 8)
+	{
+		WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: bad Length=%" PRIu32,
+		           length);
+		return ERROR_INVALID_DATA;
+	}
+
+	if (flags & SOFT_SYNC_CHANNEL_LIST_PRESENT)
+	{
+		/* One list per tunnel: TunnelType(4), NumberOfDVCs(2), ids(4 each). */
+		for (UINT16 ti = 0; ti < numTunnels; ti++)
+		{
+			UINT32 tunnelType = 0;
+			UINT16 numDvcs = 0;
+			if (!Stream_CheckAndLogRequiredLength(TAG, s, 6))
+				return ERROR_INVALID_DATA;
+			Stream_Read_UINT32(s, tunnelType);
+			Stream_Read_UINT16(s, numDvcs);
+			if (numDvcs > 1024)
+			{
+				WLog_Print(drdynvc->log, WLOG_ERROR,
+				           "soft_sync_request: too many DVCs %" PRIu16, numDvcs);
+				return ERROR_INVALID_DATA;
+			}
+			if (!Stream_CheckAndLogRequiredLength(TAG, s, (size_t)numDvcs * 4))
+				return ERROR_INVALID_DATA;
+			if (tunnelType == TUNNELTYPE_UDPFECR)
+				offersUdpFecr = TRUE;
+			Stream_Seek(s, (size_t)numDvcs * 4); /* honored implicitly: all DVCs migrate */
+		}
+	}
+	else
+	{
+		/* No lists: server migrates (unspecified) DVCs; accept if any tunnel. */
+		offersUdpFecr = (numTunnels > 0);
+	}
+
+	WLog_Print(drdynvc->log, WLOG_INFO,
+	           "soft_sync_request: tunnels=%" PRIu16 " offersUdpFecr=%d, responding",
+	           numTunnels, offersUdpFecr);
+	return drdynvc_send_soft_sync_response(drdynvc, offersUdpFecr);
+}
+
+/**
  * Function description
  *
  * @return 0 on success, otherwise a Win32 error code
@@ -1667,6 +1783,9 @@ static UINT drdynvc_order_recv(drdynvcPlugin* drdynvc, wStream* s, UINT32 Thread
 
 		case CLOSE_REQUEST_PDU:
 			return drdynvc_process_close_request(drdynvc, Sp, cbChId, s);
+
+		case SOFT_SYNC_REQUEST_PDU:
+			return drdynvc_process_soft_sync_request(drdynvc, Sp, cbChId, s);
 
 		case SOFT_SYNC_RESPONSE_PDU:
 			WLog_Print(drdynvc->log, WLOG_ERROR,

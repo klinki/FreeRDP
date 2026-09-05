@@ -216,14 +216,17 @@ BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_
 		flags = 0;
 	}
 
-	/* Soft-Sync migration hooks for TCP control PDUs sent above. */
+	/* Soft-Sync migration hooks for TCP control PDUs sent above. Only migrate
+	 * when UDPFECR is actually offered (honor tunnel lists). */
 	if (isSoftSyncPdu && rdp->multitransport)
 	{
 		const BOOL serverMode =
 		    freerdp_settings_get_bool(rdp->settings, FreeRDP_ServerMode);
-		if (serverMode && (softSyncCmd == DVC_CMD_SOFT_SYNC_REQUEST))
+		if (serverMode && (softSyncCmd == DVC_CMD_SOFT_SYNC_REQUEST) &&
+		    rdpeudp_soft_sync_request_offers_udp(data, size))
 			multitransport_on_soft_sync_request_sent(rdp->multitransport);
-		else if (!serverMode && (softSyncCmd == DVC_CMD_SOFT_SYNC_RESPONSE))
+		else if (!serverMode && (softSyncCmd == DVC_CMD_SOFT_SYNC_RESPONSE) &&
+		         rdpeudp_soft_sync_response_offers_udp(data, size))
 			multitransport_on_soft_sync_response_sent(rdp->multitransport);
 	}
 
@@ -273,7 +276,8 @@ BOOL freerdp_channel_process(freerdp* instance, wStream* s, UINT16 channelId, si
 	{
 		UINT8 rcmd = 0;
 		if (dvc_pdu_cmd(Stream_Pointer(s), chunkLength, &rcmd) &&
-		    (rcmd == DVC_CMD_SOFT_SYNC_REQUEST))
+		    (rcmd == DVC_CMD_SOFT_SYNC_REQUEST) &&
+		    rdpeudp_soft_sync_request_offers_udp(Stream_Pointer(s), chunkLength))
 			multitransport_on_soft_sync_request_received(
 			    instance->context->rdp->multitransport);
 	}
@@ -315,7 +319,8 @@ BOOL freerdp_channel_peer_process(freerdp_peer* client, wStream* s, UINT16 chann
 	{
 		UINT8 rcmd = 0;
 		if (dvc_pdu_cmd(Stream_Pointer(s), chunkLength, &rcmd) &&
-		    (rcmd == DVC_CMD_SOFT_SYNC_RESPONSE))
+		    (rcmd == DVC_CMD_SOFT_SYNC_RESPONSE) &&
+		    rdpeudp_soft_sync_response_offers_udp(Stream_Pointer(s), chunkLength))
 			multitransport_on_soft_sync_response_received(
 			    client->context->rdp->multitransport);
 	}

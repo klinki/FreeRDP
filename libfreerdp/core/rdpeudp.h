@@ -257,6 +257,14 @@ WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpemt_next_subheader(const BYTE* subheaders, size_t subheadersLen,
                                        size_t* offset, BYTE* subHeaderType,
                                        const BYTE** subData, size_t* subDataLen);
+/* Soft-Sync offer checks on whole DVC PDUs (header byte included, MS-RDPEDYC
+ * 2.2.5.1/2.2.5.2). TRUE iff the PDU offers TUNNELTYPE_UDPFECR (0x01):
+ * Request with no channel list and >=1 tunnel is accepted; otherwise the
+ * channel/tunnel lists must reference UDPFECR. */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_soft_sync_request_offers_udp(const BYTE* pdu, size_t len);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_soft_sync_response_offers_udp(const BYTE* pdu, size_t len);
 /* Decode a 4-byte tunnel header to learn payload/subheader lengths before the
  * rest of the PDU has been read. Unlike rdpemt_parse_header it does not
  * require the full PDU to be present. */

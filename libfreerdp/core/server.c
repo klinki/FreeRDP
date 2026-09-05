@@ -368,6 +368,41 @@ static BOOL wts_read_drdynvc_pdu_ready(rdpPeerChannel* channel, wStream* s, UINT
 	UINT32 ChannelId = 0;
 	rdpPeerChannel* dvc = nullptr;
 	wHashTable* table = nullptr;
+	if (!haveChannelId && (Cmd == SOFT_SYNC_RESPONSE_PDU))
+	{
+		/* Soft-Sync Response (MS-RDPEDYC 2.2.5.2) on the static drdynvc channel:
+		 * Pad(1), NumberOfTunnels(4), TunnelsToSwitch(4 each). Migrate recv iff
+		 * the client offers our reliable UDP tunnel. s is positioned after the
+		 * header byte. */
+		UINT8 pad = 0;
+		UINT32 numTunnels = 0;
+		BOOL offersUdpFecr = FALSE;
+		if (!Stream_CheckAndLogRequiredLength(TAG, s, 5))
+			return FALSE;
+		Stream_Read_UINT8(s, pad);
+		Stream_Read_UINT32(s, numTunnels);
+		if (numTunnels > 16)
+		{
+			WLog_ERR(TAG, "SoftSync response too many tunnels %" PRIu32, numTunnels);
+			return FALSE;
+		}
+		if (!Stream_CheckAndLogRequiredLength(TAG, s, (size_t)numTunnels * 4))
+			return FALSE;
+		for (UINT32 ti = 0; ti < numTunnels; ti++)
+		{
+			UINT32 tt = 0;
+			Stream_Read_UINT32(s, tt);
+			if (tt == TUNNELTYPE_UDPFECR)
+				offersUdpFecr = TRUE;
+		}
+		WLog_DBG(TAG, "SoftSync response tunnels=%" PRIu32 " udpFecr=%d", numTunnels,
+		         offersUdpFecr);
+		if (offersUdpFecr && channel && channel->vcm && channel->vcm->rdp &&
+		    channel->vcm->rdp->multitransport)
+			multitransport_on_soft_sync_response_received(
+			    channel->vcm->rdp->multitransport);
+		return TRUE;
+	}
 	if (haveChannelId)
 	{
 		const unsigned val = wts_read_variable_uint(s, cbChId, &ChannelId);
