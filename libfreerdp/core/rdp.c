@@ -2311,6 +2311,15 @@ int rdp_check_fds(rdpRdp* rdp)
 			return -1;
 	}
 
+	/* Drain UDP multitransport tunnel (channel data over UDP) without blocking.
+	 * Failures here must not kill TCP; just log and continue on TCP. */
+	if (rdp->multitransport)
+	{
+		const int mst = multitransport_check_fds(rdp->multitransport);
+		if (mst < 0)
+			WLog_Print(rdp->log, WLOG_WARN, "multitransport_check_fds() - %i", mst);
+	}
+
 	if (status < 0)
 		WLog_Print(rdp->log, WLOG_DEBUG, "transport_check_fds() - %i", status);
 	else
@@ -3217,6 +3226,13 @@ size_t rdp_get_event_handles(rdpRdp* rdp, HANDLE* handles, uint32_t count)
 
 	if (nCount == 0)
 		return 0;
+
+	if (rdp->multitransport)
+	{
+		HANDLE uev = multitransport_get_event(rdp->multitransport);
+		if (uev && (nCount < count))
+			handles[nCount++] = uev;
+	}
 
 	if (count < nCount + 2UL)
 		return 0;
