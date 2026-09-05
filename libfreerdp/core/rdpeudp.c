@@ -839,10 +839,13 @@ struct rdp_udp_transport
 	BOOL connected;
 	BOOL useUdp2;
 
-	/* v2 reliable state */
+	/* v2 reliable state ([MS-RDPEUDP2] reference: seq starts at 1, no ACK
+	 * until data received). */
 	UINT16 nextDataSeq;
 	UINT16 nextChannelSeq;
 	UINT16 expectedChannelSeq;
+	BOOL haveRecvChannel; /* first DATA sets expectedChannelSeq */
+	BOOL haveRecvData;    /* TRUE once any DATA received (ACK valid) */
 	UINT16 lastAckSent;
 	UINT16 lastAckReceived;
 	UINT16 lastAoaSent;
@@ -1026,10 +1029,15 @@ rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port
 	udp->negotiatedUpMtu = RDPUDP2_MTU;
 	udp->negotiatedDownMtu = RDPUDP2_MTU;
 	udp->maxPayload = RDPUDP2_MAX_PAYLOAD;
-	udp->nextDataSeq = 0;
-	udp->nextChannelSeq = 0;
-	udp->expectedChannelSeq = 0;
-	udp->recvDataBase = 0;
+	/* MS reference (Rdpeudp2ProtocolHandler) starts both seqs at 1 and sends
+	 * DATA-only until data received. 0-start + spurious ACK is ignored by our
+	 * own stack but Windows drops it (no ACK after SYN+ACK). */
+	udp->nextDataSeq = 1;
+	udp->nextChannelSeq = 1;
+	udp->expectedChannelSeq = 1;
+	udp->haveRecvChannel = FALSE;
+	udp->haveRecvData = FALSE;
+	udp->recvDataBase = 1;
 	udp->overhead = 50; /* avg RDPUDP2+UDP+IP overhead estimate */
 	udp->delayAckMax = 2;
 	udp->delayAckTimeoutMs = 50;
@@ -1425,9 +1433,10 @@ static wStream* rdpeudp2_build_packet(rdpUdpTransport* udp, UINT16 flags, UINT16
 	WINPR_UNUSED(ackExtraLen);
 	UINT16 aoa = udp->lastAckReceived;
 	BYTE overhead = udp->overhead;
-	/* Opportunistically piggyback OVERHEAD+DELAYACK on first data packets */
-	if ((flags & RDPUDP2_FLAG_DATA) && (udp->stats.sentPackets < 2))
-		flags |= (UINT16)(RDPUDP2_FLAG_OVERHEAD | RDPUDP2_FLAG_DELAYACK);
+	/* MS reference sends minimal DATA [+ACK if data received]; OVERHEAD and
+	 * DELAYACK are advisory and caused interop suspicion in captures
+	 * (first 2 pkts 0x0145 vs rest 0x0005, server silent). Drop opportunistic
+	 * piggyback until basic DATA/ACK interops. */
 	if (udp->needAoa)
 		flags |= RDPUDP2_FLAG_AOA;
 	return rdpeudp2_build_packet_ex(udp, flags, ackBase, 0, nullptr, aoa, overhead,
@@ -1549,6 +1558,14 @@ static void rdpeudp_ack_single_locked(rdpUdpTransport* udp, UINT16 dseq)
 
 static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 {
+	/* First DATA defines the base so 0-start (old) and 1-start (MS) peers
+	 * both interoperate. */
+	if (!udp->haveRecvData)
+	{
+		memset(udp->recvDataSeen, 0, sizeof(udp->recvDataSeen));
+		udp->recvDataBase = dseq;
+		udp->haveRecvData = TRUE;
+	}
 	const size_t WIN = ARRAYSIZE(udp->recvDataSeen);
 	INT16 diff = (INT16)(dseq - udp->recvDataBase);
 	if (diff < 0)
@@ -1701,6 +1718,12 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 
 			rdpeudp_note_recv_data_seq_locked(udp, dseq);
 
+			/* First DATA defines channel base (MS starts at 1, old code at 0). */
+			if (!udp->haveRecvChannel)
+			{
+				udp->expectedChannelSeq = cseq;
+				udp->haveRecvChannel = TRUE;
+			}
 			/* Deduplicate by channel seq */
 			BOOL dup = FALSE;
 			if (((INT16)(cseq - udp->expectedChannelSeq) < 0))
@@ -1783,6 +1806,17 @@ static BOOL rdpeudp2_send_ack(rdpUdpTransport* udp)
 	BOOL withOverhead = FALSE;
 
 	EnterCriticalSection(&udp->lock);
+	/* No spurious ACK before first DATA (MS reference returns null). */
+	if (!udp->haveRecvData)
+	{
+		/* Still send AOA-only? No – nothing to ack yet. */
+		BOOL needAoaOnly = udp->needAoa;
+		(void)needAoaOnly;
+		LeaveCriticalSection(&udp->lock);
+		if (ackvecBody)
+			Stream_Release(ackvecBody);
+		return FALSE;
+	}
 	/* Decide ACK vs ACKVEC based on DataSeq window gaps */
 	{
 		const size_t WIN = ARRAYSIZE(udp->recvDataSeen);
@@ -1824,8 +1858,8 @@ static BOOL rdpeudp2_send_ack(rdpUdpTransport* udp)
 		{
 			/* Contiguous: cumulative ACK of base-1 (last received contiguous) */
 			ackBase = (UINT16)(udp->recvDataBase - 1);
-			/* Fallback to lastAckSent if nothing yet (base==0 and empty) */
-			if ((udp->recvDataBase == 0) && !anySeen)
+			/* Fallback when nothing buffered (e.g., all acked). */
+			if (!anySeen)
 				ackBase = udp->lastAckSent;
 		}
 	}
@@ -2143,10 +2177,16 @@ static BOOL rdpeudp2_wait_acked(rdpUdpTransport* udp, UINT16 channelSeq, DWORD t
 					}
 					memcpy(tmp, cdata, clen);
 					const UINT16 ackBase = udp->lastAckSent;
+					const BOOL hasRecv = udp->haveRecvData;
 					LeaveCriticalSection(&udp->lock);
 
+					/* MS reference: no ACK until data received. Spurious ACK(0)
+					 * makes Windows ignore our DATA (silent after SYN+ACK). */
+					UINT16 rflags = RDPUDP2_FLAG_DATA;
+					if (hasRecv)
+						rflags |= RDPUDP2_FLAG_ACK;
 					wStream* rs = rdpeudp2_build_packet(
-					    udp, (UINT16)(RDPUDP2_FLAG_DATA | RDPUDP2_FLAG_ACK), ackBase,
+					    udp, rflags, ackBase,
 					    nullptr, 0, newDseq, cseq, tmp, clen, FALSE);
 					if (rs)
 					{
@@ -2249,9 +2289,14 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 		udp->sent[slot].retries = 0;
 		udp->sentCount++;
 		const UINT16 ackBase = udp->lastAckSent;
+		const BOOL hasRecv = udp->haveRecvData;
 		LeaveCriticalSection(&udp->lock);
 
-		wStream* pkt = rdpeudp2_build_packet(udp, RDPUDP2_FLAG_DATA | RDPUDP2_FLAG_ACK,
+		/* No spurious ACK(0) before first server DATA (see above). */
+		UINT16 sflags = RDPUDP2_FLAG_DATA;
+		if (hasRecv)
+			sflags |= RDPUDP2_FLAG_ACK;
+		wStream* pkt = rdpeudp2_build_packet(udp, sflags,
 		                                     ackBase, nullptr, 0, dseq, cseq, data + off,
 		                                     chunk, FALSE);
 		if (!pkt)
@@ -2978,6 +3023,13 @@ BOOL rdpeudp_send_keepalive(rdpUdpTransport* udp)
 
 	EnterCriticalSection(&udp->lock);
 	const BOOL useAckvec = FALSE;
+	/* No spurious ACK(0) keepalive before first server DATA. */
+	if (!udp->haveRecvData)
+	{
+		LeaveCriticalSection(&udp->lock);
+		udp->lastKeepaliveTs = udp_now_ms();
+		return TRUE;
+	}
 	UINT16 base = 0;
 	if (udp->recvDataBase != 0 || udp->recvDataSeen[0])
 		base = (UINT16)(udp->recvDataBase - 1);
