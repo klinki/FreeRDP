@@ -370,42 +370,21 @@ static BOOL wts_read_drdynvc_pdu_ready(rdpPeerChannel* channel, wStream* s, UINT
 	wHashTable* table = nullptr;
 	if (!haveChannelId && (Cmd == SOFT_SYNC_RESPONSE_PDU))
 	{
-		/* Soft-Sync Response (MS-RDPEDYC 2.2.5.2) on the static drdynvc channel:
-		 * Pad(1), NumberOfTunnels(4), TunnelsToSwitch(4 each). Migrate recv iff
-		 * the client offers our reliable UDP tunnel. s is positioned after the
-		 * header byte. */
-		UINT8 pad = 0;
-		UINT32 numTunnels = 0;
-		BOOL offersUdpFecr = FALSE;
-		if (!Stream_CheckAndLogRequiredLength(TAG, s, 5))
-			return FALSE;
-		Stream_Read_UINT8(s, pad);
-		Stream_Read_UINT32(s, numTunnels);
-		if (numTunnels > 16)
+		/* Soft-Sync Response (MS-RDPEDYC 2.2.5.2): use the shared strict
+		 * validator (U1: identical bytes as every other decision point). The
+		 * header byte was already consumed; rewind so the helper sees the
+		 * whole PDU. */
+		Stream_Rewind(s, 1);
 		{
-			WLog_ERR(TAG, "SoftSync response too many tunnels %" PRIu32, numTunnels);
-			return FALSE;
+			const BYTE* pdu = Stream_Pointer(s);
+			const size_t len = Stream_GetRemainingLength(s);
+			const BOOL offersUdpFecr = drdynvc_soft_sync_response_offers_udp(pdu, len);
+			WLog_DBG(TAG, "SoftSync response offersUdpFecr=%d", offersUdpFecr);
+			if (offersUdpFecr && channel && channel->vcm && channel->vcm->rdp &&
+			    channel->vcm->rdp->multitransport)
+				multitransport_on_soft_sync_response_received(
+				    channel->vcm->rdp->multitransport);
 		}
-		if (!Stream_CheckAndLogRequiredLength(TAG, s, (size_t)numTunnels * 4))
-			return FALSE;
-		for (UINT32 ti = 0; ti < numTunnels; ti++)
-		{
-			UINT32 tt = 0;
-			Stream_Read_UINT32(s, tt);
-			if (tt == TUNNELTYPE_UDPFECR)
-				offersUdpFecr = TRUE;
-		}
-		if (Stream_GetRemainingLength(s) != 0)
-		{
-			WLog_ERR(TAG, "SoftSync response trailing bytes");
-			return FALSE;
-		}
-		WLog_DBG(TAG, "SoftSync response tunnels=%" PRIu32 " udpFecr=%d", numTunnels,
-		         offersUdpFecr);
-		if (offersUdpFecr && channel && channel->vcm && channel->vcm->rdp &&
-		    channel->vcm->rdp->multitransport)
-			multitransport_on_soft_sync_response_received(
-			    channel->vcm->rdp->multitransport);
 		return TRUE;
 	}
 	if (haveChannelId)

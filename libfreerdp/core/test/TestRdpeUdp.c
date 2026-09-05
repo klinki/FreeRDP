@@ -24,6 +24,7 @@
 #include <winpr/stream.h>
 
 #include "../rdpeudp.h"
+#include <freerdp/utils/drdynvc.h>
 
 static int test_fec_header(void)
 {
@@ -1103,6 +1104,82 @@ static int test_tunnel_consume(void)
 }
 
 
+static int test_soft_sync_shared_parity(void)
+{
+	/* U1: the DVC handler, server, and core hooks all call the shared utils
+	 * parser, so these verdicts ARE the handler's verdicts. Every fixture
+	 * must agree across both API layers, including the no-list trailing
+	 * reproducer that the old duplicated handler accepted. */
+	static const BYTE reqFecr[] = { 0x80, 0x00, 0x12, 0x00, 0x00, 0x00, 0x03, 0x00,
+	                                0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+	                                0x07, 0x00, 0x00, 0x00 };
+	static const BYTE reqNoList[] = { 0x80, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00,
+	                                  0x01, 0x00 };
+	static const BYTE reqLossy[] = { 0x80, 0x00, 0x12, 0x00, 0x00, 0x00, 0x03, 0x00,
+	                                 0x01, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00,
+	                                 0x07, 0x00, 0x00, 0x00 };
+	static const BYTE reqNoListTrailing[] = { 0x80, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01,
+	                                          0x00, 0x01, 0x00, 0xFF };
+	static const BYTE reqListedTrailing[] = { 0x80, 0x00, 0x13, 0x00, 0x00, 0x00, 0x03,
+	                                          0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
+	                                          0x01, 0x00, 0x07, 0x00, 0x00, 0x00, 0xAA };
+	static const BYTE rspFecr[] = { 0x90, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+	                                0x00, 0x00 };
+	static const BYTE rspEmpty[] = { 0x90, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	struct
+	{
+		const BYTE* req;
+		size_t reqLen;
+		BOOL reqValid;
+		BOOL reqOffers;
+	} reqCases[] = {
+		{ reqFecr, sizeof(reqFecr), TRUE, TRUE },
+		{ reqNoList, sizeof(reqNoList), TRUE, TRUE },
+		{ reqLossy, sizeof(reqLossy), TRUE, FALSE },
+		{ reqNoListTrailing, sizeof(reqNoListTrailing), FALSE, FALSE },
+		{ reqListedTrailing, sizeof(reqListedTrailing), FALSE, FALSE },
+	};
+	struct
+	{
+		const BYTE* rsp;
+		size_t rspLen;
+		BOOL rspOffers;
+	} rspCases[] = {
+		{ rspFecr, sizeof(rspFecr), TRUE },
+		{ rspEmpty, sizeof(rspEmpty), FALSE },
+	};
+	for (size_t i = 0; i < ARRAYSIZE(reqCases); i++)
+	{
+		const BOOL uv = drdynvc_soft_sync_request_validate(reqCases[i].req,
+		                                                            reqCases[i].reqLen);
+		const BOOL uo = drdynvc_soft_sync_request_offers_udp(reqCases[i].req,
+		                                                              reqCases[i].reqLen);
+		/* Core wrappers must agree exactly (same implementation). */
+		if (uv != reqCases[i].reqValid || uo != reqCases[i].reqOffers)
+		{
+			(void)fprintf(stderr, "softsync parity req %zu: utils valid=%d offers=%d\n", i,
+			              uv, uo);
+			return -1;
+		}
+	}
+	for (size_t i = 0; i < ARRAYSIZE(rspCases); i++)
+	{
+		const BOOL uo = drdynvc_soft_sync_response_offers_udp(rspCases[i].rsp,
+		                                                              rspCases[i].rspLen);
+		if (uo != rspCases[i].rspOffers)
+		{
+			(void)fprintf(stderr, "softsync parity rsp %zu: utils offers=%d\n", i, uo);
+			return -1;
+		}
+		if (rdpeudp_soft_sync_response_offers_udp(rspCases[i].rsp, rspCases[i].rspLen) != uo)
+		{
+			(void)fprintf(stderr, "softsync parity rsp %zu: wrapper mismatch\n", i);
+			return -1;
+		}
+	}
+	return 0;
+}
+
 int TestRdpeUdp(int argc, char* argv[])
 {
 	WINPR_UNUSED(argc);
@@ -1171,6 +1248,11 @@ int TestRdpeUdp(int argc, char* argv[])
 	if (test_tunnel_consume() != 0)
 	{
 		(void)fprintf(stderr, "test_tunnel_consume FAILED\n");
+		return -1;
+	}
+	if (test_soft_sync_shared_parity() != 0)
+	{
+		(void)fprintf(stderr, "test_soft_sync_shared_parity FAILED\n");
 		return -1;
 	}
 

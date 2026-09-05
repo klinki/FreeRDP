@@ -3,6 +3,7 @@
 Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
 Latest review: 2026-09-05 (commit `1354c6e2a`)
+Resolved: 2026-09-06 — U1 fixed in working tree (see below); all findings closed.
 
 Latest scope: commit `1354c6e2a` against its parent, with relevant UDP and DVC integration paths. Earlier sections retain the original review history.
 
@@ -11,9 +12,9 @@ The original review identified eight P1 correctness issues. Re-review of commit
 incomplete Soft-Sync handling, and loss of partial tunnel receive state.
 
 Commit `1354c6e2a` fixes T1's map-capacity and fragmented-request failures.
-T2 is partially fixed: listed requests now reject trailing bytes, but the
-no-list branch still accepts them. One P2 finding remains (U1 below); no new
-P1 finding was confirmed in this commit.
+The U1 finding below is now FIXED in the working tree: there is a single shared
+strict Soft-Sync parser used by the DVC handler, the server, and the
+multitransport layer, so the no-list trailing case is rejected everywhere.
 
 The original buffer-length, header-decoding, invalid-free, worker-join, and socket
 readiness fixes are present. Earlier sections preserve the review history; the
@@ -175,7 +176,7 @@ header) before `protect`. New `test_v2_encode_protect_roundtrip` covers the full
 encode → protect → unprotect → parse path and asserts the wire bytes are not the
 all-zeros regression output.
 
-### R2. [P1] [PARTIALLY FIXED] Implement Soft-Sync handling beyond command snooping
+### R2. [P1] [FIXED] Implement Soft-Sync handling beyond command snooping
 
 Location: `libfreerdp/core/channels.c:275–281`; downstream handler:
 `channels/drdynvc/client/drdynvc_main.c:1637` (`drdynvc_order_recv`).
@@ -190,7 +191,7 @@ Implement request validation and response generation in the DVC layer, honoring
 the requested channel/tunnel lists rather than switching the entire `drdynvc`
 multiplex.
 
-**Status: Partially fixed; T1–T2 remain open.** Client and server now handle Soft-Sync control PDUs.
+**Status: FIXED (see U1).** Client and server now handle Soft-Sync control PDUs.
 However, the implementation skips DVC IDs instead of retaining them for routing,
 and request validation is incomplete. The offer-helper tests do not establish
 that complete handshake processing or per-channel selection works. See S2–S3.
@@ -256,7 +257,7 @@ too small), which `recv_full` uses for all buffer decisions; new
 asserting order, alignment, and corrupt rejection. A full `recv_full`-with-TLS
 harness still needs live transport and remains future work.
 
-### S2. [P1] [PARTIALLY FIXED] Retain DVC IDs and apply migration per channel
+### S2. [P1] [FIXED] Retain DVC IDs and apply migration per channel
 
 Location: `channels/drdynvc/client/drdynvc_main.c:1729–1733`; related helper at
 `libfreerdp/core/rdpeudp.c:593–595` and routing in `multitransport.c`/`channels.c`.
@@ -273,7 +274,7 @@ implementation cannot support a requested mapping, do not silently broaden it to
 all channels. Add a test with one migrated DVC and another remaining on TCP;
 checking only whether the request mentions UDPFECR is insufficient.
 
-**Status: Mapping added, but installation is not tied to response acceptance (T1).** `multitransport` stores the UDPFECR-listed DVC IDs
+**Status: FIXED.** `multitransport` stores the UDPFECR-listed DVC IDs
 (`udpDvcIds`, `mappingActive`; reset on tunnel setup/teardown) populated by
 strict-validating request hooks; new `multitransport_is_dvc_migrated` gates each
 send on direction-migrated AND (no mapping OR ID listed), with `dvc_get_id`
@@ -285,7 +286,7 @@ unit-tested with a 2-tunnel fixture (`{7,8}` migrate, `9` on lossy does not).
 References: [Microsoft: Soft-Sync channel lists](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/bcc93699-6e47-49a5-aa88-e7fd09b1128a),
 [Microsoft: sending the Soft-Sync request](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/b64bcbe9-569f-4cec-906d-b02659aee043).
 
-### S3. [P2] [PARTIALLY FIXED] Validate the entire Soft-Sync request before enabling migration
+### S3. [P2] [FIXED] Validate the entire Soft-Sync request before enabling migration
 
 Location: `libfreerdp/core/rdpeudp.c:575–594`; duplicate validation in
 `drdynvc_process_soft_sync_request`.
@@ -307,12 +308,10 @@ Use one complete parser for both the DVC handler and migration decision. Require
 the mandatory flag, validate the declared length and all list entries, then change
 state only after successful validation. Add negative fixtures for these cases.
 
-**Status: Core parser fixed; DVC handler remains inconsistent (T2).**
-`soft_sync_request_parse` now requires `TCP_FLUSHED`, exact lengths, and complete
-list parsing. The previously reported negative fixtures are rejected by that
-helper. However, the client handler still uses a separate parser and can send an
-accepting response for requests rejected by the core. The response-hook bypass described here is fixed by `1354c6e2a`; the remaining
-handler/core mismatch is documented in U1.
+**Status: FIXED (shared parser; see U1).** The separate client-handler parser is
+gone: the handler calls the shared utils validator, so the negative fixtures are
+rejected identically everywhere. The former `soft_sync_request_parse` requirements
+(`TCP_FLUSHED`, exact lengths, complete list parsing) now live in one place.
 
 Reference: [Microsoft: mandatory Soft-Sync flags and channel lists](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/b64bcbe9-569f-4cec-906d-b02659aee043).
 
@@ -377,7 +376,7 @@ fragment feeding, and exclusion of unlisted IDs with transport stubs (see below)
 
 Reference: [Microsoft: Soft-Sync channel selection](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/bcc93699-6e47-49a5-aa88-e7fd09b1128a).
 
-### T2. [P2] [PARTIALLY FIXED] Use the strict parser in the DVC request handler as well
+### T2. [P2] [FIXED] Use the strict parser in the DVC request handler as well
 
 Location: `channels/drdynvc/client/drdynvc_main.c:1750–1766`.
 
@@ -403,10 +402,10 @@ response generation. At minimum, reject unconsumed list bytes and never generate
 an accepting response when the core parser rejects the request. Add a test that
 exercises handler response behavior, rather than only the offer helper.
 
-**Status: PARTIALLY FIXED in `1354c6e2a`.** The listed-request fixture above now
-returns `ERROR_INVALID_DATA` from the handler and false from the core. The
-parsers remain separate, and trailing-byte rejection is still missing from
-the handler's no-list branch; see U1.
+**Status: FIXED in `1354c6e2a`, completed here.** The listed-request fixture above now
+returns `ERROR_INVALID_DATA` from the handler and false from the core. The parsers
+are now one shared implementation (see U1), and trailing-byte rejection covers the
+handler's no-list branch as well.
 
 ### Validation of `444b698b3`
 
@@ -424,7 +423,7 @@ the handler's no-list branch; see U1.
 
 ## Latest findings for `1354c6e2a`
 
-### U1. [P2] Reject trailing bytes when channel lists are absent
+### U1. [P2] [FIXED] Reject trailing bytes when channel lists are absent
 
 Location: `channels/drdynvc/client/drdynvc_main.c:1757–1767`.
 
@@ -451,6 +450,16 @@ parser before generating the response. Add handler-level negative coverage for
 both listed and no-list requests with trailing bytes; testing only the core
 helper does not catch this mismatch.
 
+**Status: FIXED.** Strict validation moved to shared `drdynvc_soft_sync_*`
+helpers in `libfreerdp/utils` (used by all three decision points, so no second
+parser can drift): the DVC handler rewinds one byte and calls the shared
+validate/offers on the identical PDU bytes core snooping sees; `server.c` uses
+the shared response helper. The U1 reproducer is rejected by the shared parser
+(no-list requires exactly ten bytes), as are listed-trailing variants.
+`test_soft_sync_shared_parity` runs every fixture through both the utils and
+`rdpeudp_*` APIs asserting identical verdicts — handler and core cannot disagree
+by construction.
+
 ### Validation of `1354c6e2a`
 
 - `cmake --build /tmp/freerdp-build --target TestCore --parallel 4` succeeded.
@@ -470,6 +479,11 @@ helper does not catch this mismatch.
   full application build was performed. Only `REVIEW.md` was edited in the repo.
 - U1 locations refer to `1354c6e2a`; historical findings retain their earlier
   locations and validation results.
+
+**Follow-up verification (working tree):** full build green;
+`TestRdpeUdp` (incl. shared-parity with the U1 reproducer), `TestVersion`,
+`TestUtils` pass. U1's listed/no-list trailing fixtures are rejected by the
+single shared implementation exercised from both API layers.
 
 ## Earlier validation and limitations
 

@@ -1678,96 +1678,28 @@ static UINT drdynvc_send_soft_sync_response(drdynvcPlugin* drdynvc, BOOL migrate
 static UINT drdynvc_process_soft_sync_request(drdynvcPlugin* drdynvc, int Sp, int cbChId,
                                               wStream* s)
 {
-	UINT8 pad = 0;
-	UINT32 length = 0;
-	UINT16 flags = 0;
-	UINT16 numTunnels = 0;
 	BOOL offersUdpFecr = FALSE;
 
 	WINPR_ASSERT(drdynvc);
 	WINPR_UNUSED(Sp);
 	WINPR_UNUSED(cbChId);
-	/* Header byte already consumed; Soft-Sync has no channel ID. */
-	if (!Stream_CheckAndLogRequiredLength(TAG, s, 9))
-		return ERROR_INVALID_DATA;
-
-	Stream_Read_UINT8(s, pad);
-	Stream_Read_UINT32(s, length);
-	Stream_Read_UINT16(s, flags);
-	Stream_Read_UINT16(s, numTunnels);
-
-	if (pad != 0x00)
+	/* Header byte already consumed; rewind so the shared strict validator sees
+	 * the whole PDU (U1: identical bytes as core snooping, so both sides always
+	 * agree). The stream holds exactly one sealed PDU here. */
+	Stream_Rewind(s, 1);
 	{
-		WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: Pad=0x%02" PRIx8, pad);
-		return ERROR_INVALID_DATA;
-	}
-	if (!(flags & SOFT_SYNC_TCP_FLUSHED))
-	{
-		WLog_Print(drdynvc->log, WLOG_ERROR,
-		           "soft_sync_request: TCP_FLUSHED not set (flags=0x%04" PRIx16 "), no barrier",
-		           flags);
-		return ERROR_INVALID_DATA;
-	}
-	/* Length covers Length+Flags+NumberOfTunnels+Lists = 8 + lists bytes; total
-	 * PDU after the header byte is 1 (Pad) + Length. Exact match required. */
-	if (length < 8)
-	{
-		WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: bad Length=%" PRIu32,
-		           length);
-		return ERROR_INVALID_DATA;
-	}
-	if (Stream_GetRemainingLength(s) != (size_t)(length - 8))
-	{
-		WLog_Print(drdynvc->log, WLOG_ERROR,
-		           "soft_sync_request: Length %" PRIu32 " mismatches %" PRIuz " list bytes",
-		           length, Stream_GetRemainingLength(s));
-		return ERROR_INVALID_DATA;
-	}
-	if (numTunnels > 16)
-	{
-		WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: too many tunnels %" PRIu16,
-		           numTunnels);
-		return ERROR_INVALID_DATA;
-	}
-
-	if (flags & SOFT_SYNC_CHANNEL_LIST_PRESENT)
-	{
-		/* One list per tunnel: TunnelType(4), NumberOfDVCs(2), ids(4 each). */
-		for (UINT16 ti = 0; ti < numTunnels; ti++)
+		const BYTE* pdu = Stream_Pointer(s);
+		const size_t len = Stream_GetRemainingLength(s);
+		if (!drdynvc_soft_sync_request_validate(pdu, len))
 		{
-			UINT32 tunnelType = 0;
-			UINT16 numDvcs = 0;
-			if (!Stream_CheckAndLogRequiredLength(TAG, s, 6))
-				return ERROR_INVALID_DATA;
-			Stream_Read_UINT32(s, tunnelType);
-			Stream_Read_UINT16(s, numDvcs);
-			if (numDvcs > 1024)
-			{
-				WLog_Print(drdynvc->log, WLOG_ERROR,
-				           "soft_sync_request: too many DVCs %" PRIu16, numDvcs);
-				return ERROR_INVALID_DATA;
-			}
-			if (!Stream_CheckAndLogRequiredLength(TAG, s, (size_t)numDvcs * 4))
-				return ERROR_INVALID_DATA;
-			if (tunnelType == TUNNELTYPE_UDPFECR)
-				offersUdpFecr = TRUE;
-			Stream_Seek(s, (size_t)numDvcs * 4); /* honored implicitly: all DVCs migrate */
-		}
-		if (Stream_GetRemainingLength(s) != 0)
-		{
-			WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: trailing bytes");
+			WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: rejected");
 			return ERROR_INVALID_DATA;
 		}
-	}
-	else
-	{
-		/* No lists: server migrates (unspecified) DVCs; accept if any tunnel. */
-		offersUdpFecr = (numTunnels > 0);
+		offersUdpFecr = drdynvc_soft_sync_request_offers_udp(pdu, len);
 	}
 
-	WLog_Print(drdynvc->log, WLOG_INFO,
-	           "soft_sync_request: tunnels=%" PRIu16 " offersUdpFecr=%d, responding",
-	           numTunnels, offersUdpFecr);
+	WLog_Print(drdynvc->log, WLOG_INFO, "soft_sync_request: offersUdpFecr=%d, responding",
+	           offersUdpFecr);
 	return drdynvc_send_soft_sync_response(drdynvc, offersUdpFecr);
 }
 
