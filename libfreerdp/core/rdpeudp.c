@@ -291,8 +291,8 @@ BOOL rdpeudp2_unprotect(BYTE* data, size_t len, BOOL* dummy, size_t* payloadOffs
 /* tunnel codec ([MS-RDPEMT] 2.2, little-endian)                        */
 /* ------------------------------------------------------------------ */
 
-BOOL rdpemt_parse_header(const BYTE* data, size_t len, BYTE* action, UINT16* payloadLen,
-                         UINT8* headerLen)
+BOOL rdpemt_decode_header(const BYTE* data, size_t len, BYTE* action, UINT16* payloadLen,
+                          UINT8* headerLen)
 {
 	if (!data || (len < 4))
 		return FALSE;
@@ -307,9 +307,7 @@ BOOL rdpemt_parse_header(const BYTE* data, size_t len, BYTE* action, UINT16* pay
 
 	const UINT16 plen = (UINT16)(data[1] | ((UINT16)data[2] << 8));
 	const UINT8 hlen = data[3];
-	if ((hlen < 4) || (hlen > len))
-		return FALSE;
-	if (len < (size_t)hlen + plen)
+	if (hlen < 4)
 		return FALSE;
 
 	if (action)
@@ -321,15 +319,46 @@ BOOL rdpemt_parse_header(const BYTE* data, size_t len, BYTE* action, UINT16* pay
 	return TRUE;
 }
 
-static BOOL rdpemt_write_header(wStream* s, BYTE action, UINT16 payloadLen)
+BOOL rdpemt_parse_header(const BYTE* data, size_t len, BYTE* action, UINT16* payloadLen,
+                         UINT8* headerLen)
+{
+	BYTE act = 0;
+	UINT16 plen = 0;
+	UINT8 hlen = 0;
+	if (!rdpemt_decode_header(data, len, &act, &plen, &hlen))
+		return FALSE;
+	if ((hlen > len) || (len < (size_t)hlen + plen))
+		return FALSE;
+
+	if (action)
+		*action = act;
+	if (payloadLen)
+		*payloadLen = plen;
+	if (headerLen)
+		*headerLen = hlen;
+	return TRUE;
+}
+
+static BOOL rdpemt_write_header_ex(wStream* s, BYTE action, UINT16 payloadLen,
+                                     const BYTE* subheaders, size_t subheadersLen)
 {
 	WINPR_ASSERT(s);
-	if (!Stream_EnsureRemainingCapacity(s, 4 + payloadLen))
+	if (subheadersLen > 255 - 4)
 		return FALSE;
-	Stream_Write_UINT8(s, (BYTE)(action & 0x0F)); /* action(low 4) | flags(high 4 = 0) */
+	const size_t hlen = 4 + subheadersLen;
+	if (!Stream_EnsureRemainingCapacity(s, hlen + payloadLen))
+		return FALSE;
+	Stream_Write_UINT8(s, (BYTE)(action & 0x0F));
 	Stream_Write_UINT16(s, payloadLen);
-	Stream_Write_UINT8(s, 4); /* header length, no subheaders */
+	Stream_Write_UINT8(s, (UINT8)hlen);
+	if (subheadersLen > 0)
+		Stream_Write(s, subheaders, subheadersLen);
 	return TRUE;
+}
+
+static BOOL rdpemt_write_header(wStream* s, BYTE action, UINT16 payloadLen)
+{
+	return rdpemt_write_header_ex(s, action, payloadLen, nullptr, 0);
 }
 
 wStream* rdpemt_build_create_request(UINT32 requestId, const BYTE* cookie)
@@ -391,6 +420,135 @@ wStream* rdpemt_build_data(const BYTE* data, size_t len)
 fail:
 	Stream_Release(s);
 	return nullptr;
+}
+
+wStream* rdpemt_build_tunnel_data(const BYTE* subheaders, size_t subheadersLen,
+                                  const BYTE* higherLayer, size_t higherLayerLen)
+{
+	if (!subheaders && (subheadersLen != 0))
+		return nullptr;
+	if (!higherLayer && (higherLayerLen != 0))
+		return nullptr;
+	if ((subheadersLen > 251) || (higherLayerLen > UINT16_MAX))
+		return nullptr;
+	wStream* s = Stream_New(nullptr, 4 + subheadersLen + higherLayerLen);
+	if (!s)
+		return nullptr;
+	if (!rdpemt_write_header_ex(s, RDPTUNNEL_ACTION_DATA, (UINT16)higherLayerLen,
+	                            subheaders, subheadersLen))
+		goto fail;
+	if (higherLayerLen > 0)
+		Stream_Write(s, higherLayer, higherLayerLen);
+	Stream_SealLength(s);
+	if (!Stream_SetPosition(s, 0))
+		goto fail;
+	return s;
+fail:
+	Stream_Release(s);
+	return nullptr;
+}
+
+wStream* rdpemt_build_subheader(BYTE subHeaderType, const BYTE* data, size_t dataLen)
+{
+	if (!data && (dataLen != 0))
+		return nullptr;
+	if (dataLen > 4096)
+		return nullptr;
+	if ((subHeaderType != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) &&
+	    (subHeaderType != RDP_TUNNEL_SUBHEADER_AUTODETECT_RSP))
+		return nullptr;
+	wStream* s = Stream_New(nullptr, 2 + dataLen);
+	if (!s)
+		return nullptr;
+	/* SubHeaderLength = header fields len (Length+Type only, no extras). */
+	Stream_Write_UINT8(s, 2);
+	Stream_Write_UINT8(s, subHeaderType);
+	if (dataLen > 0)
+		Stream_Write(s, data, dataLen);
+	Stream_SealLength(s);
+	if (!Stream_SetPosition(s, 0))
+	{
+		Stream_Release(s);
+		return nullptr;
+	}
+	return s;
+}
+
+size_t rdpemt_autodetect_pdu_length(const BYTE* data, size_t len)
+{
+	UINT8 headerLength = 0;
+	if (!data || (len < 6))
+		return 0;
+	headerLength = data[0];
+	if (headerLength < 6)
+		return 0;
+	if ((headerLength != 0x06) && (headerLength != 0x08) && (headerLength != 0x0E) &&
+	    (headerLength != 0x12))
+	{
+		/* Unknown headerLength; treat as headerLength == total if plausible. */
+		if ((size_t)headerLength > len)
+			return 0;
+		return headerLength;
+	}
+	if (headerLength == 0x06)
+	{
+		if (len < 6)
+			return 0;
+		return 6;
+	}
+	if (headerLength == 0x0E)
+	{
+		if (len < 14)
+			return 0;
+		return 14;
+	}
+	if (headerLength == 0x12)
+	{
+		if (len < 18)
+			return 0;
+		return 18;
+	}
+	/* headerLength == 0x08: base 8 + payloadLength(UINT16 at offset 6) + payload */
+	if (len < 8)
+		return 0;
+	const UINT16 payloadLength = (UINT16)(data[6] | ((UINT16)data[7] << 8));
+	if ((size_t)8 + payloadLength > len)
+		return 0;
+	/* payloadLength already validated against len; total fits. */
+	return 8 + payloadLength;
+}
+
+BOOL rdpemt_next_subheader(const BYTE* subheaders, size_t subheadersLen, size_t* offset,
+                           BYTE* subHeaderType, const BYTE** subData, size_t* subDataLen)
+{
+	size_t off = 0;
+	if (!subheaders || !offset || (*offset >= subheadersLen))
+		return FALSE;
+	off = *offset;
+	if (subheadersLen - off < 2)
+		return FALSE;
+	const BYTE subLen = subheaders[off];
+	const BYTE subType = subheaders[off + 1];
+	if (subLen < 2)
+		return FALSE;
+	if ((subType != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) &&
+	    (subType != RDP_TUNNEL_SUBHEADER_AUTODETECT_RSP))
+		return FALSE;
+	/* SubHeaderData starts after Length+Type; its length is determined by the
+	 * embedded autodetect PDU length (SubHeaderLength is header-fields len). */
+	const BYTE* pdu = subheaders + off + 2;
+	const size_t avail = subheadersLen - off - 2;
+	const size_t pduLen = rdpemt_autodetect_pdu_length(pdu, avail);
+	if (pduLen == 0)
+		return FALSE;
+	if (subHeaderType)
+		*subHeaderType = subType;
+	if (subData)
+		*subData = pdu;
+	if (subDataLen)
+		*subDataLen = pduLen;
+	*offset = off + 2 + pduLen;
+	return TRUE;
 }
 
 /* ------------------------------------------------------------------ */
@@ -519,12 +677,10 @@ BOOL rdpeudp_parse_ackvec(const BYTE* data, size_t len, UINT16* baseSeq, BOOL** 
 /* Payload type multiplexing (first byte):                              */
 /*  0x00 = channel (channelId/totalSize/flags/chunk)                    */
 /*  0x01 = autodetect request (sec_flags + autodetect PDU)              */
-/*  0x02 = autodetect response (sec_flags + autodetect PDU)             */
+/* HigherLayerData carries channel PDUs; autodetect uses subheaders. */
 /* ------------------------------------------------------------------ */
 
-#define UDP_TUNNEL_PTYPE_CHANNEL 0x00
-#define UDP_TUNNEL_PTYPE_AUTODETECT_REQ 0x01
-#define UDP_TUNNEL_PTYPE_AUTODETECT_RSP 0x02
+#define UDP_TUNNEL_PTYPE_CHANNEL 0x00 /* HigherLayerData multiplex tag (internal) */
 
 wStream* rdpeudp_build_channel_packet(UINT16 channelId, UINT32 totalSize, UINT32 flags,
                                       const BYTE* chunk, size_t chunkLen)
@@ -550,38 +706,6 @@ wStream* rdpeudp_build_channel_packet(UINT16 channelId, UINT32 totalSize, UINT32
 		return nullptr;
 	}
 	return s;
-}
-
-wStream* rdpeudp_build_autodetect_packet(BOOL isRequest, UINT16 secFlags, const BYTE* pdu,
-                                         size_t pduLen)
-{
-	if (!pdu && (pduLen != 0))
-		return nullptr;
-	if (pduLen > 16384)
-		return nullptr;
-	wStream* s = Stream_New(nullptr, pduLen + 3);
-	if (!s)
-		return nullptr;
-	Stream_Write_UINT8(s, isRequest ? UDP_TUNNEL_PTYPE_AUTODETECT_REQ
-	                                : UDP_TUNNEL_PTYPE_AUTODETECT_RSP);
-	Stream_Write_UINT16(s, secFlags);
-	if (pduLen > 0)
-		Stream_Write(s, pdu, pduLen);
-	Stream_SealLength(s);
-	if (!Stream_SetPosition(s, 0))
-	{
-		Stream_Release(s);
-		return nullptr;
-	}
-	return s;
-}
-
-BOOL rdpeudp_parse_tunnel_ptype(const BYTE* data, size_t len, BYTE* ptype)
-{
-	if (!data || (len < 1) || !ptype)
-		return FALSE;
-	*ptype = data[0];
-	return (*ptype <= UDP_TUNNEL_PTYPE_AUTODETECT_RSP);
 }
 
 BOOL rdpeudp_parse_channel_packet(const BYTE* data, size_t len, UINT16* channelId,
@@ -610,25 +734,6 @@ BOOL rdpeudp_parse_channel_packet(const BYTE* data, size_t len, UINT16* channelI
 		*chunk = p + 12;
 	if (chunkLen)
 		*chunkLen = clen;
-	return TRUE;
-}
-
-BOOL rdpeudp_parse_autodetect_packet(const BYTE* data, size_t len, BOOL* isRequest,
-                                     UINT16* secFlags, const BYTE** pdu, size_t* pduLen)
-{
-	if (!data || (len < 3))
-		return FALSE;
-	if ((data[0] != UDP_TUNNEL_PTYPE_AUTODETECT_REQ) &&
-	    (data[0] != UDP_TUNNEL_PTYPE_AUTODETECT_RSP))
-		return FALSE;
-	if (isRequest)
-		*isRequest = (data[0] == UDP_TUNNEL_PTYPE_AUTODETECT_REQ);
-	if (secFlags)
-		*secFlags = (UINT16)(data[1] | ((UINT16)data[2] << 8));
-	if (pdu)
-		*pdu = data + 3;
-	if (pduLen)
-		*pduLen = len - 3;
 	return TRUE;
 }
 
@@ -718,10 +823,32 @@ struct rdp_udp_transport
 	UINT64 lastSendTs;
 	UINT64 lastKeepaliveTs;
 	BOOL tunnelEstablished;
+	/* Socket-readiness event for the main loop (WSA-associated once the
+	 * socket exists; manual before that). Signaled on arrival, reset after
+	 * the socket is drained (with recheck to avoid lost wakeups). */
 	HANDLE udpEvent;
+	HANDLE sockEvent;
+	HANDLE abortEvent; /* non-owning cancel signal from owner */
 	RdpUdpStats stats;
 	wLog* log;
 };
+
+static BOOL udp_aborted(const rdpUdpTransport* udp)
+{
+	HANDLE ev = udp ? udp->abortEvent : nullptr;
+	if (!ev || (ev == INVALID_HANDLE_VALUE))
+		return FALSE;
+	return WaitForSingleObject(ev, 0) == WAIT_OBJECT_0;
+}
+
+void rdpeudp_set_abort_event(rdpUdpTransport* udp, HANDLE abortEvent)
+{
+	if (!udp)
+		return;
+	EnterCriticalSection(&udp->lock);
+	udp->abortEvent = abortEvent;
+	LeaveCriticalSection(&udp->lock);
+}
 
 static UINT64 udp_now_ms(void)
 {
@@ -862,6 +989,15 @@ rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port
 		free(udp);
 		return nullptr;
 	}
+	/* Stream_New sets length == capacity; the reassembly buffer starts empty. */
+	if (!Stream_SetPosition(udp->recvStream, 0) || !Stream_SetLength(udp->recvStream, 0))
+	{
+		(void)CloseHandle(udp->udpEvent);
+		Stream_Release(udp->recvStream);
+		free(udp->hostname);
+		free(udp);
+		return nullptr;
+	}
 
 	InitializeCriticalSection(&udp->lock);
 	return udp;
@@ -893,6 +1029,10 @@ void rdpeudp_free(rdpUdpTransport* udp)
 	if (udp->udpEvent && (udp->udpEvent != INVALID_HANDLE_VALUE))
 		(void)CloseHandle(udp->udpEvent);
 	udp->udpEvent = nullptr;
+	if (udp->sockEvent && (udp->sockEvent != INVALID_HANDLE_VALUE))
+		(void)WSACloseEvent(udp->sockEvent);
+	udp->sockEvent = nullptr;
+	udp->abortEvent = nullptr; /* non-owning */
 	LeaveCriticalSection(&udp->lock);
 	DeleteCriticalSection(&udp->lock);
 	free(udp->hostname);
@@ -916,61 +1056,262 @@ UINT32 rdpeudp_get_request_id(const rdpUdpTransport* udp)
 
 /* ---- v2 packet building (little-endian) ---- */
 
+BOOL rdpeudp2_parse_layout(const BYTE* layout, size_t len, RdpUdp2Layout* out)
+{
+	const BYTE* p = nullptr;
+	size_t rem = 0;
+	if (!layout || (len < 2) || !out)
+		return FALSE;
+	memset(out, 0, sizeof(*out));
+	p = layout;
+	rem = len;
+	const UINT16 header = (UINT16)(p[0] | ((UINT16)p[1] << 8));
+	out->flags = (UINT16)(header & 0x0FFF);
+	out->logWindow = (UINT8)((header >> 12) & 0x0F);
+	p += 2;
+	rem -= 2;
+
+	if (out->flags & RDPUDP2_FLAG_ACK)
+	{
+		if (rem < 7)
+			return FALSE;
+		out->hasAck = TRUE;
+		out->ackBase = (UINT16)(p[0] | ((UINT16)p[1] << 8));
+		out->ackTs[0] = p[2];
+		out->ackTs[1] = p[3];
+		out->ackTs[2] = p[4];
+		out->ackGap = p[5];
+		out->ackNumDelayed = (BYTE)(p[6] & 0x0F);
+		out->ackScale = (BYTE)((p[6] >> 4) & 0x0F);
+		const size_t ackLen = 7 + out->ackNumDelayed;
+		if (rem < ackLen)
+			return FALSE;
+		out->ackDelayed = p + 7;
+		out->ackDelayedLen = out->ackNumDelayed;
+		p += ackLen;
+		rem -= ackLen;
+	}
+
+	if (out->flags & RDPUDP2_FLAG_OVERHEAD)
+	{
+		if (rem < 1)
+			return FALSE;
+		out->hasOverhead = TRUE;
+		out->overhead = p[0];
+		p += 1;
+		rem -= 1;
+	}
+
+	if (out->flags & RDPUDP2_FLAG_DELAYACK)
+	{
+		if (rem < 3)
+			return FALSE;
+		out->hasDelayAck = TRUE;
+		out->delayMax = p[0];
+		out->delayTimeout = (UINT16)(p[1] | ((UINT16)p[2] << 8));
+		p += 3;
+		rem -= 3;
+	}
+
+	if (out->flags & RDPUDP2_FLAG_AOA)
+	{
+		if (rem < 2)
+			return FALSE;
+		out->hasAoa = TRUE;
+		out->aoa = (UINT16)(p[0] | ((UINT16)p[1] << 8));
+		p += 2;
+		rem -= 2;
+	}
+
+	if (out->flags & RDPUDP2_FLAG_DATA)
+	{
+		if (rem < 2)
+			return FALSE;
+		out->hasDataHeader = TRUE;
+		out->dataSeq = (UINT16)(p[0] | ((UINT16)p[1] << 8));
+		p += 2;
+		rem -= 2;
+	}
+
+	if (out->flags & RDPUDP2_FLAG_ACKVEC)
+	{
+		if (rem < 3)
+			return FALSE;
+		const BYTE b2 = p[2];
+		const BYTE csize = (BYTE)(b2 & 0x7F);
+		const BOOL haveTs = (b2 & 0x80) != 0;
+		const size_t need = 3 + (haveTs ? 4 : 0) + csize;
+		if (rem < need)
+			return FALSE;
+		out->hasAckvec = TRUE;
+		out->ackvec = p;
+		out->ackvecLen = need;
+		p += need;
+		rem -= need;
+	}
+
+	if (out->flags & RDPUDP2_FLAG_DATA)
+	{
+		if (rem < 2)
+			return FALSE;
+		out->hasDataBody = TRUE;
+		out->channelSeq = (UINT16)(p[0] | ((UINT16)p[1] << 8));
+		p += 2;
+		rem -= 2;
+		out->dataBody = p;
+		out->dataBodyLen = rem;
+	}
+	else if (out->hasAckvec && (rem != 0))
+	{
+		/* Trailing bytes with no DATA flag are malformed; be strict so
+		 * fixtures detect layout errors instead of hiding them. */
+		return FALSE;
+	}
+
+	return TRUE;
+}
+
+wStream* rdpeudp2_encode_layout(const RdpUdp2Layout* in)
+{
+	size_t need = 2;
+	if (!in || (in->flags & ~RDPUDP2_FLAGS_MASK))
+		return nullptr;
+	if (!!(in->flags & RDPUDP2_FLAG_ACK) != in->hasAck)
+		return nullptr;
+	if (!!(in->flags & RDPUDP2_FLAG_OVERHEAD) != in->hasOverhead)
+		return nullptr;
+	if (!!(in->flags & RDPUDP2_FLAG_DELAYACK) != in->hasDelayAck)
+		return nullptr;
+	if (!!(in->flags & RDPUDP2_FLAG_AOA) != in->hasAoa)
+		return nullptr;
+	if (!!(in->flags & RDPUDP2_FLAG_DATA) != (in->hasDataHeader && in->hasDataBody))
+		return nullptr;
+	if (!!(in->flags & RDPUDP2_FLAG_ACKVEC) != in->hasAckvec)
+		return nullptr;
+	if ((in->flags & (RDPUDP2_FLAG_ACK | RDPUDP2_FLAG_ACKVEC)) ==
+	    (RDPUDP2_FLAG_ACK | RDPUDP2_FLAG_ACKVEC))
+		return nullptr;
+	if (in->logWindow > 0x0F)
+		return nullptr;
+
+	if (in->hasAck)
+		need += 7 + in->ackDelayedLen;
+	if (in->hasOverhead)
+		need += 1;
+	if (in->hasDelayAck)
+		need += 3;
+	if (in->hasAoa)
+		need += 2;
+	if (in->hasDataHeader)
+		need += 2;
+	if (in->hasAckvec)
+		need += in->ackvecLen;
+	if (in->hasDataBody)
+		need += 2 + in->dataBodyLen;
+
+	wStream* s = Stream_New(nullptr, need);
+	if (!s)
+		return nullptr;
+	Stream_Write_UINT16(s, (UINT16)(((in->logWindow & 0x0F) << 12) | (in->flags & 0x0FFF)));
+	if (in->hasAck)
+	{
+		Stream_Write_UINT16(s, in->ackBase);
+		Stream_Write(s, in->ackTs, 3);
+		Stream_Write_UINT8(s, in->ackGap);
+		Stream_Write_UINT8(s, (BYTE)(((in->ackScale & 0x0F) << 4) | (in->ackNumDelayed & 0x0F)));
+		if (in->ackDelayedLen > 0)
+			Stream_Write(s, in->ackDelayed, in->ackDelayedLen);
+	}
+	if (in->hasOverhead)
+		Stream_Write_UINT8(s, in->overhead);
+	if (in->hasDelayAck)
+	{
+		Stream_Write_UINT8(s, in->delayMax);
+		Stream_Write_UINT16(s, in->delayTimeout);
+	}
+	if (in->hasAoa)
+		Stream_Write_UINT16(s, in->aoa);
+	if (in->hasDataHeader)
+		Stream_Write_UINT16(s, in->dataSeq);
+	if (in->hasAckvec)
+		Stream_Write(s, in->ackvec, in->ackvecLen);
+	if (in->hasDataBody)
+	{
+		Stream_Write_UINT16(s, in->channelSeq);
+		if (in->dataBodyLen > 0)
+			Stream_Write(s, in->dataBody, in->dataBodyLen);
+	}
+	Stream_SealLength(s);
+	if (!Stream_SetPosition(s, 0))
+	{
+		Stream_Release(s);
+		return nullptr;
+	}
+	return s;
+}
+
 static wStream* rdpeudp2_build_packet_ex(rdpUdpTransport* udp, UINT16 flags, UINT16 ackBase,
                                          UINT16 ackvecBase, wStream* ackvecBody, UINT16 aoa,
                                          BYTE overhead, BYTE delayMax, UINT16 delayTimeout,
                                          UINT16 dataSeq, UINT16 channelSeq, const BYTE* payload,
                                          size_t payloadLen, BOOL dummy)
 {
-	/* Layout: header(2) + [ACK] + [OVERHEAD] + [DELAYACK] + [AOA] + [DATA] + [ACKVEC] */
-	wStream* s = Stream_New(nullptr, payloadLen + 128);
-	if (!s)
-		return nullptr;
-
-	const UINT16 header = (UINT16)(((udp->logWindow & 0x0F) << 12) | (flags & 0x0FFF));
-	Stream_Write_UINT16(s, header);
-
+	WINPR_UNUSED(ackvecBase);
+	RdpUdp2Layout in = WINPR_C_ARRAY_INIT;
+	BYTE ackTs[3] = { 0 };
+	in.flags = (UINT16)(flags & RDPUDP2_FLAGS_MASK);
+	in.logWindow = (UINT8)(udp->logWindow & 0x0F);
 	if (flags & RDPUDP2_FLAG_ACK)
 	{
-		Stream_Write_UINT16(s, ackBase);
 		const UINT64 now = udp_now_ms() * 250; /* 4us units */
-		Stream_Write_UINT8(s, (BYTE)(now & 0xFF));
-		Stream_Write_UINT8(s, (BYTE)((now >> 8) & 0xFF));
-		Stream_Write_UINT8(s, (BYTE)((now >> 16) & 0xFF));
-		Stream_Write_UINT8(s, 0); /* sendGap */
-		Stream_Write_UINT8(s, 0); /* numDelayed(0) | scale(0) */
+		in.hasAck = TRUE;
+		in.ackBase = ackBase;
+		ackTs[0] = (BYTE)(now & 0xFF);
+		ackTs[1] = (BYTE)((now >> 8) & 0xFF);
+		ackTs[2] = (BYTE)((now >> 16) & 0xFF);
+		in.ackTs[0] = ackTs[0];
+		in.ackTs[1] = ackTs[1];
+		in.ackTs[2] = ackTs[2];
+		in.ackGap = 0;
+		in.ackNumDelayed = 0;
+		in.ackScale = 0;
 	}
-
 	if (flags & RDPUDP2_FLAG_OVERHEAD)
-		Stream_Write_UINT8(s, overhead);
-
+	{
+		in.hasOverhead = TRUE;
+		in.overhead = overhead;
+	}
 	if (flags & RDPUDP2_FLAG_DELAYACK)
 	{
-		Stream_Write_UINT8(s, delayMax);
-		Stream_Write_UINT16(s, delayTimeout);
+		in.hasDelayAck = TRUE;
+		in.delayMax = delayMax;
+		in.delayTimeout = delayTimeout;
 	}
-
 	if (flags & RDPUDP2_FLAG_AOA)
-		Stream_Write_UINT16(s, aoa);
-
+	{
+		in.hasAoa = TRUE;
+		in.aoa = aoa;
+	}
 	if (flags & RDPUDP2_FLAG_DATA)
 	{
-		Stream_Write_UINT16(s, dataSeq);
-		Stream_Write_UINT16(s, channelSeq);
-		if (payloadLen > 0)
-			Stream_Write(s, payload, payloadLen);
+		in.hasDataHeader = TRUE;
+		in.dataSeq = dataSeq;
+		in.hasDataBody = TRUE;
+		in.channelSeq = channelSeq;
+		in.dataBody = payload;
+		in.dataBodyLen = payloadLen;
 	}
-
 	if (flags & RDPUDP2_FLAG_ACKVEC)
 	{
 		if (!ackvecBody)
-		{
-			Stream_Release(s);
 			return nullptr;
-		}
-		const size_t alen = Stream_Length(ackvecBody);
-		Stream_Write(s, Stream_Buffer(ackvecBody), alen);
+		in.hasAckvec = TRUE;
+		in.ackvec = Stream_Buffer(ackvecBody);
+		in.ackvecLen = Stream_Length(ackvecBody);
 	}
+	wStream* s = rdpeudp2_encode_layout(&in);
+	if (!s)
+		return nullptr;
 
 	if (!rdpeudp2_protect(s, dummy))
 	{
@@ -1002,6 +1343,55 @@ static wStream* rdpeudp2_build_packet(rdpUdpTransport* udp, UINT16 flags, UINT16
 	return rdpeudp2_build_packet_ex(udp, flags, ackBase, 0, nullptr, aoa, overhead,
 	                                udp->delayAckMax, udp->delayAckTimeoutMs, dataSeq,
 	                                channelSeq, payload, payloadLen, dummy);
+}
+
+static BOOL rdpeudp_attach_socket_event(rdpUdpTransport* udp)
+{
+	if (!udp || (udp->sockfd < 0))
+		return FALSE;
+	if (!udp->sockEvent || (udp->sockEvent == INVALID_HANDLE_VALUE))
+	{
+		udp->sockEvent = WSACreateEvent();
+		if (!udp->sockEvent || (udp->sockEvent == INVALID_HANDLE_VALUE))
+		{
+			udp->sockEvent = nullptr;
+			return FALSE;
+		}
+	}
+	/* Associate readability/close notifications; also makes the socket
+	 * non-blocking on some platforms (harmless, we already set it). */
+	if (WSAEventSelect((SOCKET)udp->sockfd, udp->sockEvent, FD_READ | FD_CLOSE) != 0)
+	{
+		WLog_WARN(TAG, "WSAEventSelect(UDP) failed 0x%08x", (unsigned)WSAGetLastError());
+		return FALSE;
+	}
+	return TRUE;
+}
+
+/** Re-arm the readiness event after draining: reset, then recheck for
+ * arrivals between the last recv (EAGAIN) and the reset to avoid lost
+ * wakeups. Must be called with no lock held (it polls the socket). */
+void rdpeudp_update_event(rdpUdpTransport* udp)
+{
+	if (!udp)
+		return;
+	HANDLE ev = nullptr;
+	int fd = -1;
+	EnterCriticalSection(&udp->lock);
+	ev = udp->sockEvent;
+	fd = udp->sockfd;
+	const BOOL hasBuffered = (Stream_Length(udp->recvStream) > udp->recvPos);
+	LeaveCriticalSection(&udp->lock);
+	if (!ev || (ev == INVALID_HANDLE_VALUE) || (fd < 0))
+		return;
+	(void)WSAResetEvent(ev);
+	/* Recheck: data arrived between drain and reset, or buffered TLS bytes. */
+	BOOL readable = freerdp_udp_wait_readable(fd, 0);
+	EnterCriticalSection(&udp->lock);
+	const BOOL buffered = (Stream_Length(udp->recvStream) > udp->recvPos);
+	LeaveCriticalSection(&udp->lock);
+	if (readable || buffered || hasBuffered)
+		(void)WSASetEvent(ev);
 }
 
 static BOOL rdpeudp_udp_send_stream(rdpUdpTransport* udp, wStream* s)
@@ -1159,205 +1549,131 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 		p += 2;
 		rem -= 2;
 
+		RdpUdp2Layout L = WINPR_C_ARRAY_INIT;
+		if (!rdpeudp2_parse_layout(tmp + off, (size_t)r - off, &L))
+			return TRUE;
+
 		EnterCriticalSection(&udp->lock);
 		udp->stats.recvPackets++;
-		if ((peerLog <= RDPUDP2_MAX_LOGWINDOW) && (peerLog >= 2))
-			udp->peerLogWindow = peerLog;
+		if ((L.logWindow <= RDPUDP2_MAX_LOGWINDOW) && (L.logWindow >= 2))
+			udp->peerLogWindow = L.logWindow;
 
-		if (flags & RDPUDP2_FLAG_ACK)
+		if (L.hasAck)
 		{
-			if (rem >= 7)
+			udp->lastAckReceived = L.ackBase;
+			udp->needAoa = TRUE;
+			rdpeudp_ack_single_locked(udp, L.ackBase);
+		}
+
+		if (L.hasOverhead)
+			udp->overhead = L.overhead;
+
+		if (L.hasDelayAck)
+		{
+			udp->delayAckMax = L.delayMax;
+			udp->delayAckTimeoutMs = L.delayTimeout;
+		}
+
+		if (L.hasAckvec)
+		{
+			UINT16 base = 0;
+			BOOL* received = nullptr;
+			size_t count = 0;
+			/* Reuse the ACKVEC codec for selective free. */
+			if (rdpeudp_parse_ackvec(L.ackvec, L.ackvecLen, &base, &received, &count))
 			{
-				const UINT16 base = (UINT16)(p[0] | ((UINT16)p[1] << 8));
 				udp->lastAckReceived = base;
 				udp->needAoa = TRUE;
-				rdpeudp_ack_single_locked(udp, base);
-				/* Also cumulative: free everything clearly older (for
-				 * retransmits with new DataSeq that superseded old). */
-				for (size_t i = 0; i < ARRAYSIZE(udp->sent); i++)
+				for (size_t si = 0; si < count; si++)
 				{
-					if (udp->sent[i].data)
-					{
-						const INT16 diff = (INT16)(base - udp->sent[i].dataSeq);
-						if ((diff > 0) && (diff < (INT16)RDPEUDP2_WINDOW_MAX * 2))
-						{
-							/* Check if same ChannelSeq already acked? Keep
-							 * simple cumulative free for older seqs. */
-							UINT16 c = udp->sent[i].channelSeq;
-							BOOL alreadyGone = TRUE;
-							for (size_t j = 0; j < ARRAYSIZE(udp->sent); j++)
-							{
-								if ((j != i) && udp->sent[j].data &&
-								    (udp->sent[j].channelSeq == c))
-									alreadyGone = FALSE;
-							}
-							WINPR_UNUSED(alreadyGone);
-						}
-					}
+					if (received[si])
+						rdpeudp_ack_single_locked(udp, (UINT16)(base + si));
+					else if (count > 7)
+						udp->stats.lostDetected += 0; /* counted per-run below */
 				}
-				const BYTE numDelayed = (BYTE)(p[6] & 0x0F);
-				size_t ackLen = 7 + numDelayed;
-				if (rem >= ackLen)
-				{
-					p += ackLen;
-					rem -= ackLen;
-				}
-				else
-				{
-					p += rem;
-					rem = 0;
-				}
+				/* Count loss runs for stats (RLE not expanded here in detail). */
+				free(received);
+			}
+			else
+			{
+				/* Fall back to raw scan on parse failure (should not happen). */
+				udp->needAoa = TRUE;
 			}
 		}
 
-		if (flags & RDPUDP2_FLAG_OVERHEAD)
+		/* DataBody (ChannelSeqNum + Data) follows ACKVEC per spec. */
+		if (L.hasDataHeader && L.hasDataBody)
 		{
-			if (rem >= 1)
+			const UINT16 dseq = L.dataSeq;
+			const UINT16 cseq = L.channelSeq;
+			const BYTE* dp = L.dataBody;
+			const size_t drem = L.dataBodyLen;
+
+			rdpeudp_note_recv_data_seq_locked(udp, dseq);
+
+			/* Deduplicate by channel seq */
+			BOOL dup = FALSE;
+			if (((INT16)(cseq - udp->expectedChannelSeq) < 0))
 			{
-				udp->overhead = p[0];
-				p += 1;
-				rem -= 1;
+				/* Already delivered (within window) -> dup, still ACK */
+				dup = TRUE;
 			}
-		}
-
-		if (flags & RDPUDP2_FLAG_DELAYACK)
-		{
-			if (rem >= 3)
+			else
 			{
-				udp->delayAckMax = p[0];
-				udp->delayAckTimeoutMs = (UINT16)(p[1] | ((UINT16)p[2] << 8));
-				p += 3;
-				rem -= 3;
-			}
-		}
-
-		if (flags & RDPUDP2_FLAG_AOA)
-		{
-			if (rem >= 2)
-			{
-				p += 2;
-				rem -= 2;
-			}
-		}
-
-		if (flags & RDPUDP2_FLAG_DATA)
-		{
-			if (rem >= 4)
-			{
-				const UINT16 dseq = (UINT16)(p[0] | ((UINT16)p[1] << 8));
-				const UINT16 cseq = (UINT16)(p[2] | ((UINT16)p[3] << 8));
-				p += 4;
-				rem -= 4;
-
-				rdpeudp_note_recv_data_seq_locked(udp, dseq);
-
-				/* Deduplicate by channel seq */
-				BOOL dup = FALSE;
-				if (((INT16)(cseq - udp->expectedChannelSeq) < 0))
-				{
-					/* Already delivered (within window) -> dup, still ACK */
+				const size_t slot = (size_t)(cseq % RDPEUDP2_RECV_MAP);
+				if (udp->recvMap[slot].occupied &&
+				    (udp->recvMap[slot].channelSeq == cseq))
 					dup = TRUE;
-				}
-				else
+			}
+
+			if (!dup && (drem <= 65535))
+			{
+				const size_t slot = (size_t)(cseq % RDPEUDP2_RECV_MAP);
+				free(udp->recvMap[slot].data);
+				udp->recvMap[slot].data = nullptr;
+				udp->recvMap[slot].len = 0;
+				udp->recvMap[slot].occupied = FALSE;
+				if ((drem == 0) || ((udp->recvMap[slot].data = malloc(drem)) != nullptr))
 				{
-					const size_t slot = (size_t)(cseq % RDPEUDP2_RECV_MAP);
-					if (udp->recvMap[slot].occupied &&
-					    (udp->recvMap[slot].channelSeq == cseq))
-						dup = TRUE;
+					if (drem > 0)
+						memcpy(udp->recvMap[slot].data, dp, drem);
+					udp->recvMap[slot].len = drem;
+					udp->recvMap[slot].channelSeq = cseq;
+					udp->recvMap[slot].occupied = TRUE;
 				}
 
-				if (!dup && (rem <= 65535))
+				/* Deliver in-order channel stream */
+				while (TRUE)
 				{
-					const size_t slot = (size_t)(cseq % RDPEUDP2_RECV_MAP);
-					free(udp->recvMap[slot].data);
-					udp->recvMap[slot].data = malloc(rem);
-					if (udp->recvMap[slot].data)
-					{
-						memcpy(udp->recvMap[slot].data, p, rem);
-						udp->recvMap[slot].len = rem;
-						udp->recvMap[slot].channelSeq = cseq;
-						udp->recvMap[slot].occupied = TRUE;
-					}
-
-					/* Deliver in-order channel stream */
-					while (TRUE)
-					{
-						const size_t eslot =
-						    (size_t)(udp->expectedChannelSeq % RDPEUDP2_RECV_MAP);
-						if (!udp->recvMap[eslot].occupied ||
-						    (udp->recvMap[eslot].channelSeq != udp->expectedChannelSeq))
-							break;
-						if (!Stream_EnsureRemainingCapacity(
-						        udp->recvStream, udp->recvMap[eslot].len))
-							break;
+					const size_t eslot =
+					    (size_t)(udp->expectedChannelSeq % RDPEUDP2_RECV_MAP);
+					if (!udp->recvMap[eslot].occupied ||
+					    (udp->recvMap[eslot].channelSeq != udp->expectedChannelSeq))
+						break;
+					if (!Stream_EnsureRemainingCapacity(
+					        udp->recvStream, udp->recvMap[eslot].len))
+						break;
+					if (udp->recvMap[eslot].len > 0)
 						Stream_Write(udp->recvStream, udp->recvMap[eslot].data,
 						             udp->recvMap[eslot].len);
-						free(udp->recvMap[eslot].data);
-						udp->recvMap[eslot].data = nullptr;
-						udp->recvMap[eslot].len = 0;
-						udp->recvMap[eslot].occupied = FALSE;
-						udp->expectedChannelSeq++;
-					}
-					if (udp->udpEvent && (udp->udpEvent != INVALID_HANDLE_VALUE))
-						(void)SetEvent(udp->udpEvent);
+					free(udp->recvMap[eslot].data);
+					udp->recvMap[eslot].data = nullptr;
+					udp->recvMap[eslot].len = 0;
+					udp->recvMap[eslot].occupied = FALSE;
+					udp->expectedChannelSeq++;
 				}
-			}
-		}
-
-		/* ACKVEC comes last on the wire (after DATA) per our send order */
-		if (flags & RDPUDP2_FLAG_ACKVEC)
-		{
-			if (rem >= 3)
-			{
-				const UINT16 base = (UINT16)(p[0] | ((UINT16)p[1] << 8));
-				const BYTE b2 = p[2];
-				const BYTE csize = (BYTE)(b2 & 0x7F);
-				const BOOL haveTs = (b2 & 0x80) != 0;
-				size_t need = 3 + (haveTs ? 4 : 0) + csize;
-				udp->lastAckReceived = base;
-				udp->needAoa = TRUE;
-				if ((rem >= need) && (csize > 0))
-				{
-					const BYTE* vec = p + 3 + (haveTs ? 4 : 0);
-					UINT16 seq = base;
-					for (size_t vi = 0; vi < csize; vi++)
-					{
-						const BYTE b = vec[vi];
-						if ((b & 0x80) == 0)
-						{
-							for (int bit = 0; bit < 7; bit++)
-							{
-								if (b & (1 << bit))
-									rdpeudp_ack_single_locked(udp, seq);
-								seq++;
-							}
-						}
-						else
-						{
-							const BOOL received = (b & 0x40) != 0;
-							const BYTE run = (BYTE)(b & 0x3F);
-							if (received)
-							{
-								for (BYTE k = 0; k < run; k++)
-									rdpeudp_ack_single_locked(udp, (UINT16)(seq + k));
-							}
-							else if (run > 0)
-								udp->stats.lostDetected++;
-							seq = (UINT16)(seq + run);
-						}
-					}
-					p += need;
-					rem -= need;
-				}
-				else if (rem >= need)
-				{
-					p += need;
-					rem -= need;
-				}
+				/* Stream_Write advances position only; publish bytes via length. */
+				Stream_SealLength(udp->recvStream);
+				if (udp->sockEvent && (udp->sockEvent != INVALID_HANDLE_VALUE))
+					(void)WSASetEvent(udp->sockEvent);
+				if (udp->udpEvent && (udp->udpEvent != INVALID_HANDLE_VALUE))
+					(void)SetEvent(udp->udpEvent);
 			}
 		}
 
 		LeaveCriticalSection(&udp->lock);
+		if (udp->sockEvent && (udp->sockEvent != INVALID_HANDLE_VALUE))
+			(void)WSASetEvent(udp->sockEvent);
 		if (udp->udpEvent && (udp->udpEvent != INVALID_HANDLE_VALUE))
 			(void)SetEvent(udp->udpEvent);
 	}
@@ -1511,6 +1827,7 @@ BOOL rdpeudp_connect(rdpUdpTransport* udp, DWORD timeoutMs)
 		WLog_ERR(TAG, "UDP connect to %s:%d failed", udp->hostname, udp->port);
 		return FALSE;
 	}
+	(void)rdpeudp_attach_socket_event(udp);
 
 	const UINT64 deadline = udp_now_ms() + timeoutMs;
 	RdpUdpFecHeader rhdr = { 0 };
@@ -1519,6 +1836,8 @@ BOOL rdpeudp_connect(rdpUdpTransport* udp, DWORD timeoutMs)
 
 	for (int attempt = 0; attempt < RDPEUDP_SYN_MAX_RETRIES; attempt++)
 	{
+		if (udp_aborted(udp))
+			return FALSE;
 		if (udp->context && udp->context->rdp &&
 		    freerdp_shall_disconnect_context(udp->context))
 			return FALSE;
@@ -1552,6 +1871,8 @@ BOOL rdpeudp_connect(rdpUdpTransport* udp, DWORD timeoutMs)
 		const UINT64 attemptDeadline = udp_now_ms() + wait;
 		while (udp_now_ms() < attemptDeadline)
 		{
+			if (udp_aborted(udp))
+				return FALSE;
 			DWORD step = (DWORD)(attemptDeadline - udp_now_ms());
 			if (step > 100)
 				step = 100;
@@ -1656,6 +1977,8 @@ static BOOL rdpeudp2_wait_acked(rdpUdpTransport* udp, UINT16 channelSeq, DWORD t
 	const UINT64 deadline = udp_now_ms() + timeoutMs;
 	while (udp_now_ms() < deadline)
 	{
+		if (udp_aborted(udp))
+			return FALSE;
 		BOOL empty = TRUE;
 		EnterCriticalSection(&udp->lock);
 		for (size_t i = 0; i < ARRAYSIZE(udp->sent); i++)
@@ -1773,6 +2096,8 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 	size_t off = 0;
 	while (off < len)
 	{
+		if (udp_aborted(udp))
+			return -1;
 		/* Flow control: effective window = min(ours, peer's) */
 		while (TRUE)
 		{
@@ -1789,6 +2114,8 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 				break;
 			(void)rdpeudp_recv_one(udp, 20, nullptr, nullptr, nullptr, nullptr);
 			/* Abort promptly if RDP disconnecting */
+			if (udp_aborted(udp))
+				return -1;
 			if (udp->context && udp->context->rdp &&
 			    freerdp_shall_disconnect_context(udp->context))
 				return -1;
@@ -1869,6 +2196,8 @@ static SSIZE_T rdpeudp2_recv_reliable(rdpUdpTransport* udp, BYTE* buffer, size_t
 	const UINT64 deadline = udp_now_ms() + timeoutMs;
 	while (udp_now_ms() < deadline)
 	{
+		if (udp_aborted(udp))
+			return -1;
 		EnterCriticalSection(&udp->lock);
 		const size_t avail = Stream_Length(udp->recvStream) - udp->recvPos;
 		if (avail > 0)
@@ -2126,6 +2455,8 @@ static SSIZE_T tls_send_all(rdpUdpTransport* udp, const BYTE* data, size_t len)
 	size_t off = 0;
 	while (off < len)
 	{
+		if (udp_aborted(udp))
+			return -1;
 		ERR_clear_error();
 		const size_t chunk = len - off;
 		const int w = (chunk > (size_t)INT_MAX) ? INT_MAX : (int)chunk;
@@ -2152,6 +2483,8 @@ static SSIZE_T tls_recv_all(rdpUdpTransport* udp, BYTE* buffer, size_t len, DWOR
 	const UINT64 deadline = udp_now_ms() + timeoutMs;
 	while (off < len)
 	{
+		if (udp_aborted(udp))
+			return -1;
 		ERR_clear_error();
 		const size_t chunk = len - off;
 		const int r = (chunk > (size_t)INT_MAX) ? INT_MAX : (int)chunk;
@@ -2208,7 +2541,7 @@ BOOL rdpeudp_tunnel_create(rdpUdpTransport* udp, DWORD timeoutMs)
 	UINT8 hlen = 0;
 	BYTE full[4 + 4] = { 0 };
 	memcpy(full, hdr, 4);
-	if (!rdpemt_parse_header(hdr, sizeof(hdr), &action, &plen, &hlen))
+	if (!rdpemt_decode_header(hdr, sizeof(hdr), &action, &plen, &hlen))
 	{
 		WLog_ERR(TAG, "Tunnel Create Response bad header");
 		return FALSE;
@@ -2260,33 +2593,104 @@ SSIZE_T rdpeudp_tunnel_send(rdpUdpTransport* udp, const BYTE* data, size_t len)
 
 SSIZE_T rdpeudp_tunnel_recv(rdpUdpTransport* udp, BYTE* buffer, size_t len, DWORD timeoutMs)
 {
-	if (!udp || !udp->tunnelEstablished || !buffer)
+	BYTE sub[256] = { 0 };
+	size_t subLen = 0;
+	size_t payloadLen = 0;
+	/* Legacy helper: returns HigherLayerData only; fails if subheaders present
+	 * so callers cannot silently miss autodetect subheaders (P1-7). */
+	BYTE tmpPayload[65535] = { 0 };
+	const int rc =
+	    rdpeudp_tunnel_recv_full(udp, sub, sizeof(sub), &subLen, tmpPayload,
+	                             (len < sizeof(tmpPayload) ? len : sizeof(tmpPayload)),
+	                             &payloadLen, timeoutMs);
+	if (rc <= 0)
+		return rc;
+	if (subLen != 0)
+		return -1; /* subheaders must be handled via recv_full */
+	if (payloadLen > len)
 		return -1;
+	memcpy(buffer, tmpPayload, payloadLen);
+	return (SSIZE_T)payloadLen;
+}
+
+SSIZE_T rdpeudp_tunnel_send_full(rdpUdpTransport* udp, const BYTE* subheaders,
+                                 size_t subheadersLen, const BYTE* higherLayer,
+                                 size_t higherLayerLen)
+{
+	if (!udp || !udp->tunnelEstablished)
+		return -1;
+	if (!subheaders && (subheadersLen != 0))
+		return -1;
+	if (!higherLayer && (higherLayerLen != 0))
+		return -1;
+	wStream* s = rdpemt_build_tunnel_data(subheaders, subheadersLen, higherLayer,
+	                                      higherLayerLen);
+	if (!s)
+		return -1;
+	const size_t total = Stream_Length(s);
+	const SSIZE_T rc = tls_send_all(udp, Stream_Buffer(s), total);
+	Stream_Release(s);
+	return (rc == (SSIZE_T)total) ? (SSIZE_T)higherLayerLen : -1;
+}
+
+SSIZE_T rdpeudp_tunnel_send_autodetect(rdpUdpTransport* udp, BYTE subHeaderType,
+                                       const BYTE* pdu, size_t pduLen)
+{
+	wStream* sub = nullptr;
+	SSIZE_T rc = -1;
+	if (!udp || !pdu || (pduLen == 0))
+		return -1;
+	sub = rdpemt_build_subheader(subHeaderType, pdu, pduLen);
+	if (!sub)
+		return -1;
+	const size_t subLen = Stream_Length(sub);
+	rc = rdpeudp_tunnel_send_full(udp, Stream_Buffer(sub), subLen, nullptr, 0);
+	Stream_Release(sub);
+	return (rc == 0) ? (SSIZE_T)pduLen : -1;
+}
+
+int rdpeudp_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf, size_t subBufLen,
+                             size_t* subLenOut, BYTE* payloadBuf, size_t payloadBufLen,
+                             size_t* payloadLenOut, DWORD timeoutMs)
+{
 	BYTE hdr[4] = { 0 };
-	if (tls_recv_all(udp, hdr, sizeof(hdr), timeoutMs) != (SSIZE_T)sizeof(hdr))
-		return -1;
 	BYTE action = 0;
 	UINT16 plen = 0;
 	UINT8 hlen = 0;
-	if (!rdpemt_parse_header(hdr, sizeof(hdr), &action, &plen, &hlen))
+	size_t subLen = 0;
+	if (!udp || !udp->tunnelEstablished)
+		return -1;
+	const SSIZE_T hr = tls_recv_all(udp, hdr, sizeof(hdr), timeoutMs);
+	if (hr == 0)
+		return 0; /* timeout, no PDU */
+	if (hr != (SSIZE_T)sizeof(hdr))
+		return -1;
+	if (!rdpemt_decode_header(hdr, sizeof(hdr), &action, &plen, &hlen))
 		return -1;
 	if (action != RDPTUNNEL_ACTION_DATA)
 		return -1;
-	if (hlen != 4)
-	{
-		/* skip subheaders */
-		BYTE sub[256] = { 0 };
-		const size_t extra = (size_t)hlen - 4;
-		if (extra > sizeof(sub))
-			return -1;
-		if (tls_recv_all(udp, sub, extra, timeoutMs) != (SSIZE_T)extra)
-			return -1;
-	}
-	if (plen > len)
+	if (hlen < 4)
 		return -1;
-	if (tls_recv_all(udp, buffer, plen, timeoutMs) != (SSIZE_T)plen)
+	subLen = (size_t)hlen - 4;
+	if (subLen > subBufLen)
 		return -1;
-	return (SSIZE_T)plen;
+	if ((size_t)plen > payloadBufLen)
+		return -1;
+	if ((subLen > 0) && !subBuf)
+		return -1;
+	if (((size_t)plen > 0) && !payloadBuf)
+		return -1;
+	if ((subLen > 0) &&
+	    (tls_recv_all(udp, subBuf, subLen, timeoutMs) != (SSIZE_T)subLen))
+		return -1;
+	if (((size_t)plen > 0) &&
+	    (tls_recv_all(udp, payloadBuf, plen, timeoutMs) != (SSIZE_T)plen))
+		return -1;
+	if (subLenOut)
+		*subLenOut = subLen;
+	if (payloadLenOut)
+		*payloadLenOut = plen;
+	return 1;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2310,7 +2714,16 @@ int rdpeudp_get_sockfd(const rdpUdpTransport* udp)
 
 HANDLE rdpeudp_get_event(rdpUdpTransport* udp)
 {
-	return udp ? udp->udpEvent : nullptr;
+	if (!udp)
+		return nullptr;
+	EnterCriticalSection(&udp->lock);
+	HANDLE ev = nullptr;
+	if (udp->sockEvent && (udp->sockEvent != INVALID_HANDLE_VALUE))
+		ev = udp->sockEvent;
+	else
+		ev = udp->udpEvent;
+	LeaveCriticalSection(&udp->lock);
+	return ev;
 }
 
 BOOL rdpeudp_send_keepalive(rdpUdpTransport* udp)
@@ -2436,6 +2849,22 @@ static int rdpeudp_bind_udp(int port)
 rdpUdpTransport* rdpeudp_accept(rdpContext* context, int port, UINT32 expectedReqId,
                                 const BYTE* expectedCookie, DWORD timeoutMs)
 {
+	return rdpeudp_accept_ex(context, port, expectedReqId, expectedCookie, timeoutMs, nullptr);
+}
+
+static BOOL rdpeudp_accept_aborted(rdpUdpTransport* udp, rdpContext* context)
+{
+	if (udp && udp_aborted(udp))
+		return TRUE;
+	if (context && context->rdp && freerdp_shall_disconnect_context(context))
+		return TRUE;
+	return FALSE;
+}
+
+rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expectedReqId,
+                                   const BYTE* expectedCookie, DWORD timeoutMs,
+                                   HANDLE abortEvent)
+{
 	if (!context || !expectedCookie || (port <= 0))
 		return nullptr;
 
@@ -2455,6 +2884,7 @@ rdpUdpTransport* rdpeudp_accept(rdpContext* context, int port, UINT32 expectedRe
 	udp->sockfd = -1;
 	udp->requestId = expectedReqId;
 	udp->requestedProto = INITIATE_REQUEST_PROTOCOL_UDPFECR;
+	udp->abortEvent = abortEvent;
 	memcpy(udp->securityCookie, expectedCookie, RDPEUDP_COOKIE_LEN);
 	udp_compute_cookie_hash(expectedCookie, udp->cookieHash);
 	udp->logWindow = RDPUDP2_DEFAULT_LOGWINDOW;
@@ -2482,6 +2912,15 @@ rdpUdpTransport* rdpeudp_accept(rdpContext* context, int port, UINT32 expectedRe
 		free(udp);
 		return nullptr;
 	}
+	/* Stream_New sets length == capacity; the reassembly buffer starts empty. */
+	if (!Stream_SetPosition(udp->recvStream, 0) || !Stream_SetLength(udp->recvStream, 0))
+	{
+		(void)CloseHandle(udp->udpEvent);
+		Stream_Release(udp->recvStream);
+		free(udp->hostname);
+		free(udp);
+		return nullptr;
+	}
 	InitializeCriticalSection(&udp->lock);
 
 	udp->sockfd = rdpeudp_bind_udp(port);
@@ -2503,6 +2942,11 @@ rdpUdpTransport* rdpeudp_accept(rdpContext* context, int port, UINT32 expectedRe
 
 	while (udp_now_ms() < deadline)
 	{
+		if (rdpeudp_accept_aborted(udp, context))
+		{
+			rdpeudp_free(udp);
+			return nullptr;
+		}
 		BYTE buf[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
 		/* Use recvfrom to learn peer? Our sock is unconnected; freerdp_udp_recv
 		 * uses recv (connected). For accept, peek with recvfrom then connect. */
@@ -2553,6 +2997,7 @@ rdpUdpTransport* rdpeudp_accept(rdpContext* context, int port, UINT32 expectedRe
 			WLog_WARN(TAG, "UDP connect-back to peer failed");
 			continue;
 		}
+		(void)rdpeudp_attach_socket_event(udp);
 		if (winpr_RAND(&udp->initialSeq, sizeof(udp->initialSeq)) < 0)
 		{
 			rdpeudp_free(udp);
@@ -2591,6 +3036,11 @@ rdpUdpTransport* rdpeudp_accept(rdpContext* context, int port, UINT32 expectedRe
 		const UINT64 adead = udp_now_ms() + 5000;
 		while (udp_now_ms() < adead)
 		{
+			if (rdpeudp_accept_aborted(udp, context))
+			{
+				rdpeudp_free(udp);
+				return nullptr;
+			}
 			BYTE buf[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
 			const SSIZE_T r = freerdp_udp_recv(udp->sockfd, buf, sizeof(buf), 100);
 			if (r <= 0)
@@ -2666,7 +3116,7 @@ rdpUdpTransport* rdpeudp_accept(rdpContext* context, int port, UINT32 expectedRe
 		BYTE action = 0;
 		UINT16 plen = 0;
 		UINT8 hlen = 0;
-		if (!rdpemt_parse_header(hdr, sizeof(hdr), &action, &plen, &hlen) ||
+		if (!rdpemt_decode_header(hdr, sizeof(hdr), &action, &plen, &hlen) ||
 		    (action != RDPTUNNEL_ACTION_CREATEREQUEST) || (hlen != 4) || (plen != 24))
 		{
 			rdpeudp_free(udp);

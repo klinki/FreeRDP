@@ -48,8 +48,16 @@ struct rdp_multitransport
 	rdpUdpTransport* udp;
 	CRITICAL_SECTION lock;
 	HANDLE udpThread;
+	HANDLE abortEvent; /* manual-reset, signaled by free to cancel workers */
+	HANDLE stateEvent; /* auto-reset, signaled when async establishment completes */
 	BOOL closing;
 	BOOL threadRunning;
+	/* Soft-Sync migration state (MS-RDPEDYC 3.1.5.3): DVC stays on TCP until
+	 * migration is authorized, even when the tunnel is up. */
+	BOOL softSyncNegotiated;
+	BOOL softSyncComplete;
+	BOOL udpSendMigrated;
+	BOOL udpRecvMigrated;
 };
 
 #define TAG FREERDP_TAG("core.multitransport")
@@ -289,6 +297,21 @@ static DWORD WINAPI multitransport_udp_connect_thread(LPVOID arg)
 	rdpMultitransport* multi = a->multi;
 	const UINT32 reqId = a->reqId;
 
+	EnterCriticalSection(&multi->lock);
+	const BOOL earlyClose = multi->closing;
+	HANDLE abortEv = multi->abortEvent;
+	LeaveCriticalSection(&multi->lock);
+	if (earlyClose)
+	{
+		free(a);
+		EnterCriticalSection(&multi->lock);
+		multi->threadRunning = FALSE;
+		if (multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
+			(void)SetEvent(multi->stateEvent);
+		LeaveCriticalSection(&multi->lock);
+		return 1;
+	}
+
 	WLog_INFO(TAG, "UDP connect thread started reqId=%u -> %s:%d", reqId, a->hostname,
 	          a->port);
 
@@ -297,12 +320,18 @@ static DWORD WINAPI multitransport_udp_connect_thread(LPVOID arg)
 	free(a);
 	if (!udp)
 	{
-		(void)multitransport_client_send_response(multi, reqId, E_ABORT);
 		EnterCriticalSection(&multi->lock);
+		const BOOL closed = multi->closing;
+		HANDLE stateEv = multi->stateEvent;
 		multi->threadRunning = FALSE;
 		LeaveCriticalSection(&multi->lock);
+		if (!closed)
+			(void)multitransport_client_send_response(multi, reqId, E_ABORT);
+		if (stateEv && (stateEv != INVALID_HANDLE_VALUE))
+			(void)SetEvent(stateEv);
 		return 1;
 	}
+	rdpeudp_set_abort_event(udp, abortEv);
 
 	BOOL ok = FALSE;
 	if (rdpeudp_connect(udp, 5000) && rdpeudp_tls_connect(udp) &&
@@ -316,7 +345,10 @@ static DWORD WINAPI multitransport_udp_connect_thread(LPVOID arg)
 		rdpeudp_free(udp);
 		EnterCriticalSection(&multi->lock);
 		multi->threadRunning = FALSE;
+		HANDLE stateEv = multi->stateEvent;
 		LeaveCriticalSection(&multi->lock);
+		if (stateEv && (stateEv != INVALID_HANDLE_VALUE))
+			(void)SetEvent(stateEv);
 		return 1;
 	}
 	if (ok)
@@ -324,7 +356,39 @@ static DWORD WINAPI multitransport_udp_connect_thread(LPVOID arg)
 		if (multi->udp)
 			rdpeudp_free(multi->udp);
 		multi->udp = udp;
+		/* Snapshot negotiated Soft-Sync support for migration gating
+		 * (MS-RDPEDYC 3.1.5.3, MS-RDPEMT 1.3).
+		 * Without Soft-Sync, migration is authorized by tunnel creation BUT
+		 * only if no DVC traffic could have flowed yet (state < ACTIVE).
+		 * Post-ACTIVE tunnel completion stays on TCP to avoid reordering
+		 * TCP in-flight vs new UDP traffic without a TCP_FLUSHED barrier. */
+		{
+			const UINT32 flags =
+			    freerdp_settings_get_uint32(multi->rdp->settings, FreeRDP_MultitransportFlags);
+			const BOOL softSync = ((flags & SOFTSYNC_TCP_TO_UDP) != 0);
+			const BOOL preActive =
+			    (multi->rdp->state < CONNECTION_STATE_ACTIVE);
+			multi->softSyncNegotiated = softSync;
+			if (!softSync)
+			{
+				multi->softSyncComplete = TRUE;
+				/* Latch migration only if pre-ACTIVE; else stay TCP-safe. */
+				multi->udpSendMigrated = preActive;
+				multi->udpRecvMigrated = preActive;
+				if (!preActive)
+					WLog_WARN(TAG, "UDP tunnel ready post-ACTIVE without Soft-Sync; "
+					               "staying on TCP to preserve ordering");
+			}
+			else
+			{
+				/* With Soft-Sync, wait for handshake (see on_soft_sync_*). */
+				multi->softSyncComplete = FALSE;
+				multi->udpSendMigrated = FALSE;
+				multi->udpRecvMigrated = FALSE;
+			}
+		}
 	}
+	HANDLE stateEv = multi->stateEvent;
 	LeaveCriticalSection(&multi->lock);
 
 	if (ok)
@@ -342,6 +406,8 @@ static DWORD WINAPI multitransport_udp_connect_thread(LPVOID arg)
 	EnterCriticalSection(&multi->lock);
 	multi->threadRunning = FALSE;
 	LeaveCriticalSection(&multi->lock);
+	if (stateEv && (stateEv != INVALID_HANDLE_VALUE))
+		(void)SetEvent(stateEv);
 	return ok ? 0 : 1;
 }
 
@@ -351,10 +417,26 @@ static DWORD WINAPI multitransport_udp_accept_thread(LPVOID arg)
 	if (!a)
 		return 1;
 	rdpMultitransport* multi = a->multi;
+	EnterCriticalSection(&multi->lock);
+	const BOOL earlyClose = multi->closing;
+	HANDLE abortEv = multi->abortEvent;
+	LeaveCriticalSection(&multi->lock);
+	if (earlyClose)
+	{
+		free(a);
+		EnterCriticalSection(&multi->lock);
+		multi->threadRunning = FALSE;
+		if (multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
+			(void)SetEvent(multi->stateEvent);
+		LeaveCriticalSection(&multi->lock);
+		return 1;
+	}
 	WLog_INFO(TAG, "UDP accept thread started reqId=%u port=%d", a->reqId, a->port);
 	rdpUdpTransport* udp =
-	    rdpeudp_accept(multi->rdp->context, a->port, a->reqId, a->cookie, 30000);
+	    rdpeudp_accept_ex(multi->rdp->context, a->port, a->reqId, a->cookie, 30000, abortEv);
 	free(a);
+	if (udp)
+		rdpeudp_set_abort_event(udp, abortEv);
 	EnterCriticalSection(&multi->lock);
 	if (multi->closing)
 	{
@@ -363,7 +445,10 @@ static DWORD WINAPI multitransport_udp_accept_thread(LPVOID arg)
 			rdpeudp_free(udp);
 		EnterCriticalSection(&multi->lock);
 		multi->threadRunning = FALSE;
+		HANDLE stateEv = multi->stateEvent;
 		LeaveCriticalSection(&multi->lock);
+		if (stateEv && (stateEv != INVALID_HANDLE_VALUE))
+			(void)SetEvent(stateEv);
 		return 1;
 	}
 	if (udp)
@@ -371,10 +456,35 @@ static DWORD WINAPI multitransport_udp_accept_thread(LPVOID arg)
 		if (multi->udp)
 			rdpeudp_free(multi->udp);
 		multi->udp = udp;
+		{
+			const UINT32 flags =
+			    freerdp_settings_get_uint32(multi->rdp->settings, FreeRDP_MultitransportFlags);
+			const BOOL softSync = ((flags & SOFTSYNC_TCP_TO_UDP) != 0);
+			const BOOL preActive = (multi->rdp->state < CONNECTION_STATE_ACTIVE);
+			multi->softSyncNegotiated = softSync;
+			if (!softSync)
+			{
+				multi->softSyncComplete = TRUE;
+				multi->udpSendMigrated = preActive;
+				multi->udpRecvMigrated = preActive;
+				if (!preActive)
+					WLog_WARN(TAG, "UDP server tunnel ready post-ACTIVE without "
+					               "Soft-Sync; staying on TCP");
+			}
+			else
+			{
+				multi->softSyncComplete = FALSE;
+				multi->udpSendMigrated = FALSE;
+				multi->udpRecvMigrated = FALSE;
+			}
+		}
 		WLog_INFO(TAG, "RDP-UDP server tunnel ready");
 	}
 	multi->threadRunning = FALSE;
+	HANDLE stateEv = multi->stateEvent;
 	LeaveCriticalSection(&multi->lock);
+	if (stateEv && (stateEv != INVALID_HANDLE_VALUE))
+		(void)SetEvent(stateEv);
 	return udp ? 0 : 1;
 }
 
@@ -483,6 +593,19 @@ rdpMultitransport* multitransport_new(rdpRdp* rdp, WINPR_ATTR_UNUSED UINT16 prot
 		free(multi);
 		return nullptr;
 	}
+	multi->abortEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	multi->stateEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (!multi->abortEvent || (multi->abortEvent == INVALID_HANDLE_VALUE) || !multi->stateEvent ||
+	    (multi->stateEvent == INVALID_HANDLE_VALUE))
+	{
+		if (multi->abortEvent && (multi->abortEvent != INVALID_HANDLE_VALUE))
+			(void)CloseHandle(multi->abortEvent);
+		if (multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
+			(void)CloseHandle(multi->stateEvent);
+		DeleteCriticalSection(&multi->lock);
+		free(multi);
+		return nullptr;
+	}
 	multi->udpThread = nullptr;
 	multi->closing = FALSE;
 	multi->threadRunning = FALSE;
@@ -504,14 +627,19 @@ void multitransport_free(rdpMultitransport* multitransport)
 {
 	if (!multitransport)
 		return;
+	/* Signal cancellation first so blocking establishment loops exit promptly,
+	 * then join the worker before destroying shared state it may access. */
 	EnterCriticalSection(&multitransport->lock);
 	multitransport->closing = TRUE;
 	HANDLE th = multitransport->udpThread;
 	multitransport->udpThread = nullptr;
+	HANDLE abortEv = multitransport->abortEvent;
 	LeaveCriticalSection(&multitransport->lock);
+	if (abortEv && (abortEv != INVALID_HANDLE_VALUE))
+		(void)SetEvent(abortEv);
 	if (th && (th != INVALID_HANDLE_VALUE))
 	{
-		(void)WaitForSingleObject(th, 5000);
+		(void)WaitForSingleObject(th, INFINITE);
 		(void)CloseHandle(th);
 	}
 	EnterCriticalSection(&multitransport->lock);
@@ -520,7 +648,15 @@ void multitransport_free(rdpMultitransport* multitransport)
 		rdpeudp_free(multitransport->udp);
 		multitransport->udp = nullptr;
 	}
+	HANDLE stateEv = multitransport->stateEvent;
+	multitransport->stateEvent = nullptr;
+	/* abortEvent closed after worker join; transport only borrows it. */
 	LeaveCriticalSection(&multitransport->lock);
+	if (stateEv && (stateEv != INVALID_HANDLE_VALUE))
+		(void)CloseHandle(stateEv);
+	if (abortEv && (abortEv != INVALID_HANDLE_VALUE))
+		(void)CloseHandle(abortEv);
+	multitransport->abortEvent = nullptr;
 	DeleteCriticalSection(&multitransport->lock);
 	free(multitransport);
 }
@@ -533,6 +669,90 @@ BOOL multitransport_is_udp_connected(const rdpMultitransport* multi)
 	BOOL rc = multi->udp && rdpeudp_is_connected(multi->udp);
 	LeaveCriticalSection((CRITICAL_SECTION*)&multi->lock);
 	return rc;
+}
+
+BOOL multitransport_is_udp_send_migrated(const rdpMultitransport* multi)
+{
+	BOOL rc = FALSE;
+	if (!multi)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	rc = multi->udp && rdpeudp_is_connected(multi->udp) && multi->udpSendMigrated;
+	LeaveCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	return rc;
+}
+
+BOOL multitransport_is_udp_recv_migrated(const rdpMultitransport* multi)
+{
+	BOOL rc = FALSE;
+	if (!multi)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	rc = multi->udp && rdpeudp_is_connected(multi->udp) && multi->udpRecvMigrated;
+	LeaveCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	return rc;
+}
+
+void multitransport_on_soft_sync_request_sent(rdpMultitransport* multi)
+{
+	if (!multi)
+		return;
+	EnterCriticalSection(&multi->lock);
+	/* Server: after sending Soft-Sync Request it starts sending on UDP
+	 * (MS-RDPEDYC 3.1.5.3). Recv still on TCP until Response arrives. */
+	if (multi->softSyncNegotiated && multi->udp && rdpeudp_is_connected(multi->udp))
+		multi->udpSendMigrated = TRUE;
+	LeaveCriticalSection(&multi->lock);
+}
+
+void multitransport_on_soft_sync_request_received(rdpMultitransport* multi)
+{
+	if (!multi)
+		return;
+	EnterCriticalSection(&multi->lock);
+	/* Client: after receiving Request it will reply, then migrate. Enable
+	 * recv now so early server UDP data is not missed; send enables after
+	 * our Response is sent (see on_soft_sync_response_sent). */
+	if (multi->softSyncNegotiated && multi->udp && rdpeudp_is_connected(multi->udp))
+	{
+		multi->udpRecvMigrated = TRUE;
+	}
+	LeaveCriticalSection(&multi->lock);
+	if (multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
+		(void)SetEvent(multi->stateEvent);
+}
+
+void multitransport_on_soft_sync_response_sent(rdpMultitransport* multi)
+{
+	if (!multi)
+		return;
+	EnterCriticalSection(&multi->lock);
+	/* Client: after sending Response, start sending (and ensure recv) on UDP. */
+	if (multi->softSyncNegotiated && multi->udp && rdpeudp_is_connected(multi->udp))
+	{
+		multi->softSyncComplete = TRUE;
+		multi->udpSendMigrated = TRUE;
+		multi->udpRecvMigrated = TRUE;
+	}
+	LeaveCriticalSection(&multi->lock);
+	if (multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
+		(void)SetEvent(multi->stateEvent);
+}
+
+void multitransport_on_soft_sync_response_received(rdpMultitransport* multi)
+{
+	if (!multi)
+		return;
+	EnterCriticalSection(&multi->lock);
+	/* Server: after receiving Response it starts receiving on UDP. */
+	if (multi->softSyncNegotiated && multi->udp && rdpeudp_is_connected(multi->udp))
+	{
+		multi->softSyncComplete = TRUE;
+		multi->udpRecvMigrated = TRUE;
+	}
+	LeaveCriticalSection(&multi->lock);
+	if (multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
+		(void)SetEvent(multi->stateEvent);
 }
 
 rdpUdpTransport* multitransport_get_udp(rdpMultitransport* multi)
@@ -564,11 +784,15 @@ BOOL multitransport_send_channel_packet(rdpMultitransport* multi, UINT16 channel
 {
 	if (!multi)
 		return FALSE;
+	/* Gate on negotiated migration, not mere connectivity (MS-RDPEDYC 3.1.5.3).
+	 * Without Soft-Sync this is immediate on tunnel up; with Soft-Sync it
+	 * requires the Soft-Sync handshake to complete per direction. */
+	if (!multitransport_is_udp_send_migrated(multi))
+		return FALSE;
 	EnterCriticalSection(&multi->lock);
 	rdpUdpTransport* udp = multi->udp;
-	BOOL connected = udp && rdpeudp_is_connected(udp);
 	LeaveCriticalSection(&multi->lock);
-	if (!connected)
+	if (!udp)
 		return FALSE;
 	/* Only dynamic-channel multiplex (drdynvc, carries egfx/audio/etc.)
 	 * goes over UDP for now. Static channels stay on TCP to avoid
@@ -601,7 +825,11 @@ HANDLE multitransport_get_event(rdpMultitransport* multi)
 		return nullptr;
 	EnterCriticalSection(&multi->lock);
 	rdpUdpTransport* udp = multi->udp;
-	HANDLE ev = udp ? rdpeudp_get_event(udp) : nullptr;
+	HANDLE ev = nullptr;
+	if (udp)
+		ev = rdpeudp_get_event(udp);
+	if (!ev || (ev == INVALID_HANDLE_VALUE))
+		ev = multi->stateEvent; /* wakes loop when async setup completes */
 	LeaveCriticalSection(&multi->lock);
 	return ev;
 }
@@ -609,7 +837,8 @@ HANDLE multitransport_get_event(rdpMultitransport* multi)
 BOOL multitransport_send_autodetect(rdpMultitransport* multi, BOOL isRequest, UINT16 secFlags,
                                      const BYTE* pdu, size_t pduLen)
 {
-	if (!multi)
+	WINPR_UNUSED(secFlags); /* TLS over UDP provides security; no RDP sec header. */
+	if (!multi || !pdu || (pduLen == 0))
 		return FALSE;
 	EnterCriticalSection(&multi->lock);
 	rdpUdpTransport* udp = multi->udp;
@@ -618,13 +847,12 @@ BOOL multitransport_send_autodetect(rdpMultitransport* multi, BOOL isRequest, UI
 	if (!connected)
 		return FALSE;
 
-	wStream* pkt = rdpeudp_build_autodetect_packet(isRequest, secFlags, pdu, pduLen);
-	if (!pkt)
-		return FALSE;
-	const size_t plen = Stream_Length(pkt);
-	const SSIZE_T rc = rdpeudp_tunnel_send(udp, Stream_Buffer(pkt), plen);
-	Stream_Release(pkt);
-	if (rc != (SSIZE_T)plen)
+	/* MS-RDPEMT 2.2.1.1.1: autodetect PDUs go in Tunnel DATA subheaders,
+	 * not in HigherLayerData. */
+	const BYTE subType = isRequest ? RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ
+	                               : RDP_TUNNEL_SUBHEADER_AUTODETECT_RSP;
+	const SSIZE_T rc = rdpeudp_tunnel_send_autodetect(udp, subType, pdu, pduLen);
+	if (rc != (SSIZE_T)pduLen)
 		return FALSE;
 	(void)rdpeudp_check_keepalive(udp, 5000);
 	return TRUE;
@@ -632,7 +860,6 @@ BOOL multitransport_send_autodetect(rdpMultitransport* multi, BOOL isRequest, UI
 
 int multitransport_check_fds(rdpMultitransport* multi)
 {
-	BYTE buf[65535] = { 0 };
 	if (!multi)
 		return 0;
 	EnterCriticalSection(&multi->lock);
@@ -653,123 +880,142 @@ int multitransport_check_fds(rdpMultitransport* multi)
 		LeaveCriticalSection(&multi->lock);
 		if (!curUdp)
 			break;
-		const SSIZE_T r = rdpeudp_tunnel_recv(curUdp, buf, sizeof(buf), 0);
-		if (r <= 0)
-			break;
-		BYTE ptype = 0xFF;
-		if (!rdpeudp_parse_tunnel_ptype(buf, (size_t)r, &ptype))
+		BYTE subBuf[512] = { 0 };
+		BYTE payloadBuf[65535] = { 0 };
+		size_t subLen = 0;
+		size_t payloadLen = 0;
+		const int fr = rdpeudp_tunnel_recv_full(curUdp, subBuf, sizeof(subBuf), &subLen,
+		                                        payloadBuf, sizeof(payloadBuf), &payloadLen,
+		                                        0);
+		if (fr == 0)
+			break; /* timeout, no PDU */
+		if (fr < 0)
+			break; /* error/incomplete; do not spin, wait for next wakeup */
+		/* MS-RDPBCGR 2.2.14: count everything following the Tunnel PDU
+		 * header toward TUNNEL bandwidth measurements. */
+		if ((subLen + payloadLen) > 0 && multi->rdp && multi->rdp->autodetect)
+			autodetect_account_udp_bytes(multi->rdp->autodetect, subLen + payloadLen);
+
+		/* Dispatch each autodetect subheader first (MS-RDPEMT 2.2.1.1.1). */
+		if (subLen > 0)
 		{
-			WLog_WARN(TAG, "bad UDP tunnel payload, ignoring");
+			size_t off = 0;
+			while (off < subLen)
+			{
+				BYTE subType = 0xFF;
+				const BYTE* subData = nullptr;
+				size_t subDataLen = 0;
+				if (!rdpemt_next_subheader(subBuf, subLen, &off, &subType, &subData,
+				                           &subDataLen))
+				{
+					WLog_WARN(TAG, "bad UDP tunnel subheader, ignoring rest");
+					break;
+				}
+				const BOOL isReq =
+				    (subType == RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ);
+				/* Wrap PDU bytes without taking ownership of the stack buffer. */
+				wStream sbuffer = WINPR_C_ARRAY_INIT;
+				wStream* s = Stream_StaticConstInit(&sbuffer, subData, subDataLen);
+				if (!s)
+					continue;
+				rdpRdp* rdp2 = multi->rdp;
+				state_run_t ares = STATE_RUN_SUCCESS;
+				if (rdp2 && rdp2->autodetect)
+				{
+					if (isReq)
+						ares = autodetect_recv_request_packet(
+						    rdp2->autodetect, RDP_TRANSPORT_UDP_R, s);
+					else
+						ares = autodetect_recv_response_packet(
+						    rdp2->autodetect, RDP_TRANSPORT_UDP_R, s);
+					if (state_run_failed(ares))
+						WLog_WARN(TAG, "UDP autodetect dispatch failed");
+					else
+						dispatched++;
+				}
+			}
+		}
+
+		/* HigherLayerData carries channel PDUs (may be empty when the PDU
+		 * only carried autodetect subheaders). Gate on recv migration:
+		 * pre-migration UDP channel data (if any) is ignored to preserve
+		 * TCP ordering; peer should not send it per Soft-Sync rules. */
+		if (payloadLen == 0)
+			continue;
+		if (!multitransport_is_udp_recv_migrated(multi))
+		{
+			WLog_DBG(TAG, "UDP channel data pre-migration, ignoring (%zu bytes)",
+			         payloadLen);
 			continue;
 		}
-		if (ptype == 0x00)
 		{
 			UINT16 channelId = 0;
 			UINT32 totalSize = 0;
 			UINT32 flags = 0;
 			const BYTE* chunk = nullptr;
 			size_t chunkLen = 0;
-			if (!rdpeudp_parse_channel_packet(buf, (size_t)r, &channelId, &totalSize,
-			                                   &flags, &chunk, &chunkLen))
+			if (!rdpeudp_parse_channel_packet(payloadBuf, payloadLen, &channelId,
+			                                   &totalSize, &flags, &chunk, &chunkLen))
 			{
 				WLog_WARN(TAG, "bad UDP channel packet, ignoring");
 				continue;
 			}
-		rdpRdp* rdp = multi->rdp;
-		if (!rdp || !rdp->context || !rdp->context->instance)
-			continue;
-		const BOOL serverMode =
-		    freerdp_settings_get_bool(rdp->settings, FreeRDP_ServerMode);
-		if (!serverMode)
-		{
-			freerdp* instance = rdp->context->instance;
-			if (instance->ReceiveChannelData)
+			rdpRdp* rdp = multi->rdp;
+			if (!rdp || !rdp->context || !rdp->context->instance)
+				continue;
+			const BOOL serverMode =
+			    freerdp_settings_get_bool(rdp->settings, FreeRDP_ServerMode);
+			if (!serverMode)
 			{
-				if (!instance->ReceiveChannelData(instance, channelId, chunk, chunkLen,
-				                                  flags, totalSize))
-					return -1;
-				dispatched++;
-			}
-		}
-		else
-		{
-			/* Server: dispatch to peer callbacks if present */
-			freerdp_peer* client = rdp->context->peer;
-			if (client && client->ReceiveChannelData)
-			{
-				if (!client->ReceiveChannelData(client, channelId, chunk,
-				                                (UINT32)chunkLen, flags, totalSize))
-					return -1;
-				dispatched++;
-			}
-			else if (client && client->VirtualChannelRead)
-			{
-				/* Fallback: find handle by channelId */
-				HANDLE hChannel = nullptr;
-				for (UINT32 i = 0; i < rdp->mcs->channelCount; i++)
+				freerdp* instance = rdp->context->instance;
+				if (instance->ReceiveChannelData)
 				{
-					if (rdp->mcs->channels[i].ChannelId == channelId)
-					{
-						hChannel = (HANDLE)rdp->mcs->channels[i].handle;
-						break;
-					}
-				}
-				if (hChannel &&
-				    (client->VirtualChannelRead(client, hChannel, (BYTE*)chunk,
-				                                (UINT32)chunkLen) < 0))
-					return -1;
-				dispatched++;
-			}
-		}
-		}
-		else if ((ptype == 0x01) || (ptype == 0x02))
-		{
-			BOOL isReq = (ptype == 0x01);
-			UINT16 secFlags = 0;
-			const BYTE* pdu = nullptr;
-			size_t pduLen = 0;
-			if (!rdpeudp_parse_autodetect_packet(buf, (size_t)r, &isReq, &secFlags, &pdu,
-			                                     &pduLen))
-			{
-				WLog_WARN(TAG, "bad UDP autodetect packet, ignoring");
-				continue;
-			}
-			/* Wrap PDU bytes into wStream for autodetect handlers (transport=UDP_R) */
-			wStream* s = Stream_New((BYTE*)pdu, pduLen);
-			if (!s)
-				continue;
-			Stream_SetPosition(s, 0);
-			Stream_SetLength(s, pduLen);
-			rdpRdp* rdp2 = multi->rdp;
-			state_run_t ares = STATE_RUN_SUCCESS;
-			if (rdp2 && rdp2->autodetect)
-			{
-				if (isReq)
-					ares = autodetect_recv_request_packet(rdp2->autodetect,
-					                                      RDP_TRANSPORT_UDP_R, s);
-				else
-					ares = autodetect_recv_response_packet(rdp2->autodetect,
-					                                       RDP_TRANSPORT_UDP_R, s);
-				if (state_run_failed(ares))
-					WLog_WARN(TAG, "UDP autodetect dispatch failed");
-				else
+					if (!instance->ReceiveChannelData(instance, channelId, chunk,
+					                                  chunkLen, flags, totalSize))
+						return -1;
 					dispatched++;
+				}
 			}
-			Stream_Release(s);
-		}
-		else
-		{
-			WLog_WARN(TAG, "unknown UDP tunnel ptype 0x%02x", ptype);
+			else
+			{
+				/* Server: dispatch to peer callbacks if present */
+				freerdp_peer* client = rdp->context->peer;
+				if (client && client->ReceiveChannelData)
+				{
+					if (!client->ReceiveChannelData(client, channelId, chunk,
+					                                (UINT32)chunkLen, flags, totalSize))
+						return -1;
+					dispatched++;
+				}
+				else if (client && client->VirtualChannelRead)
+				{
+					/* Fallback: find handle by channelId */
+					HANDLE hChannel = nullptr;
+					for (UINT32 i = 0; i < rdp->mcs->channelCount; i++)
+					{
+						if (rdp->mcs->channels[i].ChannelId == channelId)
+						{
+							hChannel = (HANDLE)rdp->mcs->channels[i].handle;
+							break;
+						}
+					}
+					if (hChannel &&
+					    (client->VirtualChannelRead(client, hChannel, (BYTE*)chunk,
+					                                (UINT32)chunkLen) < 0))
+						return -1;
+					dispatched++;
+				}
+			}
 		}
 	}
-	/* Keepalive if idle */
+	/* Keepalive if idle; re-arm readiness (drain + reset + recheck inside). */
 	EnterCriticalSection(&multi->lock);
 	udp = multi->udp;
 	LeaveCriticalSection(&multi->lock);
 	if (udp)
 	{
 		(void)rdpeudp_check_keepalive(udp, 5000);
-		(void)ResetEvent(rdpeudp_get_event(udp));
+		rdpeudp_update_event(udp);
 	}
 	return dispatched;
 }

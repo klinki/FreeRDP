@@ -371,36 +371,203 @@ static int test_mtu(void)
 
 static int test_autodetect_framing(void)
 {
+	/* MS-RDPEMT 2.2.1.1.1: autodetect PDUs travel in Tunnel DATA subheaders. */
 	const BYTE pdu[] = { 0x06, 0x00, 0x34, 0x12, 0x01, 0x00 };
-	wStream* s = rdpeudp_build_autodetect_packet(TRUE, 0x1000, pdu, sizeof(pdu));
-	if (!s)
-		return -1;
-	BOOL isReq = FALSE;
-	UINT16 sec = 0;
-	const BYTE* out = nullptr;
-	size_t outLen = 0;
-	if (!rdpeudp_parse_autodetect_packet(Stream_Buffer(s), Stream_Length(s), &isReq, &sec,
-	                                     &out, &outLen))
+	wStream* sub = rdpemt_build_subheader(RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ, pdu,
+	                                      sizeof(pdu));
+	if (!sub)
 	{
-		(void)fprintf(stderr, "autodetect parse failed\n");
-		Stream_Release(s);
+		(void)fprintf(stderr, "subheader build failed\n");
 		return -1;
 	}
-	if (!isReq || (sec != 0x1000) || (outLen != sizeof(pdu)) || (memcmp(out, pdu, outLen) != 0))
+	const size_t subLen = Stream_Length(sub);
+	/* SubHeaderLength(1)=2, SubHeaderType(1)=0x00, SubHeaderData(6)=PDU. */
+	if ((subLen != 8) || (Stream_Buffer(sub)[0] != 2) ||
+	    (Stream_Buffer(sub)[1] != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) ||
+	    (memcmp(Stream_Buffer(sub) + 2, pdu, sizeof(pdu)) != 0))
 	{
-		(void)fprintf(stderr, "autodetect mismatch\n");
-		Stream_Release(s);
+		(void)fprintf(stderr, "subheader bytes mismatch\n");
+		Stream_Release(sub);
 		return -1;
 	}
-	Stream_Release(s);
 
-	/* Channel ptype must be distinct */
-	BYTE pt = 0xFF;
-	BYTE chbuf[16] = { 0x00, 0x05, 0x00 };
-	if (!rdpeudp_parse_tunnel_ptype(chbuf, sizeof(chbuf), &pt) || (pt != 0x00))
+	/* Tunnel DATA with subheader + empty HigherLayerData. */
+	wStream* td = rdpemt_build_tunnel_data(Stream_Buffer(sub), subLen, nullptr, 0);
+	Stream_Release(sub);
+	if (!td)
 	{
-		(void)fprintf(stderr, "ptype channel mismatch\n");
+		(void)fprintf(stderr, "tunnel data build failed\n");
 		return -1;
+	}
+	BYTE action = 0xFF;
+	UINT16 plen = 0xFFFF;
+	UINT8 hlen = 0;
+	if (!rdpemt_decode_header(Stream_Buffer(td), Stream_Length(td), &action, &plen,
+	                           &hlen))
+	{
+		(void)fprintf(stderr, "tunnel data decode failed\n");
+		Stream_Release(td);
+		return -1;
+	}
+	if ((action != RDPTUNNEL_ACTION_DATA) || (plen != 0) || (hlen != 4 + subLen))
+	{
+		(void)fprintf(stderr, "tunnel data header mismatch %u %u %u\n", action, plen,
+		              hlen);
+		Stream_Release(td);
+		return -1;
+	}
+	/* Full PDU must validate (header + subheaders + payload present). */
+	if (!rdpemt_parse_header(Stream_Buffer(td), Stream_Length(td), &action, &plen,
+	                           &hlen))
+	{
+		(void)fprintf(stderr, "tunnel data full parse failed\n");
+		Stream_Release(td);
+		return -1;
+	}
+	/* Header-only decode must succeed where full parse requires payload. */
+	{
+		BYTE hdr4[4] = { 0 };
+		memcpy(hdr4, Stream_Buffer(td), 4);
+		BYTE a2 = 0xFF;
+		UINT16 p2 = 0xFFFF;
+		UINT8 h2 = 0;
+		if (!rdpemt_decode_header(hdr4, sizeof(hdr4), &a2, &p2, &h2))
+		{
+			(void)fprintf(stderr, "header-only decode failed\n");
+			Stream_Release(td);
+			return -1;
+		}
+		if ((a2 != RDPTUNNEL_ACTION_DATA) || (p2 != plen) || (h2 != hlen))
+		{
+			(void)fprintf(stderr, "header-only decode mismatch\n");
+			Stream_Release(td);
+			return -1;
+		}
+	}
+	/* Iterate subheaders back to the PDU. */
+	{
+		const BYTE* tdb = Stream_Buffer(td);
+		const size_t tdLen = Stream_Length(td);
+		const BYTE* subStart = tdb + 4;
+		const size_t subAvail = (size_t)hlen - 4;
+		size_t off = 0;
+		BYTE stype = 0xFF;
+		const BYTE* sdata = nullptr;
+		size_t sdataLen = 0;
+		if (!rdpemt_next_subheader(subStart, subAvail, &off, &stype, &sdata,
+		                           &sdataLen))
+		{
+			(void)fprintf(stderr, "subheader iterate failed\n");
+			Stream_Release(td);
+			return -1;
+		}
+		if ((stype != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) ||
+		    (sdataLen != sizeof(pdu)) || (memcmp(sdata, pdu, sdataLen) != 0) ||
+		    (off != subAvail))
+		{
+			(void)fprintf(stderr, "subheader content mismatch\n");
+			Stream_Release(td);
+			return -1;
+		}
+		WINPR_UNUSED(tdLen);
+	}
+	Stream_Release(td);
+
+	/* Autodetect PDU length helper: 0x08 base + payloadLength. */
+	{
+		BYTE bwPayload[8 + 16] = { 0x08, 0x00, 0x01, 0x00, 0x02, 0x00, 0x10, 0x00,
+		                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		if (rdpemt_autodetect_pdu_length(bwPayload, sizeof(bwPayload)) !=
+		    sizeof(bwPayload))
+		{
+			(void)fprintf(stderr, "autodetect pdu length mismatch\n");
+			return -1;
+		}
+		if (rdpemt_autodetect_pdu_length(bwPayload, 7) != 0)
+		{
+			(void)fprintf(stderr, "autodetect truncated should be 0\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
+static int test_v2_data_ackvec_order(void)
+{
+	/* Fixture per MS-RDPEUDP2 2.2.1 order: Header, DataHeader, ACKVEC, DataBody.
+	 * flags = DATA|ACKVEC, logWindow=5. DataSeq=0x1111, ACKVEC base=0x2222 with
+	 * one bitmap byte (0x01 = first seq received), ChannelSeq=0x3333, body "AB". */
+	const BYTE ackvecRaw[] = { 0x22, 0x22, 0x01, 0x01 };
+	const BYTE body[] = { 'A', 'B' };
+	RdpUdp2Layout enc = WINPR_C_ARRAY_INIT;
+	enc.flags = (UINT16)(RDPUDP2_FLAG_DATA | RDPUDP2_FLAG_ACKVEC);
+	enc.logWindow = 5;
+	enc.hasDataHeader = TRUE;
+	enc.dataSeq = 0x1111;
+	enc.hasAckvec = TRUE;
+	enc.ackvec = ackvecRaw;
+	enc.ackvecLen = sizeof(ackvecRaw);
+	enc.hasDataBody = TRUE;
+	enc.channelSeq = 0x3333;
+	enc.dataBody = body;
+	enc.dataBodyLen = sizeof(body);
+
+	wStream* s = rdpeudp2_encode_layout(&enc);
+	if (!s)
+	{
+		(void)fprintf(stderr, "encode_layout failed\n");
+		return -1;
+	}
+	/* Expected layout bytes (LE): header 0x500C, dataSeq, ackvec, channelSeq, body. */
+	const BYTE expected[] = { 0x0C, 0x50, 0x11, 0x11, 0x22, 0x22,
+	                            0x01, 0x01, 0x33, 0x33, 'A',  'B' };
+	if ((Stream_Length(s) != sizeof(expected)) ||
+	    (memcmp(Stream_Buffer(s), expected, sizeof(expected)) != 0))
+	{
+		(void)fprintf(stderr, "encode_layout order mismatch\n");
+		Stream_Release(s);
+		return -1;
+	}
+
+	/* Parse back and verify split: DataHeader before ACKVEC before DataBody.
+	 * Validate before releasing s (dec points into its buffer). */
+	RdpUdp2Layout dec = WINPR_C_ARRAY_INIT;
+	if (!rdpeudp2_parse_layout(Stream_Buffer(s), Stream_Length(s), &dec))
+	{
+		(void)fprintf(stderr, "parse_layout failed\n");
+		Stream_Release(s);
+		return -1;
+	}
+	{
+		BOOL ok = dec.hasDataHeader && dec.hasAckvec && dec.hasDataBody &&
+		          (dec.dataSeq == 0x1111) && (dec.channelSeq == 0x3333) &&
+		          (dec.dataBodyLen == 2) && (memcmp(dec.dataBody, "AB", 2) == 0) &&
+		          (dec.ackvecLen == sizeof(ackvecRaw)) &&
+		          (memcmp(dec.ackvec, ackvecRaw, sizeof(ackvecRaw)) == 0);
+		Stream_Release(s);
+		s = nullptr;
+		if (!ok)
+		{
+			(void)fprintf(stderr, "parse_layout data mismatch\n");
+			return -1;
+		}
+	}
+	/* Old buggy order (DataHeader, DataBody, ACKVEC) must NOT parse as valid
+	 * DATA+ACKVEC with same semantics: channelSeq would be misread. */
+	{
+		const BYTE buggy[] = { 0x0C, 0x50, 0x11, 0x11, 0x33, 0x33, 'A',
+	                             'B',  0x22, 0x22, 0x01, 0x01 };
+		RdpUdp2Layout bad = WINPR_C_ARRAY_INIT;
+		if (rdpeudp2_parse_layout(buggy, sizeof(buggy), &bad))
+		{
+			/* Parses structurally, but DataBody must be trailing "22 22 01 01"
+			 * region, not "AB": proves order matters (channelSeq differs). */
+			if (bad.hasDataBody && (bad.channelSeq == 0x3333))
+			{
+				(void)fprintf(stderr, "buggy order unexpectedly matches\n");
+				return -1;
+			}
+		}
 	}
 	return 0;
 }
@@ -448,6 +615,11 @@ int TestRdpeUdp(int argc, char* argv[])
 	if (test_autodetect_framing() != 0)
 	{
 		(void)fprintf(stderr, "test_autodetect_framing FAILED\n");
+		return -1;
+	}
+	if (test_v2_data_ackvec_order() != 0)
+	{
+		(void)fprintf(stderr, "test_v2_data_ackvec_order FAILED\n");
 		return -1;
 	}
 

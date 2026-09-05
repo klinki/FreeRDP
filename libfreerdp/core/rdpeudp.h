@@ -150,6 +150,46 @@ typedef struct
 	size_t vectorLen;
 } RdpUdp2AckVecPayload;
 
+/* Pure RDP-UDP2 layout codec in spec order ([MS-RDPEUDP2] 2.2.1):
+ * Header, ACK, OverheadSize, DelayAckInfo, AckOfAcks, DataHeader, ACKVEC,
+ * DataBody. No socket, clock, or transport state; prefix transform is
+ * applied separately via rdpeudp2_protect/unprotect. */
+typedef struct
+{
+	UINT16 flags; /* 12 bits */
+	UINT8 logWindow; /* 4 bits */
+	BOOL hasAck;
+	UINT16 ackBase;
+	BYTE ackTs[3];
+	BYTE ackGap;
+	BYTE ackNumDelayed;
+	BYTE ackScale;
+	const BYTE* ackDelayed;
+	size_t ackDelayedLen;
+	BOOL hasOverhead;
+	BYTE overhead;
+	BOOL hasDelayAck;
+	BYTE delayMax;
+	UINT16 delayTimeout;
+	BOOL hasAoa;
+	UINT16 aoa;
+	BOOL hasDataHeader;
+	UINT16 dataSeq;
+	BOOL hasAckvec;
+	const BYTE* ackvec;
+	size_t ackvecLen; /* raw ACKVEC bytes: base(2)+b2(1)+[ts(4)]+vector */
+	BOOL hasDataBody;
+	UINT16 channelSeq;
+	const BYTE* dataBody;
+	size_t dataBodyLen;
+} RdpUdp2Layout;
+
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp2_parse_layout(const BYTE* layout, size_t len, RdpUdp2Layout* out);
+
+WINPR_ATTR_NODISCARD
+FREERDP_API wStream* rdpeudp2_encode_layout(const RdpUdp2Layout* in);
+
 /** Apply the [MS-RDPEUDP2] 3.1.1.1.5 prefix transform for sending.
  * Takes a complete RDP-UDP2 packet layout in @p s (position = length),
  * prepends PacketPrefixByte and swaps bytes 0 and 7. */
@@ -174,10 +214,10 @@ WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_parse_ackvec(const BYTE* data, size_t len, UINT16* baseSeq,
                                       BOOL** received, size_t* count);
 
-/* ---- channel framing over RDP_TUNNEL_DATA ----
- * First byte payload type: 0x00=channel, 0x01=autodetect_req, 0x02=autodetect_rsp.
- * Channel: type(1)+channelId(2)+totalSize(4)+flags(4)+chunkLen(2)+chunk.
- * Autodetect: type(1)+secFlags(2)+autodetect PDU. Plaintext (TLS encrypts). */
+/* ---- channel framing in HigherLayerData ----
+ * type(1)=0x00 + channelId(2)+totalSize(4)+flags(4)+chunkLen(2)+chunk.
+ * Autodetect travels in Tunnel DATA subheaders (MS-RDPEMT 2.2.1.1.1), not here.
+ * Plaintext (TLS encrypts). */
 WINPR_ATTR_NODISCARD
 FREERDP_API wStream* rdpeudp_build_channel_packet(UINT16 channelId, UINT32 totalSize,
                                                   UINT32 flags, const BYTE* chunk,
@@ -186,17 +226,11 @@ WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_parse_channel_packet(const BYTE* data, size_t len, UINT16* channelId,
                                               UINT32* totalSize, UINT32* flags,
                                               const BYTE** chunk, size_t* chunkLen);
-WINPR_ATTR_NODISCARD
-FREERDP_API wStream* rdpeudp_build_autodetect_packet(BOOL isRequest, UINT16 secFlags,
-                                                     const BYTE* pdu, size_t pduLen);
-WINPR_ATTR_NODISCARD
-FREERDP_API BOOL rdpeudp_parse_autodetect_packet(const BYTE* data, size_t len, BOOL* isRequest,
-                                                 UINT16* secFlags, const BYTE** pdu,
-                                                 size_t* pduLen);
-WINPR_ATTR_NODISCARD
-FREERDP_API BOOL rdpeudp_parse_tunnel_ptype(const BYTE* data, size_t len, BYTE* ptype);
 
 /* ---- tunnel codec ([MS-RDPEMT] 2.2, little-endian) ---- */
+
+#define RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ 0x00
+#define RDP_TUNNEL_SUBHEADER_AUTODETECT_RSP 0x01
 
 WINPR_ATTR_NODISCARD
 FREERDP_API wStream* rdpemt_build_create_request(UINT32 requestId, const BYTE* cookie);
@@ -204,6 +238,31 @@ WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpemt_parse_create_response(const BYTE* data, size_t len, UINT32* hr);
 WINPR_ATTR_NODISCARD
 FREERDP_API wStream* rdpemt_build_data(const BYTE* data, size_t len);
+/* Tunnel DATA with explicit subheaders + HigherLayerData (MS-RDPEMT 2.2.1.1,
+ * 2.2.1.1.1, 2.2.2.3). HeaderLength = 4 + subheadersLen, PayloadLength =
+ * higherLayerLen. */
+WINPR_ATTR_NODISCARD
+FREERDP_API wStream* rdpemt_build_tunnel_data(const BYTE* subheaders, size_t subheadersLen,
+                                              const BYTE* higherLayer, size_t higherLayerLen);
+/* Single subheader: SubHeaderLength(1)=2, SubHeaderType(1), SubHeaderData. */
+WINPR_ATTR_NODISCARD
+FREERDP_API wStream* rdpemt_build_subheader(BYTE subHeaderType, const BYTE* data, size_t dataLen);
+/* Length of an autodetect PDU starting at data (0 if incomplete). Uses
+ * headerLength + payloadLength fields per MS-RDPBCGR 2.2.14. */
+WINPR_ATTR_NODISCARD
+FREERDP_API size_t rdpemt_autodetect_pdu_length(const BYTE* data, size_t len);
+/* Iterate subheaders: at *offset, returns type + data + dataLen, advances
+ * offset past this subheader (2 + autodetect len). FALSE when done/invalid. */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpemt_next_subheader(const BYTE* subheaders, size_t subheadersLen,
+                                       size_t* offset, BYTE* subHeaderType,
+                                       const BYTE** subData, size_t* subDataLen);
+/* Decode a 4-byte tunnel header to learn payload/subheader lengths before the
+ * rest of the PDU has been read. Unlike rdpemt_parse_header it does not
+ * require the full PDU to be present. */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpemt_decode_header(const BYTE* data, size_t len, BYTE* action,
+                                      UINT16* payloadLen, UINT8* headerLen);
 WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpemt_parse_header(const BYTE* data, size_t len, BYTE* action,
                                      UINT16* payloadLen, UINT8* headerLen);
@@ -241,6 +300,25 @@ FREERDP_LOCAL SSIZE_T rdpeudp_tunnel_send(rdpUdpTransport* udp, const BYTE* data
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL SSIZE_T rdpeudp_tunnel_recv(rdpUdpTransport* udp, BYTE* buffer, size_t len,
                                            DWORD timeoutMs);
+/* Tunnel DATA with explicit subheaders (MS-RDPEMT 2.2.1.1.1). Sends one PDU
+ * with HeaderLength=4+subheadersLen and PayloadLength=higherLayerLen.
+ * Returns higherLayerLen on success, -1 on error. */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL SSIZE_T rdpeudp_tunnel_send_full(rdpUdpTransport* udp, const BYTE* subheaders,
+                                               size_t subheadersLen, const BYTE* higherLayer,
+                                               size_t higherLayerLen);
+/* Single autodetect PDU as a Tunnel DATA subheader (empty HigherLayerData).
+ * subHeaderType is RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ/RSP. Returns pduLen. */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL SSIZE_T rdpeudp_tunnel_send_autodetect(rdpUdpTransport* udp, BYTE subHeaderType,
+                                                     const BYTE* pdu, size_t pduLen);
+/* Receive one Tunnel DATA PDU, splitting subheaders and HigherLayerData.
+ * Returns 1 on PDU received, 0 on timeout (no PDU), -1 on error. */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL int rdpeudp_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf, size_t subBufLen,
+                                           size_t* subLenOut, BYTE* payloadBuf,
+                                           size_t payloadBufLen, size_t* payloadLenOut,
+                                           DWORD timeoutMs);
 
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL rdpeudp_is_connected(const rdpUdpTransport* udp);
@@ -265,6 +343,10 @@ FREERDP_LOCAL BOOL rdpeudp_check_keepalive(rdpUdpTransport* udp, DWORD idleMs);
 FREERDP_LOCAL BOOL rdpeudp_get_stats(const rdpUdpTransport* udp, RdpUdpStats* stats);
 FREERDP_LOCAL int rdpeudp_get_sockfd(const rdpUdpTransport* udp);
 FREERDP_LOCAL HANDLE rdpeudp_get_event(rdpUdpTransport* udp);
+/* Non-owning cancel signal; checked by blocking establishment and I/O loops. */
+FREERDP_LOCAL void rdpeudp_set_abort_event(rdpUdpTransport* udp, HANDLE abortEvent);
+/* Drain-safe re-arm of the readiness event (reset + recheck). */
+FREERDP_LOCAL void rdpeudp_update_event(rdpUdpTransport* udp);
 
 /** BIO wrapping the reliable RDPEUDP2 stream (for TLS). */
 WINPR_ATTR_NODISCARD
@@ -274,11 +356,18 @@ FREERDP_LOCAL BIO_METHOD* BIO_s_rdpeudp(void);
  * Binds a UDP socket on @p port, performs SYN handshake as server,
  * TLS accept with @p settings, validates Tunnel Create against
  * @p expectedReqId/@p expectedCookie, sends Tunnel Create Response.
+ * @p abortEvent (optional, non-owning) is polled for cooperative cancel.
  * Returns a connected transport or NULL. */
 WINPR_ATTR_MALLOC(rdpeudp_free, 1)
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL rdpUdpTransport* rdpeudp_accept(rdpContext* context, int port,
                                               UINT32 expectedReqId,
                                               const BYTE* expectedCookie, DWORD timeoutMs);
+WINPR_ATTR_MALLOC(rdpeudp_free, 1)
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port,
+                                                 UINT32 expectedReqId,
+                                                 const BYTE* expectedCookie, DWORD timeoutMs,
+                                                 HANDLE abortEvent);
 
 #endif /* FREERDP_LIB_CORE_RDPEUDP_H */

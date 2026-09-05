@@ -52,6 +52,17 @@ static UINT32* autodetect_bw_count_slot(rdpAutoDetect* autodetect, RDP_TRANSPORT
 	return &autodetect->bandwidthMeasureByteCount;
 }
 
+void autodetect_account_udp_bytes(rdpAutoDetect* autodetect, size_t bytes)
+{
+	UINT32* slot = nullptr;
+	UINT64 add = 0;
+	if (!autodetect || (bytes == 0))
+		return;
+	slot = autodetect_bw_count_slot(autodetect, RDP_TRANSPORT_UDP_R);
+	add = (UINT64)*slot + bytes;
+	*slot = (add > UINT32_MAX) ? UINT32_MAX : (UINT32)add;
+}
+
 static BOOL autodetect_try_send_udp(rdpAutoDetect* autodetect, RDP_TRANSPORT_TYPE transport,
                                     BOOL isRequest, UINT16 secFlags, wStream* s,
                                     size_t payloadOffset)

@@ -67,6 +67,23 @@ FREERDP_LOCAL BOOL multitransport_is_udp_connected(const rdpMultitransport* mult
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL rdpUdpTransport* multitransport_get_udp(rdpMultitransport* multi);
 
+/* Migration gating (MS-RDPEDYC 3.1.5.3 Soft-Sync, MS-RDPEMT 1.3).
+ * Tunnel establishment alone does NOT authorize DVC migration when Soft-Sync
+ * was negotiated. Send/recv each require their direction to be migrated. */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL multitransport_is_udp_send_migrated(const rdpMultitransport* multi);
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL multitransport_is_udp_recv_migrated(const rdpMultitransport* multi);
+/* Soft-Sync event hooks (called from DRDYNVC layer on TCP when PDUs observed):
+ * - request sent (server): server may now send on UDP.
+ * - request received (client): client must reply, then migrate both directions.
+ * - response received (server): server may now recv on UDP (send already migrated).
+ * Without Soft-Sync negotiation these are no-ops (migration immediate). */
+FREERDP_LOCAL void multitransport_on_soft_sync_request_sent(rdpMultitransport* multi);
+FREERDP_LOCAL void multitransport_on_soft_sync_request_received(rdpMultitransport* multi);
+FREERDP_LOCAL void multitransport_on_soft_sync_response_sent(rdpMultitransport* multi);
+FREERDP_LOCAL void multitransport_on_soft_sync_response_received(rdpMultitransport* multi);
+
 /* Channel data over UDP ([MS-RDPEMT] RDP_TUNNEL_DATA + plaintext channel PDU).
  * Tries UDP tunnel first if connected and channel is UDP-capable (drdynvc);
  * returns TRUE if sent over UDP, FALSE to fall back to TCP. */
