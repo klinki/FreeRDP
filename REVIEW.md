@@ -2,10 +2,10 @@
 
 Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
-Latest review: 2026-09-05 (commit `6fefaf21e`)
-Review result: U1 verified fixed; no new actionable findings in this commit.
+Latest review: 2026-09-05 (commit `11408bc5e`)
+Review result: V1/V2 fixed in working tree (see below); prior U1 remains fixed.
 
-Latest scope: commit `6fefaf21e` against its parent, with relevant UDP and DVC integration paths. Earlier sections retain the original review history.
+Latest scope: commit `11408bc5e` against its parent, with relevant UDP and DVC integration paths. Earlier sections retain the original review history.
 
 The original review identified eight P1 correctness issues. Re-review of commit
 `a9eb02727` found three blocking issues: an encoder/protector integration regression,
@@ -482,7 +482,7 @@ header, confirming the rewind and validation integration (see latest validation)
 - U1 locations refer to `1354c6e2a`; historical findings retain their earlier
   locations and validation results.
 
-## Latest review of `6fefaf21e`
+## Re-review of `6fefaf21e`
 
 No new actionable findings were identified in this commit. U1 is verified fixed.
 The shared request parser preserves the previous strict core checks, and the
@@ -507,6 +507,111 @@ before the new one-byte rewind.
 - This is focused build, static, and extracted-handler validation. No full
   application build, live-peer/TLS session, allocation-failure injection, or
   ASAN run was performed. Earlier integration limitations remain open.
+
+## Latest review of `11408bc5e`
+
+### V1. [P1] Do not choose the stream start from the first arriving DATA packet
+
+Location: `libfreerdp/core/rdpeudp.c:1721–1725`; related DataSeq rebasing at
+lines 1561–1568.
+
+The new initialization overwrites `expectedChannelSeq` with the first received
+ChannelSeq, regardless of whether earlier packets are still in flight. If a
+peer sends chunks 1 and 2 and UDP delivers chunk 2 first, chunk 2 is immediately
+written into the TLS stream. When chunk 1 arrives (or is retransmitted), the
+comparison against the now-advanced expected sequence classifies it as already
+delivered and discards it permanently. The DataSeq rebasing likewise forgets
+the initial gap. This turns ordinary initial packet loss/reordering into an
+unrecoverable truncated TLS stream.
+
+An isolated harness using the unchanged current DATA handling block and receive
+sequence helper produced:
+
+```text
+arrival 2:B,1:A -> delivered B length=1 expectedChannel=3
+```
+
+The expected result is no delivery on arrival of chunk 2, then `AB` once chunk 1
+arrives. Preserve the defined initial channel sequence and buffer later chunks.
+Any compatibility mode for zero-based peers must establish the starting sequence
+without inferring it from an arbitrary first arrival. Add initial-reordering and
+lost-first-chunk/retransmission coverage. The Microsoft test SDK uses similar
+first-packet channel rebasing; copying it does not remove this ordering failure.
+
+**Status: FIXED in working tree.** First-arrival rebasing removed for both
+sequences: `expectedChannelSeq` stays at fixed `1` (no `haveRecvChannel`
+inference; field removed) so chunk 2 is buffered and `1` then delivers `AB`;
+`recvDataBase` stays at fixed `1` (no rebase to first `dseq`) so the initial
+gap is preserved in the seen bitmap. `haveRecvData` is set only when an
+in-window DATA is recorded and gates ACK validity. `accept_ex` gets the same
+`1`-start init as the client (was zeroed by `calloc`).
+
+### V2. [P2] [FIXED] Preserve the highest contiguous ACK after filling a gap
+
+Location: `libfreerdp/core/rdpeudp.c:1859–1863`.
+
+The new unconditional `!anySeen` fallback replaces `recvDataBase - 1` with
+`lastAckSent`. However, the receive helper sets `lastAckSent` to the most recently
+arrived DataSeq, which can be lower than the highest contiguous sequence.
+For arrival order 1, 3, 2, the final packet closes the gap and advances the base
+to 4, leaving the bitmap empty. The new code consequently sends ACK(2) instead
+of ACK(3). If the earlier ACKVEC for 3 was lost, the sender must unnecessarily
+retransmit already received data and may remain blocked waiting for that ACK.
+Previously the fallback applied only when the base was zero.
+
+The focused harness confirmed `recvBase=4`, `lastAckSent=2`, and selected ACK=2
+for that arrival order. After `haveRecvData` is true and there are no gaps, retain
+`recvDataBase - 1`; do not replace it with the last arrival. Test gap closure and
+16-bit wraparound.
+
+**Status: FIXED in working tree.** Cumulative ACK is always `recvDataBase - 1`;
+the `!anySeen → lastAckSent` fallback is removed from `send_ack`, and
+piggybacked ACKs (`send_reliable`, retransmit) plus keepalive now use `base - 1`
+instead of the last arrival. `1,3,2` gap closure now ACKs `3`. `lastAckSent`
+remains as a diagnostic only. `TestCore` builds; `TestRdpeUdp`/`TestVersion`/
+`TestUtils` pass. Gap-closure/wraparound unit coverage and live-peer capture
+remain for re-review.
+
+### Assessment of the debugging message
+
+- The send-side comparison is supported: Microsoft's test SDK initializes sender
+  DataSeq and ChannelSeq to 1 and omits ACK when `CreateAckPayload()` has no data
+  to acknowledge. The commit implements those changes in the client constructor,
+  first sends, and retransmits. This is a reasonable interoperability experiment.
+- The capture supports ten attempts about 204 ms apart with increasing DataSeq
+  and fixed ChannelSeq, and no inbound packet after SYN+ACK during its 1.836-second
+  duration. That is consistent with the retransmit path. It does **not** establish
+  where Windows dropped the packets, or prove ACK(0)/zero-start caused the silence.
+  Packet delivery, handshake acceptance, server behavior, and return-path loss
+  are not distinguished by a client-side capture alone.
+- Successful dissection establishes that fields can be decoded, not full protocol
+  validity or peer acceptance. OVERHEADSIZE and DELAYACKINFO are defined optional
+  payloads; the old capture does not isolate them as causes. A new successful
+  trace would support the combined change, but would not isolate which change
+  mattered.
+- The frame-3 v1 ACK explains the dissector's UDP2 misinterpretation. Its decoded
+  raw flags/ack sequence do not by themselves prove the server accepted it.
+- Scope caveat: `rdpeudp_accept_ex` separately allocates a zeroed transport and
+  still leaves outgoing sequence counters at zero. The one-start initialization
+  is client-side, not common to both constructors. Also, this commit removes
+  initial DATA piggybacking; ACK-only packets can still carry OVERHEADSIZE.
+- The message's “working tree / uncommitted” description is stale: the changes
+  are committed as `11408bc5e`. No new capture was supplied to verify the result.
+
+Sources: [Microsoft test SDK protocol handler](https://github.com/microsoft/WindowsProtocolTestSuites/blob/main/ProtoSDK/MS-RDPEUDP2/Rdpeudp2ProtocolHandler.cs),
+[Microsoft packet header flags](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp2/501167f0-ad5c-4c05-b8f7-2649b2181b85),
+[Microsoft ACK processing](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp2/32be8113-cdb4-4843-809c-3fa3aa886971).
+
+### Validation of `11408bc5e`
+
+- `TestCore` built successfully; core `TestRdpeUdp`, `TestVersion`, and `TestUtils`
+  all passed. The commit adds no regression tests for the changed state logic.
+- `/tmp/udp-review-11408-order.c` compiles extracted current receive function
+  bodies with minimal state definitions and WinPR streams. It reproduces V1;
+  the same harness reproduces V2 using the receive helper and the ACK-selection
+  expressions. It does not exercise sockets or TLS.
+- No live Windows session or post-fix packet capture was performed. Only this
+  review document was edited in the repository.
 
 ## Earlier validation and limitations
 

@@ -840,13 +840,13 @@ struct rdp_udp_transport
 	BOOL useUdp2;
 
 	/* v2 reliable state ([MS-RDPEUDP2] reference: seq starts at 1, no ACK
-	 * until data received). */
+	 * until data received). Fixed 1-start (V1): never rebase from first
+	 * arrival; buffer reordered chunks. */
 	UINT16 nextDataSeq;
 	UINT16 nextChannelSeq;
 	UINT16 expectedChannelSeq;
-	BOOL haveRecvChannel; /* first DATA sets expectedChannelSeq */
-	BOOL haveRecvData;    /* TRUE once any DATA received (ACK valid) */
-	UINT16 lastAckSent;
+	BOOL haveRecvData;    /* TRUE once any in-window DATA recorded (ACK valid) */
+	UINT16 lastAckSent;   /* last arrival (diagnostic only; ACK uses base-1, V2) */
 	UINT16 lastAckReceived;
 	UINT16 lastAoaSent;
 	BYTE logWindow;
@@ -1035,7 +1035,6 @@ rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port
 	udp->nextDataSeq = 1;
 	udp->nextChannelSeq = 1;
 	udp->expectedChannelSeq = 1;
-	udp->haveRecvChannel = FALSE;
 	udp->haveRecvData = FALSE;
 	udp->recvDataBase = 1;
 	udp->overhead = 50; /* avg RDPUDP2+UDP+IP overhead estimate */
@@ -1558,18 +1557,13 @@ static void rdpeudp_ack_single_locked(rdpUdpTransport* udp, UINT16 dseq)
 
 static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 {
-	/* First DATA defines the base so 0-start (old) and 1-start (MS) peers
-	 * both interoperate. */
-	if (!udp->haveRecvData)
-	{
-		memset(udp->recvDataSeen, 0, sizeof(udp->recvDataSeen));
-		udp->recvDataBase = dseq;
-		udp->haveRecvData = TRUE;
-	}
+	/* V1: fixed 1-start base, never rebase from first arrival. Out-of-order
+	 * chunks are buffered (seen bitmap); base advances only on contiguous
+	 * prefix. haveRecvData gates ACK validity. */
 	const size_t WIN = ARRAYSIZE(udp->recvDataSeen);
 	INT16 diff = (INT16)(dseq - udp->recvDataBase);
 	if (diff < 0)
-		return; /* duplicate/old, still acked via lastAckSent */
+		return; /* duplicate/old, still acked via base-1 */
 	if ((size_t)diff >= WIN)
 	{
 		/* Window slide: advance base to dseq-WIN+1, dropping old */
@@ -1587,6 +1581,7 @@ static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 			return;
 	}
 	udp->recvDataSeen[diff] = TRUE;
+	udp->haveRecvData = TRUE;
 	/* Advance base while contiguous */
 	while (udp->recvDataSeen[0])
 	{
@@ -1718,12 +1713,8 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 
 			rdpeudp_note_recv_data_seq_locked(udp, dseq);
 
-			/* First DATA defines channel base (MS starts at 1, old code at 0). */
-			if (!udp->haveRecvChannel)
-			{
-				udp->expectedChannelSeq = cseq;
-				udp->haveRecvChannel = TRUE;
-			}
+			/* V1: fixed 1-start expectedChannelSeq; buffer later chunks,
+			 * deliver in order. Never infer start from first arrival. */
 			/* Deduplicate by channel seq */
 			BOOL dup = FALSE;
 			if (((INT16)(cseq - udp->expectedChannelSeq) < 0))
@@ -1856,11 +1847,11 @@ static BOOL rdpeudp2_send_ack(rdpUdpTransport* udp)
 		}
 		if (!useAckvec)
 		{
-			/* Contiguous: cumulative ACK of base-1 (last received contiguous) */
+			/* V2: cumulative ACK is highest contiguous (base-1), never the
+			 * last arrival. After gap closure (e.g., 1,3,2 -> base=4) this
+			 * sends ACK(3); last-arrival fallback would send ACK(2) and
+			 * force needless retransmit. */
 			ackBase = (UINT16)(udp->recvDataBase - 1);
-			/* Fallback when nothing buffered (e.g., all acked). */
-			if (!anySeen)
-				ackBase = udp->lastAckSent;
 		}
 	}
 	aoa = udp->lastAckReceived;
@@ -2176,7 +2167,9 @@ static BOOL rdpeudp2_wait_acked(rdpUdpTransport* udp, UINT16 channelSeq, DWORD t
 						return FALSE;
 					}
 					memcpy(tmp, cdata, clen);
-					const UINT16 ackBase = udp->lastAckSent;
+					/* V2: piggyback highest contiguous (base-1), never last
+					 * arrival. */
+					const UINT16 ackBase = (UINT16)(udp->recvDataBase - 1);
 					const BOOL hasRecv = udp->haveRecvData;
 					LeaveCriticalSection(&udp->lock);
 
@@ -2288,7 +2281,8 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 		udp->sent[slot].sentTs = udp_now_ms();
 		udp->sent[slot].retries = 0;
 		udp->sentCount++;
-		const UINT16 ackBase = udp->lastAckSent;
+		/* V2: piggyback highest contiguous (base-1), never last arrival. */
+		const UINT16 ackBase = (UINT16)(udp->recvDataBase - 1);
 		const BOOL hasRecv = udp->haveRecvData;
 		LeaveCriticalSection(&udp->lock);
 
@@ -3023,18 +3017,14 @@ BOOL rdpeudp_send_keepalive(rdpUdpTransport* udp)
 
 	EnterCriticalSection(&udp->lock);
 	const BOOL useAckvec = FALSE;
-	/* No spurious ACK(0) keepalive before first server DATA. */
+	/* No spurious ACK(0) keepalive before first server DATA. V2: use base-1. */
 	if (!udp->haveRecvData)
 	{
 		LeaveCriticalSection(&udp->lock);
 		udp->lastKeepaliveTs = udp_now_ms();
 		return TRUE;
 	}
-	UINT16 base = 0;
-	if (udp->recvDataBase != 0 || udp->recvDataSeen[0])
-		base = (UINT16)(udp->recvDataBase - 1);
-	else
-		base = udp->lastAckSent;
+	const UINT16 base = (UINT16)(udp->recvDataBase - 1);
 	LeaveCriticalSection(&udp->lock);
 	WINPR_UNUSED(useAckvec);
 
@@ -3179,6 +3169,12 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 	udp->negotiatedUpMtu = RDPUDP2_MTU;
 	udp->negotiatedDownMtu = RDPUDP2_MTU;
 	udp->maxPayload = RDPUDP2_MAX_PAYLOAD;
+	/* V1/V2: same fixed 1-start as client (was zeroed by calloc). */
+	udp->nextDataSeq = 1;
+	udp->nextChannelSeq = 1;
+	udp->expectedChannelSeq = 1;
+	udp->haveRecvData = FALSE;
+	udp->recvDataBase = 1;
 	udp->overhead = 50;
 	udp->delayAckMax = 2;
 	udp->delayAckTimeoutMs = 50;
