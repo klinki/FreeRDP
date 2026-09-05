@@ -301,18 +301,14 @@ BOOL freerdp_channel_process(freerdp* instance, wStream* s, UINT16 channelId, si
 		return FALSE;
 	}
 
-	/* Soft-Sync migration snooping (TCP drdynvc, single-chunk control PDU). */
+	/* Soft-Sync migration snooping (TCP drdynvc chunks, T1: reassembles
+	 * fragmented requests; single-chunk requests complete immediately). */
 	if (instance && instance->context && instance->context->rdp &&
 	    instance->context->rdp->multitransport &&
-	    ((flags & (CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST)) ==
-	     (CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST)) &&
 	    channel_is_drdynvc(instance->context->rdp, channelId) && (chunkLength >= 1))
 	{
-		UINT8 rcmd = 0;
-		if (dvc_pdu_cmd(Stream_Pointer(s), chunkLength, &rcmd) &&
-		    (rcmd == DVC_CMD_SOFT_SYNC_REQUEST))
-			multitransport_on_soft_sync_request_received(
-			    instance->context->rdp->multitransport, Stream_Pointer(s), chunkLength);
+		multitransport_soft_sync_recv_feed(instance->context->rdp->multitransport,
+		                                     Stream_Pointer(s), chunkLength, flags);
 	}
 
 	IFCALLRET(instance->ReceiveChannelData, rc, instance, channelId, Stream_Pointer(s), chunkLength,

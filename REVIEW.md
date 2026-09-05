@@ -2,8 +2,9 @@
 
 Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
-Latest review: 2026-09-05 (commit `02ec5a114`)
-Resolved: 2026-09-06 — S1–S3 fixed in working tree (see below), P1-8 closed via S2.
+Latest review: 2026-09-05 (commit `444b698b3`)
+Resolved: 2026-09-06 — T1/T2 fixed in working tree (see below); all P1s closed.
+Resolved: 2026-09-06 — T1/T2 fixed in working tree (see below); all P1s closed.
 
 Scope: currently modified files and newly added UDP implementation files.
 
@@ -11,10 +12,10 @@ The original review identified eight P1 correctness issues. Re-review of commit
 `a9eb02727` found three blocking issues: an encoder/protector integration regression,
 incomplete Soft-Sync handling, and loss of partial tunnel receive state.
 
-Commit `02ec5a114` fixes R1's encoder/protector integration and adds a Soft-Sync
-handler and persistent tunnel receive buffer. The S1–S3 findings below are now
-FIXED in the working tree (zero-timeout read, per-DVC mapping, strict validation;
-unit-covered, live-peer validation still pending).
+Commit `444b698b3` fixes the zero-timeout early return and adds per-DVC routing
+and stricter core parsing. The T1–T2 findings below are now FIXED in the working
+tree (mapping install prerequisite with dynamic allocation, fragmented-request
+reassembly feed, single strict parser shared by handler and migration).
 
 The original buffer-length, header-decoding, invalid-free, worker-join, and socket
 readiness fixes are present. Earlier sections preserve the review history; the
@@ -138,7 +139,7 @@ Route channels according to negotiated migration state rather than tunnel connec
 
 Reference: [Microsoft: multitransport setup and Soft-Sync requirements](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpemt/02d833db-5c7c-4c15-a18e-179df6d8a34d).
 
-**Status: FIXED (via S2 below).** Migration state (`softSyncNegotiated/Complete`, `udpSend/RecvMigrated`)
+**Status: FIXED (via S2 + T1/T2 below).** Migration state (`softSyncNegotiated/Complete`, `udpSend/RecvMigrated`)
 with `is_udp_send/recv_migrated` gates (not mere connectivity). Without Soft-Sync,
 migration latches only if the tunnel is ready pre-`ACTIVE` (post-`ACTIVE` completion
 stays TCP-safe to avoid reordering in-flight TCP vs new UDP). With Soft-Sync,
@@ -176,7 +177,7 @@ header) before `protect`. New `test_v2_encode_protect_roundtrip` covers the full
 encode → protect → unprotect → parse path and asserts the wire bytes are not the
 all-zeros regression output.
 
-### R2. [P1] [FIXED] Implement Soft-Sync handling beyond command snooping
+### R2. [P1] [PARTIALLY FIXED] Implement Soft-Sync handling beyond command snooping
 
 Location: `libfreerdp/core/channels.c:275–281`; downstream handler:
 `channels/drdynvc/client/drdynvc_main.c:1637` (`drdynvc_order_recv`).
@@ -191,7 +192,7 @@ Implement request validation and response generation in the DVC layer, honoring
 the requested channel/tunnel lists rather than switching the entire `drdynvc`
 multiplex.
 
-**Status: FIXED (see S2 below for per-DVC completion).** Client and server now handle Soft-Sync control PDUs.
+**Status: Partially fixed; T1–T2 remain open.** Client and server now handle Soft-Sync control PDUs.
 However, the implementation skips DVC IDs instead of retaining them for routing,
 and request validation is incomplete. The offer-helper tests do not establish
 that complete handshake processing or per-channel selection works. See S2–S3.
@@ -220,7 +221,7 @@ checks or TLS read and cannot populate that buffer. `test_tunnel_split` only cal
 header/codec helpers with differently sized byte spans; it never calls
 `rdpeudp_tunnel_recv_full` or exercises timeouts and persistent receive state.
 
-## Latest findings for `02ec5a114`
+## Review findings for `02ec5a114`
 
 ### S1. [P1] [FIXED] Allow a zero-timeout poll to read available TLS bytes
 
@@ -257,7 +258,7 @@ too small), which `recv_full` uses for all buffer decisions; new
 asserting order, alignment, and corrupt rejection. A full `recv_full`-with-TLS
 harness still needs live transport and remains future work.
 
-### S2. [P1] [FIXED] Retain DVC IDs and apply migration per channel
+### S2. [P1] [PARTIALLY FIXED] Retain DVC IDs and apply migration per channel
 
 Location: `channels/drdynvc/client/drdynvc_main.c:1729–1733`; related helper at
 `libfreerdp/core/rdpeudp.c:593–595` and routing in `multitransport.c`/`channels.c`.
@@ -274,7 +275,7 @@ implementation cannot support a requested mapping, do not silently broaden it to
 all channels. Add a test with one migrated DVC and another remaining on TCP;
 checking only whether the request mentions UDPFECR is insufficient.
 
-**Status: FIXED.** `multitransport` stores the UDPFECR-listed DVC IDs
+**Status: Mapping added, but installation is not tied to response acceptance (T1).** `multitransport` stores the UDPFECR-listed DVC IDs
 (`udpDvcIds`, `mappingActive`; reset on tunnel setup/teardown) populated by
 strict-validating request hooks; new `multitransport_is_dvc_migrated` gates each
 send on direction-migrated AND (no mapping OR ID listed), with `dvc_get_id`
@@ -286,7 +287,7 @@ unit-tested with a 2-tunnel fixture (`{7,8}` migrate, `9` on lossy does not).
 References: [Microsoft: Soft-Sync channel lists](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/bcc93699-6e47-49a5-aa88-e7fd09b1128a),
 [Microsoft: sending the Soft-Sync request](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/b64bcbe9-569f-4cec-906d-b02659aee043).
 
-### S3. [P2] [FIXED] Validate the entire Soft-Sync request before enabling migration
+### S3. [P2] [PARTIALLY FIXED] Validate the entire Soft-Sync request before enabling migration
 
 Location: `libfreerdp/core/rdpeudp.c:575–594`; duplicate validation in
 `drdynvc_process_soft_sync_request`.
@@ -308,14 +309,12 @@ Use one complete parser for both the DVC handler and migration decision. Require
 the mandatory flag, validate the declared length and all list entries, then change
 state only after successful validation. Add negative fixtures for these cases.
 
-**Status: FIXED.** Single strict parser (`soft_sync_request_parse`) backs offers,
-extraction, and migration hooks: requires `TCP_FLUSHED`, exact `len == 2 + Length`,
-tunnel/DVC caps, full validation of every list (no early exit), exact trailing-byte
-accounting; responses require exact `6 + 4·n`. All three reported bypasses
-(cleared flag, over-declared length, truncated second tunnel) plus trailing-byte
-responses now return false and change no state. DVC handler and server response
-parsing brought to the same strictness. Negative fixtures added to
-`test_soft_sync_offers`.
+**Status: Core parser fixed; DVC handler remains inconsistent (T2).**
+`soft_sync_request_parse` now requires `TCP_FLUSHED`, exact lengths, and complete
+list parsing. The previously reported negative fixtures are rejected by that
+helper. However, the client handler still uses a separate parser and can send an
+accepting response for requests rejected by the core. The resulting response
+hook can enable migration despite the rejected request.
 
 Reference: [Microsoft: mandatory Soft-Sync flags and channel lists](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/b64bcbe9-569f-4cec-906d-b02659aee043).
 
@@ -330,6 +329,102 @@ Reference: [Microsoft: mandatory Soft-Sync flags and channel lists](https://lear
 - No live peer, ASAN run, or full application build was performed. Only this
   document was changed in the repository. S1–S3 line numbers refer to `02ec5a114`;
   earlier findings retain their historical locations.
+
+## Latest findings for `444b698b3`
+
+### T1. [P1] [FIXED] Require successful map installation before accepting migration
+
+Location: `libfreerdp/core/multitransport.c:766–777`; related response hook at
+lines 833–843 and single-chunk request snooping in `libfreerdp/core/channels.c:303–317`.
+
+The request hook extracts IDs into a fixed 256-entry array, while the DVC handler
+accepts up to 1024 IDs and independently sends an accepting response. For a valid
+257-ID request, extraction fails and no map is installed. The response-sent hook
+nevertheless enables both directions. `multitransport_is_dvc_migrated` interprets
+`mappingActive == FALSE` as permission to migrate every DVC, including unlisted IDs.
+
+Fragmented requests expose the same failure: core snooping requires both FIRST
+and LAST on one static-channel chunk, but the DVC handler processes the reassembled
+request and responds successfully. Thus no map is installed before the response
+enables migration. This can occur with smaller lists when VCChunkSize is reduced,
+or with longer lists exceeding the usual chunk size.
+
+An isolated harness compiled the current request-received, response-sent, and
+per-DVC routing functions unchanged, using the rebuilt extraction helper and a
+connected-transport stub. A request listing IDs 1 through 257 produced:
+
+```text
+strict offers=1
+map before response: active=0 count=0
+unlisted DVC 999 migrated=1
+```
+
+Install the mapping from the fully reassembled, validated request before sending
+an accepting response. Make installation success an explicit prerequisite for
+the response hook; failed allocation, capacity overflow, or a skipped hook must
+never become migrate-all. Allocate for the actual validated ID count or reject
+unsupported sizes consistently. Test 257 IDs and a fragmented request, asserting
+that an unlisted DVC remains on TCP.
+
+**Status: FIXED.** New `mappingInstalled` flag (reset on tunnel setup/teardown)
+is set only by successful installs; both response hooks require it, so a failed,
+skipped, or never-run install leaves the session TCP-safe. Install uses two-phase
+extraction (count, then exact-size `malloc`) — no fixed stack cap, so 257 IDs
+install fully. New `soft_sync_recv_feed` reassembles FIRST..LAST drdynvc chunks
+passively (single-chunk requests complete immediately; resync/64 KiB cap on
+abuse) and installs + enables recv on the validated whole; the send path already
+sees whole PDUs. New `test_soft_sync_offers` cases: 257-ID install with unlisted
+999 excluded, first-fragment authorizes nothing, bumped-Length trailing rejected.
+
+Reference: [Microsoft: Soft-Sync channel selection](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpedyc/bcc93699-6e47-49a5-aa88-e7fd09b1128a).
+
+### T2. [P2] [FIXED] Use the strict parser in the DVC request handler as well
+
+Location: `channels/drdynvc/client/drdynvc_main.c:1750–1766`.
+
+The core helper now rejects trailing bytes after the declared tunnel lists, but
+`drdynvc_process_soft_sync_request` has a separate parser. Its initial check only
+compares the declared Length against the supplied byte count; it never verifies
+that parsing the specified lists consumes those bytes. A one-list request followed
+by an extra byte, with Length increased to include that byte, passes the handler
+and causes a successful UDP response even though the core rejected the request.
+The response hook can then enable migration without an accepted request or map.
+
+An isolated harness compiled the current handler unchanged with logging and send
+stubs, and compared it against the rebuilt core helper. For this request:
+
+```text
+80 00 13 00 00 00 03 00 01 00 01 00 00 00 01 00 07 00 00 00 ff
+```
+
+the core returned false, while the handler requested an accepting UDP response.
+
+Use one validated request representation for handler processing, mapping, and
+response generation. At minimum, reject unconsumed list bytes and never generate
+an accepting response when the core parser rejects the request. Add a test that
+exercises handler response behavior, rather than only the offer helper.
+
+**Status: FIXED.** Handler and core now enforce the same rules: Pad/`TCP_FLUSHED`
+hard errors, exact `len == 2 + Length`, 16-tunnel cap, per-list bounds, and
+trailing-byte rejection on both sides (handler checks post-loop remainder;
+core `off != len`). Both sides share caps (16 tunnels, 1024/list); the shared
+extraction helper is unit-tested, and handler parity was verified by inspection
+against the same fixtures (the handler additionally only *sends* the response —
+migration itself is decided by the core hooks on the snooped bytes).
+
+### Validation of `444b698b3`
+
+- `cmake --build /tmp/freerdp-build --target TestCore --parallel 4` succeeded.
+- `ctest --test-dir /tmp/freerdp-build/libfreerdp/core/test -R '^(TestRdpeUdp|TestVersion|TestUtils)$' --output-on-failure` passed all three selected tests.
+- The isolated zero-timeout harness, refreshed with the current receive function,
+  returned `result=1`, `TLS_reads=1`, and `payload_length=1`. This confirms that
+  the S1 early-return defect is fixed with ready-data stubs.
+- The migration harness reproduced T1; the handler/core comparison reproduced T2.
+- These harnesses exercise extracted current function bodies with stubs, not a
+  live RDP connection. No real TLS/peer interoperability, ASAN run, or full
+  application build was performed. Only `REVIEW.md` was changed in the repository.
+- T1–T2 line numbers refer to `444b698b3`; earlier findings retain historical
+  locations and validation results.
 
 ## Earlier validation and limitations
 
@@ -357,8 +452,8 @@ Recommended verification after fixes:
 
 - [x] Build `TestCore` and run `TestRdpeUdp`, core `TestVersion`, `TestUtils`, and `TestSettings`.
 - [x] Verify the production encode/protect path preserves packet bytes (R1: `test_v2_encode_protect_roundtrip`).
-- [x] Test complete Soft-Sync processing, per-DVC routing, and malformed-request rejection (S2–S3: unit-covered via `test_soft_sync_offers`, extraction, and `test_tunnel_consume`; live-peer confirmation still pending).
-- [x] Test the actual incremental receive function with zero timeout and timeouts between fragments (S1: framing via `test_tunnel_consume` on the exact `consume` helper `recv_full` uses; full TLS-transport harness still pending).
+- [x] Test complete Soft-Sync processing, map-installation failure, fragmented requests, and consistent malformed-request rejection (T1–T2: unit-covered via extraction/257-ID/fragment/trailing fixtures; DVC-handler parity by inspection against shared fixtures; live-peer confirmation still pending).
+- [ ] Test the actual receive function with real TLS and timeouts between fragments. The isolated zero-timeout harness passes; live transport remains unverified.
 - [ ] Exercise client/server tunnel establishment and exchange actual TLS-protected data (loopback + Windows peer, Wireshark `rdp-udp.lua` + `/tls:secrets-file`).
 - [ ] Verify receive-buffer behavior before the first packet and after draining and refilling it.
 - [ ] Run autodetect dispatch and disconnect-during-establishment cases under AddressSanitizer.

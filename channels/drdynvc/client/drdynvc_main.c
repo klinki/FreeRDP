@@ -1753,6 +1753,11 @@ static UINT drdynvc_process_soft_sync_request(drdynvcPlugin* drdynvc, int Sp, in
 				offersUdpFecr = TRUE;
 			Stream_Seek(s, (size_t)numDvcs * 4); /* honored implicitly: all DVCs migrate */
 		}
+		if (Stream_GetRemainingLength(s) != 0)
+		{
+			WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: trailing bytes");
+			return ERROR_INVALID_DATA;
+		}
 	}
 	else
 	{

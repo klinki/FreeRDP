@@ -75,16 +75,20 @@ FREERDP_LOCAL BOOL multitransport_is_udp_send_migrated(const rdpMultitransport* 
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL multitransport_is_udp_recv_migrated(const rdpMultitransport* multi);
 /* Soft-Sync event hooks (called from DRDYNVC layer on TCP when PDUs observed):
- * - request sent (server): server may now send listed DVCs on UDP.
- * - request received (client): client enables recv for listed DVCs; send waits.
- * - response sent (client) / received (server): complete the handshake.
- * Request hooks take the whole DVC PDU (header byte included) and strict-parse
- * it; malformed or non-UDPFECR requests change nothing (TCP-safe).
+ * - request sent (server, whole PDU): installs the mapping, enables send.
+ * - request chunks received (client, per static-channel chunk): feeds the
+ *   reassembly buffer; on the LAST chunk the validated mapping is installed
+ *   and recv is enabled. Handles fragmented requests the single-chunk fast
+ *   path cannot see.
+ * - response sent (client) / received (server): complete the handshake, but
+ *   only when a validated mapping was installed first (never migrate-all on
+ *   failure). Request hooks take the whole DVC PDU (header byte included) and
+ *   strict-parse it; malformed or non-UDPFECR requests change nothing (TCP-safe).
  * Without Soft-Sync negotiation these are no-ops (migration immediate). */
 FREERDP_LOCAL void multitransport_on_soft_sync_request_sent(rdpMultitransport* multi,
                                                              const BYTE* pdu, size_t len);
-FREERDP_LOCAL void multitransport_on_soft_sync_request_received(rdpMultitransport* multi,
-                                                                 const BYTE* pdu, size_t len);
+FREERDP_LOCAL void multitransport_soft_sync_recv_feed(rdpMultitransport* multi, const BYTE* chunk,
+                                                      size_t chunkLen, UINT32 flags);
 FREERDP_LOCAL void multitransport_on_soft_sync_response_sent(rdpMultitransport* multi);
 FREERDP_LOCAL void multitransport_on_soft_sync_response_received(rdpMultitransport* multi);
 /* Per-DVC send migration (S2): TRUE iff the direction is migrated AND (no active

@@ -853,6 +853,87 @@ static int test_soft_sync_offers(void)
 			return -1;
 		}
 	}
+	/* T1: 257-ID request installs the full map (no 256 fixed-cap fallback);
+	 * unlisted DVC 999 must not be treated as migrated. */
+	{
+		static BYTE big[10 + 6 + 257 * 4];
+		/* Header(1) + Pad(1) + Length(4) + Flags(2) + Tunnels(2) = 10, then
+		 * one UDPFECR list: type(4) + count(2) + 257 ids. Length = 8 + 6 + 1028. */
+		const UINT32 llen = 8 + 6 + 257 * 4;
+		size_t o = 0;
+		big[o++] = 0x80;
+		big[o++] = 0x00;
+		big[o++] = (BYTE)(llen & 0xFF);
+		big[o++] = (BYTE)((llen >> 8) & 0xFF);
+		big[o++] = (BYTE)((llen >> 16) & 0xFF);
+		big[o++] = (BYTE)((llen >> 24) & 0xFF);
+		big[o++] = 0x03;
+		big[o++] = 0x00;
+		big[o++] = 0x01;
+		big[o++] = 0x00;
+		big[o++] = 0x01;
+		big[o++] = 0x00;
+		big[o++] = 0x00;
+		big[o++] = 0x00;
+		big[o++] = 0x01;
+		big[o++] = 0x01;
+		for (UINT32 i = 1; i <= 257; i++)
+		{
+			big[o++] = (BYTE)(i & 0xFF);
+			big[o++] = (BYTE)((i >> 8) & 0xFF);
+			big[o++] = (BYTE)((i >> 16) & 0xFF);
+			big[o++] = (BYTE)((i >> 24) & 0xFF);
+		}
+		if (o != sizeof(big))
+		{
+			(void)fprintf(stderr, "softsync big fixture size\n");
+			return -1;
+		}
+		if (!rdpeudp_soft_sync_request_offers_udp(big, sizeof(big)))
+		{
+			(void)fprintf(stderr, "softsync 257 should offer\n");
+			return -1;
+		}
+		{
+			static UINT32 ids[300] = { 0 };
+			size_t count = 0;
+			if (!rdpeudp_soft_sync_request_udp_dvcs(big, sizeof(big), ids, 300, &count) ||
+			    (count != 257) || (ids[0] != 1) || (ids[256] != 257))
+			{
+				(void)fprintf(stderr, "softsync 257 extract mismatch %zu\n", count);
+				return -1;
+			}
+			BOOL listed999 = FALSE;
+			for (size_t i = 0; i < count; i++)
+			{
+				if (ids[i] == 999)
+					listed999 = TRUE;
+			}
+			if (listed999)
+			{
+				(void)fprintf(stderr, "softsync 999 must be unlisted\n");
+				return -1;
+			}
+		}
+		/* First fragment alone (10-byte prefix, no lists yet) authorizes nothing. */
+		if (rdpeudp_soft_sync_request_offers_udp(big, 10))
+		{
+			(void)fprintf(stderr, "softsync fragment should not offer\n");
+			return -1;
+		}
+	}
+	/* Trailing byte covered by a bumped Length must be rejected. */
+	{
+		BYTE extra[sizeof(reqFecr) + 1] = { 0 };
+		memcpy(extra, reqFecr, sizeof(reqFecr));
+		extra[2]++; /* Length 0x12 -> 0x13 to cover the extra byte */
+		extra[sizeof(reqFecr)] = 0xAA;
+		if (rdpeudp_soft_sync_request_offers_udp(extra, sizeof(extra)))
+		{
+			(void)fprintf(stderr, "softsync req trailing should not offer\n");
+			return -1;
+		}
+	}
 	/* S2: extraction honors lists (DVC 7 on UDPFECR migrates, DVC 9 on lossy does not). */
 	{
 		const BYTE reqTwo[] = {

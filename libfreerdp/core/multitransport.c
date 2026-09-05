@@ -23,6 +23,7 @@
 
 #include <winpr/thread.h>
 #include <winpr/synch.h>
+#include <winpr/wtsapi.h>
 
 #include "settings.h"
 #include "rdp.h"
@@ -65,6 +66,16 @@ struct rdp_multitransport
 	UINT32* udpDvcIds;
 	size_t udpDvcCount;
 	BOOL mappingActive;
+	/* Explicit install record (T1): set only by a validated request install
+	 * (listed IDs or authorized migrate-all). Gates the response hooks so a
+	 * failed/skipped install can never become migrate-all. */
+	BOOL mappingInstalled;
+	/* Soft-Sync request reassembly (T1): drdynvc static-channel chunks for one
+	 * request PDU (FIRST..LAST). Passive; normal dispatch is unaffected. */
+	BYTE* ssReqBuf;
+	size_t ssReqLen;
+	size_t ssReqCap;
+	BOOL ssReqActive;
 };
 
 #define TAG FREERDP_TAG("core.multitransport")
@@ -366,6 +377,12 @@ static DWORD WINAPI multitransport_udp_connect_thread(LPVOID arg)
 		multi->udpDvcIds = nullptr;
 		multi->udpDvcCount = 0;
 		multi->mappingActive = FALSE;
+		multi->mappingInstalled = FALSE;
+		free(multi->ssReqBuf);
+		multi->ssReqBuf = nullptr;
+		multi->ssReqLen = 0;
+		multi->ssReqCap = 0;
+		multi->ssReqActive = FALSE;
 		multi->udp = udp;
 		/* Snapshot negotiated Soft-Sync support for migration gating
 		 * (MS-RDPEDYC 3.1.5.3, MS-RDPEMT 1.3).
@@ -384,6 +401,12 @@ static DWORD WINAPI multitransport_udp_connect_thread(LPVOID arg)
 			multi->udpDvcIds = nullptr;
 			multi->udpDvcCount = 0;
 			multi->mappingActive = FALSE;
+			multi->mappingInstalled = FALSE;
+			free(multi->ssReqBuf);
+			multi->ssReqBuf = nullptr;
+			multi->ssReqLen = 0;
+			multi->ssReqCap = 0;
+			multi->ssReqActive = FALSE;
 			if (!softSync)
 			{
 				multi->softSyncComplete = TRUE;
@@ -474,6 +497,12 @@ static DWORD WINAPI multitransport_udp_accept_thread(LPVOID arg)
 		multi->udpDvcIds = nullptr;
 		multi->udpDvcCount = 0;
 		multi->mappingActive = FALSE;
+		multi->mappingInstalled = FALSE;
+		free(multi->ssReqBuf);
+		multi->ssReqBuf = nullptr;
+		multi->ssReqLen = 0;
+		multi->ssReqCap = 0;
+		multi->ssReqActive = FALSE;
 		multi->udp = udp;
 		{
 			const UINT32 flags =
@@ -485,6 +514,12 @@ static DWORD WINAPI multitransport_udp_accept_thread(LPVOID arg)
 			multi->udpDvcIds = nullptr;
 			multi->udpDvcCount = 0;
 			multi->mappingActive = FALSE;
+			multi->mappingInstalled = FALSE;
+			free(multi->ssReqBuf);
+			multi->ssReqBuf = nullptr;
+			multi->ssReqLen = 0;
+			multi->ssReqCap = 0;
+			multi->ssReqActive = FALSE;
 			if (!softSync)
 			{
 				multi->softSyncComplete = TRUE;
@@ -675,6 +710,12 @@ void multitransport_free(rdpMultitransport* multitransport)
 	multitransport->udpDvcIds = nullptr;
 	multitransport->udpDvcCount = 0;
 	multitransport->mappingActive = FALSE;
+	multitransport->mappingInstalled = FALSE;
+	free(multitransport->ssReqBuf);
+	multitransport->ssReqBuf = nullptr;
+	multitransport->ssReqLen = 0;
+	multitransport->ssReqCap = 0;
+	multitransport->ssReqActive = FALSE;
 	HANDLE stateEv = multitransport->stateEvent;
 	multitransport->stateEvent = nullptr;
 	/* abortEvent closed after worker join; transport only borrows it. */
@@ -720,87 +761,170 @@ BOOL multitransport_is_udp_recv_migrated(const rdpMultitransport* multi)
 	return rc;
 }
 
+/* Strict-install a validated Soft-Sync mapping (lock held). Two-phase
+ * extraction allocates for the actual validated ID count (T1: no fixed stack
+ * cap). Sets mappingInstalled on success: listed IDs (mappingActive) or
+ * authorized migrate-all when the request carries no lists. */
+static BOOL multitransport_install_mapping_locked(rdpMultitransport* multi, const BYTE* pdu,
+                                                  size_t len)
+{
+	size_t count = 0;
+	WINPR_ASSERT(multi);
+	/* Phase 1: strict-validate and count. NOTE: never touches ssReqBuf here;
+	 * the feed path passes its own reassembly buffer as pdu. */
+	if (!rdpeudp_soft_sync_request_udp_dvcs(pdu, len, nullptr, 0, &count))
+		return FALSE;
+	free(multi->udpDvcIds);
+	multi->udpDvcIds = nullptr;
+	multi->udpDvcCount = 0;
+	multi->mappingActive = FALSE;
+	multi->mappingInstalled = FALSE;
+	if (count > 0)
+	{
+		UINT32* ids = malloc(count * sizeof(UINT32));
+		size_t got = 0;
+		if (!ids)
+			return FALSE; /* OOM: stay TCP-safe */
+		/* Phase 2: fill (revalidates; cannot fail after phase 1). */
+		if (!rdpeudp_soft_sync_request_udp_dvcs(pdu, len, ids, count, &got) || (got != count))
+		{
+			free(ids);
+			return FALSE;
+		}
+		multi->udpDvcIds = ids;
+		multi->udpDvcCount = count;
+		multi->mappingActive = TRUE;
+	}
+	multi->mappingInstalled = TRUE;
+	return TRUE;
+}
+
 void multitransport_on_soft_sync_request_sent(rdpMultitransport* multi, const BYTE* pdu,
                                                 size_t len)
 {
-	UINT32 ids[256] = { 0 };
-	size_t count = 0;
-	BOOL offers = FALSE;
 	if (!multi || !pdu || (len == 0))
 		return;
-	/* Strict-parse first; never migrate on malformed requests (S3). */
-	offers = rdpeudp_soft_sync_request_udp_dvcs(pdu, len, ids, ARRAYSIZE(ids), &count);
 	EnterCriticalSection(&multi->lock);
 	/* Server: after sending Soft-Sync Request it starts sending on UDP
 	 * (MS-RDPEDYC 3.1.5.3). Recv still on TCP until Response arrives. */
-	if (offers && multi->softSyncNegotiated && multi->udp &&
-	    rdpeudp_is_connected(multi->udp))
+	if (multi->softSyncNegotiated && multi->udp && rdpeudp_is_connected(multi->udp))
 	{
-		free(multi->udpDvcIds);
-		multi->udpDvcIds = nullptr;
-		multi->udpDvcCount = 0;
-		multi->mappingActive = FALSE;
-		if (count > 0)
-		{
-			multi->udpDvcIds = malloc(count * sizeof(UINT32));
-			if (multi->udpDvcIds)
-			{
-				memcpy(multi->udpDvcIds, ids, count * sizeof(UINT32));
-				multi->udpDvcCount = count;
-				multi->mappingActive = TRUE;
-			}
-			else
-			{
-				LeaveCriticalSection(&multi->lock);
-				return; /* OOM: stay TCP-safe */
-			}
-		}
-		multi->udpSendMigrated = TRUE;
+		if (multitransport_install_mapping_locked(multi, pdu, len))
+			multi->udpSendMigrated = TRUE;
 	}
 	LeaveCriticalSection(&multi->lock);
 }
 
-void multitransport_on_soft_sync_request_received(rdpMultitransport* multi, const BYTE* pdu,
-                                                  size_t len)
+/* Feed one drdynvc static-channel chunk (T1: handles fragmented Soft-Sync
+ * requests the single-chunk fast path cannot see). Passive: normal dispatch is
+ * unaffected. Accumulates FIRST..LAST when the first chunk opens a Soft-Sync
+ * Request; on LAST the validated mapping is installed and recv is enabled. */
+void multitransport_soft_sync_recv_feed(rdpMultitransport* multi, const BYTE* chunk,
+                                        size_t chunkLen, UINT32 flags)
 {
-	UINT32 ids[256] = { 0 };
-	size_t count = 0;
-	BOOL offers = FALSE;
-	if (!multi || !pdu || (len == 0))
+	BOOL installed = FALSE;
+	if (!multi || !chunk || (chunkLen == 0))
 		return;
-	offers = rdpeudp_soft_sync_request_udp_dvcs(pdu, len, ids, ARRAYSIZE(ids), &count);
 	EnterCriticalSection(&multi->lock);
-	/* Client: after receiving Request it will reply, then migrate. Enable
-	 * recv now so early server UDP data is not missed; send enables after
-	 * our Response is sent (see on_soft_sync_response_sent). */
-	if (offers && multi->softSyncNegotiated && multi->udp &&
-	    rdpeudp_is_connected(multi->udp))
+	if (!multi->softSyncNegotiated || !multi->udp || !rdpeudp_is_connected(multi->udp))
 	{
-		free(multi->udpDvcIds);
-		multi->udpDvcIds = nullptr;
-		multi->udpDvcCount = 0;
-		multi->mappingActive = FALSE;
-		if (count > 0)
+		LeaveCriticalSection(&multi->lock);
+		return;
+	}
+	if (!multi->ssReqActive)
+	{
+		/* Start only on a chunk opening a Soft-Sync Request. */
+		if (!(flags & CHANNEL_FLAG_FIRST) || (((chunk[0] >> 4) & 0x0F) != 0x08))
 		{
-			multi->udpDvcIds = malloc(count * sizeof(UINT32));
-			if (multi->udpDvcIds)
-			{
-				memcpy(multi->udpDvcIds, ids, count * sizeof(UINT32));
-				multi->udpDvcCount = count;
-				multi->mappingActive = TRUE;
-			}
-			else
+			LeaveCriticalSection(&multi->lock);
+			return;
+		}
+		free(multi->ssReqBuf);
+		multi->ssReqBuf = malloc(chunkLen);
+		if (!multi->ssReqBuf)
+		{
+			LeaveCriticalSection(&multi->lock);
+			return; /* OOM: stay TCP-safe */
+		}
+		memcpy(multi->ssReqBuf, chunk, chunkLen);
+		multi->ssReqLen = chunkLen;
+		multi->ssReqCap = chunkLen;
+		multi->ssReqActive = TRUE;
+	}
+	else
+	{
+		/* Continuation: a new FIRST means the previous PDU never completed;
+		 * resync by restarting (TCP-safe: nothing was installed for it). */
+		if (flags & CHANNEL_FLAG_FIRST)
+		{
+			free(multi->ssReqBuf);
+			multi->ssReqBuf = nullptr;
+			multi->ssReqLen = 0;
+			multi->ssReqCap = 0;
+			multi->ssReqActive = FALSE;
+			if ((((chunk[0] >> 4) & 0x0F) != 0x08))
 			{
 				LeaveCriticalSection(&multi->lock);
-				if (multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
-					(void)SetEvent(multi->stateEvent);
-				return; /* OOM: stay TCP-safe */
+				return;
 			}
+			multi->ssReqBuf = malloc(chunkLen);
+			if (!multi->ssReqBuf)
+			{
+				LeaveCriticalSection(&multi->lock);
+				return;
+			}
+			memcpy(multi->ssReqBuf, chunk, chunkLen);
+			multi->ssReqLen = chunkLen;
+			multi->ssReqCap = chunkLen;
+			multi->ssReqActive = TRUE;
 		}
-		multi->udpRecvMigrated = TRUE;
+		else
+		{
+			if (multi->ssReqLen + chunkLen > 65536)
+			{
+				/* Runaway accumulation: drop and stay TCP-safe. */
+				free(multi->ssReqBuf);
+				multi->ssReqBuf = nullptr;
+				multi->ssReqLen = 0;
+				multi->ssReqCap = 0;
+				multi->ssReqActive = FALSE;
+				LeaveCriticalSection(&multi->lock);
+				return;
+			}
+			BYTE* grown = realloc(multi->ssReqBuf, multi->ssReqLen + chunkLen);
+			if (!grown)
+			{
+				free(multi->ssReqBuf);
+				multi->ssReqBuf = nullptr;
+				multi->ssReqLen = 0;
+				multi->ssReqCap = 0;
+				multi->ssReqActive = FALSE;
+				LeaveCriticalSection(&multi->lock);
+				return;
+			}
+			multi->ssReqBuf = grown;
+			memcpy(multi->ssReqBuf + multi->ssReqLen, chunk, chunkLen);
+			multi->ssReqLen += chunkLen;
+			multi->ssReqCap = multi->ssReqLen;
+		}
+	}
+	if (flags & CHANNEL_FLAG_LAST)
+	{
+		/* Complete: install mapping and enable recv (early server UDP data
+		 * must not be missed); send waits for our Response. */
+		if (multitransport_install_mapping_locked(multi, multi->ssReqBuf, multi->ssReqLen))
+		{
+			multi->udpRecvMigrated = TRUE;
+			installed = TRUE;
+		}
+		free(multi->ssReqBuf);
+		multi->ssReqBuf = nullptr;
+		multi->ssReqLen = 0;
+		multi->ssReqCap = 0;
+		multi->ssReqActive = FALSE;
 	}
 	LeaveCriticalSection(&multi->lock);
-	if (multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
+	if (installed && multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
 		(void)SetEvent(multi->stateEvent);
 }
 
@@ -835,8 +959,11 @@ void multitransport_on_soft_sync_response_sent(rdpMultitransport* multi)
 	if (!multi)
 		return;
 	EnterCriticalSection(&multi->lock);
-	/* Client: after sending Response, start sending (and ensure recv) on UDP. */
-	if (multi->softSyncNegotiated && multi->udp && rdpeudp_is_connected(multi->udp))
+	/* Client: after sending Response, start sending (and ensure recv) on UDP,
+	 * but only when a validated mapping was installed first (T1: a failed or
+	 * skipped install must never become migrate-all). */
+	if (multi->softSyncNegotiated && multi->mappingInstalled && multi->udp &&
+	    rdpeudp_is_connected(multi->udp))
 	{
 		multi->softSyncComplete = TRUE;
 		multi->udpSendMigrated = TRUE;
@@ -852,8 +979,11 @@ void multitransport_on_soft_sync_response_received(rdpMultitransport* multi)
 	if (!multi)
 		return;
 	EnterCriticalSection(&multi->lock);
-	/* Server: after receiving Response it starts receiving on UDP. */
-	if (multi->softSyncNegotiated && multi->udp && rdpeudp_is_connected(multi->udp))
+	/* Server: after receiving Response it starts receiving on UDP, but only
+	 * when it previously installed a mapping by sending the Request (T1:
+	 * stray responses must not migrate). */
+	if (multi->softSyncNegotiated && multi->mappingInstalled && multi->udp &&
+	    rdpeudp_is_connected(multi->udp))
 	{
 		multi->softSyncComplete = TRUE;
 		multi->udpRecvMigrated = TRUE;
