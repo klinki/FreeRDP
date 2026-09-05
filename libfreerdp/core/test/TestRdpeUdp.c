@@ -811,8 +811,216 @@ static int test_soft_sync_offers(void)
 		(void)fprintf(stderr, "softsync rsp lossy should not offer\n");
 		return -1;
 	}
+	/* S3 negatives: FLUSHED cleared, truncated length, truncated second tunnel. */
+	{
+		/* Same as reqFecr but Flags=0x02 (no TCP_FLUSHED). */
+		BYTE noFlush[] = { 0x80, 0x00, 0x12, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0x00,
+		                     0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 0x00, 0x00, 0x00 };
+		if (rdpeudp_soft_sync_request_offers_udp(noFlush, sizeof(noFlush)))
+		{
+			(void)fprintf(stderr, "softsync no-flush should not offer\n");
+			return -1;
+		}
+	}
+	{
+		/* Declared Length (0x12) exceeds supplied bytes (truncated by 4). */
+		BYTE trunc[16] = { 0 };
+		memcpy(trunc, reqFecr, sizeof(trunc));
+		if (rdpeudp_soft_sync_request_offers_udp(trunc, sizeof(trunc)))
+		{
+			(void)fprintf(stderr, "softsync truncated should not offer\n");
+			return -1;
+		}
+	}
+	{
+		/* Two tunnels declared, only the first (UDPFECR) present. */
+		const BYTE two[] = { 0x80, 0x00, 0x12, 0x00, 0x00, 0x00, 0x03, 0x00, 0x02, 0x00,
+		                       0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 0x00, 0x00, 0x00 };
+		if (rdpeudp_soft_sync_request_offers_udp(two, sizeof(two)))
+		{
+			(void)fprintf(stderr, "softsync short-tunnels should not offer\n");
+			return -1;
+		}
+	}
+	{
+		/* Valid response with one trailing byte must be rejected. */
+		BYTE trail[11] = { 0 };
+		memcpy(trail, rspFecr, sizeof(rspFecr));
+		trail[sizeof(rspFecr)] = 0xAA;
+		if (rdpeudp_soft_sync_response_offers_udp(trail, sizeof(trail)))
+		{
+			(void)fprintf(stderr, "softsync trailing should not offer\n");
+			return -1;
+		}
+	}
+	/* S2: extraction honors lists (DVC 7 on UDPFECR migrates, DVC 9 on lossy does not). */
+	{
+		const BYTE reqTwo[] = {
+			0x80, 0x00, 0x20, 0x00, 0x00, 0x00, 0x03, 0x00, 0x02, 0x00,
+			0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x07, 0x00, 0x00, 0x00,
+			0x08, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00,
+			0x09, 0x00, 0x00, 0x00
+		};
+		UINT32 ids[8] = { 0 };
+		size_t count = 0;
+		if (!rdpeudp_soft_sync_request_udp_dvcs(reqTwo, sizeof(reqTwo), ids, 8, &count))
+		{
+			(void)fprintf(stderr, "softsync extract failed\n");
+			return -1;
+		}
+		if ((count != 2) || (ids[0] != 7) || (ids[1] != 8))
+		{
+			(void)fprintf(stderr, "softsync extract ids mismatch %zu\n", count);
+			return -1;
+		}
+		/* Lossy-only request extracts nothing (valid parse, no offer). */
+		{
+			UINT32 ids2[8] = { 0 };
+			size_t count2 = 99;
+			if (rdpeudp_soft_sync_request_udp_dvcs(reqLossy, sizeof(reqLossy), ids2, 8,
+			                                     &count2))
+			{
+				(void)fprintf(stderr, "softsync lossy extract should fail\n");
+				return -1;
+			}
+		}
+	}
 	return 0;
 }
+
+static int test_tunnel_consume(void)
+{
+	/* S1: exercise the same consume helper the transport loop uses, fed in
+	 * uneven fragments mimicking timeouts between arrivals, with two
+	 * back-to-back PDUs to check alignment is preserved. */
+	const BYTE pduA[] = { 0x06, 0x00, 0x34, 0x12, 0x01, 0x00 };
+	const BYTE hlA[] = { 'H', 'E', 'L', 'L', 'O' };
+	const BYTE hlB[] = { 'B', 'Y', 'E' };
+	wStream* sub = rdpemt_build_subheader(RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ, pduA,
+	                                      sizeof(pduA));
+	if (!sub)
+		return -1;
+	wStream* tdA = rdpemt_build_tunnel_data(Stream_Buffer(sub), Stream_Length(sub), hlA,
+	                                        sizeof(hlA));
+	Stream_Release(sub);
+	wStream* tdB = rdpemt_build_tunnel_data(nullptr, 0, hlB, sizeof(hlB));
+	if (!tdA || !tdB)
+	{
+		if (tdA)
+			Stream_Release(tdA);
+		if (tdB)
+			Stream_Release(tdB);
+		(void)fprintf(stderr, "consume: build failed\n");
+		return -1;
+	}
+	const size_t lenA = Stream_Length(tdA);
+	const size_t lenB = Stream_Length(tdB);
+	static BYTE wire[131072];
+	if (lenA + lenB > sizeof(wire))
+	{
+		Stream_Release(tdA);
+		Stream_Release(tdB);
+		return -1;
+	}
+	memcpy(wire, Stream_Buffer(tdA), lenA);
+	memcpy(wire + lenA, Stream_Buffer(tdB), lenB);
+	Stream_Release(tdA);
+	Stream_Release(tdB);
+	tdA = nullptr;
+	tdB = nullptr;
+	const size_t total = lenA + lenB;
+
+	static BYTE stream[131072];
+	size_t have = 0;
+	size_t pos = 0;
+	int pdus = 0;
+	static const size_t frags[] = { 2, 4, 3, 5, 7, 1024 };
+	size_t fi = 0;
+	while ((pos < total) || (have > 0))
+	{
+		/* Drain every complete PDU currently buffered. */
+		while (TRUE)
+		{
+			size_t consumed = 0;
+			BYTE subOut[512] = { 0 };
+			BYTE payOut[1024] = { 0 };
+			size_t subOutLen = 0;
+			size_t payOutLen = 0;
+			const int cr = rdpemt_tunnel_consume(stream, have, &consumed, subOut,
+			                                     sizeof(subOut), &subOutLen, payOut,
+			                                     sizeof(payOut), &payOutLen);
+			if (cr == 0)
+				break; /* need more bytes */
+			if (cr < 0)
+			{
+				(void)fprintf(stderr, "consume: corrupt\n");
+				return -1;
+			}
+			pdus++;
+			if (pdus == 1)
+			{
+				if ((payOutLen != sizeof(hlA)) || (memcmp(payOut, hlA, payOutLen) != 0))
+				{
+					(void)fprintf(stderr, "consume: PDU A payload mismatch\n");
+					return -1;
+				}
+			}
+			else if (pdus == 2)
+			{
+				if ((payOutLen != sizeof(hlB)) || (memcmp(payOut, hlB, payOutLen) != 0))
+				{
+					(void)fprintf(stderr, "consume: PDU B payload mismatch\n");
+					return -1;
+				}
+			}
+			else
+			{
+				(void)fprintf(stderr, "consume: too many PDUs\n");
+				return -1;
+			}
+			memmove(stream, stream + consumed, have - consumed);
+			have -= consumed;
+		}
+		if (pos >= total)
+			break;
+		/* Timeout between fragments: append the next uneven chunk. */
+		size_t take = frags[fi % (sizeof(frags) / sizeof(frags[0]))];
+		fi++;
+		if (take > total - pos)
+			take = total - pos;
+		if (have + take > sizeof(stream))
+		{
+			(void)fprintf(stderr, "consume: overflow\n");
+			return -1;
+		}
+		memcpy(stream + have, wire + pos, take);
+		have += take;
+		pos += take;
+	}
+	if (pdus != 2)
+	{
+		(void)fprintf(stderr, "consume: got %d PDUs, want 2\n", pdus);
+		return -1;
+	}
+	if (have != 0)
+	{
+		(void)fprintf(stderr, "consume: trailing bytes\n");
+		return -1;
+	}
+	/* Corrupt action byte must report -1, not consume. */
+	{
+		const BYTE bad[8] = { 0x0F, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00 };
+		size_t consumed = 99;
+		if (rdpemt_tunnel_consume(bad, sizeof(bad), &consumed, nullptr, 0, nullptr,
+		                            nullptr, 0, nullptr) != -1)
+		{
+			(void)fprintf(stderr, "consume: corrupt should fail\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
 
 int TestRdpeUdp(int argc, char* argv[])
 {
@@ -877,6 +1085,11 @@ int TestRdpeUdp(int argc, char* argv[])
 	if (test_soft_sync_offers() != 0)
 	{
 		(void)fprintf(stderr, "test_soft_sync_offers FAILED\n");
+		return -1;
+	}
+	if (test_tunnel_consume() != 0)
+	{
+		(void)fprintf(stderr, "test_tunnel_consume FAILED\n");
 		return -1;
 	}
 

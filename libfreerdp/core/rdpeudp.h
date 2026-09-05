@@ -265,6 +265,13 @@ WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_soft_sync_request_offers_udp(const BYTE* pdu, size_t len);
 WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_soft_sync_response_offers_udp(const BYTE* pdu, size_t len);
+/* Strict-validated extraction of DVC IDs listed under UDPFECR tunnels.
+ * Returns TRUE iff the request is valid and offers UDPFECR; *countOut gets the
+ * ID count (capped: returns FALSE if more than maxIds, staying TCP-safe). */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_soft_sync_request_udp_dvcs(const BYTE* pdu, size_t len,
+                                                    UINT32* outIds, size_t maxIds,
+                                                    size_t* countOut);
 /* Decode a 4-byte tunnel header to learn payload/subheader lengths before the
  * rest of the PDU has been read. Unlike rdpemt_parse_header it does not
  * require the full PDU to be present. */
@@ -274,6 +281,16 @@ FREERDP_API BOOL rdpemt_decode_header(const BYTE* data, size_t len, BYTE* action
 WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpemt_parse_header(const BYTE* data, size_t len, BYTE* action,
                                      UINT16* payloadLen, UINT8* headerLen);
+/* Incremental consume of one Tunnel DATA PDU from a byte stream (R3).
+ * Inspects buf[0..len) without I/O: returns 1 with *consumedOut=hlen+plen and
+ * sub/payload copied out when a complete PDU is present; 0 when more bytes are
+ * needed (nothing consumed); -1 on corrupt framing; -2 when complete but
+ * caller buffers are too small (nothing consumed). */
+WINPR_ATTR_NODISCARD
+FREERDP_API int rdpemt_tunnel_consume(const BYTE* buf, size_t len, size_t* consumedOut,
+                                      BYTE* subBuf, size_t subBufLen, size_t* subLenOut,
+                                      BYTE* payloadBuf, size_t payloadBufLen,
+                                      size_t* payloadLenOut);
 
 /* ---- transport ---- */
 

@@ -395,6 +395,11 @@ static BOOL wts_read_drdynvc_pdu_ready(rdpPeerChannel* channel, wStream* s, UINT
 			if (tt == TUNNELTYPE_UDPFECR)
 				offersUdpFecr = TRUE;
 		}
+		if (Stream_GetRemainingLength(s) != 0)
+		{
+			WLog_ERR(TAG, "SoftSync response trailing bytes");
+			return FALSE;
+		}
 		WLog_DBG(TAG, "SoftSync response tunnels=%" PRIu32 " udpFecr=%d", numTunnels,
 		         offersUdpFecr);
 		if (offersUdpFecr && channel && channel->vcm && channel->vcm->rdp &&

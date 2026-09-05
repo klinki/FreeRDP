@@ -1697,15 +1697,36 @@ static UINT drdynvc_process_soft_sync_request(drdynvcPlugin* drdynvc, int Sp, in
 	Stream_Read_UINT16(s, numTunnels);
 
 	if (pad != 0x00)
-		WLog_Print(drdynvc->log, WLOG_WARN, "soft_sync_request: Pad=0x%02" PRIx8, pad);
+	{
+		WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: Pad=0x%02" PRIx8, pad);
+		return ERROR_INVALID_DATA;
+	}
 	if (!(flags & SOFT_SYNC_TCP_FLUSHED))
-		WLog_Print(drdynvc->log, WLOG_WARN,
-		           "soft_sync_request: TCP_FLUSHED not set (flags=0x%04" PRIx16 ")", flags);
-	/* Length covers Length+Flags+NumberOfTunnels+Lists = 8 + lists bytes. */
+	{
+		WLog_Print(drdynvc->log, WLOG_ERROR,
+		           "soft_sync_request: TCP_FLUSHED not set (flags=0x%04" PRIx16 "), no barrier",
+		           flags);
+		return ERROR_INVALID_DATA;
+	}
+	/* Length covers Length+Flags+NumberOfTunnels+Lists = 8 + lists bytes; total
+	 * PDU after the header byte is 1 (Pad) + Length. Exact match required. */
 	if (length < 8)
 	{
 		WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: bad Length=%" PRIu32,
 		           length);
+		return ERROR_INVALID_DATA;
+	}
+	if (Stream_GetRemainingLength(s) != (size_t)(length - 8))
+	{
+		WLog_Print(drdynvc->log, WLOG_ERROR,
+		           "soft_sync_request: Length %" PRIu32 " mismatches %" PRIuz " list bytes",
+		           length, Stream_GetRemainingLength(s));
+		return ERROR_INVALID_DATA;
+	}
+	if (numTunnels > 16)
+	{
+		WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: too many tunnels %" PRIu16,
+		           numTunnels);
 		return ERROR_INVALID_DATA;
 	}
 

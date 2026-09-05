@@ -58,6 +58,13 @@ struct rdp_multitransport
 	BOOL softSyncComplete;
 	BOOL udpSendMigrated;
 	BOOL udpRecvMigrated;
+	/* Per-DVC migration map (S2): DVC IDs listed under UDPFECR tunnels in the
+	 * last validated Soft-Sync Request. Active only when a listed request was
+	 * accepted; otherwise (no lists / no Soft-Sync) the whole multiplex may
+	 * migrate once the direction is enabled. */
+	UINT32* udpDvcIds;
+	size_t udpDvcCount;
+	BOOL mappingActive;
 };
 
 #define TAG FREERDP_TAG("core.multitransport")
@@ -355,6 +362,10 @@ static DWORD WINAPI multitransport_udp_connect_thread(LPVOID arg)
 	{
 		if (multi->udp)
 			rdpeudp_free(multi->udp);
+		free(multi->udpDvcIds);
+		multi->udpDvcIds = nullptr;
+		multi->udpDvcCount = 0;
+		multi->mappingActive = FALSE;
 		multi->udp = udp;
 		/* Snapshot negotiated Soft-Sync support for migration gating
 		 * (MS-RDPEDYC 3.1.5.3, MS-RDPEMT 1.3).
@@ -369,6 +380,10 @@ static DWORD WINAPI multitransport_udp_connect_thread(LPVOID arg)
 			const BOOL preActive =
 			    (multi->rdp->state < CONNECTION_STATE_ACTIVE);
 			multi->softSyncNegotiated = softSync;
+			free(multi->udpDvcIds);
+			multi->udpDvcIds = nullptr;
+			multi->udpDvcCount = 0;
+			multi->mappingActive = FALSE;
 			if (!softSync)
 			{
 				multi->softSyncComplete = TRUE;
@@ -455,6 +470,10 @@ static DWORD WINAPI multitransport_udp_accept_thread(LPVOID arg)
 	{
 		if (multi->udp)
 			rdpeudp_free(multi->udp);
+		free(multi->udpDvcIds);
+		multi->udpDvcIds = nullptr;
+		multi->udpDvcCount = 0;
+		multi->mappingActive = FALSE;
 		multi->udp = udp;
 		{
 			const UINT32 flags =
@@ -462,6 +481,10 @@ static DWORD WINAPI multitransport_udp_accept_thread(LPVOID arg)
 			const BOOL softSync = ((flags & SOFTSYNC_TCP_TO_UDP) != 0);
 			const BOOL preActive = (multi->rdp->state < CONNECTION_STATE_ACTIVE);
 			multi->softSyncNegotiated = softSync;
+			free(multi->udpDvcIds);
+			multi->udpDvcIds = nullptr;
+			multi->udpDvcCount = 0;
+			multi->mappingActive = FALSE;
 			if (!softSync)
 			{
 				multi->softSyncComplete = TRUE;
@@ -648,6 +671,10 @@ void multitransport_free(rdpMultitransport* multitransport)
 		rdpeudp_free(multitransport->udp);
 		multitransport->udp = nullptr;
 	}
+	free(multitransport->udpDvcIds);
+	multitransport->udpDvcIds = nullptr;
+	multitransport->udpDvcCount = 0;
+	multitransport->mappingActive = FALSE;
 	HANDLE stateEv = multitransport->stateEvent;
 	multitransport->stateEvent = nullptr;
 	/* abortEvent closed after worker join; transport only borrows it. */
@@ -693,33 +720,114 @@ BOOL multitransport_is_udp_recv_migrated(const rdpMultitransport* multi)
 	return rc;
 }
 
-void multitransport_on_soft_sync_request_sent(rdpMultitransport* multi)
+void multitransport_on_soft_sync_request_sent(rdpMultitransport* multi, const BYTE* pdu,
+                                                size_t len)
 {
-	if (!multi)
+	UINT32 ids[256] = { 0 };
+	size_t count = 0;
+	BOOL offers = FALSE;
+	if (!multi || !pdu || (len == 0))
 		return;
+	/* Strict-parse first; never migrate on malformed requests (S3). */
+	offers = rdpeudp_soft_sync_request_udp_dvcs(pdu, len, ids, ARRAYSIZE(ids), &count);
 	EnterCriticalSection(&multi->lock);
 	/* Server: after sending Soft-Sync Request it starts sending on UDP
 	 * (MS-RDPEDYC 3.1.5.3). Recv still on TCP until Response arrives. */
-	if (multi->softSyncNegotiated && multi->udp && rdpeudp_is_connected(multi->udp))
+	if (offers && multi->softSyncNegotiated && multi->udp &&
+	    rdpeudp_is_connected(multi->udp))
+	{
+		free(multi->udpDvcIds);
+		multi->udpDvcIds = nullptr;
+		multi->udpDvcCount = 0;
+		multi->mappingActive = FALSE;
+		if (count > 0)
+		{
+			multi->udpDvcIds = malloc(count * sizeof(UINT32));
+			if (multi->udpDvcIds)
+			{
+				memcpy(multi->udpDvcIds, ids, count * sizeof(UINT32));
+				multi->udpDvcCount = count;
+				multi->mappingActive = TRUE;
+			}
+			else
+			{
+				LeaveCriticalSection(&multi->lock);
+				return; /* OOM: stay TCP-safe */
+			}
+		}
 		multi->udpSendMigrated = TRUE;
+	}
 	LeaveCriticalSection(&multi->lock);
 }
 
-void multitransport_on_soft_sync_request_received(rdpMultitransport* multi)
+void multitransport_on_soft_sync_request_received(rdpMultitransport* multi, const BYTE* pdu,
+                                                  size_t len)
 {
-	if (!multi)
+	UINT32 ids[256] = { 0 };
+	size_t count = 0;
+	BOOL offers = FALSE;
+	if (!multi || !pdu || (len == 0))
 		return;
+	offers = rdpeudp_soft_sync_request_udp_dvcs(pdu, len, ids, ARRAYSIZE(ids), &count);
 	EnterCriticalSection(&multi->lock);
 	/* Client: after receiving Request it will reply, then migrate. Enable
 	 * recv now so early server UDP data is not missed; send enables after
 	 * our Response is sent (see on_soft_sync_response_sent). */
-	if (multi->softSyncNegotiated && multi->udp && rdpeudp_is_connected(multi->udp))
+	if (offers && multi->softSyncNegotiated && multi->udp &&
+	    rdpeudp_is_connected(multi->udp))
 	{
+		free(multi->udpDvcIds);
+		multi->udpDvcIds = nullptr;
+		multi->udpDvcCount = 0;
+		multi->mappingActive = FALSE;
+		if (count > 0)
+		{
+			multi->udpDvcIds = malloc(count * sizeof(UINT32));
+			if (multi->udpDvcIds)
+			{
+				memcpy(multi->udpDvcIds, ids, count * sizeof(UINT32));
+				multi->udpDvcCount = count;
+				multi->mappingActive = TRUE;
+			}
+			else
+			{
+				LeaveCriticalSection(&multi->lock);
+				if (multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
+					(void)SetEvent(multi->stateEvent);
+				return; /* OOM: stay TCP-safe */
+			}
+		}
 		multi->udpRecvMigrated = TRUE;
 	}
 	LeaveCriticalSection(&multi->lock);
 	if (multi->stateEvent && (multi->stateEvent != INVALID_HANDLE_VALUE))
 		(void)SetEvent(multi->stateEvent);
+}
+
+BOOL multitransport_is_dvc_migrated(const rdpMultitransport* multi, UINT32 dvcId)
+{
+	BOOL rc = FALSE;
+	if (!multi)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	if (multi->udp && rdpeudp_is_connected(multi->udp) && multi->udpSendMigrated)
+	{
+		if (!multi->mappingActive)
+			rc = TRUE; /* migrate-all (no lists / no Soft-Sync pre-ACTIVE) */
+		else
+		{
+			for (size_t i = 0; i < multi->udpDvcCount; i++)
+			{
+				if (multi->udpDvcIds[i] == dvcId)
+				{
+					rc = TRUE;
+					break;
+				}
+			}
+		}
+	}
+	LeaveCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	return rc;
 }
 
 void multitransport_on_soft_sync_response_sent(rdpMultitransport* multi)
