@@ -1279,13 +1279,13 @@ static int test_dvc_pdu_length(void)
 		'G', 'r', 'a', 'p', 'h', 'i', 'c', 's', 0x00
 	};
 	size_t len = 0;
-	if (!rdpeudp_dvc_pdu_length(createCoreIn, sizeof(createCoreIn), &len) ||
+	if (!rdpeudp_dvc_pdu_length(createCoreIn, sizeof(createCoreIn), FALSE, &len) ||
 	    (len != sizeof(createCoreIn)))
 	{
 		(void)fprintf(stderr, "live CREATE CoreInput rejected\n");
 		return -1;
 	}
-	if (!rdpeudp_dvc_pdu_length(createGfx, sizeof(createGfx), &len) ||
+	if (!rdpeudp_dvc_pdu_length(createGfx, sizeof(createGfx), FALSE, &len) ||
 	    (len != sizeof(createGfx)))
 	{
 		(void)fprintf(stderr, "live CREATE Graphics rejected\n");
@@ -1294,7 +1294,7 @@ static int test_dvc_pdu_length(void)
 	/* Synthetic CLOSE (header Cmd=4 + 1-byte id) and DATA_FIRST exact-fit. */
 	{
 		static const BYTE closePdu[] = { 0x44, 0x09 };
-		if (!rdpeudp_dvc_pdu_length(closePdu, sizeof(closePdu), &len) || (len != 2))
+		if (!rdpeudp_dvc_pdu_length(closePdu, sizeof(closePdu), FALSE, &len) || (len != 2))
 		{
 			(void)fprintf(stderr, "CLOSE rejected\n");
 			return -1;
@@ -1302,14 +1302,14 @@ static int test_dvc_pdu_length(void)
 		/* DATA_FIRST total == present (exact fit): header + id + len(9) + 3 data. */
 		static const BYTE firstPdu[] = { 0x20, 0x05, 0x09, 0x00, 0x00, 0x00,
 			                               'A', 'B', 'C' };
-		if (!rdpeudp_dvc_pdu_length(firstPdu, sizeof(firstPdu), &len) || (len != 9))
+		if (!rdpeudp_dvc_pdu_length(firstPdu, sizeof(firstPdu), FALSE, &len) || (len != 9))
 		{
 			(void)fprintf(stderr, "exact DATA_FIRST rejected\n");
 			return -1;
 		}
 		/* Plain DATA runs to end of buffer. */
 		static const BYTE dataPdu[] = { 0x30, 0x0A, 'x', 'y' };
-		if (!rdpeudp_dvc_pdu_length(dataPdu, sizeof(dataPdu), &len) || (len != 4))
+		if (!rdpeudp_dvc_pdu_length(dataPdu, sizeof(dataPdu), FALSE, &len) || (len != 4))
 		{
 			(void)fprintf(stderr, "DATA rejected\n");
 			return -1;
@@ -1323,10 +1323,10 @@ static int test_dvc_pdu_length(void)
 		static const BYTE noNul[] = { 0x18, 0x02, 'A', 'B' };
 		static const BYTE zeroTotal[] = { 0x20, 0x05, 0x00 };
 		static const BYTE unknown[] = { 0xF8, 0x01 };
-		if (rdpeudp_dvc_pdu_length(trunc, sizeof(trunc), &len) ||
-		    rdpeudp_dvc_pdu_length(noNul, sizeof(noNul), &len) ||
-		    rdpeudp_dvc_pdu_length(zeroTotal, sizeof(zeroTotal), &len) ||
-		    rdpeudp_dvc_pdu_length(unknown, sizeof(unknown), &len))
+		if (rdpeudp_dvc_pdu_length(trunc, sizeof(trunc), FALSE, &len) ||
+		    rdpeudp_dvc_pdu_length(noNul, sizeof(noNul), FALSE, &len) ||
+		    rdpeudp_dvc_pdu_length(zeroTotal, sizeof(zeroTotal), FALSE, &len) ||
+		    rdpeudp_dvc_pdu_length(unknown, sizeof(unknown), FALSE, &len))
 		{
 			(void)fprintf(stderr, "negative DVC fixture accepted\n");
 			return -1;
@@ -1336,10 +1336,33 @@ static int test_dvc_pdu_length(void)
 	 * consuming all present bytes; completion tracked by the caller. */
 	{
 		static const BYTE fragFirst[] = { 0x20, 0x05, 0x20, 0x00, 0x00, 0x00, 'A' };
-		if (!rdpeudp_dvc_pdu_length(fragFirst, sizeof(fragFirst), &len) ||
+		if (!rdpeudp_dvc_pdu_length(fragFirst, sizeof(fragFirst), FALSE, &len) ||
 		    (len != sizeof(fragFirst)))
 		{
 			(void)fprintf(stderr, "fragmented DATA_FIRST rejected\n");
+			return -1;
+		}
+	}
+	/* CREATE responses (server-side direction, N4): same command nibble as
+	 * requests but header + ChannelId + 4-byte status. Success and failure
+	 * statuses both take 6 bytes here (1-byte id); truncation fails. */
+	{
+		static const BYTE rspOk[] = { 0x10, 0x07, 0x00, 0x00, 0x00, 0x00 };
+		static const BYTE rspFail[] = { 0x10, 0x07, 0x01, 0x00, 0x00, 0x80 };
+		static const BYTE rspTrunc[] = { 0x10, 0x07, 0x00, 0x00, 0x00 };
+		if (!rdpeudp_dvc_pdu_length(rspOk, sizeof(rspOk), TRUE, &len) || (len != 6))
+		{
+			(void)fprintf(stderr, "CREATE success response rejected\n");
+			return -1;
+		}
+		if (!rdpeudp_dvc_pdu_length(rspFail, sizeof(rspFail), TRUE, &len) || (len != 6))
+		{
+			(void)fprintf(stderr, "CREATE failure response rejected\n");
+			return -1;
+		}
+		if (rdpeudp_dvc_pdu_length(rspTrunc, sizeof(rspTrunc), TRUE, &len))
+		{
+			(void)fprintf(stderr, "truncated CREATE response accepted\n");
 			return -1;
 		}
 	}

@@ -844,6 +844,15 @@ builder, then the new receive splitter: `accepted=0 firstByte=00`.
 Update the send framing and receive framing together, preserving DVC message
 boundaries, and test a complete bidirectional channel exchange after send migration.
 
+**Implementor status (2026-09-06): acknowledged, NOT fixed — latent by design
+for now.** Send migration requires a mapping install that only Soft-Sync can
+authorize, and no peer has ever offered Soft-Sync in any live run, so the old
+envelope builder is unreachable in practice (verified: all live DVC responses
+go over TCP and sessions complete). The self-incompatibility the harness shows
+is accepted as real. Fix is queued with send-side UDP migration (raw framing,
+symmetric to receive); doing it now would be untestable churn. Suggest P2
+until a migration trigger exists.
+
 ### N2. [P1] Do not consume first DATA while waiting for the removed final ACK
 
 Location: `libfreerdp/core/rdpeudp.c:3549–3557`; related peek at `3558–3584`.
@@ -864,7 +873,16 @@ client/accept_ex test in which first DATA is queued before the server's receive;
 codec-only tests do not exercise this branch. This finding is from control-flow
 inspection; no live server/loopback test was run in this review.
 
-### N3. [P1] Advance the ACK window using the AOA value, not its packet's DataSeq
+**Implementor status (2026-09-06): FIXED as described.** The wait loop is now
+peek-only (classify first, consume only a validated v1 ACK; v2 DATA is never
+consumed here), so the race is gone structurally. Validated with a
+localhost-UDP-socketpair harness running the exact classification
+(`/tmp/n2-check.c`, throwaway, both cases pass: queued DATA completes with
+bytes intact, queued ACK completes and is consumed). That harness also caught
+a double-swap bug in the first draft of this fix before it ever ran live.
+Live accept-path coverage still does not exist; the harness is logic-level.
+
+### N3. [P1] [FIXED] Advance the ACK window using the AOA value, not its packet's DataSeq
 
 Location: `libfreerdp/core/rdpeudp.c:1833–1840`.
 Introduced by `db0f808c0`.
@@ -886,7 +904,20 @@ still-required gaps. Cover first-packet loss, a later first AOA, and reordered A
 packets. The old arbitrary-start documentation concern C1 is improved in prose,
 but this implementation does not correctly resolve its receive-window limitation.
 
-### N4. [P1] Parse CREATE responses differently from CREATE requests
+**Implementor status (2026-09-06): FIXED per prescription, live-verified.**
+First-AOA now advances `max(base, aoa)` wrap-aware with bitmap translation
+instead of memset-clear, so gaps survive (the synthetic case now yields a
+gap-preserving `ACKVEC`, never a false cumulative `ACK(2)`). Live VM run after
+the change: 936+233 ACKs flowing with correct bases, session healthy, no stall.
+**Dispute (mechanism, not fix):** the "permanent TLS stall" narrative conflates
+DATA-seq gaps with channel delivery (independent number spaces — channel
+reassembly keys on ChannelSeq, and spec-compliant new-dseq retransmits
+self-heal DATA gaps, so the sender has no unrecoverable state here). The fix
+is strictly safer regardless, but I would not cite that stall theory without a
+live reproduction; the harness case is synthetic (real peers send AOA==dseq,
+where old and new code agree).
+
+### N4. [P1] [FIXED, parse layer] Parse CREATE responses differently from CREATE requests
 
 Location: `libfreerdp/core/rdpeudp.c:843–855`, called for both client and server
 receives by `multitransport_check_fds`. Introduced by `d549ba018`.
@@ -904,6 +935,14 @@ Pass direction/context to the parser or retain the tunnel's known PDU boundary
 and let the existing direction-specific DVC handler parse it. Add success and
 failure response fixtures alongside the existing Windows CREATE-request fixtures.
 
+**Implementor status (2026-09-06): FIXED at the parse layer as suggested**
+(splitter takes direction; client parses NUL-name requests, server parses
+fixed `header+id+status(4)`; success, failure, and truncated RSP fixtures
+added; unit tests green). NOT live-validated on either side of the direction
+split: no server-mode run exists anywhere in this project, and client-side
+RSP bytes never legitimately arrive. The client path (requests) is live-proven
+(channels open); the server path is unit-proven only.
+
 ### Validation and limits
 
 - Rebuilt `TestCore` successfully against this HEAD. `TestRdpeUdp`, core
@@ -920,6 +959,15 @@ failure response fixtures alongside the existing Windows CREATE-request fixtures
   progress but do not establish a reliable bidirectional UDP graphics session.
 - Reviewed `free-rdp-vm-loop.sh` statically and with `bash -n`; no new actionable
   script issue is included. Its PROGRESS verdict is not an end-to-end success test.
+
+**Implementor validation note (2026-09-06):** since this review, N2 was
+additionally verified with a localhost-UDP-socketpair harness running the exact
+classification (queued DATA completes with bytes intact; queued ACK completes
+and is consumed), N3/N4 are covered by new `TestRdpeUdp` fixtures plus a live
+VM session (tunnel 24, migration latched, ~1200 ACKs with correct bases, bulk
+graphics both ways, desktop visible), and the working-directory N2/N3/N4 code
+above is committed on `feat/add-udp`. Agreed open items remaining: N1 (queued),
+live server-mode coverage, lossy transport, wrap/loss soak tests.
 
 ## Working-directory review — HEAD `33e410c56` (2026-09-06)
 

@@ -267,11 +267,14 @@ FREERDP_API BOOL rdpeudp_parse_channel_packet(const BYTE* data, size_t len, UINT
  * [cbId(2)|Sp/Pri(2)|Cmd(4)] + ChannelId of cbChId width). Live servers put
  * RAW DVC PDUs in Tunnel DATA HigherLayerData with no outer envelope
  * (observed: CREATEs `18 02/07/08 <name>\0`, one PDU per Tunnel DATA).
- * Supported: CREATE (NUL scan), CLOSE (fixed), DATA_FIRST (exact-fit only;
- * fragmented across Tunnel DATAs is rejected visibly), DATA (to end).
+ * Supported: CREATE (NUL scan client-side, fixed status server-side),
+ * CLOSE (fixed), DATA_FIRST (exact-fit only; fragmented across Tunnel DATAs
+ * is rejected visibly), DATA (to end). isServer selects the CREATE direction
+ * (N4: same command nibble both ways; server receives responses).
  * FALSE when the bytes do not hold one complete supported PDU. */
 WINPR_ATTR_NODISCARD
-FREERDP_API BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, size_t* pduLenOut);
+FREERDP_API BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer,
+                                        size_t* pduLenOut);
 
 /* ---- tunnel codec ([MS-RDPEMT] 2.2, little-endian) ---- */
 

@@ -824,7 +824,7 @@ BOOL rdpeudp_parse_channel_packet(const BYTE* data, size_t len, UINT16* channelI
  * supported command (CREATE/CLOSE/DATA_FIRST/DATA/SOFT-SYNC incl. compressed
  * DATA forms; CAPABILITY PDUs go through their dedicated handlers).
  * DATA_FIRST beyond the present bytes and unknown commands fail visibly. */
-BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, size_t* pduLenOut)
+BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer, size_t* pduLenOut)
 {
 	UINT8 cmd = 0;
 	UINT8 cbChId = 0;
@@ -840,21 +840,30 @@ BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, size_t* pduLenOut)
 	off = 1 + idLen;
 	switch (cmd)
 	{
-		case 0x01: /* CREATE_REQUEST: ChannelId + NUL-terminated name */
-		{
-			size_t nameLen = 0;
-			while (off + nameLen < len)
+		case 0x01: /* CREATE_REQUEST (client receives) vs CREATE_RESPONSE
+		              (server receives): same command nibble, direction
+		              decides the layout (N4). Request carries a
+		              NUL-terminated name; response carries a 4-byte status. */
+			if (!isServer)
 			{
-				if (data[off + nameLen] == 0)
+				size_t nameLen = 0;
+				while (off + nameLen < len)
 				{
-					if (pduLenOut)
-						*pduLenOut = off + nameLen + 1;
-					return TRUE;
+					if (data[off + nameLen] == 0)
+					{
+						if (pduLenOut)
+							*pduLenOut = off + nameLen + 1;
+						return TRUE;
+					}
+					nameLen++;
 				}
-				nameLen++;
+				return FALSE; /* name runs past HigherLayerData */
 			}
-			return FALSE; /* name runs past HigherLayerData */
-		}
+			if (len < off + 4)
+				return FALSE;
+			if (pduLenOut)
+				*pduLenOut = off + 4;
+			return TRUE;
 		case 0x04: /* CLOSE_REQUEST: header + ChannelId only */
 			if (pduLenOut)
 				*pduLenOut = off;
@@ -1825,18 +1834,28 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 			 * dummies are still never delivered, and their ACK/ACKVEC
 			 * payloads use the peer's own numbering space, so only the
 			 * DataSeq feeds receive state here.
-			 * Epoch via peer AOA (C1): MS numbers all counters from 100
-			 * and announces it in AOA from the first packet. Snap a never-
-			 * advanced base to the first AOA-carrying arrival. V1-safe:
-			 * AOA-less arrivals (harness, plain DATA) still buffer, and
-			 * mid-session jumps keep slide semantics (latched once). */
-			if (!udp->haveSeenAoa && L.hasAoa &&
-			    ((INT16)(L.dataSeq - udp->recvDataBase) != 0))
+			 * Epoch via peer AOA (C1/N3): the first AOA-bearing packet
+			 * adopts max(base, aoa) with wrap-aware monotonic advancement,
+			 * translating (not clearing) the bitmap so still-required gaps
+			 * survive. AOA-less arrivals (harness, plain DATA) still
+			 * buffer, and mid-session jumps keep slide semantics (latched
+			 * once). Using aoa rather than the packet's own DataSeq (N3):
+			 * AOA declares what needs no ACK, so the base must never jump
+			 * past unreceived sequences on a DataSeq's say-so. */
+			if (!udp->haveSeenAoa && L.hasAoa)
 			{
-				memset(udp->recvDataSeen, 0, sizeof(udp->recvDataSeen));
-				udp->recvDataBase = L.dataSeq;
+				const INT16 adv = (INT16)(L.aoa - udp->recvDataBase);
+				if (adv > 0)
+				{
+					const size_t WIN = ARRAYSIZE(udp->recvDataSeen);
+					const size_t a = ((size_t)adv < WIN) ? (size_t)adv : WIN;
+					memmove(udp->recvDataSeen, udp->recvDataSeen + a,
+					        (WIN - a) * sizeof(BOOL));
+					memset(udp->recvDataSeen + (WIN - a), 0, a * sizeof(BOOL));
+					udp->recvDataBase = (UINT16)(udp->recvDataBase + adv);
+				}
+				udp->haveSeenAoa = TRUE;
 			}
-			udp->haveSeenAoa = udp->haveSeenAoa || L.hasAoa;
 			rdpeudp_note_recv_data_seq_locked(udp, L.dataSeq);
 			if (dummy)
 			{
@@ -3534,7 +3553,12 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 		Stream_Release(synack);
 	}
 
-	/* 3. Wait for final ACK (v1 ACK, no SYN) */
+	/* 3. Wait for handshake completion: standalone final ACK (v1 ACK, no
+	 * SYN), or first v2 DATA for MS-compatible peers that skip the ACK
+	 * (N2). Peek only, never consume here: consuming a queued DATA into
+	 * buf and dropping it on v1-parse failure (plus losing the race on
+	 * every retransmit) wedges this wait even though valid DATA arrived.
+	 * Anything received stays queued for TLS to read normally. */
 	{
 		BOOL ok = FALSE;
 		const UINT64 adead = udp_now_ms() + 5000;
@@ -3545,28 +3569,39 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 				rdpeudp_free(udp);
 				return nullptr;
 			}
-			BYTE buf[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
-			const SSIZE_T r = freerdp_udp_recv(udp->sockfd, buf, sizeof(buf), 100);
-			if (r <= 0)
+			if (freerdp_udp_wait_readable(udp->sockfd, 100))
 			{
-				/* No standalone final ACK yet: MS-compatible peers skip it
-				 * and send DATA straight after SYN+ACK. Peek (without
-				 * consuming: TLS reads it normally later) for a valid v2
-				 * DATA datagram and accept that as completion too. The
-				 * 16-byte peek covers prefix + header + ACK/overhead/
-				 * delay/AoA + data header for minimal first-DATA shapes. */
-				if (freerdp_udp_wait_readable(udp->sockfd, 0))
+				BYTE peek[16] = { 0 };
+				const SSIZE_T pr = recv(udp->sockfd, (char*)peek, sizeof(peek),
+				                        MSG_PEEK);
+				if (pr > 8)
 				{
-					BYTE peek[16] = { 0 };
-					const SSIZE_T pr = recv(udp->sockfd, (char*)peek, sizeof(peek),
-					                        MSG_PEEK);
-					if (pr > 8)
+					/* v1 final ACK? Parse the peeked bytes without
+					 * consuming them. */
+					RdpUdpFecHeader h = { 0 };
+					wStream sb = { 0 };
+					wStream* s = Stream_StaticConstInit(&sb, peek, (size_t)pr);
+					if (s && rdpeudp_read_fec_header(s, &h) &&
+					    (h.flags & RDPUDP_FLAG_ACK) && !(h.flags & RDPUDP_FLAG_SYN) &&
+					    (h.snSourceAck == udp->initialSeq))
 					{
-						const size_t plen =
-						    ((size_t)pr < sizeof(peek)) ? (size_t)pr : sizeof(peek);
-						BYTE t0 = peek[0];
-						peek[0] = peek[7];
-						peek[7] = t0;
+						/* Consume the ACK now that it is validated. */
+						BYTE drop[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
+						(void)freerdp_udp_recv(udp->sockfd, drop, sizeof(drop), 0);
+						ok = TRUE;
+						break;
+					}
+					/* v2 DATA (peers that skip the standalone ACK)? The
+					 * 16-byte peek covers prefix + header + ACK/overhead/
+					 * delay/AoA + data header for minimal first-DATA
+					 * shapes; the datagram itself stays queued for TLS.
+					 * NOTE: pass wire bytes straight to unprotect (it undoes
+					 * the byte 0/7 swap itself); pre-swapping here would
+					 * double-swap back to an invalid prefix. */
+					{
+						const size_t plen = ((size_t)pr < sizeof(peek))
+						                        ? (size_t)pr
+						                        : sizeof(peek);
 						BOOL dummy = FALSE;
 						size_t poff = 0;
 						RdpUdp2Layout pl = WINPR_C_ARRAY_INIT;
@@ -3579,18 +3614,6 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 						}
 					}
 				}
-				continue;
-			}
-			RdpUdpFecHeader h = { 0 };
-			wStream sb = { 0 };
-			wStream* s = Stream_StaticConstInit(&sb, buf, (size_t)r);
-			if (!rdpeudp_read_fec_header(s, &h))
-				continue;
-			if ((h.flags & RDPUDP_FLAG_ACK) && !(h.flags & RDPUDP_FLAG_SYN) &&
-			    (h.snSourceAck == udp->initialSeq))
-			{
-				ok = TRUE;
-				break;
 			}
 		}
 		if (!ok)

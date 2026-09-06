@@ -1217,6 +1217,10 @@ int multitransport_check_fds(rdpMultitransport* multi)
 		 * sends this traffic only over UDP. */
 		if (payloadLen == 0)
 			continue;
+		rdpRdp* rdpEarly = multi->rdp;
+		const BOOL serverModeEarly =
+		    rdpEarly && rdpEarly->context && rdpEarly->settings &&
+		    freerdp_settings_get_bool(rdpEarly->settings, FreeRDP_ServerMode);
 		if (!multitransport_is_udp_recv_migrated(multi))
 		{
 			BOOL softSync = FALSE;
@@ -1226,7 +1230,8 @@ int multitransport_check_fds(rdpMultitransport* multi)
 			if (!softSync)
 			{
 				size_t probeLen = 0;
-				if (rdpeudp_dvc_pdu_length(payloadBuf, payloadLen, &probeLen))
+				if (rdpeudp_dvc_pdu_length(payloadBuf, payloadLen, serverModeEarly,
+				                           &probeLen))
 				{
 					EnterCriticalSection(&multi->lock);
 					multi->udpRecvMigrated = TRUE;
@@ -1255,11 +1260,18 @@ int multitransport_check_fds(rdpMultitransport* multi)
 				continue;
 			}
 			size_t poff = 0;
+			rdpRdp* rdp = multi->rdp;
+			if (!rdp || !rdp->context || !rdp->context->instance)
+				continue;
+			/* Direction for CREATE parsing (N4): our client receives
+			 * CREATE requests, our server receives CREATE responses. */
+			const BOOL serverMode =
+			    freerdp_settings_get_bool(rdp->settings, FreeRDP_ServerMode);
 			while (poff < payloadLen)
 			{
 				size_t pduLen = 0;
 				if (!rdpeudp_dvc_pdu_length(payloadBuf + poff, payloadLen - poff,
-				                            &pduLen) ||
+				                            serverMode, &pduLen) ||
 				    (pduLen == 0) || (poff + pduLen > payloadLen))
 				{
 					WLog_WARN(TAG, "bad UDP DVC PDU at offset %zu/%zu, dropping rest",
@@ -1275,11 +1287,6 @@ int multitransport_check_fds(rdpMultitransport* multi)
 				UINT32 flags =
 				    (UINT32)(CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
 				poff += pduLen;
-			rdpRdp* rdp = multi->rdp;
-			if (!rdp || !rdp->context || !rdp->context->instance)
-				continue;
-			const BOOL serverMode =
-			    freerdp_settings_get_bool(rdp->settings, FreeRDP_ServerMode);
 			if (!serverMode)
 			{
 				freerdp* instance = rdp->context->instance;
