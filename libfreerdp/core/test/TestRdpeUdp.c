@@ -425,7 +425,9 @@ static int test_mtu(void)
 
 static int test_autodetect_framing(void)
 {
-	/* MS-RDPEMT 2.2.1.1.1: autodetect PDUs travel in Tunnel DATA subheaders. */
+	/* MS-RDPEMT 2.2.1.1.1: autodetect PDUs travel in Tunnel DATA subheaders,
+	 * overlaid: the subheader IS the PDU's own header start ([totalLen][type]
+	 * + remainder), not a separate Length=2 prefix. */
 	const BYTE pdu[] = { 0x06, 0x00, 0x34, 0x12, 0x01, 0x00 };
 	wStream* sub = rdpemt_build_subheader(RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ, pdu,
 	                                      sizeof(pdu));
@@ -435,10 +437,8 @@ static int test_autodetect_framing(void)
 		return -1;
 	}
 	const size_t subLen = Stream_Length(sub);
-	/* SubHeaderLength(1)=2, SubHeaderType(1)=0x00, SubHeaderData(6)=PDU. */
-	if ((subLen != 8) || (Stream_Buffer(sub)[0] != 2) ||
-	    (Stream_Buffer(sub)[1] != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) ||
-	    (memcmp(Stream_Buffer(sub) + 2, pdu, sizeof(pdu)) != 0))
+	/* Overlaid emit: identical to the complete 6-byte PDU. */
+	if ((subLen != sizeof(pdu)) || (memcmp(Stream_Buffer(sub), pdu, sizeof(pdu)) != 0))
 	{
 		(void)fprintf(stderr, "subheader bytes mismatch\n");
 		Stream_Release(sub);
@@ -540,6 +540,38 @@ static int test_autodetect_framing(void)
 		if (rdpemt_autodetect_pdu_length(bwPayload, 7) != 0)
 		{
 			(void)fprintf(stderr, "autodetect truncated should be 0\n");
+			return -1;
+		}
+	}
+
+	/* Live-VM fixture: 18-byte subheader region exactly as received
+	 * (subLen == PDU total; REQ network-characteristics result,
+	 * requestType 0x08C0, baseRTT=1, bandwidth=512, averageRTT=360).
+	 * The old separate-framing parser rejected this (headerLength 0x00
+	 * at data offset); the overlaid model consumes it exactly. */
+	{
+		static const BYTE live[] = { 0x12, 0x00, 0x00, 0x00, 0xC0, 0x08, 0x01, 0x00,
+			                           0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x68, 0x01,
+			                           0x00, 0x00 };
+		size_t off = 0;
+		BYTE stype = 0xFF;
+		const BYTE* sdata = nullptr;
+		size_t sdataLen = 0;
+		if (!rdpemt_next_subheader(live, sizeof(live), &off, &stype, &sdata, &sdataLen))
+		{
+			(void)fprintf(stderr, "live subheader rejected\n");
+			return -1;
+		}
+		if ((stype != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) || (sdataLen != 18) ||
+		    (sdata != live) || (off != sizeof(live)))
+		{
+			(void)fprintf(stderr, "live subheader content mismatch\n");
+			return -1;
+		}
+		/* Trailing garbage must not parse as a second subheader. */
+		if (rdpemt_next_subheader(live, sizeof(live), &off, &stype, &sdata, &sdataLen))
+		{
+			(void)fprintf(stderr, "live trailing subheader should fail\n");
 			return -1;
 		}
 	}
@@ -747,9 +779,9 @@ static int test_tunnel_split(void)
 	}
 	const size_t total = Stream_Length(td);
 	const BYTE* buf = Stream_Buffer(td);
-	if (total != 4 + 8 + 5)
+	if (total != 4 + 6 + 5)
 	{
-		(void)fprintf(stderr, "split: total %zu != 17\n", total);
+		(void)fprintf(stderr, "split: total %zu != 15\n", total);
 		Stream_Release(td);
 		return -1;
 	}
@@ -765,7 +797,7 @@ static int test_tunnel_split(void)
 			return -1;
 		}
 	}
-	/* 4-byte header decodes to hlen=12 plen=5 without needing the rest. */
+	/* 4-byte header decodes to hlen=10 plen=5 without needing the rest. */
 	BYTE action = 0xFF;
 	UINT16 plen = 0xFFFF;
 	UINT8 hlen = 0;
@@ -775,7 +807,7 @@ static int test_tunnel_split(void)
 		Stream_Release(td);
 		return -1;
 	}
-	if ((action != RDPTUNNEL_ACTION_DATA) || (plen != 5) || (hlen != 12))
+	if ((action != RDPTUNNEL_ACTION_DATA) || (plen != 5) || (hlen != 10))
 	{
 		(void)fprintf(stderr, "split: header mismatch\n");
 		Stream_Release(td);

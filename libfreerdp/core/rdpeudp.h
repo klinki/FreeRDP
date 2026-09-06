@@ -274,15 +274,18 @@ FREERDP_API wStream* rdpemt_build_data(const BYTE* data, size_t len);
 WINPR_ATTR_NODISCARD
 FREERDP_API wStream* rdpemt_build_tunnel_data(const BYTE* subheaders, size_t subheadersLen,
                                               const BYTE* higherLayer, size_t higherLayerLen);
-/* Single subheader: SubHeaderLength(1)=2, SubHeaderType(1), SubHeaderData. */
+/* Single subheader in overlaid form: data must be a complete RDPBCGR PDU
+ * whose [0]=total length and [1]=REQ/RSP typeId; the subheader IS those
+ * framing bytes (emitted verbatim after validation). */
 WINPR_ATTR_NODISCARD
 FREERDP_API wStream* rdpemt_build_subheader(BYTE subHeaderType, const BYTE* data, size_t dataLen);
 /* Length of an autodetect PDU starting at data (0 if incomplete). Uses
  * headerLength + payloadLength fields per MS-RDPBCGR 2.2.14. */
 WINPR_ATTR_NODISCARD
 FREERDP_API size_t rdpemt_autodetect_pdu_length(const BYTE* data, size_t len);
-/* Iterate subheaders: at *offset, returns type + data + dataLen, advances
- * offset past this subheader (2 + autodetect len). FALSE when done/invalid. */
+/* Iterate subheaders: at *offset, returns type + FULL PDU bytes + total
+ * length, advances offset past this subheader (== PDU length). FALSE when
+ * done/invalid. */
 WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpemt_next_subheader(const BYTE* subheaders, size_t subheadersLen,
                                        size_t* offset, BYTE* subHeaderType,

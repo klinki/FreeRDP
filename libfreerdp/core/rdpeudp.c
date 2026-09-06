@@ -494,21 +494,31 @@ fail:
 
 wStream* rdpemt_build_subheader(BYTE subHeaderType, const BYTE* data, size_t dataLen)
 {
-	if (!data && (dataLen != 0))
+	if (!data || (dataLen < 2))
 		return nullptr;
 	if (dataLen > 4096)
 		return nullptr;
 	if ((subHeaderType != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) &&
 	    (subHeaderType != RDP_TUNNEL_SUBHEADER_AUTODETECT_RSP))
 		return nullptr;
-	wStream* s = Stream_New(nullptr, 2 + dataLen);
+	/* Overlaid model (MS-RDPEMT 2.2.1.1.1 as observed on the wire): the
+	 * subheader IS the PDU's own RDPBCGR header start. SubHeaderLength is
+	 * the total PDU length including these framing bytes, SubHeaderType
+	 * equals the PDU's headerTypeId. E.g. a Bandwidth Measure Start is
+	 * emitted as its own 6 bytes [06 00 ...], a Network Characteristics
+	 * Result as its 18 bytes [12 00 ...]. A previous revision wrote a
+	 * constant Length=2 plus a full PDU copy (duplicated header); Windows
+	 * parses the overlaid form. */
+	if (data[1] != subHeaderType)
+		return nullptr;
+	if (data[0] != dataLen)
+		return nullptr;
+	if (rdpemt_autodetect_pdu_length(data, dataLen) != dataLen)
+		return nullptr;
+	wStream* s = Stream_New(nullptr, dataLen);
 	if (!s)
 		return nullptr;
-	/* SubHeaderLength = header fields len (Length+Type only, no extras). */
-	Stream_Write_UINT8(s, 2);
-	Stream_Write_UINT8(s, subHeaderType);
-	if (dataLen > 0)
-		Stream_Write(s, data, dataLen);
+	Stream_Write(s, data, dataLen);
 	Stream_SealLength(s);
 	if (!Stream_SetPosition(s, 0))
 	{
@@ -571,6 +581,11 @@ BOOL rdpemt_next_subheader(const BYTE* subheaders, size_t subheadersLen, size_t*
 	off = *offset;
 	if (subheadersLen - off < 2)
 		return FALSE;
+	/* Overlaid model: the subheader header IS the PDU's own RDPBCGR
+	 * header start. SubHeaderLength is the total PDU length including
+	 * these framing bytes (live: an 18-byte region holds exactly one
+	 * [12 00 ...] Network Characteristics Result); SubHeaderType equals
+	 * the PDU's headerTypeId. The returned data is the FULL PDU. */
 	const BYTE subLen = subheaders[off];
 	const BYTE subType = subheaders[off + 1];
 	if (subLen < 2)
@@ -578,12 +593,12 @@ BOOL rdpemt_next_subheader(const BYTE* subheaders, size_t subheadersLen, size_t*
 	if ((subType != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) &&
 	    (subType != RDP_TUNNEL_SUBHEADER_AUTODETECT_RSP))
 		return FALSE;
-	/* SubHeaderData starts after Length+Type; its length is determined by the
-	 * embedded autodetect PDU length (SubHeaderLength is header-fields len). */
-	const BYTE* pdu = subheaders + off + 2;
-	const size_t avail = subheadersLen - off - 2;
+	if ((size_t)subLen > subheadersLen - off)
+		return FALSE;
+	const BYTE* pdu = subheaders + off;
+	const size_t avail = subheadersLen - off;
 	const size_t pduLen = rdpemt_autodetect_pdu_length(pdu, avail);
-	if (pduLen == 0)
+	if ((pduLen == 0) || (pduLen != subLen))
 		return FALSE;
 	if (subHeaderType)
 		*subHeaderType = subType;
@@ -591,7 +606,7 @@ BOOL rdpemt_next_subheader(const BYTE* subheaders, size_t subheadersLen, size_t*
 		*subData = pdu;
 	if (subDataLen)
 		*subDataLen = pduLen;
-	*offset = off + 2 + pduLen;
+	*offset = off + subLen;
 	return TRUE;
 }
 
