@@ -1570,6 +1570,19 @@ static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 	 * prefix. haveRecvData gates ACK validity. */
 	const size_t WIN = ARRAYSIZE(udp->recvDataSeen);
 	INT16 diff = (INT16)(dseq - udp->recvDataBase);
+	if (!udp->haveRecvData && (diff >= (INT16)WIN))
+	{
+		/* Initial epoch sync: the very first DATA starts far ahead of the
+		 * fixed base (peer counters start at 100+). Sliding would leave a
+		 * phantom 1..N gap so every cumulative ACK references ancient
+		 * history the peer ignores (observed: base stuck, zero valid ACKs,
+		 * peer retransmits forever). Adopt the first far-ahead seq as the
+		 * epoch instead. Scoped to pre-first-DATA only, so mid-session
+		 * jumps keep slide semantics and in-window reordering still
+		 * buffers (V1). */
+		udp->recvDataBase = dseq;
+		diff = 0;
+	}
 	if (diff < 0)
 		return; /* duplicate/old, still acked via base-1 */
 	if ((size_t)diff >= WIN)
@@ -2053,32 +2066,12 @@ BOOL rdpeudp_connect(rdpUdpTransport* udp, DWORD timeoutMs)
 			         negUp, negDown, udp->maxPayload, rsyn.upstreamMtu, rsyn.downstreamMtu);
 		}
 
-		/* Send final ACK of handshake (v1 ACK, no SYN) */
-		wStream* ack = Stream_New(nullptr, 32);
-		if (!ack)
-			return FALSE;
-		RdpUdpFecHeader ah = { 0 };
-		ah.snSourceAck = udp->peerInitialSeq;
-		ah.receiveWindow = 128;
-		ah.flags = RDPUDP_FLAG_ACK;
-		if (!rdpeudp_write_fec_header(ack, &ah))
-		{
-			Stream_Release(ack);
-			return FALSE;
-		}
-		/* Minimal ACK vector header: size 0 + padding */
-		Stream_Write_UINT16_BE(ack, 0);
-		Stream_Write_UINT16_BE(ack, 0);
-		Stream_SealLength(ack);
-		if (!Stream_SetPosition(ack, 0))
-		{
-			Stream_Release(ack);
-			return FALSE;
-		}
-		const BOOL sent = rdpeudp_udp_send_stream(udp, ack);
-		Stream_Release(ack);
-		if (!sent)
-			return FALSE;
+		/* No standalone final ACK is sent: the healthy MS capture shows DATA
+		 * following SYN+ACK directly, and this server wedges when the 12 B
+		 * ACK is sent (total silence on the wire; MS-compatible order gets
+		 * immediate replies). The first DATA itself acknowledges the
+		 * handshake. The accept path tolerates a missing final ACK
+		 * symmetrically (it also completes on first v2 DATA). */
 
 		udp->connected = TRUE;
 		udp->useUdp2 = TRUE;
@@ -2187,8 +2180,8 @@ static BOOL rdpeudp2_wait_acked(rdpUdpTransport* udp, UINT16 channelSeq, DWORD t
 					if (hasRecv)
 						rflags |= RDPUDP2_FLAG_ACK;
 					wStream* rs = rdpeudp2_build_packet(
-					    udp, rflags, ackBase,
-					    nullptr, 0, newDseq, cseq, tmp, clen, FALSE);
+					    udp, rflags, ackBase, nullptr, 0, newDseq, cseq, tmp, clen,
+					    FALSE);
 					if (rs)
 					{
 						(void)rdpeudp_udp_send_stream(udp, rs);
@@ -2302,9 +2295,8 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 		UINT16 sflags = RDPUDP2_FLAG_DATA;
 		if (hasRecv)
 			sflags |= RDPUDP2_FLAG_ACK;
-		wStream* pkt = rdpeudp2_build_packet(udp, sflags,
-		                                     ackBase, nullptr, 0, dseq, cseq, data + off,
-		                                     chunk, FALSE);
+		wStream* pkt = rdpeudp2_build_packet(udp, sflags, ackBase, nullptr, 0, dseq,
+		                                     cseq, data + off, chunk, FALSE);
 		if (!pkt)
 			return -1;
 		if (!rdpeudp_udp_send_stream(udp, pkt))
@@ -2454,7 +2446,27 @@ static long rdpeudp_bio_ctrl(BIO* bio, int cmd, long arg1, void* arg2)
 		case BIO_C_GET_EVENT:
 			if (!ptr || !arg2)
 				return 0;
-			*((HANDLE*)arg2) = ptr->hEvent;
+			/* Return the transport socket-readiness event, NOT the BIO's
+			 * private hEvent (created never signaled, never bound: TLS
+			 * setup (pollAndHandshake) waits on this event INFINITE, so a
+			 * dead handle freezes the handshake mid-flight once early APC
+			 * luck runs out — observed as zero parses despite arrivals).
+			 * sockEvent is WSA-bound at connect/accept time and signaled
+			 * on every received datagram (drain-safe re-arm via
+			 * rdpeudp_update_event once multitransport_check_fds runs).
+			 * Same pattern as the TCP BIO (tcp.c). */
+			{
+				HANDLE ev = nullptr;
+				if (ptr->udp)
+				{
+					EnterCriticalSection(&ptr->udp->lock);
+					ev = ptr->udp->sockEvent;
+					LeaveCriticalSection(&ptr->udp->lock);
+				}
+				if (!ev || (ev == INVALID_HANDLE_VALUE))
+					ev = ptr->hEvent; /* pre-connect fallback */
+				*((HANDLE*)arg2) = ev;
+			}
 			return 1;
 		case BIO_C_SET_NONBLOCK:
 			return 1;
@@ -3358,7 +3370,39 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 			BYTE buf[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
 			const SSIZE_T r = freerdp_udp_recv(udp->sockfd, buf, sizeof(buf), 100);
 			if (r <= 0)
+			{
+				/* No standalone final ACK yet: MS-compatible peers skip it
+				 * and send DATA straight after SYN+ACK. Peek (without
+				 * consuming: TLS reads it normally later) for a valid v2
+				 * DATA datagram and accept that as completion too. The
+				 * 16-byte peek covers prefix + header + ACK/overhead/
+				 * delay/AoA + data header for minimal first-DATA shapes. */
+				if (freerdp_udp_wait_readable(udp->sockfd, 0))
+				{
+					BYTE peek[16] = { 0 };
+					const SSIZE_T pr = recv(udp->sockfd, (char*)peek, sizeof(peek),
+					                        MSG_PEEK);
+					if (pr > 8)
+					{
+						const size_t plen =
+						    ((size_t)pr < sizeof(peek)) ? (size_t)pr : sizeof(peek);
+						BYTE t0 = peek[0];
+						peek[0] = peek[7];
+						peek[7] = t0;
+						BOOL dummy = FALSE;
+						size_t poff = 0;
+						RdpUdp2Layout pl = WINPR_C_ARRAY_INIT;
+						if (rdpeudp2_unprotect(peek, plen, &dummy, &poff) && !dummy &&
+						    rdpeudp2_parse_layout(peek + poff, plen - poff, &pl) &&
+						    pl.hasDataHeader)
+						{
+							ok = TRUE;
+							break;
+						}
+					}
+				}
 				continue;
+			}
 			RdpUdpFecHeader h = { 0 };
 			wStream sb = { 0 };
 			wStream* s = Stream_StaticConstInit(&sb, buf, (size_t)r);

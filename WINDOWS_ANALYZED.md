@@ -56,8 +56,13 @@ Follow-up C→S ACK-only packets (10–22 B) also carry prefix `0xE0`.
 
 ## Secondary observations (not blocking)
 
-- MS `DataSeq` starts at **100** (either start value is accepted server-side;
-  consistent with our fixed-base receiver, V1).
+- MS `DataSeq` starts at **100**. This pairs with its first-DATA `AOA=100`:
+  AOA tells the receiver which lower DataSeq values need no acknowledgments,
+  i.e. the instruction that lets the peer skip the 1–99 range. Our receiver
+  parses `L.aoa` but never applies it to its window (known integration
+  limitation, not a prefix-fix regression), and our fixed base stays at 1 —
+  so arbitrary-start interop is claimed only for decoding, not yet proven at
+  transport level. Needs a DataSeq=100/AOA=100 test with initial loss.
 - MS `ChannelSeq` starts at **1** (matches our fix; original 0-start was wrong).
 - MS ClientHello flight fits one datagram (~440 B); ours is 1538 B over two
   UDP2 chunks. UDP-layer ACKs must not depend on TLS record completeness,
@@ -79,8 +84,11 @@ Follow-up C→S ACK-only packets (10–22 B) also carry prefix `0xE0`.
   `MAX_LOGWINDOW`-only cap could admit more in flight than slots exist.
 - Not adopted: DataSeq start 100 (product quirk; reference SDK uses 1 and
   servers accept any start — our fixed-base receiver already handles both).
-- Not adopted: first-DATA AOA=100 (no semantics before any ACK is received;
-  reference SDK omits AOA until there is something to acknowledge).
+- Not adopted (pending probe): first-DATA AOA=100. AOA is not meaningless
+  pre-exchange: it releases the receiver from waiting for the skipped lower
+  range, which is exactly what a DataSeq=100 start needs. Reference SDK omits
+  AOA until something is acknowledged; whether Windows requires it alongside
+  a nonzero start is what the mimic probe tests.
 - Not adopted: reserved flag bit `0x200` (unknown meaning; MUST-ignore on
   receipt — setting unknown bits is never correct).
 - Not adopted: SYN window 64 (ours 128 is honest for our buffers; both valid).
@@ -88,3 +96,26 @@ Follow-up C→S ACK-only packets (10–22 B) also carry prefix `0xE0`.
   not have; our 5 stays, MS's 15 is ignored for flow control as before).
 - Not adopted: skipping the standalone final ACK (ours is accepted per the
   81 s no-retransmit evidence; MS's omission is their quirk).
+
+## Live verification outcome (2026-09-06, `/tmp/udp-probe-noack.pcap`)
+
+- Setup: prefix fix + mimic first-DATA (flags `0x314`, AOA=100, dseq=100)
+  **plus** skipped standalone final ACK (`SYN → SYN+ACK → DATA`, MS order).
+- Result: **first ever two-way exchange with DavidPC** — server replied with
+  ~66 packets (small `0xE0` ACKs incl. base=101/104, `0xF0` zero-filled
+  probe train dseq=100–145, then TLS ServerHello flight as `0xE0` DATA
+  dseq=146+, cseq=1, `16 03 03...`). Prior runs with the 12 B ACK were met
+  with total silence, so the standalone final ACK step was a second gate
+  after the prefix byte (poisonous to this server's state, or lost with no
+  documented retransmit — undecided).
+- New stall point (our side, code-grind territory): after our second TLS
+  chunk (`dseq=102`, 415 B) the client emits zero ACKs for the server's
+  `0xE0` DATA flight, which the server retransmits ~1 Hz; the app session
+  continues over TCP. Suspects: ACK generation/transport after partial-TLS
+  consumption, not wire shape. Open micro-question: server ACK base=104
+  exceeds our max sent dseq=102.
+- Confound left open: mimic-DATA and skip-ACK changed together, so whether
+  mimicry (AOA/`0x200`/dseq=100) matters at all is untested. Next isolation
+  run: minimal DATA (`0x004`, dseq=1) + no standalone ACK. If the server
+  replies, revert all mimicry and keep only skip-ACK (+ already committed
+  prefix fix); if silent, bisect mimicry fields.
