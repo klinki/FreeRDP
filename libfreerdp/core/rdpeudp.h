@@ -30,6 +30,36 @@
 
 #include <openssl/bio.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+
+/* Temporary live-debug tracing (remove once wlog-filter delivery is fixed:
+ * correct `com.freerdp.*:DEBUG` filter strings are silently ignored by
+ * sdl-freerdp even though an isolated wlog test honors them, so WLog_DBG
+ * lines are invisible in live runs). Toggle at RUNTIME, no rebuild and no
+ * add/remove churn around the call sites:
+ *     RDPEUDP_TRACE=1 ./sdl-freerdp ...
+ * Completely silent unless the variable is set to a non-"0" value. Call
+ * sites stay in the tree; each expansion caches the lookup once. */
+#define UDP_TRACE(...) \
+	do \
+	{ \
+		static int udp_trace_on = -1; \
+		if (udp_trace_on < 0) \
+		{ \
+			const char* udp_trace_env = getenv("RDPEUDP_TRACE"); \
+			udp_trace_on = (udp_trace_env && (udp_trace_env[0] != '\0') && \
+			                (udp_trace_env[0] != '0')) \
+			                   ? 1 \
+			                   : 0; \
+		} \
+		if (udp_trace_on) \
+		{ \
+			fprintf(stderr, __VA_ARGS__); \
+			fflush(stderr); \
+		} \
+	} while (0)
+
 /* [MS-RDPEUDP] 2.2.2.1 RDPUDP_FEC_HEADER flags (big-endian on the wire) */
 #define RDPUDP_FLAG_SYN 0x0001
 #define RDPUDP_FLAG_FIN 0x0002

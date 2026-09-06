@@ -32,6 +32,17 @@
 #include "udp.h"
 #include "autodetect.h"
 
+/* Hexdump helper for the UDP_TRACE sites below (temporary with the macro:
+ * exact failing tunnel bytes for live runs, no add/remove churn). */
+static void udp_trace_bytes(const char* label, const BYTE* data, size_t len)
+{
+	size_t hn = (len < 170) ? len : 170;
+	UDP_TRACE("%s len=%zu [", label, len);
+	for (size_t hi = 0; hi < hn; hi++)
+		UDP_TRACE("%02x ", data[hi]);
+	UDP_TRACE("]%s\n", (len > hn) ? " (truncated)" : "");
+}
+
 struct rdp_multitransport
 {
 	rdpRdp* rdp;
@@ -1147,6 +1158,7 @@ int multitransport_check_fds(rdpMultitransport* multi)
 				                           &subDataLen))
 				{
 					WLog_WARN(TAG, "bad UDP tunnel subheader, ignoring rest");
+					udp_trace_bytes("UDP-TUNNEL-SUB", subBuf, subLen);
 					break;
 				}
 				const BOOL isReq =
@@ -1196,6 +1208,7 @@ int multitransport_check_fds(rdpMultitransport* multi)
 			                                   &totalSize, &flags, &chunk, &chunkLen))
 			{
 				WLog_WARN(TAG, "bad UDP channel packet, ignoring");
+				udp_trace_bytes("UDP-TUNNEL-CHAN", payloadBuf, payloadLen);
 				continue;
 			}
 			rdpRdp* rdp = multi->rdp;
