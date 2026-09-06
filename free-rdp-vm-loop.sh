@@ -52,7 +52,7 @@ for ((n = 1; n <= ITERS; n++)); do
 		/cert:tofu \
 		+multitransport \
 		/tls:secrets-file:"${SECRETS}" \
-		/log-filters:com.freerdp.core.rdpeudp:DEBUG,com.freerdp.core.multitransport:DEBUG \
+		/log-filters:com.freerdp.core.rdpeudp:DEBUG,com.freerdp.core.multitransport:DEBUG,com.freerdp.channels.*:DEBUG \
 		>"${LOG}" 2>&1 &
 	client=$!
 	sleep "${DUR}" || true
