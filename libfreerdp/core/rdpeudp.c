@@ -868,6 +868,9 @@ struct rdp_udp_transport
 	UINT16 expectedChannelSeq;
 	BOOL haveRecvData;    /* TRUE once any in-window DATA recorded (ACK valid) */
 	BOOL haveSeenAoa;     /* TRUE once any AOA-bearing packet arrived (epoch known) */
+	BOOL haveRealData;    /* TRUE once NON-DUMMY data arrived: gate for emitting
+	                       * ACKs. Probes flip haveRecvData (base marches) but must
+	                       * not trigger ACK emission on their own. */
 	UINT16 lastAckSent;   /* last arrival (diagnostic only; ACK uses base-1, V2) */
 	UINT16 lastAckReceived;
 	UINT16 lastAoaSent;
@@ -1059,6 +1062,7 @@ rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port
 	udp->expectedChannelSeq = 1;
 	udp->haveRecvData = FALSE;
 	udp->haveSeenAoa = FALSE;
+	udp->haveRealData = FALSE;
 	udp->recvDataBase = 1;
 	udp->overhead = 50; /* avg RDPUDP2+UDP+IP overhead estimate */
 	/* DelayAck hint as observed from the MS client (max=1, timeout=20 ms);
@@ -1723,6 +1727,7 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 				LeaveCriticalSection(&udp->lock);
 				return TRUE;
 			}
+			udp->haveRealData = TRUE;
 		}
 
 		if (L.hasAck)
@@ -1861,8 +1866,10 @@ static BOOL rdpeudp2_send_ack(rdpUdpTransport* udp)
 	BOOL withOverhead = FALSE;
 
 	EnterCriticalSection(&udp->lock);
-	/* No spurious ACK before first DATA (MS reference returns null). */
-	if (!udp->haveRecvData)
+	/* No ACK emission before real (non-dummy) DATA: probes flip
+	 * haveRecvData (base marches) but emitting ACKs for a probe-only
+	 * window correlates with the peer withholding its own small ACKs. */
+	if (!udp->haveRealData)
 	{
 		/* Still send AOA-only? No – nothing to ack yet. */
 		BOOL needAoaOnly = udp->needAoa;
@@ -2214,7 +2221,7 @@ static BOOL rdpeudp2_wait_acked(rdpUdpTransport* udp, UINT16 channelSeq, DWORD t
 					/* V2: piggyback highest contiguous (base-1), never last
 					 * arrival. */
 					const UINT16 ackBase = (UINT16)(udp->recvDataBase - 1);
-					const BOOL hasRecv = udp->haveRecvData;
+					const BOOL hasRecv = udp->haveRealData;
 					LeaveCriticalSection(&udp->lock);
 
 					/* MS reference: no ACK until data received. Spurious ACK(0)
@@ -2331,7 +2338,7 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 		udp->sentCount++;
 		/* V2: piggyback highest contiguous (base-1), never last arrival. */
 		const UINT16 ackBase = (UINT16)(udp->recvDataBase - 1);
-		const BOOL hasRecv = udp->haveRecvData;
+		const BOOL hasRecv = udp->haveRealData;
 		LeaveCriticalSection(&udp->lock);
 
 		/* No spurious ACK(0) before first server DATA (see above). */
@@ -3101,8 +3108,8 @@ BOOL rdpeudp_send_keepalive(rdpUdpTransport* udp)
 
 	EnterCriticalSection(&udp->lock);
 	const BOOL useAckvec = FALSE;
-	/* No spurious ACK(0) keepalive before first server DATA. V2: use base-1. */
-	if (!udp->haveRecvData)
+	/* No spurious ACK(0) keepalive before real server DATA (see above). */
+	if (!udp->haveRealData)
 	{
 		LeaveCriticalSection(&udp->lock);
 		udp->lastKeepaliveTs = udp_now_ms();
@@ -3259,6 +3266,7 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 	udp->expectedChannelSeq = 1;
 	udp->haveRecvData = FALSE;
 	udp->haveSeenAoa = FALSE;
+	udp->haveRealData = FALSE;
 	udp->recvDataBase = 1;
 	udp->overhead = 50;
 	/* Same DelayAck hint as client (MS-observed max=1, timeout=20 ms). */
