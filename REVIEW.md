@@ -1198,11 +1198,14 @@ Location: `libfreerdp/core/rdpeudp.c:1737–1752`, following the new guard at 17
 
 Adding `!haveSeenAoa` fixes the explicit initial-epoch reset, but execution then
 falls through to the general `diff >= WIN` slide. The very same DATA=300/AOA=1
-case now advances the base from 1 to 45 instead of 301, still forgetting missing
-sequences 1–44 without authorization from AOA. Any cumulative ACK based on
-`recvDataBase-1` therefore claims ACK(44), not the required boundary before the
+case advances the production base from 1 to 173 instead of 301, still forgetting missing
+sequences 1–172 without authorization from AOA. Any cumulative ACK based on
+`recvDataBase-1` therefore uses 172, not the required boundary before the
 missing sequence 1. The refreshed extracted production helper/block reproduces
-`First DATA seq=300 AOA=1: cumulativeACK=44 missingSeq1WasReceived=0`.
+`First DATA seq=300 AOA=1: baseMinusOne=172 missingSeq1WasReceived=0`.
+The original 45/44 numbers used an incorrectly sized 256-slot harness; production
+has 128 slots. Also, this state normally selects ACKVEC in `send_ack`, not a
+standalone cumulative ACK. See the correction below.
 
 Reject/buffer an out-of-window arrival without acknowledging unseen data, or
 advance only to a boundary justified by AOA/received state. Guarding one rebase
@@ -1264,3 +1267,46 @@ execution completed, not that all displayed protocol behavior is correct.
 At review start there were no tracked working changes. The prior review's untracked
 `474` harnesses/logs/runner and unrelated local `ai/` and shell scripts were retained.
 Only REVIEW.md and review-owned harness/archive material were changed here.
+
+
+### Q2 evidence correction and remedy assessment
+
+The implementor correctly identified a review-harness error: the extracted
+`11c` state used 256 receive slots instead of production's
+`RDPEUDP2_WINDOW_MAX * 2 = 128`. I corrected it and reran the helper. For
+DATA=300/AOA=1, **base=173, base-1=172**. The earlier 45/44 numbers are withdrawn.
+The original log is historical; the corrected output is saved separately as
+`tools/udp-review-tests/logs/review-11c4f822b/udp-review-11c-aoa-corrected.txt`.
+
+I also corrected the diagnostic label: base-1 is an ACK-selection input, not
+proof an ACK packet was transmitted. With this bitmap, `rdpeudp2_send_ack`
+selects ACKVEC. Building and decoding that vector with the production codec
+confirms base=173, missing entries starting at 173, and DATA=300 marked received
+(the codec decodes 133 entries because of run padding). **Sequences 1–172 are
+not represented in that ACKVEC.** Thus “ACKVEC marks the skipped range missing”
+is incorrect for the range discarded by the slide. It marks remaining gaps
+inside the shifted window. Piggyback/keepalive ACK paths separately use base-1;
+this harness does not model their timing or peer interpretation.
+
+The implementor is right that simply rejecting every future out-of-window
+retransmission could prevent recovery when the sender keeps allocating higher
+DataSeq values. The previous reject/buffer suggestion is not a complete design
+and should not be applied blindly. However, the claim that sliding bounds the
+false-ACK span to the window is also not generally true: it bounds the retained
+bitmap, while a larger jump can discard an arbitrarily larger range within the
+sequence comparison's range.
+
+**Keep Q2/P2 partial pending transport integration evidence.** The diagnostic
+proves state is discarded; it does not prove a Windows stall or prescribe the
+correct recovery policy. Do not remove the slide solely on this extraction.
+The next test should use the actual receiver plus a sender/retransmission model:
+lose a ChannelSeq chunk, advance DataSeq through retries across the 128-slot
+boundary, apply ACK/ACKVEC feedback, and verify every byte is delivered exactly
+once or the connection fails explicitly. Include AOA-authorized epoch changes,
+reordered/lost AOA, and wraparound. That distinguishes recovery from silent loss.
+Static functions can be tested through a transport integration harness or a
+small internal test seam; direct public exposure is not required.
+
+Only review-owned diagnostic/documentation files were changed for this correction.
+Concurrent implementation changes in channels.c and multitransport.c were left
+untouched and were not reviewed as part of this focused response.
