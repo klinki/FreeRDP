@@ -426,6 +426,9 @@ FREERDP_API BOOL rdpeudp_test_recv_state(const rdpUdpTransport* udp, RdpUdpTestR
 /** TRUE if DataSeq (base+i) is recorded received; FALSE if out of range. */
 WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_test_seen(const rdpUdpTransport* udp, size_t i);
+/** Force the connected flag (lets the multitransport test fixture skip the
+ * socket handshake; no I/O is performed). */
+FREERDP_API void rdpeudp_test_set_connected(rdpUdpTransport* udp, BOOL connected);
 
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL rdpeudp_is_connected(const rdpUdpTransport* udp);

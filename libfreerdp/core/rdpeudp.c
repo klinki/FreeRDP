@@ -2006,6 +2006,15 @@ BOOL rdpeudp_test_seen(const rdpUdpTransport* udp, size_t i)
 	return v;
 }
 
+void rdpeudp_test_set_connected(rdpUdpTransport* udp, BOOL connected)
+{
+	if (!udp)
+		return;
+	EnterCriticalSection(&udp->lock);
+	udp->connected = connected;
+	LeaveCriticalSection(&udp->lock);
+}
+
 /* Returns TRUE if a datagram was received (even if ignored). */
 static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1SynAck,
                              RdpUdpFecHeader* v1hdr, RdpUdpSynPayload* v1syn,

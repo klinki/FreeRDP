@@ -22,8 +22,10 @@
 
 #include <winpr/crt.h>
 #include <winpr/stream.h>
+#include <winpr/wtsapi.h>
 
 #include "../rdpeudp.h"
+#include "../multitransport.h"
 #include <freerdp/utils/drdynvc.h>
 
 static int test_fec_header(void)
@@ -1585,6 +1587,289 @@ static int test_rx_integration(void)
 	return 0;
 }
 
+/* Soft-Sync allocation-failure injection + complete mapping processing.
+ * Real mapping paths (multitransport feed/send hooks) on a socketless
+ * negotiated fixture; OOM is injected via multitransport_test_fail_alloc_after
+ * (0 = fail next wrapped allocation). Every failure must stay TCP-safe:
+ * nothing migrated, nothing routed, and the transport must recover fully. */
+static BYTE* ss_build_req(const UINT32* ids, size_t n, size_t* lenOut)
+{
+	/* Header(2) + Length(4) + Flags(2) + Tunnels(2) + list(type 4 + count 2). */
+	const size_t len = 10 + 6 + n * 4;
+	BYTE* b = malloc(len ? len : 1);
+	size_t o = 0;
+	if (!b)
+		return nullptr;
+	b[o++] = 0x80; /* CREATE... Soft-Sync Request */
+	b[o++] = 0x00; /* Pad */
+	const UINT32 llen = (UINT32)(8 + 6 + n * 4);
+	b[o++] = (BYTE)(llen & 0xFF);
+	b[o++] = (BYTE)((llen >> 8) & 0xFF);
+	b[o++] = (BYTE)((llen >> 16) & 0xFF);
+	b[o++] = (BYTE)((llen >> 24) & 0xFF);
+	b[o++] = 0x01 | 0x02; /* TCP_FLUSHED | CHANNELLIST */
+	b[o++] = 0x00;
+	b[o++] = 0x01; /* one tunnel */
+	b[o++] = 0x00;
+	b[o++] = 0x01; /* UDPFECR */
+	b[o++] = 0x00;
+	b[o++] = 0x00;
+	b[o++] = 0x00;
+	b[o++] = (BYTE)(n & 0xFF);
+	b[o++] = (BYTE)((n >> 8) & 0xFF);
+	for (size_t i = 0; i < n; i++)
+	{
+		b[o++] = (BYTE)(ids[i] & 0xFF);
+		b[o++] = (BYTE)((ids[i] >> 8) & 0xFF);
+		b[o++] = (BYTE)((ids[i] >> 16) & 0xFF);
+		b[o++] = (BYTE)((ids[i] >> 24) & 0xFF);
+	}
+	if (lenOut)
+		*lenOut = len;
+	return b;
+}
+
+#define SS_CHECK(cond) \
+	do \
+	{ \
+		if (!(cond)) \
+		{ \
+			(void)fprintf(stderr, "soft_sync_alloc FAILED line %d: %s\n", __LINE__, \
+			              #cond); \
+			multitransport_test_free(mt); \
+			free(big); \
+			return -1; \
+		} \
+	} while (0)
+
+static int test_soft_sync_alloc(void)
+{
+	rdpMultitransport* mt = nullptr;
+	BYTE* big = nullptr;
+	size_t bigLen = 0;
+	{
+		/* 257-ID request: the fragmented-installation case from T1. */
+		static UINT32 ids257[257];
+		for (UINT32 i = 0; i < 257; i++)
+			ids257[i] = i + 1;
+		big = ss_build_req(ids257, 257, &bigLen);
+		if (!big)
+			return -1;
+	}
+
+	/* A. Fragmented install happy path: 3 chunks -> migrated + routed. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	multitransport_test_recv_feed(mt, big, 400, CHANNEL_FLAG_FIRST);
+	multitransport_test_recv_feed(mt, big + 400, 400, 0);
+	multitransport_test_recv_feed(mt, big + 800, bigLen - 800, CHANNEL_FLAG_LAST);
+	SS_CHECK(multitransport_test_recvmigrated(mt));
+	SS_CHECK(multitransport_test_dvc_routed(mt, 1));
+	SS_CHECK(multitransport_test_dvc_routed(mt, 257));
+	SS_CHECK(!multitransport_test_dvc_routed(mt, 999));
+	multitransport_test_free(mt);
+
+	/* B1. Reassembly malloc OOM: FIRST chunk fails -> TCP-safe + recoverable. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	{
+		static const UINT32 one[] = { 7 };
+		size_t rl = 0;
+		BYTE* req = ss_build_req(one, 1, &rl);
+		if (!req)
+		{
+			multitransport_test_free(mt);
+			free(big);
+			return -1;
+		}
+		multitransport_test_fail_alloc_after(0);
+		multitransport_test_recv_feed(mt, req, rl,
+		                              CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+		SS_CHECK(!multitransport_test_recvmigrated(mt));
+		SS_CHECK(!multitransport_test_dvc_routed(mt, 7));
+		multitransport_test_fail_alloc_after(-1);
+		multitransport_test_recv_feed(mt, req, rl,
+		                              CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+		SS_CHECK(multitransport_test_recvmigrated(mt));
+		SS_CHECK(multitransport_test_dvc_routed(mt, 7));
+		free(req);
+	}
+	multitransport_test_free(mt);
+
+	/* B2. Install malloc OOM: reassembly ok, mapping alloc fails. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	{
+		static const UINT32 one[] = { 7 };
+		size_t rl = 0;
+		BYTE* req = ss_build_req(one, 1, &rl);
+		if (!req)
+		{
+			multitransport_test_free(mt);
+			free(big);
+			return -1;
+		}
+		multitransport_test_fail_alloc_after(1);
+		multitransport_test_recv_feed(mt, req, rl,
+		                              CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+		SS_CHECK(!multitransport_test_recvmigrated(mt));
+		SS_CHECK(!multitransport_test_dvc_routed(mt, 7));
+		multitransport_test_fail_alloc_after(-1);
+		multitransport_test_recv_feed(mt, req, rl,
+		                              CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+		SS_CHECK(multitransport_test_recvmigrated(mt));
+		SS_CHECK(multitransport_test_dvc_routed(mt, 7));
+		free(req);
+	}
+	multitransport_test_free(mt);
+
+	/* C. Realloc OOM on continuation: accumulation dropped, TCP-safe. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	multitransport_test_fail_alloc_after(1);
+	multitransport_test_recv_feed(mt, big, 400, CHANNEL_FLAG_FIRST);
+	multitransport_test_recv_feed(mt, big + 400, 400, 0);
+	SS_CHECK(!multitransport_test_recvmigrated(mt));
+	multitransport_test_fail_alloc_after(-1);
+	multitransport_test_recv_feed(mt, big, 400, CHANNEL_FLAG_FIRST);
+	multitransport_test_recv_feed(mt, big + 400, 400, 0);
+	multitransport_test_recv_feed(mt, big + 800, bigLen - 800, CHANNEL_FLAG_LAST);
+	SS_CHECK(multitransport_test_recvmigrated(mt));
+	SS_CHECK(multitransport_test_dvc_routed(mt, 257));
+	multitransport_test_free(mt);
+
+	/* D. Runaway accumulation guard (>65536): dropped without install. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	{
+		static BYTE first[40000];
+		static BYTE cont[30000];
+		first[0] = 0x80; /* opens a Soft-Sync reassembly, never completes */
+		multitransport_test_recv_feed(mt, first, sizeof(first), CHANNEL_FLAG_FIRST);
+		multitransport_test_recv_feed(mt, cont, sizeof(cont), 0);
+		SS_CHECK(!multitransport_test_recvmigrated(mt));
+		/* State reset: a later valid request still installs. */
+		multitransport_test_recv_feed(mt, big, 400, CHANNEL_FLAG_FIRST);
+		multitransport_test_recv_feed(mt, big + 400, bigLen - 400, CHANNEL_FLAG_LAST);
+		SS_CHECK(multitransport_test_recvmigrated(mt));
+		SS_CHECK(multitransport_test_dvc_routed(mt, 1));
+	}
+	multitransport_test_free(mt);
+
+	/* E. Malformed request through the feed path installs nothing. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	multitransport_test_recv_feed(mt, big, 10, CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+	SS_CHECK(!multitransport_test_recvmigrated(mt));
+	SS_CHECK(!multitransport_test_dvc_routed(mt, 1));
+	multitransport_test_free(mt);
+
+	/* F. Zero-list request authorizes migrate-all routing. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	{
+		static const BYTE noList[] = { 0x80, 0x00, 0x08, 0x00, 0x00, 0x00,
+			                       0x01, 0x00, 0x01, 0x00 };
+		multitransport_test_recv_feed(mt, noList, sizeof(noList),
+		                              CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+		SS_CHECK(multitransport_test_recvmigrated(mt));
+		SS_CHECK(multitransport_test_dvc_routed(mt, 424242));
+	}
+	multitransport_test_free(mt);
+
+	/* G. Send-side install hook migrates; OOM keeps it on TCP. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	{
+		static const UINT32 one[] = { 7 };
+		size_t rl = 0;
+		BYTE* req = ss_build_req(one, 1, &rl);
+		if (!req)
+		{
+			multitransport_test_free(mt);
+			free(big);
+			return -1;
+		}
+		multitransport_test_fail_alloc_after(0);
+		multitransport_test_request_sent(mt, req, rl);
+		SS_CHECK(!multitransport_test_sendmigrated(mt));
+		SS_CHECK(!multitransport_test_dvc_routed(mt, 7));
+		multitransport_test_fail_alloc_after(-1);
+		multitransport_test_request_sent(mt, req, rl);
+		SS_CHECK(multitransport_test_sendmigrated(mt));
+		SS_CHECK(multitransport_test_dvc_routed(mt, 7));
+		SS_CHECK(!multitransport_test_dvc_routed(mt, 8));
+		free(req);
+	}
+	multitransport_test_free(mt);
+
+	/* H. T1 response gates: stray hooks migrate nothing. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	multitransport_test_response_sent(mt);
+	SS_CHECK(!multitransport_test_sendmigrated(mt));
+	multitransport_test_response_received(mt);
+	SS_CHECK(!multitransport_test_recvmigrated(mt));
+	/* After a real install both hooks take effect. */
+	multitransport_test_recv_feed(mt, big, bigLen, CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+	SS_CHECK(multitransport_test_recvmigrated(mt));
+	multitransport_test_response_sent(mt);
+	SS_CHECK(multitransport_test_sendmigrated(mt));
+	multitransport_test_free(mt);
+
+	/* I. NULL robustness. */
+	mt = nullptr;
+	multitransport_test_free(nullptr);
+	multitransport_test_recv_feed(nullptr, big, bigLen, CHANNEL_FLAG_LAST);
+	multitransport_test_request_sent(nullptr, big, bigLen);
+	multitransport_test_response_sent(nullptr);
+	multitransport_test_response_received(nullptr);
+	multitransport_test_fail_alloc_after(-1);
+	SS_CHECK(!multitransport_test_recvmigrated(nullptr));
+	SS_CHECK(!multitransport_test_sendmigrated(nullptr));
+	SS_CHECK(!multitransport_test_dvc_routed(nullptr, 1));
+	/* SS_CHECK frees mt (nullptr here) and big; big still live. */
+	free(big);
+	big = nullptr;
+	return 0;
+}
+
 int TestRdpeUdp(int argc, char* argv[])
 {
 	WINPR_UNUSED(argc);
@@ -1668,6 +1953,11 @@ int TestRdpeUdp(int argc, char* argv[])
 	if (test_rx_integration() != 0)
 	{
 		(void)fprintf(stderr, "test_rx_integration FAILED\n");
+		return -1;
+	}
+	if (test_soft_sync_alloc() != 0)
+	{
+		(void)fprintf(stderr, "test_soft_sync_alloc FAILED\n");
 		return -1;
 	}
 

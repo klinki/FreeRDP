@@ -91,6 +91,30 @@ struct rdp_multitransport
 
 #define TAG FREERDP_TAG("core.multitransport")
 
+/* Test-only OOM injection for the Soft-Sync mapping/reassembly allocations
+ * below (mt_test_malloc/realloc). When armed (>= 0), each wrapped allocation
+ * decrements the counter and the one reaching 0 fails; negative disables.
+ * Callers run under multi->lock; tests are single-threaded. */
+static int g_mt_fail_alloc_after = -1;
+
+static void* mt_test_malloc(size_t n)
+{
+	if (g_mt_fail_alloc_after == 0)
+		return nullptr;
+	if (g_mt_fail_alloc_after > 0)
+		g_mt_fail_alloc_after--;
+	return malloc(n);
+}
+
+static void* mt_test_realloc(void* p, size_t n)
+{
+	if (g_mt_fail_alloc_after == 0)
+		return nullptr;
+	if (g_mt_fail_alloc_after > 0)
+		g_mt_fail_alloc_after--;
+	return realloc(p, n);
+}
+
 static state_run_t multitransport_client_request_udp(rdpMultitransport* multi, UINT32 reqId,
                                                      UINT16 reqProto, const BYTE* cookie);
 static DWORD WINAPI multitransport_udp_connect_thread(LPVOID arg);
@@ -792,7 +816,7 @@ static BOOL multitransport_install_mapping_locked(rdpMultitransport* multi, cons
 	multi->mappingInstalled = FALSE;
 	if (count > 0)
 	{
-		UINT32* ids = malloc(count * sizeof(UINT32));
+		UINT32* ids = mt_test_malloc(count * sizeof(UINT32));
 		size_t got = 0;
 		if (!ids)
 			return FALSE; /* OOM: stay TCP-safe */
@@ -851,7 +875,7 @@ void multitransport_soft_sync_recv_feed(rdpMultitransport* multi, const BYTE* ch
 			return;
 		}
 		free(multi->ssReqBuf);
-		multi->ssReqBuf = malloc(chunkLen);
+		multi->ssReqBuf = mt_test_malloc(chunkLen);
 		if (!multi->ssReqBuf)
 		{
 			LeaveCriticalSection(&multi->lock);
@@ -878,7 +902,7 @@ void multitransport_soft_sync_recv_feed(rdpMultitransport* multi, const BYTE* ch
 				LeaveCriticalSection(&multi->lock);
 				return;
 			}
-			multi->ssReqBuf = malloc(chunkLen);
+			multi->ssReqBuf = mt_test_malloc(chunkLen);
 			if (!multi->ssReqBuf)
 			{
 				LeaveCriticalSection(&multi->lock);
@@ -902,7 +926,7 @@ void multitransport_soft_sync_recv_feed(rdpMultitransport* multi, const BYTE* ch
 				LeaveCriticalSection(&multi->lock);
 				return;
 			}
-			BYTE* grown = realloc(multi->ssReqBuf, multi->ssReqLen + chunkLen);
+			BYTE* grown = mt_test_realloc(multi->ssReqBuf, multi->ssReqLen + chunkLen);
 			if (!grown)
 			{
 				free(multi->ssReqBuf);
@@ -1346,4 +1370,121 @@ int multitransport_check_fds(rdpMultitransport* multi)
 		rdpeudp_update_event(udp);
 	}
 	return dispatched;
+}
+
+/* ---- unit-test driver (see multitransport.h) ---- */
+static rdpRdp g_mt_test_rdp; /* fixture peer; settings allocated once, never freed */
+
+rdpMultitransport* multitransport_test_new(void)
+{
+	if (!g_mt_test_rdp.settings)
+	{
+		g_mt_test_rdp.settings = freerdp_settings_new(0);
+		if (!g_mt_test_rdp.settings)
+			return nullptr;
+	}
+	rdpMultitransport* multi = multitransport_new(&g_mt_test_rdp, 0);
+	if (!multi)
+		return nullptr;
+	/* Fixture: negotiated with a connected (socketless) UDP transport, so the
+	 * mapping install/feed hooks run exactly as in production. */
+	multi->softSyncNegotiated = TRUE;
+	multi->udp = rdpeudp_test_new();
+	if (!multi->udp)
+	{
+		multitransport_free(multi);
+		return nullptr;
+	}
+	rdpeudp_test_set_connected(multi->udp, TRUE);
+	return multi;
+}
+
+void multitransport_test_free(rdpMultitransport* multi)
+{
+	g_mt_fail_alloc_after = -1; /* never leak an armed hook into the next test */
+	multitransport_free(multi);
+}
+
+void multitransport_test_fail_alloc_after(int n)
+{
+	g_mt_fail_alloc_after = n;
+}
+
+void multitransport_test_recv_feed(rdpMultitransport* multi, const BYTE* chunk, size_t chunkLen,
+                                   UINT32 flags)
+{
+	if (!multi)
+		return;
+	multitransport_soft_sync_recv_feed(multi, chunk, chunkLen, flags);
+}
+
+void multitransport_test_request_sent(rdpMultitransport* multi, const BYTE* pdu, size_t len)
+{
+	if (!multi)
+		return;
+	multitransport_on_soft_sync_request_sent(multi, pdu, len);
+}
+
+void multitransport_test_response_sent(rdpMultitransport* multi)
+{
+	if (!multi)
+		return;
+	multitransport_on_soft_sync_response_sent(multi);
+}
+
+void multitransport_test_response_received(rdpMultitransport* multi)
+{
+	if (!multi)
+		return;
+	multitransport_on_soft_sync_response_received(multi);
+}
+
+BOOL multitransport_test_recvmigrated(const rdpMultitransport* multi)
+{
+	BOOL v = FALSE;
+	if (!multi)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	v = multi->udpRecvMigrated;
+	LeaveCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	return v;
+}
+
+BOOL multitransport_test_sendmigrated(const rdpMultitransport* multi)
+{
+	BOOL v = FALSE;
+	if (!multi)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	v = multi->udpSendMigrated;
+	LeaveCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	return v;
+}
+
+BOOL multitransport_test_dvc_routed(const rdpMultitransport* multi, UINT32 dvcId)
+{
+	BOOL rc = FALSE;
+	if (!multi)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	/* Mapping decision without the connection/send gates: installed &&
+	 * (migrate-all or listed). Mirrors multitransport_is_dvc_migrated. */
+	if (multi->mappingInstalled)
+	{
+		if (!multi->mappingActive)
+			rc = TRUE;
+		else
+		{
+			for (size_t i = 0; i < multi->udpDvcCount; i++)
+			{
+				if (multi->udpDvcIds[i] == dvcId)
+				{
+					rc = TRUE;
+					break;
+				}
+			}
+		}
+	}
+	LeaveCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	return rc;
 }
