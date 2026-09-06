@@ -1044,8 +1044,10 @@ rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port
 	udp->haveRecvData = FALSE;
 	udp->recvDataBase = 1;
 	udp->overhead = 50; /* avg RDPUDP2+UDP+IP overhead estimate */
-	udp->delayAckMax = 2;
-	udp->delayAckTimeoutMs = 50;
+	/* DelayAck hint as observed from the MS client (max=1, timeout=20 ms);
+	 * matches our prompt-ACK behavior better than the old 2/50. */
+	udp->delayAckMax = 1;
+	udp->delayAckTimeoutMs = 20;
 	udp->lastKeepaliveTs = udp_now_ms();
 	udp->udpEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (!udp->udpEvent || (udp->udpEvent == INVALID_HANDLE_VALUE))
@@ -2238,6 +2240,10 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 			                                                  : udp->peerLogWindow;
 			if (effWindow > RDPUDP2_MAX_LOGWINDOW)
 				effWindow = RDPUDP2_MAX_LOGWINDOW;
+			/* Never allow more in flight than sent[] slots: MS peers
+			 * advertise logWindow 15 (2^15), far beyond our 64 entries. */
+			while ((size_t)(1u << effWindow) > ARRAYSIZE(udp->sent))
+				effWindow--;
 			LeaveCriticalSection(&udp->lock);
 			if (used < (size_t)(1u << effWindow))
 				break;
@@ -3182,8 +3188,9 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 	udp->haveRecvData = FALSE;
 	udp->recvDataBase = 1;
 	udp->overhead = 50;
-	udp->delayAckMax = 2;
-	udp->delayAckTimeoutMs = 50;
+	/* Same DelayAck hint as client (MS-observed max=1, timeout=20 ms). */
+	udp->delayAckMax = 1;
+	udp->delayAckTimeoutMs = 20;
 	udp->lastKeepaliveTs = udp_now_ms();
 	udp->udpEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
 	if (!udp->udpEvent || (udp->udpEvent == INVALID_HANDLE_VALUE))
