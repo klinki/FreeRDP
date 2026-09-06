@@ -1265,6 +1265,75 @@ static int test_soft_sync_shared_parity(void)
 	return 0;
 }
 
+static int test_dvc_pdu_length(void)
+{
+	/* Live CREATEs: `18 02/07/08 <name>\0`, one PDU each (VM + DavidPC). */
+	static const BYTE createCoreIn[] = {
+		0x18, 0x02, 'M', 'i', 'c', 'r', 'o', 's', 'o', 'f', 't', ':',
+		':', 'W', 'i', 'n', 'd', 'o', 'w', 's', ':', ':', 'R', 'D', 'S', ':', ':',
+		'C', 'o', 'r', 'e', 'I', 'n', 'p', 'u', 't', 0x00
+	};
+	static const BYTE createGfx[] = {
+		0x18, 0x07, 'M', 'i', 'c', 'r', 'o', 's', 'o', 'f', 't', ':',
+		':', 'W', 'i', 'n', 'd', 'o', 'w', 's', ':', ':', 'R', 'D', 'S', ':', ':',
+		'G', 'r', 'a', 'p', 'h', 'i', 'c', 's', 0x00
+	};
+	size_t len = 0;
+	if (!rdpeudp_dvc_pdu_length(createCoreIn, sizeof(createCoreIn), &len) ||
+	    (len != sizeof(createCoreIn)))
+	{
+		(void)fprintf(stderr, "live CREATE CoreInput rejected\n");
+		return -1;
+	}
+	if (!rdpeudp_dvc_pdu_length(createGfx, sizeof(createGfx), &len) ||
+	    (len != sizeof(createGfx)))
+	{
+		(void)fprintf(stderr, "live CREATE Graphics rejected\n");
+		return -1;
+	}
+	/* Synthetic CLOSE (header Cmd=4 + 1-byte id) and DATA_FIRST exact-fit. */
+	{
+		static const BYTE closePdu[] = { 0x44, 0x09 };
+		if (!rdpeudp_dvc_pdu_length(closePdu, sizeof(closePdu), &len) || (len != 2))
+		{
+			(void)fprintf(stderr, "CLOSE rejected\n");
+			return -1;
+		}
+		/* DATA_FIRST total == present (exact fit): header + id + len(9) + 3 data. */
+		static const BYTE firstPdu[] = { 0x20, 0x05, 0x09, 0x00, 0x00, 0x00,
+			                               'A', 'B', 'C' };
+		if (!rdpeudp_dvc_pdu_length(firstPdu, sizeof(firstPdu), &len) || (len != 9))
+		{
+			(void)fprintf(stderr, "exact DATA_FIRST rejected\n");
+			return -1;
+		}
+		/* Plain DATA runs to end of buffer. */
+		static const BYTE dataPdu[] = { 0x30, 0x0A, 'x', 'y' };
+		if (!rdpeudp_dvc_pdu_length(dataPdu, sizeof(dataPdu), &len) || (len != 4))
+		{
+			(void)fprintf(stderr, "DATA rejected\n");
+			return -1;
+		}
+	}
+	/* Negatives: truncated header/id, unterminated CREATE, fragmented
+	 * DATA_FIRST, unknown command. */
+	{
+		static const BYTE trunc[] = { 0x18 };
+		static const BYTE noNul[] = { 0x18, 0x02, 'A', 'B' };
+		static const BYTE fragFirst[] = { 0x20, 0x05, 0x20, 0x00, 0x00, 0x00, 'A' };
+		static const BYTE unknown[] = { 0xF8, 0x01 };
+		if (rdpeudp_dvc_pdu_length(trunc, sizeof(trunc), &len) ||
+		    rdpeudp_dvc_pdu_length(noNul, sizeof(noNul), &len) ||
+		    rdpeudp_dvc_pdu_length(fragFirst, sizeof(fragFirst), &len) ||
+		    rdpeudp_dvc_pdu_length(unknown, sizeof(unknown), &len))
+		{
+			(void)fprintf(stderr, "negative DVC fixture accepted\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
 int TestRdpeUdp(int argc, char* argv[])
 {
 	WINPR_UNUSED(argc);
@@ -1340,7 +1409,13 @@ int TestRdpeUdp(int argc, char* argv[])
 		(void)fprintf(stderr, "test_soft_sync_shared_parity FAILED\n");
 		return -1;
 	}
+	if (test_dvc_pdu_length() != 0)
+	{
+		(void)fprintf(stderr, "test_dvc_pdu_length FAILED\n");
+		return -1;
+	}
 
 	(void)printf("TestRdpeUdp passed\n");
 	return 0;
 }
+

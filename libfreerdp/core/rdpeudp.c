@@ -816,6 +816,118 @@ BOOL rdpeudp_parse_channel_packet(const BYTE* data, size_t len, UINT16* channelI
 	return TRUE;
 }
 
+/* Length of one DYNVC PDU at data (MS-RDPEDYC 2.2, header byte
+ * [cbId(2)|Sp/Pri(2)|Cmd(4)] + ChannelId of cbChId width). Live servers put
+ * RAW DVC PDUs in Tunnel DATA HigherLayerData with no outer envelope
+ * (observed: CREATEs `18 02/07/08 <name>\0`, one PDU per Tunnel DATA).
+ * Returns FALSE when the bytes do not hold exactly one complete PDU of a
+ * supported command (CREATE/CLOSE/DATA_FIRST/DATA/SOFT-SYNC incl. compressed
+ * DATA forms; CAPABILITY PDUs go through their dedicated handlers).
+ * DATA_FIRST beyond the present bytes and unknown commands fail visibly. */
+BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, size_t* pduLenOut)
+{
+	UINT8 cmd = 0;
+	UINT8 cbChId = 0;
+	size_t idLen = 0;
+	size_t off = 0;
+	if (!data || (len < 1))
+		return FALSE;
+	cmd = (UINT8)((data[0] >> 4) & 0x0F);
+	cbChId = (UINT8)(data[0] & 0x03);
+	idLen = (cbChId == 0) ? 1 : ((cbChId == 1) ? 2 : 4);
+	if (len < 1 + idLen)
+		return FALSE;
+	off = 1 + idLen;
+	switch (cmd)
+	{
+		case 0x01: /* CREATE_REQUEST: ChannelId + NUL-terminated name */
+		{
+			size_t nameLen = 0;
+			while (off + nameLen < len)
+			{
+				if (data[off + nameLen] == 0)
+				{
+					if (pduLenOut)
+						*pduLenOut = off + nameLen + 1;
+					return TRUE;
+				}
+				nameLen++;
+			}
+			return FALSE; /* name runs past HigherLayerData */
+		}
+		case 0x04: /* CLOSE_REQUEST: header + ChannelId only */
+			if (pduLenOut)
+				*pduLenOut = off;
+			return TRUE;
+		case 0x02: /* DATA_FIRST (+0x06 compressed): header + ChannelId +
+		              Length + first bytes. Length width follows the middle
+		              bits exactly like drdynvc_read_variable_uint (0->1B,
+		              1->2B, else 4B) and counts message DATA bytes after the
+		              Length field (dvcman allocates exactly this and appends
+		              across fragments until full). A first fragment carries
+		              only part of it (more fragments follow in later Tunnel
+		              DATAs); a complete message may share its HigherLayer
+		              with trailing PDUs. */
+		case 0x06:
+		{
+			const size_t lenLen =
+			    ((((data[0] >> 2) & 0x03) == 0)
+			         ? 1
+			         : ((((data[0] >> 2) & 0x03) == 1) ? 2 : 4));
+			if (len < off + lenLen)
+				return FALSE;
+			UINT32 total = 0;
+			for (size_t li = 0; li < lenLen; li++)
+				total |= ((UINT32)data[off + li] << (8 * li));
+			const size_t dataOff = off + lenLen;
+			if (total == 0)
+				return FALSE;
+			if (total <= len - dataOff)
+			{
+				/* Complete here; trailers may follow in this HigherLayer. */
+				if (pduLenOut)
+					*pduLenOut = dataOff + total;
+			}
+			else
+			{
+				/* First fragment: rest arrives later; consume all here. */
+				if (pduLenOut)
+					*pduLenOut = len;
+			}
+			return TRUE;
+		}
+		case 0x03: /* DATA (+0x07 compressed): header + ChannelId + rest */
+		case 0x07:
+			if (pduLenOut)
+				*pduLenOut = len;
+			return TRUE;
+		case 0x08: /* SOFT_SYNC_REQUEST (+0x09 response): header + Pad +
+		              Length(u32: total size of Length and everything after)
+		              + body. Length framing is trusted for SPLITTING only;
+		              content is strictly validated downstream by
+		              drdynvc_order_recv via the shared parsers, which reject
+		              garbage loudly. */
+		case 0x09:
+		{
+			if (len < 6)
+				return FALSE;
+			const UINT32 bodyLen =
+			    (UINT32)data[2] | ((UINT32)data[3] << 8) |
+			    ((UINT32)data[4] << 16) | ((UINT32)data[5] << 24);
+			if (bodyLen > 65535)
+				return FALSE;
+			const size_t total = (size_t)6 + bodyLen;
+			if (total > len)
+				return FALSE;
+			if (pduLenOut)
+				*pduLenOut = total;
+			return TRUE;
+		}
+		default:
+			return FALSE;
+	}
+}
+
 /* ------------------------------------------------------------------ */
 /* reliable RDPEUDP2 transport                                          */
 /* ------------------------------------------------------------------ */
