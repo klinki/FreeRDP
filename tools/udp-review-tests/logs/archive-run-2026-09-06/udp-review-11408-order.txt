@@ -1,0 +1,2 @@
+arrival 2:B,1:A -> delivered B length=1 expectedChannel=3
+arrival dseq 1,3,2 -> recvBase=4 lastAckSent=2 selected ACK=2 (contiguous through 3)

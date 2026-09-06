@@ -1,0 +1,29 @@
+[ 87%] Built target winpr
+[ 87%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestNTLM.c.o
+[ 87%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestIni.c.o
+[ 87%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestVersion.c.o
+[ 87%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestWinPRUtils.c.o
+[ 87%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestImage.c.o
+[ 87%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestQueue.c.o
+[ 91%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestBacktrace.c.o
+[ 91%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestPrint.c.o
+[ 91%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestStream.c.o
+[ 91%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestPubSub.c.o
+[ 91%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestBitStream.c.o
+[ 91%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestArrayList.c.o
+[ 95%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestLinkedList.c.o
+[ 95%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestListDictionary.c.o
+[ 95%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestCmdLine.c.o
+[ 95%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestASN1.c.o
+[ 95%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestSAM.c.o
+[ 95%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestWLog.c.o
+[ 95%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestWLogCallback.c.o
+[ 95%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestHashTable.c.o
+[ 95%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestStreamPool.c.o
+[100%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestBufferPool.c.o
+[100%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestMessageQueue.c.o
+[100%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestMessagePipe.c.o
+[100%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestJson.c.o
+[100%] Building C object winpr/libwinpr/utils/test/CMakeFiles/TestWinPRUtils.dir/TestCommandLineToCommaSeparatedValues.c.o
+[100%] Linking C executable ../../../../Testing/TestWinPRUtils
+[100%] Built target TestWinPRUtils
