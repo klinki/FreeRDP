@@ -867,6 +867,7 @@ struct rdp_udp_transport
 	UINT16 nextChannelSeq;
 	UINT16 expectedChannelSeq;
 	BOOL haveRecvData;    /* TRUE once any in-window DATA recorded (ACK valid) */
+	BOOL haveSeenAoa;     /* TRUE once any AOA-bearing packet arrived (epoch known) */
 	UINT16 lastAckSent;   /* last arrival (diagnostic only; ACK uses base-1, V2) */
 	UINT16 lastAckReceived;
 	UINT16 lastAoaSent;
@@ -1057,6 +1058,7 @@ rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port
 	udp->nextChannelSeq = 1;
 	udp->expectedChannelSeq = 1;
 	udp->haveRecvData = FALSE;
+	udp->haveSeenAoa = FALSE;
 	udp->recvDataBase = 1;
 	udp->overhead = 50; /* avg RDPUDP2+UDP+IP overhead estimate */
 	/* DelayAck hint as observed from the MS client (max=1, timeout=20 ms);
@@ -1674,8 +1676,6 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 		memcpy(tmp, buf, (size_t)r);
 		if (!rdpeudp2_unprotect(tmp, (size_t)r, &dummy, &off))
 			return TRUE;
-		if (dummy)
-			return TRUE; /* ignore dummy for reliability */
 
 		const BYTE* p = tmp + off;
 		size_t rem = (size_t)r - off;
@@ -1695,6 +1695,35 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 		udp->stats.recvPackets++;
 		if ((L.logWindow <= RDPUDP2_MAX_LOGWINDOW) && (L.logWindow >= 2))
 			udp->peerLogWindow = L.logWindow;
+
+		if (L.hasDataHeader)
+		{
+			/* ACK state tracks EVERY received DataSeq, including dummy
+			 * (probe/keepalive) packets: dropping whole ranges (e.g. the
+			 * MS 100+ probe train) otherwise wedges the cumulative base
+			 * forever and every ACK references ancient history. Bodies of
+			 * dummies are still never delivered, and their ACK/ACKVEC
+			 * payloads use the peer's own numbering space, so only the
+			 * DataSeq feeds receive state here.
+			 * Epoch via peer AOA (C1): MS numbers all counters from 100
+			 * and announces it in AOA from the first packet. Snap a never-
+			 * advanced base to the first AOA-carrying arrival. V1-safe:
+			 * AOA-less arrivals (harness, plain DATA) still buffer, and
+			 * mid-session jumps keep slide semantics (latched once). */
+			if (!udp->haveSeenAoa && L.hasAoa &&
+			    ((INT16)(L.dataSeq - udp->recvDataBase) != 0))
+			{
+				memset(udp->recvDataSeen, 0, sizeof(udp->recvDataSeen));
+				udp->recvDataBase = L.dataSeq;
+			}
+			udp->haveSeenAoa = udp->haveSeenAoa || L.hasAoa;
+			rdpeudp_note_recv_data_seq_locked(udp, L.dataSeq);
+			if (dummy)
+			{
+				LeaveCriticalSection(&udp->lock);
+				return TRUE;
+			}
+		}
 
 		if (L.hasAck)
 		{
@@ -1742,13 +1771,12 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 		/* DataBody (ChannelSeqNum + Data) follows ACKVEC per spec. */
 		if (L.hasDataHeader && L.hasDataBody)
 		{
-			const UINT16 dseq = L.dataSeq;
 			const UINT16 cseq = L.channelSeq;
 			const BYTE* dp = L.dataBody;
 			const size_t drem = L.dataBodyLen;
 
-			rdpeudp_note_recv_data_seq_locked(udp, dseq);
-
+			/* DataSeq already recorded above (dummies included); here only
+			 * channel reassembly and delivery. */
 			/* V1: fixed 1-start expectedChannelSeq; buffer later chunks,
 			 * deliver in order. Never infer start from first arrival. */
 			/* Deduplicate by channel seq */
@@ -2321,10 +2349,27 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 		}
 		Stream_Release(pkt);
 
-		if (!rdpeudp2_wait_acked(udp, cseq, 2000))
+		if (!rdpeudp2_wait_acked(udp, cseq, RDPEUDP_SEND_TIMEOUT_MS))
 		{
 			WLog_WARN(TAG, "RDPEUDP2 send timeout cseq=0x%04" PRIx16 " dseq=0x%04" PRIx16,
 			          cseq, dseq);
+			/* Release this chunk and its retransmit copies: TLS retries
+			 * the bytes from scratch with fresh seqs, and leaked slots
+			 * would eventually exhaust the 64-entry window. Late ACKs for
+			 * the released seqs simply match nothing. */
+			EnterCriticalSection(&udp->lock);
+			for (size_t fi = 0; fi < ARRAYSIZE(udp->sent); fi++)
+			{
+				if (udp->sent[fi].data && (udp->sent[fi].channelSeq == cseq))
+				{
+					free(udp->sent[fi].data);
+					udp->sent[fi].data = nullptr;
+					udp->sent[fi].len = 0;
+					if (udp->sentCount > 0)
+						udp->sentCount--;
+				}
+			}
+			LeaveCriticalSection(&udp->lock);
 			return -1;
 		}
 
@@ -3213,6 +3258,7 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 	udp->nextChannelSeq = 1;
 	udp->expectedChannelSeq = 1;
 	udp->haveRecvData = FALSE;
+	udp->haveSeenAoa = FALSE;
 	udp->recvDataBase = 1;
 	udp->overhead = 50;
 	/* Same DelayAck hint as client (MS-observed max=1, timeout=20 ms). */

@@ -29,10 +29,19 @@ for ((n = 1; n <= ITERS; n++)); do
 	SECRETS="/tmp/rdp-vm-secrets-${n}.txt"
 	echo "=== round $n/$ITERS: ${DUR}s capture -> $PCAP ==="
 	rm -f "${SECRETS}"
+	# Remove any stale capture first: a previous sudo-run leaves a root-owned
+	# file that dumpcap (unprivileged) then fails to truncate, silently
+	# leaving stale packets that get misattributed to the new round.
+	rm -f "${PCAP}"
 	dumpcap -i "${IFACE}" -w "${PCAP}" -f "udp port 3389" -a "duration:${DUR}" \
-		>/dev/null 2>&1 &
+		>"/tmp/dumpcap-${n}.log" 2>&1 &
 	dcap=$!
 	sleep 2 # let capture settle
+	if ! kill -0 "${dcap}" 2>/dev/null; then
+		echo "dumpcap failed to start; see /tmp/dumpcap-${n}.log"
+		cat "/tmp/dumpcap-${n}.log" 2>/dev/null | head -n 5
+		exit 1
+	fi
 	# NOTE: /p: instead of piped /from-stdin:force — the passphrase reader
 	# needs a tty for termios and fails headless (prints usage, no connect).
 	# Test-VM-only password from $RDP_PASS (never committed with a value).

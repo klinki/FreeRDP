@@ -110,6 +110,13 @@
 #define RDPEUDP_ACK_TIMEOUT_MS 200
 #define RDPEUDP_MAX_RETRIES 5
 #define RDPEUDP_KEEPALIVE_MS 30000
+/* Per-chunk reliable-send deadline. Generous on purpose: loaded peers have
+ * been observed to take ~2 s before their first ACK while blasting probe
+ * trains, and a 2 s deadline lost that race by milliseconds (the ACKs kept
+ * arriving right after). The establishment worker is async (main session on
+ * TCP is unaffected), and MS's own reference waits an order of magnitude
+ * longer, so patience here is safe. */
+#define RDPEUDP_SEND_TIMEOUT_MS 10000
 
 typedef struct rdp_udp_transport rdpUdpTransport;
 
