@@ -2,10 +2,10 @@
 
 Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
-Latest review: 2026-09-06 (HEAD `33e410c56`)
-Review result: four new committed-code findings N1–N4 below. No tracked implementation changes in the working directory.
+Latest review: 2026-09-06 (HEAD `9fbe4fb10`)
+Review result: N4 fixed; N2 and N3 partially fixed with remaining cases P1/P2 below; N1 remains open. The archived runner also needs an API update (P3).
 
-Latest scope: `a1ce296da..33e410c56` (eight commits after the saved review), plus a separate working-directory inspection. The interim progress report was not a code review. Earlier sections retain historical findings and line numbers.
+Latest scope: `33e410c56..9fbe4fb10` (three commits), plus a separate working-directory inspection. The interim progress report was not a code review. Earlier sections retain historical findings and line numbers.
 
 The original review identified eight P1 correctness issues. Re-review of commit
 `a9eb02727` found three blocking issues: an encoder/protector integration regression,
@@ -980,3 +980,117 @@ harnesses, their runner, and logs. No implementation files were edited.
 
 Historical WD1's unconditional first-send sequence-jump probe is absent from the
 current send path, so that specific retransmission finding no longer applies.
+
+
+## Re-review — `33e410c56..9fbe4fb10` (2026-09-06)
+
+Reviewed `dfa15584e` (review document), `47459d93e` (N2–N4 fixes and status
+updates), and `9fbe4fb10` (preserved harnesses/logs). No tracked implementation
+changes were present outside these commits. Findings below supersede the
+implementor's status claims where they differ.
+
+### P1. [P1] Drain packets that do not complete the peek-only handshake
+
+Location: `libfreerdp/core/rdpeudp.c:3572–3618`, introduced by `47459d93e`.
+
+The N2 change correctly leaves a first DATA datagram queued for TLS and consumes
+a validated v1 ACK, but never consumes anything else. A dummy probe at the queue
+head fails the `!dummy` condition, remains readable, and is peeked repeatedly
+until the five-second deadline. A valid ACK or DATA queued behind it is never
+examined. This turns a non-completing packet into a handshake failure and a busy
+loop. Rejecting a packet as handshake completion must not leave it blocking the
+socket queue indefinitely.
+
+The preserved localhost socket harness first confirms the normal queued-DATA
+case succeeds without consuming the datagram. It then queues a valid dummy
+packet followed by a valid v1 ACK and reproduces the failure using the
+implementor's classification loop (shortened test deadline):
+`REGRESSION: dummy datagram blocks valid queued ACK`.
+Consume/handle packets that do not complete the handshake, preserving accepted
+DATA for TLS. Cover dummy/duplicate/non-completing traffic before first DATA/ACK.
+N2's original consume-before-classify bug is fixed, but acceptance is not robust yet.
+
+### P2. [P1] Prevent the old initial-DataSeq rebase from overriding the AOA fix
+
+Location: `libfreerdp/core/rdpeudp.c:1859–1860` (call after the new AOA block);
+related `rdpeudp_note_recv_data_seq_locked` initial epoch branch.
+
+The new block advances the base using `L.aoa`, correctly preserving the original
+small-gap example. It then calls the existing receive helper, which resets the
+base to `dseq` whenever no DATA has been recorded and the distance is at least
+the bitmap size. That helper does not check `haveSeenAoa`. Consequently, first
+DATA=300 with AOA=1 still skips all missing sequences 1–299, even though the
+AOA just processed did not authorize skipping them. The extracted current
+production block/helper reproduces `cumulativeACK=300` with sequence 1 missing.
+This contradicts the new guarantee that AOA, rather than DataSeq, controls which
+unreceived sequences can be skipped. Treat N3 as partially fixed, not complete.
+
+Remove or reconcile that fallback with the AOA boundary, and test the transition
+at the receive-window size as well as the original DATA=2 case. The broader
+first-AOA-only behavior also still merits protocol/loss testing; this finding
+specifically demonstrates the fallback overriding the new fix, rather than
+claiming a live failure was observed.
+
+On the document's mechanism dispute: retransmission uses a new DataSeq but the
+same ChannelSeq, which repairs loss only while the sender retains/retransmits
+the missing bytes. A false acknowledgment can remove that obligation before
+channel delivery. The two sequence spaces being independent does not itself
+prove self-healing. The earlier permanent-stall consequence remains conditional
+on sender ACK processing and has not been demonstrated in a live session here.
+
+### P3. [P2] Update the preserved runner for the new splitter signature
+
+Location: `tools/udp-review-tests/harnesses/udp-review-33e-framing.c:10,15`,
+added by `9fbe4fb10` after the signature change in `47459d93e`.
+
+Both calls still supply three arguments to `rdpeudp_dvc_pdu_length`; the API now
+requires four, including direction. The documented `run-33e-review.sh` command
+and the general harness runner therefore fail to compile this newly committed
+harness against HEAD. Reproduced: `too few arguments ... expected 4, have 3`.
+Preserve the historical source/output but make the runner explicitly select its
+matching revision, or provide a current-API variant that supplies the correct
+direction and distinguishes historical diagnostics from fixed behavior.
+
+### Existing findings and review-document corrections
+
+- **N4: fixed at the parser and call sites.** Server direction selects the
+  four-byte CREATE status; client direction retains the NUL-name request.
+  Both the migration probe and actual dispatch pass direction. New success,
+  failure, and truncation fixtures pass. No live server-mode session was tested.
+- **N1: still P1 and not unreachable by design.** The status paragraph says
+  only a Soft-Sync mapping install can authorize sending. In fact, the
+  establishment path sets `udpSendMigrated = preActive` without Soft-Sync,
+  clears `mappingActive`, and `multitransport_is_dvc_migrated` returns TRUE
+  when that mapping is inactive (lines 948–951). A pre-ACTIVE tunnel is already
+  a reachable migration trigger. Observed post-ACTIVE sessions using TCP sends
+  do not make the old envelope safe. Keep the finding open until send framing
+  agrees with receive framing, or explicitly disable the unsupported send path.
+- The validation note says new `TestRdpeUdp` fixtures cover N3 and N4. The
+  committed test changes add N4 fixtures and direction arguments, but no AOA
+  receive-state regression fixture. The old `33e` AOA harness is an extracted
+  historical body and cannot validate the current fix. The new `474` diagnostic
+  preserved here exercises the current extracted block instead.
+- Claims of a healthy live session are retained as implementor reports. This
+  review did not independently establish UDP graphics in both directions;
+  the document itself reports DVC responses going over TCP. Tunnel setup,
+  inbound UDP graphics, and bidirectional UDP migration are different milestones.
+
+### Validation
+
+`TestCore` rebuilt successfully; `TestRdpeUdp`, core `TestVersion`, and
+`TestUtils` all exited 0. The localhost classifier harness reproduces P1; the
+extracted current receive-state helper/block reproduces P2. P3 is a real compile
+failure of the documented archived runner. No implementation files were edited.
+No new VM session, capture, or sanitizer run was performed.
+
+Preserved `udp-review-474-accept.c` (extends the implementor's `/tmp/n2-check.c`)
+and `udp-review-474-aoa.c`, with runner `tools/udp-review-tests/run-474-review.sh`
+and logs under `tools/udp-review-tests/logs/review-47459d93e/`. These are diagnostic
+programs: exit 0 reports a completed reproduction, not a passing conformance test.
+The socket harness requires permission for localhost UDP sockets on this host.
+
+## Working-directory review — HEAD `9fbe4fb10`
+
+No staged/unstaged tracked changes at review start. The existing untracked
+`ai/`, `build.sh`, and `free-rdp-02-better-codec-better-text.sh` were preserved.
+This review adds only documentation, diagnostic harnesses, runner, and logs.
