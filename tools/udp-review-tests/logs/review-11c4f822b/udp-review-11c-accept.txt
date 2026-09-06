@@ -1,0 +1,3 @@
+case1 ok: queued DATA completes, left queued
+case2 ok: queued ACK completes and is consumed
+N2-CHECK PASSED

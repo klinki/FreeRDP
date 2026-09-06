@@ -1,0 +1,44 @@
+Running udp-review-33e-aoa
+First DATA seq=2 AOA=1: cumulativeACK=2 missingSeq1WasReceived=0
+Running udp-review-33e-framing
+In file included from /Users/david/projects/FreeRDP/tools/udp-review-tests/harnesses/udp-review-33e-framing.c:5:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/rdpeudp.h:28:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/freerdp.h:26:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:942:6: warning: 'SEC_WINPR_NTLM_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_NTLM_SETTINGS_V2 [-Wdeprecated-declarations]
+  942 |             SEC_WINPR_NTLM_SETTINGS* ntlmSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:916:1: note: 'SEC_WINPR_NTLM_SETTINGS' has been explicitly marked deprecated here
+  916 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/tools/udp-review-tests/harnesses/udp-review-33e-framing.c:5:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/rdpeudp.h:28:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/freerdp.h:26:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:943:6: warning: 'SEC_WINPR_KERBEROS_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_KERBEROS_SETTINGS_V2 [-Wdeprecated-declarations]
+  943 |             SEC_WINPR_KERBEROS_SETTINGS* kerberosSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:924:1: note: 'SEC_WINPR_KERBEROS_SETTINGS' has been explicitly marked deprecated here
+  924 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+/Users/david/projects/FreeRDP/tools/udp-review-tests/harnesses/udp-review-33e-framing.c:10:61: error: too few arguments to function call, expected 4, have 3
+   10 |  BOOL ok=rdpeudp_dvc_pdu_length(response,sizeof(response),&n);
+      |          ~~~~~~~~~~~~~~~~~~~~~~                             ^
+/Users/david/projects/FreeRDP/libfreerdp/core/rdpeudp.h:276:18: note: 'rdpeudp_dvc_pdu_length' declared here
+  276 | FREERDP_API BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer,
+      |                  ^                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  277 |                                         size_t* pduLenOut);
+      |                                         ~~~~~~~~~~~~~~~~~
+/Users/david/projects/FreeRDP/tools/udp-review-tests/harnesses/udp-review-33e-framing.c:15:69: error: too few arguments to function call, expected 4, have 3
+   15 |  n=0; ok=rdpeudp_dvc_pdu_length(Stream_Buffer(s),Stream_Length(s),&n);
+      |          ~~~~~~~~~~~~~~~~~~~~~~                                     ^
+/Users/david/projects/FreeRDP/libfreerdp/core/rdpeudp.h:276:18: note: 'rdpeudp_dvc_pdu_length' declared here
+  276 | FREERDP_API BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer,
+      |                  ^                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  277 |                                         size_t* pduLenOut);
+      |                                         ~~~~~~~~~~~~~~~~~
+2 warnings and 2 errors generated.

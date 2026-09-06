@@ -1,0 +1,2 @@
+first SVC chunk accepted=1 consumed=512 of full 600-byte DVC
+continuation SVC chunk accepted=0 (payload byte misread as command)

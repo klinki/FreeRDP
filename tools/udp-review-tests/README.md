@@ -64,3 +64,16 @@ are reproducible from source and were not copied. Traffic captures, extracted TL
 payloads, and TLS secret files are not test harnesses and are not included here.
 
 See `../../REVIEW.md` for findings, historical validation, and live-peer limitations.
+
+## Review of 11c4f822b
+
+`run-11c-review.sh` runs the refreshed accept-loop socket check, extracted AOA
+state diagnostic, and SVC/DVC boundary diagnostic. The localhost socket test
+requires network permission. Results are in `logs/review-11c4f822b/`.
+
+The `33e` framing harness now uses the current four-argument API: TRUE for a
+CREATE response received by a server, FALSE for client-side legacy-envelope
+rejection. Its original three-argument source is preserved verbatim in
+`support/udp-review-33e-framing-original.c.txt`. The envelope check is now a
+legacy utility rejection test, not a test of the current production sender.
+The accompanying `33e` AOA harness intentionally retains its historical bug.

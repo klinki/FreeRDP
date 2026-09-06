@@ -1,0 +1,586 @@
+CMake Warning at cmake/ClangDetectTool.cmake:11 (message):
+  clang tool clang-format (CLANG_FORMAT) not detected, skipping
+Call Stack (most recent call first):
+  cmake/ClangFormat.cmake:13 (clang_detect_tool)
+  CMakeLists.txt:79 (include)
+
+
+CMake Warning at cmake/ClangFormat.cmake:16 (message):
+  clang-format not found in path! code format target not available.
+Call Stack (most recent call first):
+  CMakeLists.txt:79 (include)
+
+
+--  default symbol visibility: hidden
+Using CFLAGS  -fvisibility=hidden -fno-omit-frame-pointer -Wredundant-decls -fsigned-char -Wimplicit-function-declaration -Wno-jump-misses-init -Wno-c++-keyword
+Using CFLAGS_RELEASE -O3 -DNDEBUG
+Using CFLAGS_DEBUG -g
+Using CFLAGS_MINSIZEREL -Os -DNDEBUG
+Using CFLAGS_RELWITHDEBINFO -O2 -g -DNDEBUG
+FREERDP_VERSION=3.31.2-dev0
+-- Git Revision 9fbe4fb10
+--  default symbol visibility: hidden
+-- Skipping disabled feature Wayland for Wayland (Wayland client)
+-- Finding required feature OpenSSL for cryptography (encryption, certificate validation, hashing functions)
+-- Skipping optional feature MbedTLS for cryptography ([experimental] encryption, certificate validation, hashing functions)
+--     Enable feature MbedTLS using "-DWITH_MBEDTLS=ON"
+-- Finding recommended feature PCSC for smart card (smart card device redirection)
+--     Disable feature PCSC using "-DWITH_PCSC=OFF"
+-- Found FFmpeg: /opt/homebrew/Cellar/ffmpeg/9.0.1_1/lib/libavutil.dylib;/opt/homebrew/Cellar/ffmpeg/9.0.1_1/lib/libavcodec.dylib  found components: AVUTIL AVCODEC
+-- Skipping optional feature OpenH264 for codec (use OpenH264 library)
+--     Enable feature OpenH264 using "-DWITH_OPENH264=ON"
+-- Skipping optional feature GSM for codec (GSM audio codec library)
+--     Enable feature GSM using "-DWITH_GSM=ON"
+-- Skipping optional feature LAME for codec (lame MP3 audio codec library)
+--     Enable feature LAME using "-DWITH_LAME=ON"
+-- Skipping optional feature FAAD2 for codec (FAAD2 AAC audio codec library)
+--     Enable feature FAAD2 using "-DWITH_FAAD2=ON"
+-- Skipping optional feature FAAC for codec (FAAC AAC audio codec library)
+--     Enable feature FAAC using "-DWITH_FAAC=ON"
+-- Skipping optional feature soxr for codec (SOX audio resample library)
+--     Enable feature soxr using "-DWITH_SOXR=ON"
+-- Skipping optional feature aom for codec (AOM AV1 encoder/decoder library)
+--     Enable feature aom using "-DWITH_AOM=ON"
+-- Skipping optional feature dav1d for codec (dav1d AV1 decoder library)
+--     Enable feature dav1d using "-DWITH_DAV1D=ON"
+-- Skipping optional feature yuv for codec (YUV encoder/decoder library)
+--     Enable feature yuv using "-DWITH_YUV=ON"
+-- Using OpenSSL Version: 3.6.4
+using default plugins location
+Configured RPATH=@loader_path/../lib
+CMake Warning at cmake/JsonDetect.cmake:6 (find_package):
+  By not providing "Findjansson.cmake" in CMAKE_MODULE_PATH this project has
+  asked CMake to find a package configuration file provided by "jansson", but
+  CMake did not find one.
+
+  Could not find a package configuration file provided by "jansson"
+  (requested version 2.13) with any of the following names:
+
+    jansson.cps
+    janssonConfig.cmake
+    jansson-config.cmake
+
+  Add the installation prefix of "jansson" to CMAKE_PREFIX_PATH or set
+  "jansson_DIR" to a directory containing one of the above files.  If
+  "jansson" provides a separate development package or SDK, be sure it has
+  been installed.
+Call Stack (most recent call first):
+  cmake/JsonDetect.cmake:139 (detect_package)
+  winpr/libwinpr/CMakeLists.txt:19 (include)
+
+
+-- Checking for module 'jansson>=2.13'
+--   Found jansson, version 2.15.1
+CMake Warning at cmake/JsonDetect.cmake:6 (find_package):
+  By not providing "FindcJSON.cmake" in CMAKE_MODULE_PATH this project has
+  asked CMake to find a package configuration file provided by "cJSON", but
+  CMake did not find one.
+
+  Could not find a package configuration file provided by "cJSON" with any of
+  the following names:
+
+    cJSON.cps
+    cjson.cps
+    cJSONConfig.cmake
+    cjson-config.cmake
+
+  Add the installation prefix of "cJSON" to CMAKE_PREFIX_PATH or set
+  "cJSON_DIR" to a directory containing one of the above files.  If "cJSON"
+  provides a separate development package or SDK, be sure it has been
+  installed.
+Call Stack (most recent call first):
+  cmake/JsonDetect.cmake:151 (detect_package)
+  winpr/libwinpr/CMakeLists.txt:19 (include)
+
+
+-- Checking for module 'libcjson'
+--   Package 'libcjson' not found
+-- Could NOT find libsystemd (missing: LIBSYSTEMD_LIBRARY LIBSYSTEMD_INCLUDE_DIR) 
+add_library(winpr) []
+add_library(winpr-tools) []
+add_executable(winpr-makecert) []
+add_executable(winpr-hash) []
+-- Found FFmpeg: /opt/homebrew/Cellar/ffmpeg/9.0.1_1/lib/libswscale.dylib;/opt/homebrew/Cellar/ffmpeg/9.0.1_1/lib/libavutil.dylib  found components: SWSCALE AVUTIL
+-- Found FFmpeg: /opt/homebrew/Cellar/ffmpeg/9.0.1_1/lib/libavcodec.dylib  found components: AVCODEC
+-- FFmpeg AVCODEC found - MJPEG support available in video codec wrappers
+Skipping connection tests, requires BUILD_TESTING_INTERNAL, WITH_SAMPLE and WITH_SERVER set!
+INTRINSIC_TYPE=sse3: not supported on target platform, ignoring
+INTRINSIC_TYPE=neon: not supported on target platform, ignoring
+-- Checking for module 'libva'
+--   Package 'libva' not found
+INTRINSIC_TYPE=sse3: not supported on target platform, ignoring
+INTRINSIC_TYPE=ssse3: not supported on target platform, ignoring
+INTRINSIC_TYPE=sse4.1: not supported on target platform, ignoring
+INTRINSIC_TYPE=sse4.2: not supported on target platform, ignoring
+INTRINSIC_TYPE=avx2: not supported on target platform, ignoring
+INTRINSIC_TYPE=neon: not supported on target platform, ignoring
+add_library(freerdp) []
+-- Adding STATIC channel client server "drdynvc": Dynamic Virtual Channel Extension
+-- Adding DYNAMIC channel client "video": Video optimized remoting Virtual Channel Extension
+-- Adding DYNAMIC channel client "urbdrc": USB Devices Virtual Channel Extension
+-- Found libusb-1.0:
+--  - Includes: /opt/homebrew/include/libusb-1.0
+--  - Libraries: /opt/homebrew/lib/libusb-1.0.dylib
+-- Adding DYNAMIC channel server "telemetry": Telemetry Virtual Channel Extension
+-- Adding DEVICE channel client "smartcard": Smart Card Virtual Channel Extension
+Serial redirection not supported on apple
+-- Adding DEVICE channel "serial": Serial Port Virtual Channel Extension
+-- Adding STATIC channel client server "remdesk": Remote Assistance Virtual Channel Extension
+-- Adding STATIC channel client server "rdpsnd": Audio Output Virtual Channel Extension
+-- Adding DYNAMIC channel client server "rdpgfx": Graphics Pipeline Extension
+-- Adding DYNAMIC channel server "rdpemsc": Mouse Cursor Virtual Channel Extension
+-- Adding DYNAMIC channel client server "rdpei": Input Virtual Channel Extension
+-- Adding DYNAMIC channel server "rdpecam": Video Capture Virtual Channel Extension
+-- Adding STATIC channel client server "rdpdr": Device Redirection Virtual Channel Extension
+-- Adding STATIC channel client server "rail": Remote Programs Virtual Channel Extension
+-- Adding DEVICE channel client "printer": Print Virtual Channel Extension
+Serial redirection not supported on apple
+-- Adding DEVICE channel "parallel": Parallel Port Virtual Channel Extension
+-- Adding DYNAMIC channel client server "location": Location Virtual Channel Extension
+-- Adding DYNAMIC channel client "geometry": Geometry tracking Virtual Channel Extension
+-- Adding STATIC channel client server "encomsp": Multiparty Virtual Channel Extension
+-- Adding DYNAMIC channel client server "echo": Echo Virtual Channel Extension
+-- Adding DEVICE channel client "drive": Drive Redirection Virtual Channel Extension
+-- Adding DYNAMIC channel client server "disp": Display Update Virtual Channel Extension
+-- Adding STATIC channel client server "cliprdr": Clipboard Virtual Channel Extension
+-- Adding DYNAMIC channel client server "audin": Audio Input Redirection Virtual Channel Extension
+-- Adding DYNAMIC channel client server "ainput": Advanced Input Virtual Channel Extension
+add_library(freerdp-client) []
+project sdl-freerdp is using version 3.31.2
+Configured RPATH=@loader_path/../lib
+--  default symbol visibility: hidden
+Using CXXFLAGS  -fvisibility=hidden -fno-omit-frame-pointer -Wredundant-decls -fsigned-char
+Using CXXFLAGS_RELEASE -O3 -DNDEBUG
+Using CXXFLAGS_DEBUG -g
+Using CXXFLAGS_MINSIZEREL -Os -DNDEBUG
+Using CXXFLAGS_RELWITHDEBINFO -O2 -g -DNDEBUG
+add_executable(sdl3-freerdp) []
+add_library(freerdp-server) []
+CMake Warning at server/CMakeLists.txt:26 (message):
+  Mac shadow server implementation no longer compiles
+
+
+add_library(freerdp-server-proxy) []
+add_executable(freerdp-proxy) []
+-- Adding proxy module bitmap-filter
+project proxy-bitmap-filter-plugin is using version 3.31.2
+Configured RPATH=@loader_path/../lib
+--  default symbol visibility: hidden
+Using CXXFLAGS  -fvisibility=hidden -fno-omit-frame-pointer -Wredundant-decls -fsigned-char
+Using CXXFLAGS_RELEASE -O3 -DNDEBUG
+Using CXXFLAGS_DEBUG -g
+Using CXXFLAGS_MINSIZEREL -Os -DNDEBUG
+Using CXXFLAGS_RELWITHDEBINFO -O2 -g -DNDEBUG
+add_library(proxy-bitmap-filter-plugin) []
+-- Adding proxy module demo
+project proxy-demo-plugin is using version 3.31.2
+Configured RPATH=@loader_path/../lib
+--  default symbol visibility: hidden
+Using CXXFLAGS  -fvisibility=hidden -fno-omit-frame-pointer -Wredundant-decls -fsigned-char
+Using CXXFLAGS_RELEASE -O3 -DNDEBUG
+Using CXXFLAGS_DEBUG -g
+Using CXXFLAGS_MINSIZEREL -Os -DNDEBUG
+Using CXXFLAGS_RELWITHDEBINFO -O2 -g -DNDEBUG
+add_library(proxy-demo-plugin) []
+-- Adding proxy module dyn-channel-dump
+project proxy-dyn-channel-dump-plugin is using version 3.31.2
+Configured RPATH=@loader_path/../lib
+--  default symbol visibility: hidden
+Using CXXFLAGS  -fvisibility=hidden -fno-omit-frame-pointer -Wredundant-decls -fsigned-char
+Using CXXFLAGS_RELEASE -O3 -DNDEBUG
+Using CXXFLAGS_DEBUG -g
+Using CXXFLAGS_MINSIZEREL -Os -DNDEBUG
+Using CXXFLAGS_RELWITHDEBINFO -O2 -g -DNDEBUG
+add_library(proxy-dyn-channel-dump-plugin) []
+CMake Warning at server/CMakeLists.txt:43 (message):
+  Mac platform server implementation no longer compiles
+
+
+-- Intrinsic path configuration:
+-- FREERDP_INSTALL_PREFIX=/usr/local
+-- FREERDP_LIBRARY_PATH=lib
+-- FREERDP_PLUGIN_PATH=lib/freerdp3
+-- FREERDP_ADDIN_PATH=lib/freerdp3
+-- FREERDP_EXTENSION_PATH=/usr/local/lib/freerdp3/extensions
+-- FREERDP_PROXY_PLUGINDIR=lib/freerdp3/proxy/
+CMake Warning at cmake/WarnExperimental.cmake:18 (message):
+  [experimental] VAAPI H264 encoding, deactivate with
+  -DWITH_VAAPI_H264_ENCODING=OFF
+Call Stack (most recent call first):
+  CMakeLists.txt:610 (warn_experimental_print)
+
+
+CMake Warning at cmake/WarnExperimental.cmake:38 (message):
+  [experimental] No API/ABI guarantees of the stable version apply.
+
+  [experimental] The feature can change with every version, or even be
+  dropped entirely.
+
+  [experimental] If problems occur please check
+  https://github.com/FreeRDP/FreeRDP/issues for known issues, but be prepared
+  to fix them on your own!
+
+  [experimental] Developers hang out in
+  https://matrix.to/#/#FreeRDP:matrix.org?via=matrix.org
+
+  [experimental] - don't hesitate to ask some questions.  (replies might take
+  some time depending on your timezone)
+
+  [experimental] - if you intend using this component write us a message
+
+  [experimental] use to disable
+Call Stack (most recent call first):
+  CMakeLists.txt:610 (warn_experimental_print)
+
+
+-- Configuring done (5.1s)
+-- Generating done (0.7s)
+-- Build files have been written to: /tmp/freerdp-build
+[  0%] Built target rdpsnd-common
+[  0%] Built target encomsp-client
+[  5%] Built target freerdp-primitives
+[ 12%] Built target freerdp-codecs
+[ 12%] Built target drdynvc-client
+[ 12%] Built target urbdrc-common
+[ 14%] Built target remdesk-common
+[ 16%] Building C object winpr/libwinpr/CMakeFiles/winpr.dir/utils/winpr.c.o
+[ 16%] Building C object winpr/libwinpr/CMakeFiles/winpr.dir/path/path.c.o
+[ 16%] Linking C shared library libwinpr3.dylib
+ld: warning: ignoring duplicate libraries: '-lm'
+[ 48%] Built target winpr
+[ 48%] Built target geometry-client
+[ 48%] Built target echo-client
+[ 48%] Built target location-client
+[ 48%] Built target ainput-client
+[ 50%] Built target disp-client
+[ 51%] Built target video-client
+[ 51%] Building C object libfreerdp/CMakeFiles/freerdp.dir/utils/helpers.c.o
+[ 51%] Building C object libfreerdp/CMakeFiles/freerdp.dir/core/freerdp.c.o
+[ 51%] Building C object libfreerdp/CMakeFiles/freerdp.dir/core/settings.c.o
+[ 53%] Building C object libfreerdp/CMakeFiles/freerdp.dir/core/gateway/wst.c.o
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/freerdp.c:24:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/settings.h:25In file included from :
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h/Users/david/projects/FreeRDP/libfreerdp/core/settings.c:24:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/settings.h:25:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:942:6: warning: 'SEC_WINPR_NTLM_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_NTLM_SETTINGS_V2 [-Wdeprecated-declarations]
+:942:6:  942 |             SEC_WINPR_NTLM_SETTINGS* ntlmSettings;
+      |              ^
+warning: 'SEC_WINPR_NTLM_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_NTLM_SETTINGS_V2 [-Wdeprecated-declarations]
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:916:1: note: 'SEC_WINPR_NTLM_SETTINGS' has been explicitly marked deprecated here
+  942 |   916 | WINPR_DEPRECATED_VAR(
+      | ^
+           /Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+ SE  567 | #define WINPR_DEPRECATEC_WINPD_VAR(text, oR_NTLM_SEbj) obj TTINGS* ntlmSettings;
+      |             ^
+__attribute__/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:916:1: note: 'SEC_WINPR_NTLM_SETTINGS' has been explicitly marked deprecated here
+((depr  916 | WINPR_DEPRECAecated("[deprecaTED_VAR(
+      | ^
+ted] " text)))
+      | /Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+                                                           ^
+  567 | #defineIn file included from /Users/david/projects/FreeRDP/libfreerdp/core/settings.c:24 WI:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/settings.h:25:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:943:6NPR: warning: 'SEC_WINPR_KERBEROS_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_KERBEROS_SETTINGS_V2 [-Wdeprecated-declarations]
+_D  943 |             SEC_WINPR_KEREPRECATED_VAR(text, obj) obj __attBEributROS_SETTINGS* kerberosSettingse__((deprec;
+      |             ^
+at/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:924:1: note: 'SEC_WINPR_KERBEROS_SETTINGS' has been explicitly marked deprecated here
+ed("[deprecated] " text)))
+      |                                                            ^
+  924 | WINPR_DEIn file included from /Users/david/projects/FreeRDP/libfreerdp/core/freerdp.c:24:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/settings.h:25:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:943:6: warning: 'SEC_WINPR_KERBEROS_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_KERBEROS_SETTINGS_V2 [-Wdeprecated-declarations]
+PRECATED_VAR(
+      | ^
+  943 |           /Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567  SEC_WINP:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+R  567 | #define WINPR_DEPRECATED_VAR(text, obj_KERBEROS_SETTINGS* kerberosSettings;
+      |             ^
+) obj __attribute__((deprecated("[deprecated] " text/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:924:)))
+      |                                                            ^
+1: note: 'SEC_WINPR_KERBEROS_SETTINGS' has been explicitly marked deprecated here
+  924 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/utils/helpers.c:31:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/utils/../core/utils.h:25:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/freerdp.h:26:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:942:6: warning: 'SEC_WINPR_NTLM_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_NTLM_SETTINGS_V2 [-Wdeprecated-declarations]
+  942 |             SEC_WINPR_NTLM_SETTINGS* ntlmSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:916:1: note: 'SEC_WINPR_NTLM_SETTINGS' has been explicitly marked deprecated here
+  916 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/utils/helpers.c:31:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/utils/../core/utils.h:25:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/freerdp.h:26:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:943:6: warning: 'SEC_WINPR_KERBEROS_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_KERBEROS_SETTINGS_V2 [-Wdeprecated-declarations]
+  943 |             SEC_WINPR_KERBEROS_SETTINGS* kerberosSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:924:1: note: 'SEC_WINPR_KERBEROS_SETTINGS' has been explicitly marked deprecated here
+  924 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/wst.c:34:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../settings.h:25:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:942:6: warning: 'SEC_WINPR_NTLM_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_NTLM_SETTINGS_V2 [-Wdeprecated-declarations]
+  942 |             SEC_WINPR_NTLM_SETTINGS* ntlmSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:916:1: note: 'SEC_WINPR_NTLM_SETTINGS' has been explicitly marked deprecated here
+  916 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/wst.c:34:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../settings.h:25:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:943:6: warning: 'SEC_WINPR_KERBEROS_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_KERBEROS_SETTINGS_V2 [-Wdeprecated-declarations]
+  943 |             SEC_WINPR_KERBEROS_SETTINGS* kerberosSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:924:1: note: 'SEC_WINPR_KERBEROS_SETTINGS' has been explicitly marked deprecated here
+  924 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+2 warnings generated.
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/freerdp.c:30:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/rdp.h:35:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/nla.h:36:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/transport.h:37:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/tsg.h:27:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/rpc.h:28:
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:139:8: warning: 'WINPR_SINGLE_LIST_ENTRY' is deprecated: [deprecated] [since 3.27.0] [-Wdeprecated-declarations]
+  139 |                             WINPR_SLIST_ENTRY Next;
+      |                             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:92:27: note: expanded from macro 'WINPR_SLIST_ENTRY'
+   92 | #define WINPR_SLIST_ENTRY WINPR_SINGLE_LIST_ENTRY
+      |                           ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:53:2: note: 'WINPR_SINGLE_LIST_ENTRY' has been explicitly marked deprecated here
+   53 |         WINPR_DEPRECATED_VAR("[since 3.27.0]",
+      |         ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/freerdp.c:30:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/rdp.h:35:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/nla.h:36:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/transport.h:37:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/tsg.h:27:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/rpc.h:28:
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:146:10: warning: 'WINPR_SLIST_HEADER' is deprecated: [deprecated] [since 3.27.0] [-Wdeprecated-declarations]
+  146 |         typedef WINPR_SLIST_HEADER* WINPR_PSLIST_HEADER;
+      |                 ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:133:2: note: 'WINPR_SLIST_HEADER' has been explicitly marked deprecated here
+  133 |         WINPR_DEPRECATED_VAR(
+      |         ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+[ 53%] Building C object libfreerdp/CMakeFiles/freerdp.dir/core/gateway/arm.c.o
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/settings.c:46:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/capabilities.h:23:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/rdp.h:35:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/nla.h:36:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/transport.h:37:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/tsg.h:27:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/rpc.h:28:
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:139:8: warning: 'WINPR_SINGLE_LIST_ENTRY' is deprecated: [deprecated] [since 3.27.0] [-Wdeprecated-declarations]
+  139 |                             WINPR_SLIST_ENTRY Next;
+      |                             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:92:27: note: expanded from macro 'WINPR_SLIST_ENTRY'
+   92 | #define WINPR_SLIST_ENTRY WINPR_SINGLE_LIST_ENTRY
+      |                           ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:53:2: note: 'WINPR_SINGLE_LIST_ENTRY' has been explicitly marked deprecated here
+   53 |         WINPR_DEPRECATED_VAR("[since 3.27.0]",
+      |         ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/settings.c:46:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/capabilities.h:23:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/rdp.h:35:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/nla.h:36:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/transport.h:37:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/tsg.h:27:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/rpc.h:28:
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:146:10: warning: 'WINPR_SLIST_HEADER' is deprecated: [deprecated] [since 3.27.0] [-Wdeprecated-declarations]
+  146 |         typedef WINPR_SLIST_HEADER* WINPR_PSLIST_HEADER;
+      |                 ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:133:2: note: 'WINPR_SLIST_HEADER' has been explicitly marked deprecated here
+  133 |         WINPR_DEPRECATED_VAR(
+      |         ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/wst.c:46:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../rdp.h:35:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../nla.h:36:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../transport.h:37:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../gateway/tsg.h:27:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../gateway/rpc.h:28:
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:139:8: warning: 'WINPR_SINGLE_LIST_ENTRY' is deprecated: [deprecated] [since 3.27.0] [-Wdeprecated-declarations]
+  139 |                             WINPR_SLIST_ENTRY Next;
+      |                             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:92:27: note: expanded from macro 'WINPR_SLIST_ENTRY'
+   92 | #define WINPR_SLIST_ENTRY WINPR_SINGLE_LIST_ENTRY
+      |                           ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:53:2: note: 'WINPR_SINGLE_LIST_ENTRY' has been explicitly marked deprecated here
+   53 |         WINPR_DEPRECATED_VAR("[since 3.27.0]",
+      |         ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/wst.c:46:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../rdp.h:35:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../nla.h:36:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../transport.h:37:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../gateway/tsg.h:27:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../gateway/rpc.h:28:
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:146:10: warning: 'WINPR_SLIST_HEADER' is deprecated: [deprecated] [since 3.27.0] [-Wdeprecated-declarations]
+  146 |         typedef WINPR_SLIST_HEADER* WINPR_PSLIST_HEADER;
+      |                 ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:133:2: note: 'WINPR_SLIST_HEADER' has been explicitly marked deprecated here
+  133 |         WINPR_DEPRECATED_VAR(
+      |         ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/arm.c:24:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../settings.h:25:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:942:6: warning: 'SEC_WINPR_NTLM_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_NTLM_SETTINGS_V2 [-Wdeprecated-declarations]
+  942 |             SEC_WINPR_NTLM_SETTINGS* ntlmSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:916:1: note: 'SEC_WINPR_NTLM_SETTINGS' has been explicitly marked deprecated here
+  916 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/arm.c:24:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../settings.h:25:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:943:6: warning: 'SEC_WINPR_KERBEROS_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_KERBEROS_SETTINGS_V2 [-Wdeprecated-declarations]
+  943 |             SEC_WINPR_KERBEROS_SETTINGS* kerberosSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:924:1: note: 'SEC_WINPR_KERBEROS_SETTINGS' has been explicitly marked deprecated here
+  924 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+4 warnings generated.
+4 warnings generated.
+4 warnings generated.
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/arm.c:49:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../rdp.h:35:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../nla.h:36:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../transport.h:37:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../gateway/tsg.h:27:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../gateway/rpc.h:28:
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:139:8: warning: 'WINPR_SINGLE_LIST_ENTRY' is deprecated: [deprecated] [since 3.27.0] [-Wdeprecated-declarations]
+  139 |                             WINPR_SLIST_ENTRY Next;
+      |                             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:92:27: note: expanded from macro 'WINPR_SLIST_ENTRY'
+   92 | #define WINPR_SLIST_ENTRY WINPR_SINGLE_LIST_ENTRY
+      |                           ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:53:2: note: 'WINPR_SINGLE_LIST_ENTRY' has been explicitly marked deprecated here
+   53 |         WINPR_DEPRECATED_VAR("[since 3.27.0]",
+      |         ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/arm.c:49:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../rdp.h:35:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../nla.h:36:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../transport.h:37:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../gateway/tsg.h:27:
+In file included from /Users/david/projects/FreeRDP/libfreerdp/core/gateway/../gateway/rpc.h:28:
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:146:10: warning: 'WINPR_SLIST_HEADER' is deprecated: [deprecated] [since 3.27.0] [-Wdeprecated-declarations]
+  146 |         typedef WINPR_SLIST_HEADER* WINPR_PSLIST_HEADER;
+      |                 ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:133:2: note: 'WINPR_SLIST_HEADER' has been explicitly marked deprecated here
+  133 |         WINPR_DEPRECATED_VAR(
+      |         ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+4 warnings generated.
+[ 53%] Linking C shared library libfreerdp3.dylib
+ld: warning: ignoring duplicate libraries: '-lm'
+[ 83%] Built target freerdp
+[ 83%] Built target rdpsnd-client-fake
+[ 85%] Built target rdpsnd-client
+[ 85%] Built target rdpgfx-client
+[ 85%] Built target rdpsnd-client-mac
+[ 85%] Built target rdpei-client
+[ 87%] Built target rail-client
+[ 89%] Built target printer-client
+[ 91%] Built target rdpdr-client
+[ 92%] Built target drive-client
+[ 92%] Built target cliprdr-client
+[ 94%] Built target audin-client
+[ 94%] Built target urbdrc-client
+[ 94%] Built target audin-client-mac
+[ 94%] Built target urbdrc-client-libusb
+[ 94%] Built target smartcard-client
+[ 94%] Built target remdesk-client
+[ 96%] Building C object client/common/CMakeFiles/freerdp-client.dir/cmdline.c.o
+In file included from /Users/david/projects/FreeRDP/client/common/cmdline.c:37:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/freerdp.h:26:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:942:6: warning: 'SEC_WINPR_NTLM_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_NTLM_SETTINGS_V2 [-Wdeprecated-declarations]
+  942 |             SEC_WINPR_NTLM_SETTINGS* ntlmSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:916:1: note: 'SEC_WINPR_NTLM_SETTINGS' has been explicitly marked deprecated here
+  916 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/client/common/cmdline.c:37:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/freerdp.h:26:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:943:6: warning: 'SEC_WINPR_KERBEROS_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_KERBEROS_SETTINGS_V2 [-Wdeprecated-declarations]
+  943 |             SEC_WINPR_KERBEROS_SETTINGS* kerberosSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:924:1: note: 'SEC_WINPR_KERBEROS_SETTINGS' has been explicitly marked deprecated here
+  924 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/client/common/cmdline.c:57:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/channels/rdpdr.h:33:
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:139:8: warning: 'WINPR_SINGLE_LIST_ENTRY' is deprecated: [deprecated] [since 3.27.0] [-Wdeprecated-declarations]
+  139 |                             WINPR_SLIST_ENTRY Next;
+      |                             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:92:27: note: expanded from macro 'WINPR_SLIST_ENTRY'
+   92 | #define WINPR_SLIST_ENTRY WINPR_SINGLE_LIST_ENTRY
+      |                           ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:53:2: note: 'WINPR_SINGLE_LIST_ENTRY' has been explicitly marked deprecated here
+   53 |         WINPR_DEPRECATED_VAR("[since 3.27.0]",
+      |         ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+In file included from /Users/david/projects/FreeRDP/client/common/cmdline.c:57:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/channels/rdpdr.h:33:
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:146:10: warning: 'WINPR_SLIST_HEADER' is deprecated: [deprecated] [since 3.27.0] [-Wdeprecated-declarations]
+  146 |         typedef WINPR_SLIST_HEADER* WINPR_PSLIST_HEADER;
+      |                 ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/interlocked.h:133:2: note: 'WINPR_SLIST_HEADER' has been explicitly marked deprecated here
+  133 |         WINPR_DEPRECATED_VAR(
+      |         ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:567:60: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  567 | #define WINPR_DEPRECATED_VAR(text, obj) obj __attribute__((deprecated("[deprecated] " text)))
+      |                                                            ^
+4 warnings generated.
+[ 98%] Linking C shared library libfreerdp-client3.dylib
+[ 98%] Built target freerdp-client
+[ 98%] Building C object libfreerdp/core/test/CMakeFiles/TestCore.dir/TestUtils.c.o
+[ 98%] Building C object libfreerdp/core/test/CMakeFiles/TestCore.dir/TestVersion.c.o
+[ 98%] Linking C executable ../../../Testing/TestCore
+[100%] Built target TestCore

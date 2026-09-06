@@ -1,0 +1,2 @@
+First DATA seq=300 AOA=1: baseMinusOne=172 missingSeq1WasReceived=0
+ACKVEC base=173 count=133 firstMissing=173 lastReceived=300; sequences below base are not represented
