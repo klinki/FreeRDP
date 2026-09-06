@@ -212,8 +212,12 @@ static BYTE rdpeudp2_make_prefix(BOOL dummy, size_t layoutLen)
 	if (layoutLen < 7)
 		shortLen = (BYTE)(layoutLen & 0x07);
 	const BYTE type = dummy ? 8 : 0;
-	/* A(1)=0 | B(4)=type | C(3)=shortLen */
-	return (BYTE)(((type & 0x0F) << 3) | (shortLen & 0x07));
+	/* Prefix byte MSB-first: C(3)=shortLen | B(4)=type | A(1)=0.
+	 * Normal DATA wire capture (MS client): 0xE0; dummy: 0xF0.
+	 * A previous revision had the nibbles mirrored ((type<<3)|shortLen =
+	 * 0x07), which decodes as reserved packet type 3: Windows silently
+	 * drops every UDP2 datagram while the v1 handshake still succeeds. */
+	return (BYTE)(((shortLen & 0x07) << 5) | ((type & 0x0F) << 1));
 }
 
 BOOL rdpeudp2_protect(wStream* s, BOOL dummy)
@@ -276,8 +280,10 @@ BOOL rdpeudp2_unprotect(BYTE* data, size_t len, BOOL* dummy, size_t* payloadOffs
 
 	const BYTE prefix = data[0];
 	BOOL isDummy = FALSE;
-	/* Spec: type in bits 6..3. Be lenient: also accept lua-style mask. */
-	const BYTE typeSpec = (BYTE)((prefix >> 3) & 0x0F);
+	/* Prefix byte MSB-first: C(3)=shortLen | B(4)=type | A(1)=0, so the
+	 * packet type lives in bits 4:1 (mask 0x1E, Data=0, Dummy=8).
+	 * Same convention as tools/wireshark/rdp-udp.lua. */
+	const BYTE typeSpec = (BYTE)((prefix >> 1) & 0x0F);
 	const BYTE typeLua = (BYTE)(prefix & 0x1E);
 	if ((typeSpec == 8) || (typeLua == 8))
 		isDummy = TRUE;

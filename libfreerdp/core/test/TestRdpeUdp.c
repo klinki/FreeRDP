@@ -147,6 +147,16 @@ static int test_v2_protect(void)
 	}
 	const size_t wireLen = Stream_Length(s);
 	BYTE* wire = Stream_Buffer(s);
+	/* Absolute prefix check (not just roundtrip): normal DATA must be 0xE0
+	 * (shortLen=7 | type=0). The mirrored 0x07 decodes as reserved packet
+	 * type 3 and is silently dropped by Windows although v1 still works. */
+	if (wireLen < 8 || (wire[7] != 0xE0))
+	{
+		(void)fprintf(stderr, "DATA prefix must be 0xE0, got 0x%02x\n",
+		              (wireLen >= 8) ? wire[7] : 0);
+		Stream_Release(s);
+		return -1;
+	}
 	BYTE tmp[64] = { 0 };
 	if (wireLen > sizeof(tmp))
 	{
@@ -200,8 +210,51 @@ static int test_v2_protect(void)
 			Stream_Release(s);
 			return -1;
 		}
+		if ((wl < 8) || (Stream_Buffer(s)[7] != 0xF0))
+		{
+			(void)fprintf(stderr, "dummy prefix must be 0xF0\n");
+			Stream_Release(s);
+			return -1;
+		}
 	}
 	Stream_Release(s);
+
+	/* Interop fixture: first DATA of a healthy MS-client session on the
+	 * wire (prefix + layout for flags DATA|AOA|DELAYACK, dseq=100, cseq=1).
+	 * Our parser must accept it exactly; our encoder must emit the same
+	 * prefix byte for normal DATA. */
+	{
+		static const BYTE msWire[] = {
+			0x00, 0x14, 0xF3, 0x01, 0x14, 0x00, 0x64, 0xE0, 0x64, 0x00, 0x01, 0x00,
+			0xAA, 0xBB
+		};
+		BYTE ms[sizeof(msWire)] = { 0 };
+		memcpy(ms, msWire, sizeof(msWire));
+		BOOL msDummy = TRUE;
+		size_t msOff = 0;
+		if (!rdpeudp2_unprotect(ms, sizeof(ms), &msDummy, &msOff) || msDummy ||
+		    (msOff != 1))
+		{
+			(void)fprintf(stderr, "MS DATA prefix rejected\n");
+			return -1;
+		}
+		RdpUdp2Layout msLayout = { 0 };
+		if (!rdpeudp2_parse_layout(ms + msOff, sizeof(ms) - msOff, &msLayout))
+		{
+			(void)fprintf(stderr, "MS DATA layout rejected\n");
+			return -1;
+		}
+		/* Bit 0x200 is set by the MS client but unnamed in the spec;
+		 * assert the meaningful fields, not exact flag equality. */
+		if (!msLayout.hasDataHeader || !msLayout.hasDelayAck || !msLayout.hasAoa ||
+		    msLayout.hasAck || msLayout.hasOverhead || msLayout.hasAckvec ||
+		    (msLayout.logWindow != 15) || (msLayout.dataSeq != 100) ||
+		    !msLayout.hasDataBody || (msLayout.channelSeq != 1))
+		{
+			(void)fprintf(stderr, "MS DATA fields mismatch\n");
+			return -1;
+		}
+	}
 	return 0;
 }
 

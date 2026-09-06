@@ -2,10 +2,10 @@
 
 Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
-Latest review: 2026-09-05 (commit `11408bc5e`)
-Review result: V1/V2 fixed in working tree (see below); prior U1 remains fixed.
+Latest review: 2026-09-05 (commit `8ddd53a5f`)
+Review result: V1/V2 verified fixed; Windows interoperability remains unresolved.
 
-Latest scope: commit `11408bc5e` against its parent, with relevant UDP and DVC integration paths. Earlier sections retain the original review history.
+Latest scope: commit `8ddd53a5f` against its parent, plus the refreshed capture and debugging log, with relevant UDP and DVC integration paths. Earlier sections retain the original review history.
 
 The original review identified eight P1 correctness issues. Re-review of commit
 `a9eb02727` found three blocking issues: an encoder/protector integration regression,
@@ -508,7 +508,7 @@ before the new one-byte rewind.
   application build, live-peer/TLS session, allocation-failure injection, or
   ASAN run was performed. Earlier integration limitations remain open.
 
-## Latest review of `11408bc5e`
+## Re-review of `11408bc5e`
 
 ### V1. [P1] Do not choose the stream start from the first arriving DATA packet
 
@@ -647,3 +647,55 @@ Recommended verification after fixes:
 - [ ] Verify UDP-only arrivals wake an otherwise idle main loop (logic: `sockEvent` + `stateEvent` + recheck; needs live idle test).
 - [x] Test combined DATA/ACKVEC packets against protocol fixtures, not only encoder/decoder round trips (`test_v2_data_ackvec_order`).
 - [ ] Validate autodetect subheaders and channel migration against a conforming RDP peer.
+
+## Latest review of `8ddd53a5f` and refreshed capture
+
+V1 and V2 are fixed in the reviewed paths. The receive channel and DataSeq bases
+remain at 1 until contiguous packets arrive; both constructors now initialize
+the outgoing counters to 1. ACK-only, piggyback, retransmit, and keepalive paths
+use the contiguous base rather than the last arrival. No new actionable
+regression was confirmed in this commit. This does not establish Windows
+interoperability.
+
+Validation: `TestCore` built and core `TestRdpeUdp`, `TestVersion`, and `TestUtils`
+passed. A refreshed extracted-body harness (`/tmp/udp-review-8ddd-order.c`)
+produced `AB` for channel arrival order 2:B,1:A, and ACK(3) after DataSeq arrival
+order 1,3,2. No live connection was initiated during this review.
+
+The refreshed `/tmp/udp-data.pcap` contains 13 packets over a 1.846-second
+first-to-last-packet interval. Frames 4–13 are ten client DATA-only attempts
+(flags 0x0004), DataSeq 1–10, ChannelSeq 1, 1139-byte UDP payloads. The only
+server packet is SYN+ACK. Directly reversing the prefix swap confirms frame 4
+contains 1132 TLS bytes beginning `16 03 01 05 fd`: a TLS record declaring 1533
+payload bytes, or 1538 including its header. The log records the cseq=1/dseq=1
+send timeout. It contains no core.rdpeudp DEBUG entries.
+
+Corrections to the implementor's interpretation:
+
+- These observations confirm the send change is on the wire, but do not identify
+  the rejecting layer or prove that the final ACK was accepted. They do not
+  support the earlier ACK(0)/zero-start explanation as a sufficient fix.
+- The first-to-last packet interval does not prove tcpdump stopped after 1.8s:
+  ordinary pcap files do not record the subsequent silent capture interval.
+  Record capture start/stop times separately for the proposed ten-second run.
+- SYN+ACK retransmission would suggest an incomplete handshake, but continued
+  silence does not prove DATA rejection. Server termination, packet loss, and
+  capture visibility can produce the same observation. Microsoft's documented
+  Windows behavior is three SYN/SYN+ACK retransmissions at 800 ms intervals;
+  the existing traffic interval already covers two such intervals, although
+  this is not proof of handshake completion for this peer.
+- A client-versus-accept_ex loopback test is useful for exercising transport/TLS
+  integration. It cannot independently validate the codec against Windows,
+  because both ends share encoding, parsing, and handshake assumptions.
+
+Next evidence to collect: synchronized client and Windows-side packet captures
+with explicit start/stop times, and a log with confirmed core.rdpeudp DEBUG
+output. Establish whether Windows receives the final ACK and DATA, and whether
+it emits replies missing from the client capture. Compare the handshake bytes
+against an independent known-good client or Microsoft test SDK. If transport
+packets reach Windows without replies, server-side tracing is needed to identify
+the rejection reason. Keep the loopback result separate from interoperability
+claims; a partial ClientHello and absence of ACK alone do not prove a TLS-layer
+or UDP-layer cause.
+
+Reference: [Microsoft Windows retransmission behavior](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp/cb93d5bf-25d1-4780-b58b-54c5579902d3).
