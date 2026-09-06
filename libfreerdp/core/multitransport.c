@@ -1068,16 +1068,19 @@ BOOL multitransport_send_channel_packet(rdpMultitransport* multi, UINT16 channel
 	if (!multitransport_is_drdynvc_channel(multi->rdp, channelId))
 		return FALSE;
 
-	wStream* pkt = rdpeudp_build_channel_packet(channelId, (UINT32)totalSize, flags, chunk,
-	                                            chunkLen);
-	if (!pkt)
+	/* N1: HigherLayerData carries raw DVC PDUs (symmetric with the
+	 * receive splitter), not the legacy 13-byte envelope. Each call
+	 * carries one SVC chunk; chunk boundaries become Tunnel DATA
+	 * boundaries and the DVC layer reassembles (DATA_FIRST Length +
+	 * DATA pieces), exactly as the receive dispatch does. totalSize/
+	 * flags carry no per-chunk metadata in raw framing. */
+	WINPR_UNUSED(totalSize);
+	WINPR_UNUSED(flags);
+	if (!chunk || (chunkLen == 0))
 		return FALSE;
-	const size_t plen = Stream_Length(pkt);
-	BYTE* pbuf = Stream_Buffer(pkt);
-	/* Tunnel DATA payload is the channel packet bytes */
-	const SSIZE_T rc = rdpeudp_tunnel_send(udp, pbuf, plen);
-	Stream_Release(pkt);
-	if (rc != (SSIZE_T)plen)
+	/* Tunnel DATA payload is the raw DVC chunk bytes */
+	const SSIZE_T rc = rdpeudp_tunnel_send(udp, chunk, chunkLen);
+	if (rc != (SSIZE_T)chunkLen)
 	{
 		WLog_WARN(TAG, "UDP channel send failed, falling back to TCP");
 		return FALSE;

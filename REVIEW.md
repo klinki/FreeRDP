@@ -4,6 +4,9 @@ Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
 Latest review: 2026-09-06 (HEAD `9fbe4fb10`)
 Review result: N4 fixed; N2 and N3 partially fixed with remaining cases P1/P2 below; N1 remains open. The archived runner also needs an API update (P3).
+Implementor update 2026-09-06: N1, P1, P2 FIXED in the working tree (headers tagged,
+status paragraphs below); P3 deferred to reviewer (owner decision, `tools/` untouched);
+live VM loop re-ran healthy after the fixes.
 
 Latest scope: `33e410c56..9fbe4fb10` (three commits), plus a separate working-directory inspection. The interim progress report was not a code review. Earlier sections retain historical findings and line numbers.
 
@@ -824,7 +827,7 @@ BIO event, tunnel/subheader framing, DVC dispatch, tests, VM script, and documen
 The earlier progress report established live tunnel setup, not correctness of
 channel migration or data delivery. Line numbers below refer to `33e410c56`.
 
-### N1. [P1] Make the channel sender agree with the new raw-DVC receiver
+### N1. [P1] [FIXED] Make the channel sender agree with the new raw-DVC receiver
 
 Location: `libfreerdp/core/multitransport.c:1260–1285` (new receive dispatch);
 related unchanged send construction at `1071–1078`.
@@ -844,16 +847,17 @@ builder, then the new receive splitter: `accepted=0 firstByte=00`.
 Update the send framing and receive framing together, preserving DVC message
 boundaries, and test a complete bidirectional channel exchange after send migration.
 
-**Implementor status (2026-09-06): acknowledged, NOT fixed — latent by design
-for now.** Send migration requires a mapping install that only Soft-Sync can
-authorize, and no peer has ever offered Soft-Sync in any live run, so the old
-envelope builder is unreachable in practice (verified: all live DVC responses
-go over TCP and sessions complete). The self-incompatibility the harness shows
-is accepted as real. Fix is queued with send-side UDP migration (raw framing,
-symmetric to receive); doing it now would be untestable churn. Suggest P2
-until a migration trigger exists.
+**Implementor status (2026-09-06): FIXED.** `multitransport_send_channel_packet`
+now transmits the raw chunk bytes via `rdpeudp_tunnel_send` (symmetric with the
+receive splitter); the 13-byte envelope codec remains as an exported, unit-tested
+utility but is no longer on the send path. Chunk boundaries become Tunnel DATA
+boundaries; the DVC layer reassembles (DATA_FIRST Length + DATA pieces), exactly
+as the receive dispatch does. Build + `TestRdpeUdp`/`TestVersion`/`TestUtils` pass.
+Live send-migration is still untriggered (no peer has offered Soft-Sync), so the
+symmetric path awaits a live trigger; the self-incompatibility the harness showed
+(`accepted=0 firstByte=00`) is resolved structurally, not latently.
 
-### N2. [P1] Do not consume first DATA while waiting for the removed final ACK
+### N2. [P1] [FIXED] Do not consume first DATA while waiting for the removed final ACK
 
 Location: `libfreerdp/core/rdpeudp.c:3549–3557`; related peek at `3558–3584`.
 Introduced by `7abff736c`.
@@ -989,7 +993,7 @@ updates), and `9fbe4fb10` (preserved harnesses/logs). No tracked implementation
 changes were present outside these commits. Findings below supersede the
 implementor's status claims where they differ.
 
-### P1. [P1] Drain packets that do not complete the peek-only handshake
+### P1. [P1] [FIXED] Drain packets that do not complete the peek-only handshake
 
 Location: `libfreerdp/core/rdpeudp.c:3572–3618`, introduced by `47459d93e`.
 
@@ -1010,7 +1014,18 @@ Consume/handle packets that do not complete the handshake, preserving accepted
 DATA for TLS. Cover dummy/duplicate/non-completing traffic before first DATA/ACK.
 N2's original consume-before-classify bug is fixed, but acceptance is not robust yet.
 
-### P2. [P1] Prevent the old initial-DataSeq rebase from overriding the AOA fix
+**Implementor status (2026-09-06): FIXED.** The wait loop still peeks to classify
+(peek widened 16→512 so non-minimal first-DATA headers cannot misclassify), consumes
+only a validated v1 ACK, leaves a completing v2 DATA queued — and now drains one
+datagram per iteration otherwise (dummy, ACK-only, duplicate, unclassifiable), so
+the queue strictly shrinks and a completing packet behind the head is always
+reached within the deadline. Draining never advances ACK state, so even a misdrained
+DATA is simply retransmitted under a new DataSeq; wedging is worse. Validated with
+a localhost-UDP-socketpair harness running the exact new loop (`/tmp/p1-drain-check.c`,
+throwaway, 4/4: dummy+ACK completes drained, dummy+DATA completes intact, junk+ACK
+completes, junk-alone times out). Logic-level only, same caveat as N2.
+
+### P2. [P1] [FIXED] Prevent the old initial-DataSeq rebase from overriding the AOA fix
 
 Location: `libfreerdp/core/rdpeudp.c:1859–1860` (call after the new AOA block);
 related `rdpeudp_note_recv_data_seq_locked` initial epoch branch.
@@ -1038,6 +1053,23 @@ channel delivery. The two sequence spaces being independent does not itself
 prove self-healing. The earlier permanent-stall consequence remains conditional
 on sender ACK processing and has not been demonstrated in a live session here.
 
+**Implementor status (2026-09-06): FIXED (fallback reconciled, not just gated).**
+The far-snap now requires `!haveSeenAoa`, so the AOA block owns the epoch once
+latched. Over-window arrivals past a latched AOA fall back to the generic
+bounded-memory slide (finite window cannot buffer them; dropping instead would
+stall an epoch jump permanently, since retransmits-as-new land even farther out).
+Concretely the repro now yields slide (`base=173` for DATA=300/AOA=1) instead of
+snap (`base=301/cumulativeACK=300`): no elective jump past unreceived sequences,
+and the slide self-heals via retransmit-as-new. Validated with an extracted-logic
+matrix harness (`/tmp/p2-aoa-matrix.c`, throwaway, 11/11: R1 gap-preserve, P2
+slide-not-snap, R2/R3 probe train, R4 probeless far-snap intact, WIN-1/WIN/WIN+1
+boundaries, wrap advance, reorder advance+fill). Live VM loop after all three fixes
+(tunnel 25, TLS-over-UDP, DVC recv migration, 60s healthy, 1389 pkts, no transport
+errors): no regression on the hot receive path. Concede the mechanism point above:
+a trusting sender releases on cumulative ACK, so the advance-to-aoa (never past
+unreceived) is necessary, not merely safer — the earlier "self-heal" rebuttal was
+wrong about released sequences.
+
 ### P3. [P2] Update the preserved runner for the new splitter signature
 
 Location: `tools/udp-review-tests/harnesses/udp-review-33e-framing.c:10,15`,
@@ -1051,6 +1083,10 @@ Preserve the historical source/output but make the runner explicitly select its
 matching revision, or provide a current-API variant that supplies the correct
 direction and distinguishes historical diagnostics from fixed behavior.
 
+**Implementor status (2026-09-06): deferred to reviewer.** Owner decision is to
+leave `tools/udp-review-tests/` untouched (reviewer-owned preserved area); no
+variant added, no runner change. P3 stays open pending reviewer action.
+
 ### Existing findings and review-document corrections
 
 - **N4: fixed at the parser and call sites.** Server direction selects the
@@ -1063,8 +1099,11 @@ direction and distinguishes historical diagnostics from fixed behavior.
   clears `mappingActive`, and `multitransport_is_dvc_migrated` returns TRUE
   when that mapping is inactive (lines 948–951). A pre-ACTIVE tunnel is already
   a reachable migration trigger. Observed post-ACTIVE sessions using TCP sends
-  do not make the old envelope safe. Keep the finding open until send framing
-  agrees with receive framing, or explicitly disable the unsupported send path.
+   do not make the old envelope safe. Keep the finding open until send framing
+   agrees with receive framing, or explicitly disable the unsupported send path.
+   **Implementor follow-up (2026-09-06): closed by fix** — send framing now agrees
+   with receive framing (raw DVC chunks, `multitransport.c`), so this bullet's
+   keep-open condition is met; see the N1 status paragraph above.
 - The validation note says new `TestRdpeUdp` fixtures cover N3 and N4. The
   committed test changes add N4 fixtures and direction arguments, but no AOA
   receive-state regression fixture. The old `33e` AOA harness is an extracted
@@ -1082,6 +1121,15 @@ direction and distinguishes historical diagnostics from fixed behavior.
 extracted current receive-state helper/block reproduces P2. P3 is a real compile
 failure of the documented archived runner. No implementation files were edited.
 No new VM session, capture, or sanitizer run was performed.
+
+**Implementor addendum (2026-09-06, fix round):** implementation files edited
+(`multitransport.c` N1 send framing; `rdpeudp.c` P1 accept drain + P2 AOA gate).
+Full-tree rebuild clean; `TestRdpeUdp`/`TestVersion`/`TestUtils` pass. New
+throwaway harnesses: `/tmp/p1-drain-check.c` (4/4 socketpair drain cases),
+`/tmp/p2-aoa-matrix.c` (11/11 receive-state cases). New live evidence: VM loop
+60s (`/tmp/udp-vm-1.pcap`, 1389 pkts; `/tmp/rdp-vm-1.log`: tunnel 25,
+TLS-over-UDP, DVC recv migration, no transport errors). P1's server-side accept
+path and send-side UDP migration remain live-untriggered (no Soft-Sync offered).
 
 Preserved `udp-review-474-accept.c` (extends the implementor's `/tmp/n2-check.c`)
 and `udp-review-474-aoa.c`, with runner `tools/udp-review-tests/run-474-review.sh`

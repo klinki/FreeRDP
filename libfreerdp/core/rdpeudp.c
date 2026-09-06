@@ -1716,7 +1716,7 @@ static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 	 * rule in recv_one. */
 	const size_t WIN = ARRAYSIZE(udp->recvDataSeen);
 	INT16 diff = (INT16)(dseq - udp->recvDataBase);
-	if (!udp->haveRecvData && (diff >= (INT16)WIN))
+	if (!udp->haveRecvData && !udp->haveSeenAoa && (diff >= (INT16)WIN))
 	{
 		/* Initial epoch sync: the very first DATA starts far ahead of the
 		 * fixed base (peer counters start at 100+). Sliding would leave a
@@ -1725,7 +1725,9 @@ static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 		 * peer retransmits forever). Adopt the first far-ahead seq as the
 		 * epoch instead. Scoped to pre-first-DATA only, so mid-session
 		 * jumps keep slide semantics and in-window reordering still
-		 * buffers (V1). */
+		 * buffers (V1). Gated on !haveSeenAoa (P2): once an AOA fixed
+		 * the epoch, DataSeq alone must never skip unreceived sequences
+		 * again — the AOA block above owns that boundary now. */
 		udp->recvDataBase = dseq;
 		diff = 0;
 	}
@@ -3555,10 +3557,15 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 
 	/* 3. Wait for handshake completion: standalone final ACK (v1 ACK, no
 	 * SYN), or first v2 DATA for MS-compatible peers that skip the ACK
-	 * (N2). Peek only, never consume here: consuming a queued DATA into
-	 * buf and dropping it on v1-parse failure (plus losing the race on
-	 * every retransmit) wedges this wait even though valid DATA arrived.
-	 * Anything received stays queued for TLS to read normally. */
+	 * (N2). Peek to classify, consume only validated non-DATA: consuming
+	 * a queued DATA into buf and dropping it on v1-parse failure (plus
+	 * losing the race on every retransmit) wedges this wait even though
+	 * valid DATA arrived. A completing v2 DATA datagram itself always
+	 * stays queued for TLS to read normally. Anything else at queue head
+	 * (P1: dummy probe, duplicate, ACK-only, unclassifiable) is drained
+	 * so it cannot head-block a completing packet behind it. Draining
+	 * never advances ACK state, so even a misdrained DATA is simply
+	 * retransmitted by the peer under a new DataSeq; wedging is worse. */
 	{
 		BOOL ok = FALSE;
 		const UINT64 adead = udp_now_ms() + 5000;
@@ -3571,7 +3578,10 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 			}
 			if (freerdp_udp_wait_readable(udp->sockfd, 100))
 			{
-				BYTE peek[16] = { 0 };
+				/* Peek wide enough for non-minimal first-DATA headers
+				 * (ACKVEC etc.); truncation must bias toward leaving
+				 * the datagram queued, never toward draining DATA. */
+				BYTE peek[512] = { 0 };
 				const SSIZE_T pr = recv(udp->sockfd, (char*)peek, sizeof(peek),
 				                        MSG_PEEK);
 				if (pr > 8)
@@ -3591,10 +3601,8 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 						ok = TRUE;
 						break;
 					}
-					/* v2 DATA (peers that skip the standalone ACK)? The
-					 * 16-byte peek covers prefix + header + ACK/overhead/
-					 * delay/AoA + data header for minimal first-DATA
-					 * shapes; the datagram itself stays queued for TLS.
+					/* v2 DATA (peers that skip the standalone ACK)?
+					 * The datagram itself stays queued for TLS.
 					 * NOTE: pass wire bytes straight to unprotect (it undoes
 					 * the byte 0/7 swap itself); pre-swapping here would
 					 * double-swap back to an invalid prefix. */
@@ -3613,6 +3621,14 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 							break;
 						}
 					}
+				}
+				/* P1: queue head does not complete the handshake — drain
+				 * one datagram and keep waiting for the completer behind
+				 * it. Each drain strictly shrinks the queue, so this
+				 * always makes progress within the deadline. */
+				{
+					BYTE drop[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
+					(void)freerdp_udp_recv(udp->sockfd, drop, sizeof(drop), 0);
 				}
 			}
 		}
