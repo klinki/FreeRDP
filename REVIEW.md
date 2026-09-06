@@ -2,13 +2,13 @@
 
 Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
-Latest review: 2026-09-06 (HEAD `9fbe4fb10`)
-Review result: N4 fixed; N2 and N3 partially fixed with remaining cases P1/P2 below; N1 remains open. The archived runner also needs an API update (P3).
+Latest review: 2026-09-06 (HEAD `11c4f822b`)
+Review result: accept queue-blocking and legacy send envelope fixed; two remaining issues Q1/Q2 below. P3 harness API mismatch repaired by this review.
 Implementor update 2026-09-06: N1, P1, P2 FIXED in the working tree (headers tagged,
 status paragraphs below); P3 deferred to reviewer (owner decision, `tools/` untouched);
 live VM loop re-ran healthy after the fixes.
 
-Latest scope: `33e410c56..9fbe4fb10` (three commits), plus a separate working-directory inspection. The interim progress report was not a code review. Earlier sections retain historical findings and line numbers.
+Latest scope: `9fbe4fb10..11c4f822b` (two commits), plus a separate working-directory inspection. The interim progress report was not a code review. Earlier sections retain historical findings and line numbers.
 
 The original review identified eight P1 correctness issues. Re-review of commit
 `a9eb02727` found three blocking issues: an encoder/protector integration regression,
@@ -1142,3 +1142,89 @@ The socket harness requires permission for localhost UDP sockets on this host.
 No staged/unstaged tracked changes at review start. The existing untracked
 `ai/`, `build.sh`, and `free-rdp-02-better-codec-better-text.sh` were preserved.
 This review adds only documentation, diagnostic harnesses, runner, and logs.
+
+
+## Re-review — `9fbe4fb10..11c4f822b` (2026-09-06)
+
+Reviewed `4c1ec178e` (review document) and `11c4f822b` (raw sender, accept drain,
+AOA guard, and status updates). Earlier implementor status notes are retained as
+history; the results here supersede claims that all runtime findings are closed.
+
+### Q1. [P1] Preserve DVC PDU boundaries when removing the SVC envelope
+
+Location: `libfreerdp/core/multitransport.c:1071–1083`; caller splitting at
+`libfreerdp/core/channels.c:189–205`.
+
+The new sender discards `totalSize`/`flags` and sends each SVC chunk as a separate
+raw Tunnel DATA payload. SVC fragmentation is not DVC fragmentation: only the
+first SVC chunk contains the DVC command/ChannelId, whereas DVC DATA continuation
+PDUs have their own headers. If negotiated `VCChunkSize` is smaller than a DVC
+PDU, the receiver marks the first truncated piece FIRST|LAST and interprets the
+next piece's arbitrary application bytes as a fresh DVC command. This loses or
+misroutes data. The comment claiming the DVC layer will reassemble these SVC
+chunks is incorrect because the framing information it needs was removed.
+
+The capability code accepts a nonzero chunk size below 1600, while drdynvc builds
+PDUs up to `CHANNEL_CHUNK_LENGTH`. With `VCChunkSize=512`, a 600-byte DVC DATA PDU
+is a concrete example. The preserved codec/split diagnostic reports first chunk
+accepted as a complete 512-byte PDU and the remaining 88-byte payload rejected
+as a command. Default equal chunk limits can hide this regression in live runs.
+
+Send each complete DVC PDU as one tunnel payload before the SVC split, or
+reassemble SVC chunks before writing raw DVC framing. Keep transport/TLS packet
+fragmentation below that boundary. N1's private envelope is removed, but message
+boundary handling still needs this correction before send migration is robust.
+
+### Q2. [P1] Do not let the general window slide bypass the AOA boundary
+
+Location: `libfreerdp/core/rdpeudp.c:1737–1752`, following the new guard at 1719.
+
+Adding `!haveSeenAoa` fixes the explicit initial-epoch reset, but execution then
+falls through to the general `diff >= WIN` slide. The very same DATA=300/AOA=1
+case now advances the base from 1 to 45 instead of 301, still forgetting missing
+sequences 1–44 without authorization from AOA. Any cumulative ACK based on
+`recvDataBase-1` therefore claims ACK(44), not the required boundary before the
+missing sequence 1. The refreshed extracted production helper/block reproduces
+`First DATA seq=300 AOA=1: cumulativeACK=44 missingSeq1WasReceived=0`.
+
+Reject/buffer an out-of-window arrival without acknowledging unseen data, or
+advance only to a boundary justified by AOA/received state. Guarding one rebase
+branch is insufficient while the next branch skips the same gaps. This is the
+remaining P2 failure, not a new live-session failure claim. No new regression
+fixture for this state logic was added to TestRdpeUdp in the reviewed commit.
+
+### Confirmed fixes and response to the implementor's message
+
+- **P1/N2 queue blocking fixed:** the accept loop drains non-completing packets,
+  preserves completing DATA, and expands its peek to 512 bytes. The refreshed
+  localhost classifier harness passes queued DATA retention and dummy-before-ACK
+  draining. This is classification/socket validation, not full TLS/server accept.
+- **N1 envelope removal confirmed:** the production sender no longer calls the
+  legacy utility. Its old rejection diagnostic is no longer evidence of live
+  send/receive self-incompatibility. Q1 addresses a separate boundary regression.
+- **P3 repaired in review-owned tools:** the `33e` framing harness now compiles
+  against the four-argument API. Contrary to the suggested direction, CREATE
+  responses are received by the server, so that case uses `isServer=TRUE` and
+  consumes all six bytes. FALSE would route those bytes through the request-name
+  parser and repeat the old diagnostic incorrectly. The envelope rejection case
+  uses FALSE and is explicitly labeled as testing the legacy utility.
+- Preserved the original three-argument source verbatim under
+  `tools/udp-review-tests/support/udp-review-33e-framing-original.c.txt`; historical
+  logs remain intact. `run-33e-review.sh` now completes successfully against HEAD.
+- **N4 remains fixed** at parser/call sites. No new CREATE direction regression
+  was found. No independent new bidirectional UDP live-session claim is made.
+
+### Validation and working directory
+
+TestCore rebuilt and TestRdpeUdp, core TestVersion, and TestUtils all exited 0.
+`run-11c-review.sh` preserves the current accept, AOA, and chunk-boundary checks;
+outputs/build/core-test logs are under `tools/udp-review-tests/logs/review-11c4f822b/`.
+The accept harness extends the prior implementor classifier with current peek/drain
+behavior; the AOA helper is copied from this HEAD; the chunk test uses real codec
+helpers with the caller's split arithmetic. None is a full transport integration test.
+No new VM login, capture, or sanitizer run was performed. Diagnostic exit 0 means
+execution completed, not that all displayed protocol behavior is correct.
+
+At review start there were no tracked working changes. The prior review's untracked
+`474` harnesses/logs/runner and unrelated local `ai/` and shell scripts were retained.
+Only REVIEW.md and review-owned harness/archive material were changed here.
