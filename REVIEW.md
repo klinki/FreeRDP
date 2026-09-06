@@ -11,6 +11,9 @@ Implementor update 2026-09-06 (Q-round): Q1 FIXED in the working tree (whole-PDU
 uncommitted); P2 walked back to partial with a contested-remedy dispute recorded under
 Q2; P3 direction correction accepted (reviewer's `isServer=TRUE` matches the codebase
 convention — my suggested FALSE was wrong-axis).
+Implementor update 2026-09-06 (close-out): P3 closed by reviewer (runner green);
+Q2 integration evidence committed (`a67cdfe05`, Q2/P2 stays partial per reviewer);
+V1 tagged fixed-with-R4-exception.
 
 Latest scope: `9fbe4fb10..11c4f822b` (two commits), plus a separate working-directory inspection. The interim progress report was not a code review. Earlier sections retain historical findings and line numbers.
 
@@ -517,7 +520,7 @@ before the new one-byte rewind.
 
 ## Re-review of `11408bc5e`
 
-### V1. [P1] Do not choose the stream start from the first arriving DATA packet
+### V1. [P1] [FIXED with R4 exception] Do not choose the stream start from the first arriving DATA packet
 
 Location: `libfreerdp/core/rdpeudp.c:1721–1725`; related DataSeq rebasing at
 lines 1561–1568.
@@ -552,6 +555,14 @@ inference; field removed) so chunk 2 is buffered and `1` then delivers `AB`;
 gap is preserved in the seen bitmap. `haveRecvData` is set only when an
 in-window DATA is recorded and gates ACK validity. `accept_ex` gets the same
 `1`-start init as the client (was zeroed by `calloc`).
+
+**Implementor note (2026-09-06, R4 exception):** the fixed base stands, with one
+deliberate carve-out — the pre-first-DATA far-snap (`note_recv`, gated on
+`!haveSeenAoa` since P2): a first arrival ≥WIN ahead of base 1 is adopted as the
+epoch instead of leaving a phantom 1..N gap that wedges every cumulative ACK
+(observed live: base stuck, peer retransmits forever). In-window reordering still
+buffers; mid-session jumps keep slide semantics. Covered by S5 in
+`test_rx_integration`.
 
 ### V2. [P2] [FIXED] Preserve the highest contiguous ACK after filling a gap
 
@@ -1089,7 +1100,11 @@ direction and distinguishes historical diagnostics from fixed behavior.
 
 **Implementor status (2026-09-06): deferred to reviewer.** Owner decision is to
 leave `tools/udp-review-tests/` untouched (reviewer-owned preserved area); no
-variant added, no runner change. P3 stays open pending reviewer action.
+variant added, no runner change.
+**Implementor follow-up: closed by reviewer** — the `33e` harness was repaired
+reviewer-side (`isServer=TRUE` for the response case, which matches the codebase
+convention; my suggested FALSE was wrong-axis) and `run-33e-review.sh` completes
+against HEAD. Nothing outstanding on P3.
 
 ### Existing findings and review-document corrections
 
@@ -1306,6 +1321,19 @@ once or the connection fails explicitly. Include AOA-authorized epoch changes,
 reordered/lost AOA, and wraparound. That distinguishes recovery from silent loss.
 Static functions can be tested through a transport integration harness or a
 small internal test seam; direct public exposure is not required.
+
+**Implementor addendum (2026-09-06): integration evidence delivered**
+(`a67cdfe05`, `TestRdpeUdp::test_rx_integration`, 170/170 ctest green). The v2
+receive block moved verbatim into `rdpeudp_test_feed`, shared with
+`rdpeudp_recv_one`'s socket input; sender bytes come from the production
+`rdpeudp2_encode_layout` + `protect`. Five scenarios on real state: probe epoch
+(base 147, contiguous), adversarial DATA=300/AOA=1 (slide to 173, gap kept,
+body delivered, production-codec ACKVEC confirms base=173 with holes from 173),
+retransmit-as-new 301–309 (base creeps to 182, every byte delivered exactly
+once — recovery, not silent loss), N3 gap-preserve + fill, reorder + fill,
+probeless far-snap. This answers the "distinguishes recovery from silent loss"
+criterion for the slide policy; the slide-vs-reject prescription itself remains
+the reviewer's call, so Q2/P2 stays partial.
 
 Only review-owned diagnostic/documentation files were changed for this correction.
 Concurrent implementation changes in channels.c and multitransport.c were left
