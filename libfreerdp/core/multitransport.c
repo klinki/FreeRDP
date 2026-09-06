@@ -1068,12 +1068,14 @@ BOOL multitransport_send_channel_packet(rdpMultitransport* multi, UINT16 channel
 	if (!multitransport_is_drdynvc_channel(multi->rdp, channelId))
 		return FALSE;
 
-	/* N1: HigherLayerData carries raw DVC PDUs (symmetric with the
+	/* N1/Q1: HigherLayerData carries raw DVC PDUs (symmetric with the
 	 * receive splitter), not the legacy 13-byte envelope. Each call
-	 * carries one SVC chunk; chunk boundaries become Tunnel DATA
-	 * boundaries and the DVC layer reassembles (DATA_FIRST Length +
-	 * DATA pieces), exactly as the receive dispatch does. totalSize/
-	 * flags carry no per-chunk metadata in raw framing. */
+	 * carries one WHOLE DVC PDU: the caller (channels.c UDP branch) must
+	 * not SVC-chunk-split here, since only the first SVC chunk holds the
+	 * DVC header and the splitter takes DATA as "to end" (a truncated
+	 * piece would be accepted whole and the rest misparsed). One call =
+	 * one Tunnel DATA payload = one PDU. totalSize/flags carry no
+	 * per-chunk metadata in raw framing. */
 	WINPR_UNUSED(totalSize);
 	WINPR_UNUSED(flags);
 	if (!chunk || (chunkLen == 0))

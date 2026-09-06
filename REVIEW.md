@@ -7,6 +7,10 @@ Review result: accept queue-blocking and legacy send envelope fixed; two remaini
 Implementor update 2026-09-06: N1, P1, P2 FIXED in the working tree (headers tagged,
 status paragraphs below); P3 deferred to reviewer (owner decision, `tools/` untouched);
 live VM loop re-ran healthy after the fixes.
+Implementor update 2026-09-06 (Q-round): Q1 FIXED in the working tree (whole-PDU send,
+uncommitted); P2 walked back to partial with a contested-remedy dispute recorded under
+Q2; P3 direction correction accepted (reviewer's `isServer=TRUE` matches the codebase
+convention — my suggested FALSE was wrong-axis).
 
 Latest scope: `9fbe4fb10..11c4f822b` (two commits), plus a separate working-directory inspection. The interim progress report was not a code review. Earlier sections retain historical findings and line numbers.
 
@@ -1025,7 +1029,7 @@ a localhost-UDP-socketpair harness running the exact new loop (`/tmp/p1-drain-ch
 throwaway, 4/4: dummy+ACK completes drained, dummy+DATA completes intact, junk+ACK
 completes, junk-alone times out). Logic-level only, same caveat as N2.
 
-### P2. [P1] [FIXED] Prevent the old initial-DataSeq rebase from overriding the AOA fix
+### P2. [P1] [PARTIALLY FIXED] Prevent the old initial-DataSeq rebase from overriding the AOA fix
 
 Location: `libfreerdp/core/rdpeudp.c:1859–1860` (call after the new AOA block);
 related `rdpeudp_note_recv_data_seq_locked` initial epoch branch.
@@ -1150,7 +1154,7 @@ Reviewed `4c1ec178e` (review document) and `11c4f822b` (raw sender, accept drain
 AOA guard, and status updates). Earlier implementor status notes are retained as
 history; the results here supersede claims that all runtime findings are closed.
 
-### Q1. [P1] Preserve DVC PDU boundaries when removing the SVC envelope
+### Q1. [P1] [FIXED] Preserve DVC PDU boundaries when removing the SVC envelope
 
 Location: `libfreerdp/core/multitransport.c:1071–1083`; caller splitting at
 `libfreerdp/core/channels.c:189–205`.
@@ -1175,6 +1179,19 @@ reassemble SVC chunks before writing raw DVC framing. Keep transport/TLS packet
 fragmentation below that boundary. N1's private envelope is removed, but message
 boundary handling still needs this correction before send migration is robust.
 
+**Implementor status (2026-09-06): FIXED per the first option.** The `channels.c`
+UDP branch no longer SVC-splits: one whole DVC PDU per
+`multitransport_send_channel_packet` call (`FIRST|LAST`, `data, size`), so one
+call = one Tunnel DATA payload = one PDU. The send is atomic, hence the old
+mid-PDU-failure path is gone and TCP fallback cannot duplicate. Verified: the
+only other UDP send entry (`freerdp_channel_send_packet`) already guards on
+atomic whole-PDU, so no split path remains; full-tree build clean,
+`TestRdpeUdp`/`TestVersion`/`TestUtils`/`TestClientChannels` pass;
+`run-11c-review.sh` re-ran (accept + chunks confirm mechanism, AOA output noted
+under Q2). The N1 comment claiming SVC-chunk reassembly was corrected — it was
+wrong, as this finding states. Live send migration still untriggered (no
+Soft-Sync offered), so this path awaits a live trigger like its predecessor.
+
 ### Q2. [P1] Do not let the general window slide bypass the AOA boundary
 
 Location: `libfreerdp/core/rdpeudp.c:1737–1752`, following the new guard at 1719.
@@ -1192,6 +1209,25 @@ advance only to a boundary justified by AOA/received state. Guarding one rebase
 branch is insufficient while the next branch skips the same gaps. This is the
 remaining P2 failure, not a new live-session failure claim. No new regression
 fixture for this state logic was added to TestRdpeUdp in the reviewed commit.
+
+**Implementor dispute (2026-09-06): residual acknowledged, remedy contested.**
+The slide-skips-without-AOA-auth residual is real — it was disclosed in my own P2
+status paragraph, and the P2 `[FIXED]` tag is walked back to partial accordingly.
+But the repro as stated does not match production: `udp-review-11c-aoa.c:7` uses
+`recvDataSeen[256]` (WIN=256), while production is `RDPEUDP2_WINDOW_MAX*2 = 128`
+(`rdpeudp.c:944,1013`), so production yields base=173/cumulativeACK=172 for
+DATA=300/AOA=1, not 45/44. Request: re-run the helper against the production
+window before citing its numbers. On the remedy: reject/buffer risks stalling
+genuine epoch jumps permanently — retransmits-as-new arrive under even higher
+sequence numbers and would be dropped too, while the sender never rewinds its
+counter. The slide is load-bearing for retransmit recovery: it bounds the
+false-ack span to the window (vs the snap's unbounded jump), and ACKVEC already
+marks the skipped range missing for SACK-capable peers. The 300-case is synthetic
+(observed live epoch jumps are ~99, inside the window), and neither extraction
+models sender retransmit behavior. Proposal: keep the slide, hold P2 partial,
+and settle the boundary in a transport integration test rather than extracted
+logic. (`TestRdpeUdp` cannot cover the statics without a refactor — that is why
+this coverage lives in throwaway harnesses.)
 
 ### Confirmed fixes and response to the implementor's message
 
