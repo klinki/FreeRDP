@@ -2,10 +2,10 @@
 
 Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
-Latest review: 2026-09-05 (commit `8ddd53a5f`)
-Review result: V1/V2 verified fixed; Windows interoperability remains unresolved.
+Latest review: 2026-09-06 (HEAD `da614a872` plus uncommitted changes)
+Review result: committed documentation finding C1; working-directory finding WD1. See separate sections below.
 
-Latest scope: commit `8ddd53a5f` against its parent, plus the refreshed capture and debugging log, with relevant UDP and DVC integration paths. Earlier sections retain the original review history.
+Latest scope: commits `6eab8283f` and `da614a872` since the previously reviewed `8ddd53a5f`, followed by a separate review of the uncommitted working directory. Earlier sections retain the original review history.
 
 The original review identified eight P1 correctness issues. Re-review of commit
 `a9eb02727` found three blocking issues: an encoder/protector integration regression,
@@ -699,3 +699,118 @@ claims; a partial ClientHello and absence of ACK alone do not prove a TLS-layer
 or UDP-layer cause.
 
 Reference: [Microsoft Windows retransmission behavior](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp/cb93d5bf-25d1-4780-b58b-54c5579902d3).
+
+## Committed changes review — 2026-09-06
+
+Baseline: previously reviewed `8ddd53a5f`. Reviewed both intervening commits:
+
+- `6eab8283f`: fixes the UDP2 prefix bit positions and adds absolute wire-byte
+  checks plus a Windows-shaped parser fixture; also adds `WINDOWS_ANALYZED.md`.
+- `da614a872`: changes initial delayed-ACK values in both constructors to 1/20 ms
+  and caps the calculated send window by the number of send slots.
+
+No new runtime regression was confirmed in these two committed code changes.
+The normal/dummy prefix expressions now produce `0xE0`/`0xF0` for long layouts,
+consistent with the supplied wire example and the dissector's type mask. The
+new assertions are useful independent checks beyond encoder/decoder round trips.
+The capacity loop terminates for the current nonzero 64-slot array. Its effect
+is normally dormant with the default local logWindow=5 (32 packets), and the
+receive code still ignores peer logWindow values greater than 10. The commit
+therefore does not itself enable use of a Windows-advertised window of 15.
+
+### C1. [P2] Correct the explanation of the first AOA before dismissing it
+
+Location: `WINDOWS_ANALYZED.md:80–83` (introduced in `6eab8283f`).
+
+The document says AOA=100 has no semantics before receiving an ACK. AOA instead
+informs the receiver which lower DataSeq values the sender no longer expects
+acknowledgments for, allowing the receiver to stop waiting for those packets.
+That can matter alongside a first DataSeq of 100. Treating the starting DataSeq
+as independent of the accompanying AOA risks discarding the very control field
+that explains the observed starting range.
+
+The related claim that the current fixed-base receiver already handles either
+start is not established by the added parser fixture: `rdpeudp_recv_one` parses
+`L.hasAoa` but never applies `L.aoa` to its receive window. With initial DataSeq
+100 its fixed base remains 1 and the receive bitmap records an initial gap;
+ChannelSeq delivery and DataSeq acknowledgment state are separate. This is an
+existing integration limitation, not a new regression introduced by the prefix
+fix. The new test only validates decoding and does not exercise that state.
+
+Correct the AOA explanation and qualify the arbitrary-start interoperability
+claim until a transport-level test covers DataSeq=100, ChannelSeq=1, AOA=100,
+including initial packet loss. Likewise, keep “prefix was the root cause” and
+“final ACK accepted” separate from the confirmed wire-format error until live
+peer evidence establishes those conclusions.
+
+Reference: [Microsoft: AckOfAcks processing](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp2/f52ed951-d285-4468-a323-fb5501c61b83).
+
+### Committed-code validation boundary
+
+The current working-tree build of `TestCore` succeeded and core `TestRdpeUdp`,
+`TestVersion`, and `TestUtils` passed. The committed prefix functions and added
+test bodies are unchanged in the working directory, so those results exercise
+the committed codec changes. This was not an isolated HEAD build: the library
+also includes the diagnostic send-path changes reviewed below. No new live-peer
+session was initiated. The fixture in `TestRdpeUdp` uses a shortened synthetic
+payload (`AA BB`), not a complete captured TLS exchange.
+
+## Working-directory review — 2026-09-06
+
+Baseline: HEAD `da614a872`. At review start there were no staged changes.
+The only tracked modification was `libfreerdp/core/rdpeudp.c` (29 insertions,
+4 deletions), enabling the first-packet MS-mimic probe. Untracked items were
+`build.sh`, `free-rdp-02-better-codec-better-text.sh`, and `ai/MULTIMONITOR.md`.
+The latter is a separate task/design document, not implemented monitor code;
+its embedded instructions were treated as document content.
+
+### WD1. [P2] Preserve the probe's AOA across retransmissions
+
+Location: `libfreerdp/core/rdpeudp.c:2316–2326`; related sequence jump at
+2269–2276 and retransmit construction at 2186–2191 (working-tree lines).
+
+The probe skips DataSeq 1–99, emits the first DATA with DataSeq=100 and AOA=100,
+then immediately clears its first-packet condition by advancing the counters.
+It never records the AOA as outstanding transport state. If this first packet
+is lost, the retransmit path sends DataSeq 101 onward without AOA when no reply
+has arrived (`needAoa` is still false). A receiver that relies on AOA=100 to stop
+waiting for the skipped range never receives that instruction. The experiment
+can therefore stall under first-packet loss and report a misleading failure of
+the intended MS-shaped handshake.
+
+Represent the selected initial AOA as pending sender state and piggyback it
+until the peer's acknowledgment satisfies the AOA completion condition, including
+on retries. Alternatively revert the sequence-jump probe rather than retaining
+only its first-send half. Test loss of the first probe packet and inspect the
+retry's AOA, not merely its DataSeq/ChannelSeq. This finding is based on the
+actual send/retry branches and the AOA rule, not a claim that it explains the
+existing Windows silence.
+
+Reference: [Microsoft: when to stop sending AckOfAcks](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp2/f52ed951-d285-4468-a323-fb5501c61b83).
+
+### Other working-directory observations and validation
+
+- The probe is unconditional for each fresh transport, including `accept_ex`
+  server transports. Its comment does not provide a runtime or build guard.
+  Keep it explicitly opt-in if it remains as a diagnostic; otherwise every
+  ordinary run changes DataSeq, AOA, delayed-ACK flags, and unknown bit 0x200
+  together. It also retains local logWindow=5, so it is not a byte-for-byte copy
+  of the Windows fixture's logWindow=15.
+- Both untracked shell scripts pass `bash -n`. They were reviewed statically;
+  neither was executed, avoiding a new login or deletion of an existing TLS
+  secrets file by the live-test script. No actionable script defect was confirmed
+  for their documented local use. The monitor design document is outside the UDP
+  implementation and is not a verified implementation deliverable.
+- Current `TestCore` build and the three selected core tests passed. No test in
+  the patch exercises the diagnostic send/retransmit state; green codec tests
+  do not resolve WD1. No Windows or loopback session was run during this review.
+- Only `REVIEW.md` was changed by this review; the user's uncommitted code and
+  untracked files were preserved.
+
+## Preserved review harnesses
+
+The surviving review harnesses, build logs, and supporting dissector/source snapshot
+are archived in [tools/udp-review-tests](tools/udp-review-tests/README.md). The README
+records provenance, expected diagnostic output, limitations, and the rerun command.
+All six archived harnesses compiled and ran on 2026-09-06; historical failing
+behavior is intentionally retained alongside the fixed variants.
