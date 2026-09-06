@@ -1762,64 +1762,51 @@ static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 	udp->stats.recvPackets++;
 }
 
-/* Returns TRUE if a datagram was received (even if ignored). */
-static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1SynAck,
-                             RdpUdpFecHeader* v1hdr, RdpUdpSynPayload* v1syn,
-                             RdpUdpSynExPayload* v1synex)
+/* ---- unit-test driver (no sockets; see rdpeudp.h) ----
+ * rdpeudp_test_feed runs the production v2 receive block below, shared with
+ * rdpeudp_recv_one's socket input. The dummy context is never dereferenced on
+ * test paths (state handling and free touch no context members). */
+static rdpContext g_rdpeudp_test_ctx;
+
+rdpUdpTransport* rdpeudp_test_new(void)
 {
-	BYTE buf[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
-	const SSIZE_T r = freerdp_udp_recv(udp->sockfd, buf, sizeof(buf), timeoutMs);
-	if (r <= 0)
+	static const BYTE cookie[RDPEUDP_COOKIE_LEN] = { 0 };
+	return rdpeudp_new(&g_rdpeudp_test_ctx, "test.invalid", 0, 0, 0, cookie);
+}
+
+void rdpeudp_test_free(rdpUdpTransport* udp)
+{
+	rdpeudp_free(udp);
+}
+
+BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
+{
+	if (!udp || !buf || (len == 0))
 		return FALSE;
-	udp->lastRecvTs = udp_now_ms();
-
-	/* Try v1 SYN+ACK first during handshake (starts with 0xFF..? snSourceAck) */
-	if (haveV1SynAck && ((size_t)r >= 16))
-	{
-		RdpUdpFecHeader h = { 0 };
-		RdpUdpSynPayload syn = { 0 };
-		RdpUdpSynExPayload ex = { 0 };
-		if (rdpeudp_parse_syn(buf, (size_t)r, &h, &syn, nullptr, &ex))
-		{
-			if ((h.flags & (RDPUDP_FLAG_SYN | RDPUDP_FLAG_ACK)) ==
-			    (RDPUDP_FLAG_SYN | RDPUDP_FLAG_ACK))
-			{
-				*haveV1SynAck = TRUE;
-				if (v1hdr)
-					*v1hdr = h;
-				if (v1syn)
-					*v1syn = syn;
-				if (v1synex)
-					*v1synex = ex;
-				return TRUE;
-			}
-		}
-		*haveV1SynAck = FALSE;
-	}
-
-	/* Otherwise treat as v2 packet */
 	{
 		BOOL dummy = FALSE;
 		size_t off = 0;
 		BYTE tmp[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
-		if ((size_t)r > sizeof(tmp))
+		if (len > sizeof(tmp))
 			return TRUE; /* ignore oversize */
-		memcpy(tmp, buf, (size_t)r);
-		if (!rdpeudp2_unprotect(tmp, (size_t)r, &dummy, &off))
+		memcpy(tmp, buf, len);
+		if (!rdpeudp2_unprotect(tmp, len, &dummy, &off))
 			return TRUE;
 
 		const BYTE* p = tmp + off;
-		size_t rem = (size_t)r - off;
+		size_t rem = len - off;
 		if (rem < 2)
 			return TRUE;
 		const UINT16 header = (UINT16)(p[0] | ((UINT16)p[1] << 8));
 		const UINT16 flags = (UINT16)(header & 0x0FFF);
 		const BYTE peerLog = (BYTE)((header >> 12) & 0x0F);
+		WINPR_UNUSED(flags);
+		WINPR_UNUSED(peerLog);
 		p += 2;
 		rem -= 2;
 
 		RdpUdp2Layout L = WINPR_C_ARRAY_INIT;
-		if (!rdpeudp2_parse_layout(tmp + off, (size_t)r - off, &L))
+		if (!rdpeudp2_parse_layout(tmp + off, len - off, &L))
 			return TRUE;
 
 		EnterCriticalSection(&udp->lock);
@@ -1987,6 +1974,75 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 		if (udp->udpEvent && (udp->udpEvent != INVALID_HANDLE_VALUE))
 			(void)SetEvent(udp->udpEvent);
 	}
+
+	return TRUE;
+}
+
+BOOL rdpeudp_test_recv_state(const rdpUdpTransport* udp, RdpUdpTestRecvState* out)
+{
+	if (!udp || !out)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&udp->lock);
+	out->recvDataBase = udp->recvDataBase;
+	out->lastAckSent = udp->lastAckSent;
+	out->expectedChannelSeq = udp->expectedChannelSeq;
+	out->haveRecvData = udp->haveRecvData;
+	out->haveSeenAoa = udp->haveSeenAoa;
+	out->haveRealData = udp->haveRealData;
+	out->recvStreamLen = Stream_Length(udp->recvStream);
+	LeaveCriticalSection((CRITICAL_SECTION*)&udp->lock);
+	return TRUE;
+}
+
+BOOL rdpeudp_test_seen(const rdpUdpTransport* udp, size_t i)
+{
+	BOOL v = FALSE;
+	if (!udp)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&udp->lock);
+	if (i < ARRAYSIZE(udp->recvDataSeen))
+		v = udp->recvDataSeen[i];
+	LeaveCriticalSection((CRITICAL_SECTION*)&udp->lock);
+	return v;
+}
+
+/* Returns TRUE if a datagram was received (even if ignored). */
+static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1SynAck,
+                             RdpUdpFecHeader* v1hdr, RdpUdpSynPayload* v1syn,
+                             RdpUdpSynExPayload* v1synex)
+{
+	BYTE buf[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
+	const SSIZE_T r = freerdp_udp_recv(udp->sockfd, buf, sizeof(buf), timeoutMs);
+	if (r <= 0)
+		return FALSE;
+	udp->lastRecvTs = udp_now_ms();
+
+	/* Try v1 SYN+ACK first during handshake (starts with 0xFF..? snSourceAck) */
+	if (haveV1SynAck && ((size_t)r >= 16))
+	{
+		RdpUdpFecHeader h = { 0 };
+		RdpUdpSynPayload syn = { 0 };
+		RdpUdpSynExPayload ex = { 0 };
+		if (rdpeudp_parse_syn(buf, (size_t)r, &h, &syn, nullptr, &ex))
+		{
+			if ((h.flags & (RDPUDP_FLAG_SYN | RDPUDP_FLAG_ACK)) ==
+			    (RDPUDP_FLAG_SYN | RDPUDP_FLAG_ACK))
+			{
+				*haveV1SynAck = TRUE;
+				if (v1hdr)
+					*v1hdr = h;
+				if (v1syn)
+					*v1syn = syn;
+				if (v1synex)
+					*v1synex = ex;
+				return TRUE;
+			}
+		}
+		*haveV1SynAck = FALSE;
+	}
+
+	/* Otherwise treat as v2 packet through the shared testable path. */
+	(void)rdpeudp_test_feed(udp, buf, (size_t)r);
 
 	return TRUE;
 }

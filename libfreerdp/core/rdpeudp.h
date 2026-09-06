@@ -397,6 +397,36 @@ FREERDP_LOCAL int rdpeudp_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf, s
                                            size_t payloadBufLen, size_t* payloadLenOut,
                                            DWORD timeoutMs);
 
+/* ---- unit-test driver (Q2 transport integration, no sockets) ----
+ * Feeds one wire datagram through the production v2 receive path (the same
+ * block rdpeudp_recv_one runs for socket input): prefix/layout parse, AOA
+ * epoch rule, DataSeq window, ACK accounting, channel delivery. The sender
+ * side is modeled with the production builders (rdpeudp2_encode_layout +
+ * rdpeudp2_protect), so wire bytes are real in both directions. */
+typedef struct
+{
+	UINT16 recvDataBase;
+	UINT16 lastAckSent;
+	UINT16 expectedChannelSeq;
+	BOOL haveRecvData;
+	BOOL haveSeenAoa;
+	BOOL haveRealData;
+	size_t recvStreamLen; /* delivered in-order channel bytes */
+} RdpUdpTestRecvState;
+
+WINPR_ATTR_MALLOC(rdpeudp_test_free, 1)
+WINPR_ATTR_NODISCARD
+FREERDP_API rdpUdpTransport* rdpeudp_test_new(void);
+FREERDP_API void rdpeudp_test_free(rdpUdpTransport* udp);
+/** Feed one datagram; TRUE if received (even if ignored, same as recv_one). */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* datagram, size_t len);
+/** Snapshot scalar receive state (bitmap via rdpeudp_test_seen below). */
+FREERDP_API BOOL rdpeudp_test_recv_state(const rdpUdpTransport* udp, RdpUdpTestRecvState* out);
+/** TRUE if DataSeq (base+i) is recorded received; FALSE if out of range. */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_test_seen(const rdpUdpTransport* udp, size_t i);
+
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL rdpeudp_is_connected(const rdpUdpTransport* udp);
 WINPR_ATTR_NODISCARD

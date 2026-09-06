@@ -1369,6 +1369,222 @@ static int test_dvc_pdu_length(void)
 	return 0;
 }
 
+/* Q2 transport integration: real receiver (rdpeudp_test_feed runs the
+ * production v2 receive block) + sender model (production
+ * rdpeudp2_encode_layout + rdpeudp2_protect) + retransmit-as-new-dseq model.
+ * Covers the MS probe epoch, the adversarial far-ahead AOA case and its
+ * recovery, and gap preservation — all against real receive state. */
+typedef struct
+{
+	UINT16 dseq;
+	UINT16 cseq;
+	const BYTE* body;
+	size_t bodyLen;
+	BOOL hasAoa;
+	UINT16 aoa;
+	BOOL dummy;
+	BOOL withBody;
+} RxScriptPkt;
+
+static wStream* rx_emit(const RxScriptPkt* pkt)
+{
+	RdpUdp2Layout in = { 0 };
+	in.logWindow = 5;
+	if (pkt->hasAoa)
+	{
+		in.flags |= RDPUDP2_FLAG_AOA;
+		in.hasAoa = TRUE;
+		in.aoa = pkt->aoa;
+	}
+	if (pkt->withBody)
+	{
+		in.flags |= RDPUDP2_FLAG_DATA;
+		in.hasDataHeader = TRUE;
+		in.dataSeq = pkt->dseq;
+		in.hasDataBody = TRUE;
+		in.channelSeq = pkt->cseq;
+		in.dataBody = pkt->body;
+		in.dataBodyLen = pkt->bodyLen;
+	}
+	wStream* s = rdpeudp2_encode_layout(&in);
+	if (!s)
+		return nullptr;
+	if (!Stream_SetPosition(s, Stream_Length(s)) || !rdpeudp2_protect(s, pkt->dummy))
+	{
+		Stream_Release(s);
+		return nullptr;
+	}
+	return s;
+}
+
+static int rx_feed(rdpUdpTransport* udp, const RxScriptPkt* pkt)
+{
+	wStream* s = rx_emit(pkt);
+	if (!s)
+		return -1;
+	const BOOL ok = rdpeudp_test_feed(udp, Stream_Buffer(s), Stream_Length(s));
+	Stream_Release(s);
+	return ok ? 0 : -1;
+}
+
+static int rx_state(rdpUdpTransport* udp, RdpUdpTestRecvState* out)
+{
+	return rdpeudp_test_recv_state(udp, out) ? 0 : -1;
+}
+
+#define RX_CHECK(cond) \
+	do \
+	{ \
+		if (!(cond)) \
+		{ \
+			(void)fprintf(stderr, "rx_integration FAILED line %d: %s\n", __LINE__, #cond); \
+			rdpeudp_test_free(udp); \
+			return -1; \
+		} \
+	} while (0)
+
+static int test_rx_integration(void)
+{
+	rdpUdpTransport* udp = nullptr;
+	RdpUdpTestRecvState st = { 0 };
+	static const BYTE b1[] = { 'A', 'B' };
+	static const BYTE b2[] = { 'C', 'D' };
+
+	/* S1: MS-like probe epoch (100..145, AOA=100) then DATA 146. */
+	udp = rdpeudp_test_new();
+	if (!udp)
+		return -1;
+	for (UINT16 d = 100; d <= 145; d++)
+	{
+		/* Dummy prefix + DATA header/AOA + empty body: the state path
+		 * under test only sees (dataSeq, aoa, dummy); the empty body is
+		 * never delivered. A headerless probe could not move the DataSeq
+		 * window at all. */
+		const RxScriptPkt probe = { d, 0, nullptr, 0, TRUE, 100, TRUE, TRUE };
+		if (rx_feed(udp, &probe) != 0)
+		{
+			rdpeudp_test_free(udp);
+			return -1;
+		}
+	}
+	{
+		const RxScriptPkt data = { 146, 1, b1, sizeof(b1), TRUE, 100, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &data) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.haveSeenAoa && (st.recvDataBase == 147));
+		RX_CHECK((st.expectedChannelSeq == 2) && (st.recvStreamLen == sizeof(b1)));
+		RX_CHECK(st.haveRealData);
+	}
+	rdpeudp_test_free(udp);
+
+	/* S2: adversarial DATA=300/AOA=1, then retransmit-as-new recovery. */
+	udp = rdpeudp_test_new();
+	if (!udp)
+		return -1;
+	{
+		const RxScriptPkt adv = { 300, 1, b2, sizeof(b2), TRUE, 1, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &adv) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		/* Slide, not snap: base advances past nothing electively. */
+		RX_CHECK(st.recvDataBase == 173);
+		RX_CHECK(rdpeudp_test_seen(udp, 127) && !rdpeudp_test_seen(udp, 0));
+		/* ChannelSeq delivery is independent of the DataSeq gap. */
+		RX_CHECK((st.expectedChannelSeq == 2) && (st.recvStreamLen == sizeof(b2)));
+		/* Real ACK codec on real state: gaps from 173, 300 marked,
+		 * 1..172 unrepresentable (reviewer-corrected facts). */
+		BOOL rec[128] = { 0 };
+		for (size_t i = 0; i < 128; i++)
+			rec[i] = rdpeudp_test_seen(udp, i);
+		wStream* av = rdpeudp_build_ackvec(st.recvDataBase, rec, 128, FALSE, 0, 0);
+		RX_CHECK(av != nullptr);
+		{
+			UINT16 pbase = 0;
+			BOOL* pvec = nullptr;
+			size_t pcount = 0;
+			const BOOL pok = rdpeudp_parse_ackvec(Stream_Buffer(av), Stream_Length(av),
+			                                      &pbase, &pvec, &pcount);
+			RX_CHECK(pok && (pbase == 173) && (pcount > 127) && pvec && pvec[127]);
+			for (size_t i = 0; i < 127; i++)
+				RX_CHECK(!pvec[i]);
+			free(pvec);
+		}
+		Stream_Release(av);
+	}
+	/* Sender retransmits onward under fresh DataSeqs; base must creep
+	 * monotonically (no stall) and every body must deliver in order. */
+	{
+		UINT16 cseq = 2;
+		size_t wantLen = sizeof(b2);
+		static BYTE rb[1] = { 'x' };
+		for (UINT16 d = 301; d <= 309; d++)
+		{
+			const RxScriptPkt rtx = { d, cseq, rb, sizeof(rb), TRUE, 1, FALSE, TRUE };
+			RX_CHECK(rx_feed(udp, &rtx) == 0);
+			cseq++;
+			wantLen += sizeof(rb);
+		}
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 182);
+		RX_CHECK((st.expectedChannelSeq == cseq) && (st.recvStreamLen == wantLen));
+	}
+	rdpeudp_test_free(udp);
+
+	/* S3: N3 synthetic on real code — DATA 2/AOA=1 first keeps the gap. */
+	udp = rdpeudp_test_new();
+	if (!udp)
+		return -1;
+	{
+		static const BYTE g1[] = { 'G', 'H' };
+		static const BYTE g2[] = { 'I', 'J' };
+		const RxScriptPkt first = { 2, 1, g1, sizeof(g1), TRUE, 1, FALSE, TRUE };
+		const RxScriptPkt second = { 1, 2, g2, sizeof(g2), TRUE, 1, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &first) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 1);
+		RX_CHECK(st.recvStreamLen == sizeof(g1));
+		RX_CHECK(rx_feed(udp, &second) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 3);
+		RX_CHECK((st.expectedChannelSeq == 3) &&
+		         (st.recvStreamLen == sizeof(g1) + sizeof(g2)));
+	}
+	rdpeudp_test_free(udp);
+
+	/* S4: mild reorder with AOA advance, then fill. */
+	udp = rdpeudp_test_new();
+	if (!udp)
+		return -1;
+	{
+		static const BYTE h1[] = { 'K', 'L' };
+		static const BYTE h2[] = { 'M', 'N' };
+		const RxScriptPkt ahead = { 6, 1, h1, sizeof(h1), TRUE, 5, FALSE, TRUE };
+		const RxScriptPkt fill = { 5, 2, h2, sizeof(h2), TRUE, 5, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &ahead) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 5);
+		RX_CHECK(rx_feed(udp, &fill) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 7);
+		RX_CHECK(st.recvStreamLen == sizeof(h1) + sizeof(h2));
+	}
+	rdpeudp_test_free(udp);
+
+	/* S5: probeless far jump without AOA keeps the initial epoch snap. */
+	udp = rdpeudp_test_new();
+	if (!udp)
+		return -1;
+	{
+		static const BYTE k1[] = { 'O', 'P' };
+		const RxScriptPkt far = { 150, 1, k1, sizeof(k1), FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &far) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK((st.recvDataBase == 151) && !st.haveSeenAoa);
+		RX_CHECK(st.recvStreamLen == sizeof(k1));
+	}
+	rdpeudp_test_free(udp);
+	return 0;
+}
+
 int TestRdpeUdp(int argc, char* argv[])
 {
 	WINPR_UNUSED(argc);
@@ -1447,6 +1663,11 @@ int TestRdpeUdp(int argc, char* argv[])
 	if (test_dvc_pdu_length() != 0)
 	{
 		(void)fprintf(stderr, "test_dvc_pdu_length FAILED\n");
+		return -1;
+	}
+	if (test_rx_integration() != 0)
+	{
+		(void)fprintf(stderr, "test_rx_integration FAILED\n");
 		return -1;
 	}
 
