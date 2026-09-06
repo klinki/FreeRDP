@@ -2,10 +2,10 @@
 
 Date: 2026-09-05
 Re-reviewed: 2026-09-05 (commit `a9eb02727`)
-Latest review: 2026-09-06 (HEAD `da614a872` plus uncommitted changes)
-Review result: committed documentation finding C1; working-directory finding WD1. See separate sections below.
+Latest review: 2026-09-06 (HEAD `33e410c56`)
+Review result: four new committed-code findings N1–N4 below. No tracked implementation changes in the working directory.
 
-Latest scope: commits `6eab8283f` and `da614a872` since the previously reviewed `8ddd53a5f`, followed by a separate review of the uncommitted working directory. Earlier sections retain the original review history.
+Latest scope: `a1ce296da..33e410c56` (eight commits after the saved review), plus a separate working-directory inspection. The interim progress report was not a code review. Earlier sections retain historical findings and line numbers.
 
 The original review identified eight P1 correctness issues. Re-review of commit
 `a9eb02727` found three blocking issues: an encoder/protector integration regression,
@@ -814,3 +814,121 @@ are archived in [tools/udp-review-tests](tools/udp-review-tests/README.md). The 
 records provenance, expected diagnostic output, limitations, and the rerun command.
 All six archived harnesses compiled and ran on 2026-09-06; historical failing
 behavior is intentionally retained alongside the fixed variants.
+
+
+## Committed changes review — `a1ce296da..33e410c56` (2026-09-06)
+
+Reviewed commits: `7abff736c`, `965365678`, `0de3c95e5`, `db0f808c0`,
+`e8e4e268a`, `d549ba018`, `6dc844d3a`, and `33e410c56`. Scope includes transport,
+BIO event, tunnel/subheader framing, DVC dispatch, tests, VM script, and documentation.
+The earlier progress report established live tunnel setup, not correctness of
+channel migration or data delivery. Line numbers below refer to `33e410c56`.
+
+### N1. [P1] Make the channel sender agree with the new raw-DVC receiver
+
+Location: `libfreerdp/core/multitransport.c:1260–1285` (new receive dispatch);
+related unchanged send construction at `1071–1078`.
+
+The receiver now treats HigherLayerData as raw DVC messages, but
+`multitransport_send_channel_packet` still calls `rdpeudp_build_channel_packet`,
+which prepends the private 13-byte `00/channelId/totalSize/flags/chunkLen`
+envelope. With send migration enabled (pre-ACTIVE tunnel or completed Soft-Sync),
+all outgoing DVC messages therefore start with command 0 rather than their DVC
+command. The new receiver rejects even packets produced by its own sender;
+Windows expecting the observed raw format cannot process that envelope either.
+This blocks DVC responses/data once the send path switches to UDP. The latest
+post-ACTIVE receive-only latch can hide the problem because it leaves sends on TCP.
+
+The linked codec harness passes a raw DATA message through the production send
+builder, then the new receive splitter: `accepted=0 firstByte=00`.
+Update the send framing and receive framing together, preserving DVC message
+boundaries, and test a complete bidirectional channel exchange after send migration.
+
+### N2. [P1] Do not consume first DATA while waiting for the removed final ACK
+
+Location: `libfreerdp/core/rdpeudp.c:3549–3557`; related peek at `3558–3584`.
+Introduced by `7abff736c`.
+
+The client no longer sends a standalone final ACK, but `accept_ex` first calls
+`freerdp_udp_recv` and only checks for UDP2 DATA in the `r <= 0` branch. An already
+queued DATA packet is consumed by that receive, then passed to the v1 FEC-header
+parser and discarded instead of completing the handshake or reaching TLS. Its
+retransmissions follow the same path. The peek can work only in the narrow race
+where DATA arrives after the timed receive has returned empty and before the
+immediate readiness check. A normal client/accept_ex connection therefore times
+out with `UDP accept: no final ACK` despite valid DATA arriving.
+
+Check for DATA before consuming it, or classify and retain the datagram returned
+by the receive so TLS can process it after handshake completion. Validate with a
+client/accept_ex test in which first DATA is queued before the server's receive;
+codec-only tests do not exercise this branch. This finding is from control-flow
+inspection; no live server/loopback test was run in this review.
+
+### N3. [P1] Advance the ACK window using the AOA value, not its packet's DataSeq
+
+Location: `libfreerdp/core/rdpeudp.c:1833–1840`.
+Introduced by `db0f808c0`.
+
+The first packet carrying AOA clears the receive bitmap and resets the base to
+`L.dataSeq`; `L.aoa` is never consulted. The condition does not require that no
+DATA has previously arrived, despite the comment's “never-advanced base” claim.
+For example, if DATA 1 is missing and DATA 2 carrying AOA=1 arrives, the new block
+sets base=2, records 2, and advances to 3. Subsequent ACK generation advertises
+ACK(2), falsely acknowledging the missing DATA 1. The sender can then release its
+retransmission while channel reassembly still waits for ChannelSeq 1, permanently
+stalling the TLS byte stream. AOA presence alone cannot authorize skipping every
+sequence before the packet carrying it.
+
+An extracted, unchanged production-block harness confirms:
+`First DATA seq=2 AOA=1: cumulativeACK=2 missingSeq1WasReceived=0`.
+Use the actual AOA boundary with wrap-aware monotonic advancement, preserving
+still-required gaps. Cover first-packet loss, a later first AOA, and reordered AOA
+packets. The old arbitrary-start documentation concern C1 is improved in prose,
+but this implementation does not correctly resolve its receive-window limitation.
+
+### N4. [P1] Parse CREATE responses differently from CREATE requests
+
+Location: `libfreerdp/core/rdpeudp.c:843–855`, called for both client and server
+receives by `multitransport_check_fds`. Introduced by `d549ba018`.
+
+Command 1 is always treated as a NUL-terminated CREATE request name. In the reverse
+direction it is a CREATE response with a four-byte status. A valid success response
+`10 07 00 00 00 00` is split after its first status byte: the helper returns length
+3 instead of 6. The server callback receives a truncated status and the remaining
+zeros are subsequently rejected as another DVC command. Thus a FreeRDP server
+cannot complete channel creation over the new UDP receive path even after the
+handshake issue is fixed. Failed status values can be mis-sized too.
+
+The linked production-helper harness reproduces `consumed=3 expected=6`.
+Pass direction/context to the parser or retain the tunnel's known PDU boundary
+and let the existing direction-specific DVC handler parse it. Add success and
+failure response fixtures alongside the existing Windows CREATE-request fixtures.
+
+### Validation and limits
+
+- Rebuilt `TestCore` successfully against this HEAD. `TestRdpeUdp`, core
+  `TestVersion`, and `TestUtils` all exited 0. Passing tests do not cover N1–N4.
+- Added two preserved diagnostic harnesses, `udp-review-33e-framing.c` (linked
+  production helpers) and `udp-review-33e-aoa.c` (unchanged extracted state block).
+  Their output demonstrates N1, N3, and N4; exit 0 means the diagnostic ran,
+  not that the observed behavior is correct. N2 is statically verified only.
+- Rerun: `bash tools/udp-review-tests/run-33e-review.sh /tmp/freerdp-build`.
+  Build/test/diagnostic outputs are preserved in
+  `tools/udp-review-tests/logs/review-33e410c56/`.
+- No new VM login, packet capture, full application build, sanitizer run, or
+  end-to-end migration test was performed. Existing live logs show tunnel setup
+  progress but do not establish a reliable bidirectional UDP graphics session.
+- Reviewed `free-rdp-vm-loop.sh` statically and with `bash -n`; no new actionable
+  script issue is included. Its PROGRESS verdict is not an end-to-end success test.
+
+## Working-directory review — HEAD `33e410c56` (2026-09-06)
+
+At review start there were no staged or unstaged tracked changes. Untracked
+`ai/`, `build.sh`, and `free-rdp-02-better-codec-better-text.sh` remain separate
+local material; no new UDP implementation patch exists there to review against
+HEAD. No additional working-directory implementation finding is reported.
+The changes made by this review are limited to this document and preserved review
+harnesses, their runner, and logs. No implementation files were edited.
+
+Historical WD1's unconditional first-send sequence-jump probe is absent from the
+current send path, so that specific retransmission finding no longer applies.
