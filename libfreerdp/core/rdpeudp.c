@@ -978,7 +978,10 @@ struct rdp_udp_transport
 	UINT16 nextDataSeq;
 	UINT16 nextChannelSeq;
 	UINT16 expectedChannelSeq;
-	BOOL haveRecvData;    /* TRUE once any in-window DATA recorded (ACK valid) */
+	BOOL haveRecvData;    /* Set on any in-window DATA record; sole reader is the
+	                       * initial-epoch rule below (first far-ahead DATA adopts
+	                       * the peer epoch). ACK emission and base validity for
+	                       * steady state use haveRealData/haveSeenAoa. */
 	BOOL haveSeenAoa;     /* TRUE once any AOA-bearing packet arrived (epoch known) */
 	BOOL haveRealData;    /* TRUE once NON-DUMMY data arrived: gate for emitting
 	                       * ACKs. Probes flip haveRecvData (base marches) but must
@@ -1700,7 +1703,8 @@ static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 {
 	/* V1: fixed 1-start base, never rebase from first arrival. Out-of-order
 	 * chunks are buffered (seen bitmap); base advances only on contiguous
-	 * prefix. haveRecvData gates ACK validity. */
+	 * prefix. haveRealData gates ACK emission; haveSeenAoa feeds the epoch
+	 * rule in recv_one. */
 	const size_t WIN = ARRAYSIZE(udp->recvDataSeen);
 	INT16 diff = (INT16)(dseq - udp->recvDataBase);
 	if (!udp->haveRecvData && (diff >= (INT16)WIN))
@@ -1983,9 +1987,6 @@ static BOOL rdpeudp2_send_ack(rdpUdpTransport* udp)
 	 * window correlates with the peer withholding its own small ACKs. */
 	if (!udp->haveRealData)
 	{
-		/* Still send AOA-only? No – nothing to ack yet. */
-		BOOL needAoaOnly = udp->needAoa;
-		(void)needAoaOnly;
 		LeaveCriticalSection(&udp->lock);
 		if (ackvecBody)
 			Stream_Release(ackvecBody);
@@ -2537,9 +2538,7 @@ static SSIZE_T rdpeudp2_recv_reliable(rdpUdpTransport* udp, BYTE* buffer, size_t
 		DWORD step = (DWORD)(deadline - udp_now_ms());
 		if (step > 50)
 			step = 50;
-		BOOL dummyFlag = FALSE;
 		(void)rdpeudp_recv_one(udp, step, nullptr, nullptr, nullptr, nullptr);
-		WINPR_UNUSED(dummyFlag);
 
 		/* Send periodic ACKs so sender window progresses even without data */
 		EnterCriticalSection(&udp->lock);
@@ -3219,7 +3218,6 @@ BOOL rdpeudp_send_keepalive(rdpUdpTransport* udp)
 	Stream_Release(s);
 
 	EnterCriticalSection(&udp->lock);
-	const BOOL useAckvec = FALSE;
 	/* No spurious ACK(0) keepalive before real server DATA (see above). */
 	if (!udp->haveRealData)
 	{
@@ -3229,7 +3227,6 @@ BOOL rdpeudp_send_keepalive(rdpUdpTransport* udp)
 	}
 	const UINT16 base = (UINT16)(udp->recvDataBase - 1);
 	LeaveCriticalSection(&udp->lock);
-	WINPR_UNUSED(useAckvec);
 
 	wStream* pkt = rdpeudp2_build_packet(udp, RDPUDP2_FLAG_ACK, base, nullptr, 0, 0, 0,
 	                                     nullptr, 0, FALSE);

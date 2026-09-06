@@ -1315,19 +1315,31 @@ static int test_dvc_pdu_length(void)
 			return -1;
 		}
 	}
-	/* Negatives: truncated header/id, unterminated CREATE, fragmented
-	 * DATA_FIRST, unknown command. */
+	/* Negatives: truncated header/id, unterminated CREATE, zero-length
+	 * DATA_FIRST, unknown command. A fragmented DATA_FIRST (total beyond
+	 * present) is ACCEPTED consuming all (see below), so it is not here. */
 	{
 		static const BYTE trunc[] = { 0x18 };
 		static const BYTE noNul[] = { 0x18, 0x02, 'A', 'B' };
-		static const BYTE fragFirst[] = { 0x20, 0x05, 0x20, 0x00, 0x00, 0x00, 'A' };
+		static const BYTE zeroTotal[] = { 0x20, 0x05, 0x00 };
 		static const BYTE unknown[] = { 0xF8, 0x01 };
 		if (rdpeudp_dvc_pdu_length(trunc, sizeof(trunc), &len) ||
 		    rdpeudp_dvc_pdu_length(noNul, sizeof(noNul), &len) ||
-		    rdpeudp_dvc_pdu_length(fragFirst, sizeof(fragFirst), &len) ||
+		    rdpeudp_dvc_pdu_length(zeroTotal, sizeof(zeroTotal), &len) ||
 		    rdpeudp_dvc_pdu_length(unknown, sizeof(unknown), &len))
 		{
 			(void)fprintf(stderr, "negative DVC fixture accepted\n");
+			return -1;
+		}
+	}
+	/* Fragmented DATA_FIRST (total 0x20=32 > 4 present bytes): accepted,
+	 * consuming all present bytes; completion tracked by the caller. */
+	{
+		static const BYTE fragFirst[] = { 0x20, 0x05, 0x20, 0x00, 0x00, 0x00, 'A' };
+		if (!rdpeudp_dvc_pdu_length(fragFirst, sizeof(fragFirst), &len) ||
+		    (len != sizeof(fragFirst)))
+		{
+			(void)fprintf(stderr, "fragmented DATA_FIRST rejected\n");
 			return -1;
 		}
 	}
