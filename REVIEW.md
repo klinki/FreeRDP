@@ -1338,3 +1338,72 @@ the reviewer's call, so Q2/P2 stays partial.
 Only review-owned diagnostic/documentation files were changed for this correction.
 Concurrent implementation changes in channels.c and multitransport.c were left
 untouched and were not reviewed as part of this focused response.
+
+
+## Reviewer comments on latest changes — HEAD `026e5a022`
+
+Reviewed changes since `11c4f822b`, including whole-PDU sending in `fcd082c29`,
+shared receive processing/tests in `a67cdfe05`, and the updated status claims.
+No tracked working changes were present at review start.
+
+### R4. [P1] Do not assume a failed whole-PDU UDP write delivered nothing
+
+Location: `libfreerdp/core/channels.c:180–198` (whole-PDU send and TCP fallback).
+
+Q1's boundary fix is correct, but the new atomicity claim is not: one call to
+`rdpeudp_tunnel_send` is not a transactional delivery operation. It writes via
+`tls_send_all`/BIO, and the reliable UDP layer sends datagrams before waiting for
+ACKs. An error can therefore follow partial progress or full peer receipt with
+lost acknowledgments. The FALSE return does not distinguish that situation from
+failure before sending anything. Falling through to TCP can deliver the same
+DVC PDU a second time, or overtake a partly delivered UDP PDU; independent TCP
+and UDP channel delivery does not deduplicate these copies. The old guard against
+failure after earlier SVC chunks was removed without adding any lower-layer
+all-or-nothing guarantee.
+
+Only fall back for failures proven to precede submission; for ambiguous delivery,
+fail the operation/connection or use an explicit migration/recovery protocol.
+A boolean result from the current tunnel API cannot establish that distinction.
+Add fault injection after UDP progress (including lost final ACK) and assert
+that TCP does not replay a possibly delivered PDU. This is a static call-chain
+finding, not a newly observed live failure.
+
+### R5. [P2] Test actual retransmission feedback before claiming Q2 recovery
+
+Location: `libfreerdp/core/test/TestRdpeUdp.c:1512–1528`; integration-evidence
+addendum in this document.
+
+The S2 loop calls its inputs retransmissions, but increments both DataSeq and
+ChannelSeq on every iteration and adds each payload length to the expected
+output. These are nine new channel chunks, not retries (which preserve
+ChannelSeq and bytes). The first ChannelSeq is already delivered, so no missing
+channel chunk must be recovered. There is also no sender outstanding-data state,
+ACK/ACKVEC feedback applied to it, or sender decision about whether to retransmit.
+Checking only aggregate stream length cannot prove exact byte order/content or
+once-only delivery under loss.
+
+The shared production receive path is a useful improvement over extracted state.
+Its tests establish window state and delivery for those scripted arrivals, but
+do not yet satisfy the requested recovery-versus-silent-loss experiment. Keep
+Q2 partial and qualify the addendum accordingly. Add a lost ChannelSeq followed
+by retransmissions with the same ChannelSeq, duplicate delivery checks against
+actual stream bytes, and ACK/ACKVEC feedback governing sender retention/retries.
+Retain the existing new-data slide test under an accurate name.
+
+### Other conclusions
+
+Q1's SVC/DVC boundary defect is fixed: the UDP branch now bypasses SVC splitting.
+P3's current-API harness repair is present. The receive-path extraction preserves
+the prior processing block; no separate runtime regression was confirmed in that
+refactor. Q2's slide policy is unchanged, so its remaining issue is not closed by
+the new test's passing assertions. No new live session or packet capture was run.
+
+
+Validation limitation: the attempted TestCore rebuild overlapped concurrent
+implementation edits and failed on undeclared `mt_test_malloc`/`mt_test_realloc`
+calls. Those definitions subsequently appeared in the working file. This is not
+attributed to reviewed HEAD `026e5a022`, and no fresh passing test result is claimed.
+The build log is preserved in `tools/udp-review-tests/logs/review-026e5a022/build-concurrent.log`.
+At completion, multitransport.c/.h and rdpeudp.c/.h had new uncommitted changes;
+they were left untouched and are outside this commit-focused review. No new
+harness was needed for the two static code/test-contract findings above.
