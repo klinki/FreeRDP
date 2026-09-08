@@ -346,13 +346,13 @@ FREERDP_API int rdpemt_tunnel_consume(const BYTE* buf, size_t len, size_t* consu
 
 /* ---- transport ---- */
 
+FREERDP_LOCAL void rdpeudp_free(rdpUdpTransport* udp);
+
 WINPR_ATTR_MALLOC(rdpeudp_free, 1)
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port,
                                            UINT32 requestId, UINT16 requestedProto,
                                            const BYTE* securityCookie);
-
-FREERDP_LOCAL void rdpeudp_free(rdpUdpTransport* udp);
 
 /** Establish UDP socket + RDPEUDP handshake + version negotiation.
  * On success the reliable RDPEUDP2 data path is ready (but not yet TLS).
@@ -414,10 +414,11 @@ typedef struct
 	size_t recvStreamLen; /* delivered in-order channel bytes */
 } RdpUdpTestRecvState;
 
+FREERDP_API void rdpeudp_test_free(rdpUdpTransport* udp);
+
 WINPR_ATTR_MALLOC(rdpeudp_test_free, 1)
 WINPR_ATTR_NODISCARD
 FREERDP_API rdpUdpTransport* rdpeudp_test_new(void);
-FREERDP_API void rdpeudp_test_free(rdpUdpTransport* udp);
 /** Feed one datagram; TRUE if received (even if ignored, same as recv_one). */
 WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* datagram, size_t len);

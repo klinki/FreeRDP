@@ -131,10 +131,11 @@ FREERDP_LOCAL rdpMultitransport* multitransport_new(rdpRdp* rdp, UINT16 protocol
  * multitransport_test_fail_alloc_after arms OOM injection for the mapping and
  * reassembly allocations: n >= 0 fails the (n+1)-th wrapped allocation (0 =
  * fail next), negative disables. Single-threaded test use only. */
+FREERDP_API void multitransport_test_free(rdpMultitransport* multi);
+
 WINPR_ATTR_MALLOC(multitransport_test_free, 1)
 WINPR_ATTR_NODISCARD
 FREERDP_API rdpMultitransport* multitransport_test_new(void);
-FREERDP_API void multitransport_test_free(rdpMultitransport* multi);
 FREERDP_API void multitransport_test_fail_alloc_after(int n);
 FREERDP_API void multitransport_test_recv_feed(rdpMultitransport* multi, const BYTE* chunk,
                                                size_t chunkLen, UINT32 flags);
