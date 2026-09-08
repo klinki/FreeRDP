@@ -153,8 +153,14 @@ ErrorMsg::ErrorMsg(int rc, Uint32 type, const std::string& msg, const std::strin
 }
 
 static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const char* signame,
-                             [[maybe_unused]] void* context)
+                             void* context)
 {
+	/* Abort first: the RDP thread may be parked in a blocking wait that only
+	 * the abort event wakes. Pushing quit alone leaves teardown hangs
+	 * SIGTERM-deaf when the main loop is past event pumping (join/cleanup). */
+	auto rdpCtx = static_cast<rdpContext*>(context);
+	if (rdpCtx)
+		std::ignore = freerdp_abort_connect_context(rdpCtx);
 	std::ignore = sdl_push_quit();
 }
 
@@ -190,7 +196,22 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 					continue;
 
 				if (!sdl->handleEvent(windowEvent))
+				{
+					/* Teardown input drain: events arriving after disconnect
+					 * started (e.g. a keypress racing transport death) must
+					 * not kill the event loop via exception — the loop has
+					 * to stay alive until cleanup and join complete, or the
+					 * process wedges SIGTERM-deaf. Swallow and keep draining. */
+					if (freerdp_shall_disconnect_context(sdl->context()))
+					{
+						WLog_Print(sdl->getWLog(), WLOG_DEBUG,
+						           "ignoring event %s [0x%08" PRIx32 "] during disconnect",
+						           sdl::utils::toString(windowEvent.type).c_str(),
+						           windowEvent.type);
+						continue;
+					}
 					throw ErrorMsg{ -1, windowEvent.type, "sdl->handleEvent" };
+				}
 
 				switch (windowEvent.type)
 				{
