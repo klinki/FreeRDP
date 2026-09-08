@@ -40,6 +40,7 @@ rm -f "${SECRETS_FILE}"
   /monitors:"${PRIMARY_MONITOR_ID},${SECONDARY_MONITOR_ID}" \
   /sdl-monitor-scale:"${PRIMARY_MONITOR_ID}=175/100,${SECONDARY_MONITOR_ID}=100/100" \
   +multitransport \
+  +async-update \
   /auto-reconnect \
   /auto-reconnect-max-retries:5 \
   /tls:secrets-file:"${SECRETS_FILE}" \

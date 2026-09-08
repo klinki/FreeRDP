@@ -51,6 +51,7 @@ for ((n = 1; n <= ITERS; n++)); do
 		/p:"${RDP_PASS}" \
 		/cert:tofu \
 		+multitransport \
+		+async-update \
 		/tls:secrets-file:"${SECRETS}" \
 		/log-filters:com.freerdp.core.rdpeudp:DEBUG,com.freerdp.core.multitransport:DEBUG,com.freerdp.channels.*:DEBUG \
 		>"${LOG}" 2>&1 &
