@@ -1217,7 +1217,7 @@ bool SdlRailWindow::paintGfx(SDL_PixelFormat format)
 			std::ignore = _win->drawRects(s, dst, _gfxDamage);
 		}
 
-		_win->updateSurface();
+		std::ignore = _win->updateSurface();
 		_gfxPresented = true; /* First frame rendered; paint() may map the window. */
 	}
 	SDL_DestroySurface(s);
@@ -1300,7 +1300,7 @@ bool SdlRailWindow::paintLegacy(SDL_Surface* primary, const std::vector<SDL_Rect
 			std::unique_lock lock(_gfxLock);
 			_painted = true;
 		}
-		_win->updateSurface();
+		std::ignore = _win->updateSurface();
 		WLog_VRB(TAG, "paintLegacy id=0x%08" PRIx32 " full=%d visRects=%zu",
 		         static_cast<uint32_t>(_id), full ? 1 : 0, vis.size());
 		/* Defer mapping until GFX frame arrives to avoid desktop flash. */
