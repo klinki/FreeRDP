@@ -38,6 +38,8 @@ set(SRCS
     sdl_select_list.cpp
     sdl_selectable_widget.cpp
     sdl_selectable_widget.hpp
+    sdl_topbar.hpp
+    sdl_topbar.cpp
     sdl_connection_dialog.cpp
     sdl_connection_dialog.hpp
     sdl_connection_dialog_wrapper.cpp
