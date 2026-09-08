@@ -1463,7 +1463,7 @@ bool SdlRailWindow::paintGfx(SDL_PixelFormat format)
 			std::ignore = _win->drawRects(s, dst, _gfxDamage);
 		}
 
-		_win->updateSurface();
+		std::ignore = _win->updateSurface();
 		_gfxPresented = true; /* First frame rendered; paint() may map the window. */
 		commitPlacement();
 	}
@@ -1548,7 +1548,7 @@ bool SdlRailWindow::paintLegacy(SDL_Surface* primary, const std::vector<SDL_Rect
 			std::unique_lock lock(_gfxLock);
 			_painted = true;
 		}
-		_win->updateSurface();
+		std::ignore = _win->updateSurface();
 		{
 			std::unique_lock lock(_gfxLock);
 			commitPlacement();
