@@ -89,6 +89,9 @@ class SdlWindow
 	[[nodiscard]] bool topBarContains(float x, float y) const;
 	[[nodiscard]] bool topBarNearTop(float x, float y) const;
 	[[nodiscard]] SdlTopBarButton topBarButtonAt(float x, float y) const;
+	[[nodiscard]] bool topBarMoveAt(float x, float y) const;
+	[[nodiscard]] bool topBarResizeAt(float x, float y) const;
+	[[nodiscard]] SDL_Rect pixelViewport() const;
 
   protected:
 	SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect& rect, Uint32 flags);
@@ -128,4 +131,11 @@ class SdlWindow
 	Sint32 _offset_y = 0;
 	rdpMonitor _monitor{};
 	std::unique_ptr<SdlTopBar> _topBar;
+	SdlTopBarRect _topBarRect{};
+	bool _topBarRectInit = false;
+
+  public:
+	[[nodiscard]] SdlTopBarRect topBarRect() const;
+	void setTopBarRect(const SdlTopBarRect& rect);
+	void resetTopBarRect();
 };

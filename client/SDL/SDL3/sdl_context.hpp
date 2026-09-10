@@ -269,6 +269,19 @@ class SdlContext
 	bool _topBarVisible = true;
 	SDL_FPoint _topBarPointer{ -1.0f, -1.0f };
 	SdlTopBarButton _topBarHoveredButton = SdlTopBarButton::None;
+	/* Floating-bar move/resize gesture (mstsc-style): press on the title area
+	 * drags the bar, press on an edge handle resizes its width. */
+	enum class TopBarDragMode
+	{
+		None,
+		Move,
+		Resize
+	};
+	TopBarDragMode _topBarDrag = TopBarDragMode::None;
+	SDL_WindowID _topBarDragWindow = 0;
+	SDL_FPoint _topBarDragGrab{};
+	SdlTopBarRect _topBarDragRect{};
+	bool _topBarDragLeftEdge = false;
 	TopBarGestureOwner _topBarGestureOwner = TopBarGestureOwner::None;
 	std::array<TopBarPointerCapture, SDL_BUTTON_X2 + 1> _topBarCaptures{};
 

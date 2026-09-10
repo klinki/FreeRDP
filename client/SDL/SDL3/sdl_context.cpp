@@ -135,6 +135,8 @@ void SdlContext::cleanup()
 	_topBarHoveredButton = SdlTopBarButton::None;
 	_topBarGestureOwner = TopBarGestureOwner::None;
 	_topBarCaptures = {};
+	_topBarDrag = TopBarDragMode::None;
+	_topBarDragWindow = 0;
 	_dialog.destroy();
 	_primary.reset();
 }
@@ -399,6 +401,8 @@ bool SdlContext::createWindows()
 	_topBarHoveredButton = SdlTopBarButton::None;
 	_topBarGestureOwner = TopBarGestureOwner::None;
 	_topBarCaptures = {};
+	_topBarDrag = TopBarDragMode::None;
+	_topBarDragWindow = 0;
 	for (UINT32 x = 0; x < windowCount; x++)
 	{
 		auto id = monitorId(x);
@@ -841,6 +845,10 @@ void SdlContext::applyMonitorOffset(SDL_WindowID window, float& x, float& y) con
 	if (!freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon))
 		return;
 
+	/* Input mapping uses the dedicated input offsets (raw negotiated RDP
+	 * coordinates), never the draw offsets: those are origin-normalized for
+	 * GDI surface indexing and shift input by -origin whenever a monitor
+	 * lives at negative desktop coordinates. */
 	auto w = getWindowForId(window);
 	x -= static_cast<float>(w->offsetX());
 	y -= static_cast<float>(w->offsetY());
@@ -1104,6 +1112,8 @@ bool SdlContext::moveMouseTo(const SDL_FPoint& pos)
 
 	const auto id = SDL_GetWindowID(window);
 	const auto spos = pixelToScreen(id, pos);
+	WLog_Print(_log, WLOG_DEBUG, "warp mouse to %.0f,%.0f on window %u", spos.x, spos.y,
+	           (unsigned)id);
 	SDL_WarpMouseInWindow(window, spos.x, spos.y);
 	return true;
 }
@@ -1135,6 +1145,45 @@ bool SdlContext::handleTopBarMotion(const SDL_MouseMotionEvent& ev)
 		return true;
 	if (_topBarGestureOwner == TopBarGestureOwner::Remote)
 		return false;
+
+	/* Active move/resize gesture: apply pointer delta to the stored bar rect. */
+	if (_topBarDrag != TopBarDragMode::None)
+	{
+		auto window = getWindowForId(_topBarDragWindow);
+		if (!window)
+		{
+			_topBarDrag = TopBarDragMode::None;
+			_topBarDragWindow = 0;
+			std::ignore = SDL_CaptureMouse(false);
+			return true;
+		}
+		const auto cur = screenToPixel(_topBarDragWindow, { ev.x, ev.y });
+		auto rect = _topBarDragRect;
+		if (_topBarDrag == TopBarDragMode::Move)
+		{
+			rect.x += cur.x - _topBarDragGrab.x;
+			rect.y += cur.y - _topBarDragGrab.y;
+		}
+		else
+		{
+			if (_topBarDragLeftEdge)
+			{
+				const float dx = cur.x - _topBarDragGrab.x;
+				rect.x += dx;
+				rect.w -= dx;
+			}
+			else
+			{
+				rect.w += cur.x - _topBarDragGrab.x;
+			}
+		}
+		rect = SdlTopBar::clampToViewport(rect, window->pixelViewport());
+		window->setTopBarRect(rect);
+		_topBarPointer = cur;
+		if (!redrawWindows())
+			WLog_Print(_log, WLOG_WARN, "Unable to redraw the SDL connection bar");
+		return true;
+	}
 
 	const auto settings = context()->settings;
 	if (!_topBarWindowId ||
@@ -1327,6 +1376,12 @@ bool SdlContext::handleEvent(const SDL_MouseButtonEvent& ev)
 bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 {
 	auto* capture = topBarCapture(ev.button);
+	if (ev.button == SDL_BUTTON_LEFT && _topBarDrag != TopBarDragMode::None)
+	{
+		_topBarDrag = TopBarDragMode::None;
+		_topBarDragWindow = 0;
+		std::ignore = SDL_CaptureMouse(false);
+	}
 	if (ev.type == SDL_EVENT_MOUSE_BUTTON_UP && capture && capture->active)
 	{
 		const auto gesture = *capture;
@@ -1413,6 +1468,30 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 		{
 			_topBarPointer = screenToPixel(ev.windowID, { ev.x, ev.y });
 			_topBarHoveredButton = window->topBarButtonAt(ev.x, ev.y);
+		}
+		/* mstsc-style move/resize gestures: left press on the title area
+		 * drags the bar, press on an edge grip resizes its width. */
+		if (overVisibleBar && ev.button == SDL_BUTTON_LEFT)
+		{
+			const auto grab = screenToPixel(ev.windowID, { ev.x, ev.y });
+			if (window->topBarResizeAt(ev.x, ev.y))
+			{
+				_topBarDrag = TopBarDragMode::Resize;
+				_topBarDragWindow = ev.windowID;
+				_topBarDragGrab = grab;
+				_topBarDragRect = window->topBarRect();
+				_topBarDragLeftEdge =
+				    grab.x < _topBarDragRect.x + _topBarDragRect.w / 2.0f;
+				std::ignore = SDL_CaptureMouse(true);
+			}
+			else if (window->topBarMoveAt(ev.x, ev.y))
+			{
+				_topBarDrag = TopBarDragMode::Move;
+				_topBarDragWindow = ev.windowID;
+				_topBarDragGrab = grab;
+				_topBarDragRect = window->topBarRect();
+				std::ignore = SDL_CaptureMouse(true);
+			}
 		}
 		return true;
 	}
@@ -1768,11 +1847,16 @@ void SdlContext::applyMonitorScaleOverride(rdpMonitor& monitor) const
 	if (!sdl_apply_monitor_scale_override(_monitorScaleOverrides, monitor))
 		return;
 
-	WLog_Print(_log, WLOG_DEBUG,
-	           "monitor %" PRIu32 " scale override: desktopScaleFactor %" PRIu32 " -> %" PRIu32
-	           ", deviceScaleFactor %" PRIu32 " -> %" PRIu32,
-	           monitor.orig_screen, desktopScaleFactor, monitor.attributes.desktopScaleFactor,
-	           deviceScaleFactor, monitor.attributes.deviceScaleFactor);
+	/* INFO, not DEBUG: a silent mismatch here (e.g. SDL display IDs renumbered
+	 * between sessions) inverts the server's DPI map. The name pins the
+	 * override to a physical display. */
+	const char* name = SDL_GetDisplayName(monitor.orig_screen);
+	WLog_Print(_log, WLOG_INFO,
+	           "monitor %" PRIu32 " ('%s') scale override: desktopScaleFactor %" PRIu32
+	           " -> %" PRIu32 ", deviceScaleFactor %" PRIu32 " -> %" PRIu32,
+	           monitor.orig_screen, name ? name : "?", desktopScaleFactor,
+	           monitor.attributes.desktopScaleFactor, deviceScaleFactor,
+	           monitor.attributes.deviceScaleFactor);
 }
 
 CriticalSection& SdlContext::lock()
