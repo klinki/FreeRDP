@@ -32,6 +32,18 @@ enum class SdlTopBarButton
 	Close
 };
 
+/* mstsc-style floating connection bar: a small centered pill, draggable by
+ * its title area to anywhere on the window, width-resizable via the right
+ * edge handle. Fixed height; only horizontal resize. All geometry in render
+ * pixels; SdlTopBar is stateless, the caller owns the rect. */
+struct SdlTopBarRect
+{
+	float x = 0.0f;
+	float y = 0.0f;
+	float w = 0.0f;
+	float h = 0.0f;
+};
+
 class SdlTopBar
 {
   public:
@@ -43,10 +55,23 @@ class SdlTopBar
 	SdlTopBar& operator=(const SdlTopBar& other) = delete;
 	SdlTopBar& operator=(SdlTopBar&& other) noexcept;
 
-	[[nodiscard]] bool draw(const SDL_Rect& viewport, bool pinned, const SDL_FPoint& pointer) const;
-	[[nodiscard]] bool contains(const SDL_Rect& viewport, const SDL_FPoint& pointer) const;
+	/* Default rect: centered horizontally at the top, default width. */
+	[[nodiscard]] static SdlTopBarRect defaultRect(const SDL_Rect& viewport);
+	[[nodiscard]] static float fixedHeight(const SDL_Rect& viewport);
+	[[nodiscard]] static float minWidth(const SDL_Rect& viewport);
+	[[nodiscard]] static float defaultWidth(const SDL_Rect& viewport);
+	[[nodiscard]] static SdlTopBarRect clampToViewport(SdlTopBarRect bar,
+	                                                   const SDL_Rect& viewport);
+
+	[[nodiscard]] bool draw(const SdlTopBarRect& bar, const SDL_Rect& viewport, bool pinned,
+	                        const SDL_FPoint& pointer) const;
+	[[nodiscard]] bool contains(const SdlTopBarRect& bar, const SDL_FPoint& pointer) const;
 	[[nodiscard]] bool nearTop(const SDL_Rect& viewport, const SDL_FPoint& pointer) const;
-	[[nodiscard]] SdlTopBarButton hitTest(const SDL_Rect& viewport,
+	[[nodiscard]] bool hitResize(const SdlTopBarRect& bar, const SDL_Rect& viewport,
+	                             const SDL_FPoint& pointer) const;
+	[[nodiscard]] bool hitMove(const SdlTopBarRect& bar, const SDL_Rect& viewport,
+	                           const SDL_FPoint& pointer) const;
+	[[nodiscard]] SdlTopBarButton hitTest(const SdlTopBarRect& bar, const SDL_Rect& viewport,
 	                                      const SDL_FPoint& pointer) const;
 
   private:

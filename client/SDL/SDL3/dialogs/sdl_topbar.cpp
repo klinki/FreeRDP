@@ -45,28 +45,40 @@ struct Layout
 	float margin = 0.0f;
 	float gap = 0.0f;
 	float button = 0.0f;
+	float grip = 0.0f;
 	float buttonY = 0.0f;
 	float pinX = 0.0f;
 	float minimizeX = 0.0f;
 	float restoreX = 0.0f;
 	float closeX = 0.0f;
+	float barX = 0.0f;
+	float barW = 0.0f;
 };
 
-Layout layoutFor(const SDL_Rect& viewport)
+float topBarScale(const SDL_Rect& viewport)
 {
-	const auto scale = std::clamp(static_cast<float>(viewport.w) / 1920.0f, 1.0f, 2.0f);
-	Layout layout;
-	layout.height = 48.0f * scale;
-	layout.margin = 8.0f * scale;
+	return std::clamp(static_cast<float>(viewport.w) / 1920.0f, 1.0f, 2.0f);
+}
+
+Layout layoutFor(const SdlTopBarRect& bar, const SDL_Rect& viewport)
+{
+	const auto scale = topBarScale(viewport);
+	Layout layout{};
+	layout.height = 40.0f * scale;
+	layout.margin = 10.0f * scale;
 	layout.gap = 4.0f * scale;
-	layout.button = 34.0f * scale;
-	layout.buttonY = (layout.height - layout.button) / 2.0f;
-	layout.closeX = static_cast<float>(viewport.w) - layout.margin - layout.button;
+	layout.button = 30.0f * scale;
+	layout.grip = 8.0f * scale;
+	layout.buttonY = bar.y + (layout.height - layout.button) / 2.0f;
+	layout.barX = bar.x;
+	layout.barW = bar.w;
+	layout.closeX = bar.x + bar.w - layout.margin - layout.button;
 	layout.restoreX = layout.closeX - layout.gap - layout.button;
 	layout.minimizeX = layout.restoreX - layout.gap - layout.button;
 	layout.pinX = layout.minimizeX - layout.gap - layout.button;
 	return layout;
 }
+
 
 SDL_FRect buttonRect(const Layout& layout, SdlTopBarButton button)
 {
@@ -151,6 +163,52 @@ void drawClose(SDL_Renderer* renderer, const SDL_FRect& rect)
 }
 } // namespace
 
+float SdlTopBar::fixedHeight(const SDL_Rect& viewport)
+{
+	return 40.0f * topBarScale(viewport);
+}
+
+float SdlTopBar::minWidth(const SDL_Rect& viewport)
+{
+	const auto scale = topBarScale(viewport);
+	/* grips + 4 buttons + gaps + a sliver of title so the bar stays grabbable */
+	return 2.0f * 8.0f * scale + 4.0f * 30.0f * scale + 3.0f * 4.0f * scale +
+	       2.0f * 10.0f * scale + 60.0f * scale;
+}
+
+float SdlTopBar::defaultWidth(const SDL_Rect& viewport)
+{
+	const auto scale = topBarScale(viewport);
+	return std::min(static_cast<float>(viewport.w), 280.0f * scale);
+}
+
+SdlTopBarRect SdlTopBar::defaultRect(const SDL_Rect& viewport)
+{
+	const auto w = defaultWidth(viewport);
+	const auto h = fixedHeight(viewport);
+	return { (static_cast<float>(viewport.w) - w) / 2.0f, 0.0f, w, h };
+}
+
+SdlTopBarRect SdlTopBar::clampToViewport(SdlTopBarRect bar, const SDL_Rect& viewport)
+{
+	const auto minW = minWidth(viewport);
+	if (bar.w < minW)
+		bar.w = minW;
+	if (bar.w > static_cast<float>(viewport.w))
+		bar.w = static_cast<float>(viewport.w);
+	if (bar.x < 0.0f)
+		bar.x = 0.0f;
+	if (bar.x + bar.w > static_cast<float>(viewport.w))
+		bar.x = static_cast<float>(viewport.w) - bar.w;
+	if (bar.y < 0.0f)
+		bar.y = 0.0f;
+	if (bar.y + bar.h > static_cast<float>(viewport.h))
+		bar.y = static_cast<float>(viewport.h) - bar.h;
+	bar.h = fixedHeight(viewport);
+	return bar;
+}
+
+
 struct SdlTopBar::Impl
 {
 	SDL_Renderer* renderer = nullptr;
@@ -210,30 +268,54 @@ SdlTopBar::~SdlTopBar() = default;
 
 SdlTopBar& SdlTopBar::operator=(SdlTopBar&& other) noexcept = default;
 
-bool SdlTopBar::contains(const SDL_Rect& viewport, const SDL_FPoint& pointer) const
+bool SdlTopBar::contains(const SdlTopBarRect& bar, const SDL_FPoint& pointer) const
 {
 	if (!_impl)
 		return false;
-	const auto layout = layoutFor(viewport);
-	return pointer.y >= 0.0f && pointer.y < layout.height && pointer.x >= 0.0f &&
-	       pointer.x < static_cast<float>(viewport.w);
+	return pointer.x >= bar.x && pointer.x < bar.x + bar.w && pointer.y >= bar.y &&
+	       pointer.y < bar.y + bar.h;
 }
 
 bool SdlTopBar::nearTop(const SDL_Rect& viewport, const SDL_FPoint& pointer) const
 {
 	if (!_impl)
 		return false;
-	const auto layout = layoutFor(viewport);
-	return pointer.y >= 0.0f && pointer.y < std::max(8.0f, layout.height * 0.16f) && pointer.x >= 0.0f &&
+	const auto height = fixedHeight(viewport);
+	return pointer.y >= 0.0f && pointer.y < std::max(8.0f, height * 0.16f) && pointer.x >= 0.0f &&
 	       pointer.x < static_cast<float>(viewport.w);
 }
 
-SdlTopBarButton SdlTopBar::hitTest(const SDL_Rect& viewport, const SDL_FPoint& pointer) const
+bool SdlTopBar::hitResize(const SdlTopBarRect& bar, const SDL_Rect& viewport,
+                           const SDL_FPoint& pointer) const
 {
-	if (!contains(viewport, pointer))
+	if (!_impl || bar.w <= 0.0f || bar.h <= 0.0f)
+		return false;
+	/* Resize grips: vertical strips on both outer edges, full bar height. */
+	const float grip = 8.0f * topBarScale(viewport);
+	const bool left = pointer.x >= bar.x && pointer.x < bar.x + grip && pointer.y >= bar.y &&
+	                  pointer.y < bar.y + bar.h;
+	const bool right = pointer.x >= bar.x + bar.w - grip && pointer.x < bar.x + bar.w &&
+	                   pointer.y >= bar.y && pointer.y < bar.y + bar.h;
+	return left || right;
+}
+
+bool SdlTopBar::hitMove(const SdlTopBarRect& bar, const SDL_Rect& viewport,
+                         const SDL_FPoint& pointer) const
+{
+	if (!contains(bar, pointer))
+		return false;
+	if (hitTest(bar, viewport, pointer) != SdlTopBarButton::None)
+		return false;
+	return !hitResize(bar, viewport, pointer);
+}
+
+SdlTopBarButton SdlTopBar::hitTest(const SdlTopBarRect& bar, const SDL_Rect& viewport,
+                                   const SDL_FPoint& pointer) const
+{
+	if (!contains(bar, pointer))
 		return SdlTopBarButton::None;
 
-	const auto layout = layoutFor(viewport);
+	const auto layout = layoutFor(bar, viewport);
 	for (const auto button : { SdlTopBarButton::Pin, SdlTopBarButton::Minimize,
 	                           SdlTopBarButton::Restore, SdlTopBarButton::Close })
 	{
@@ -243,21 +325,21 @@ SdlTopBarButton SdlTopBar::hitTest(const SDL_Rect& viewport, const SDL_FPoint& p
 	return SdlTopBarButton::None;
 }
 
-bool SdlTopBar::draw(const SDL_Rect& viewport, bool pinned, const SDL_FPoint& pointer) const
+bool SdlTopBar::draw(const SdlTopBarRect& bar, const SDL_Rect& viewport, bool pinned,
+                     const SDL_FPoint& pointer) const
 {
-	if (!_impl || !_impl->renderer || viewport.w <= 0 || viewport.h <= 0)
+	if (!_impl || !_impl->renderer || bar.w <= 0.0f || bar.h <= 0.0f)
 		return false;
 
-	const auto layout = layoutFor(viewport);
+	const auto layout = layoutFor(bar, viewport);
 	if (!SDL_SetRenderDrawBlendMode(_impl->renderer, SDL_BLENDMODE_BLEND))
 		return false;
-	if (!fillRect(_impl->renderer, { 0.0f, 0.0f, static_cast<float>(viewport.w), layout.height },
-	              barColor))
+	if (!fillRect(_impl->renderer, { bar.x, bar.y, bar.w, bar.h }, barColor))
 		return false;
 
 	if (!setColor(_impl->renderer, barBorderColor) ||
-	    !drawLine(_impl->renderer, 0.0f, layout.height - 1.0f, static_cast<float>(viewport.w),
-              layout.height - 1.0f))
+	    !drawLine(_impl->renderer, bar.x, bar.y + bar.h - 1.0f, bar.x + bar.w,
+                      bar.y + bar.h - 1.0f))
 		return false;
 
 	const auto drawButton = [&](SdlTopBarButton button) -> bool
@@ -297,12 +379,12 @@ bool SdlTopBar::draw(const SDL_Rect& viewport, bool pinned, const SDL_FPoint& po
 
 	if (_impl->titleTexture && _impl->titleWidth > 0 && _impl->titleHeight > 0)
 	{
-		const auto maxWidth = std::max(0.0f, layout.pinX - layout.margin * 2.0f - 44.0f);
+		const auto titleX0 = bar.x + layout.grip + layout.margin;
+		const auto maxWidth = std::max(0.0f, layout.pinX - layout.gap - titleX0);
 		const auto titleScale = std::min(1.0f, maxWidth / static_cast<float>(_impl->titleWidth));
 		const SDL_FRect src = { 0.0f, 0.0f, static_cast<float>(_impl->titleWidth),
 		                        static_cast<float>(_impl->titleHeight) };
-		const SDL_FRect dst = { layout.margin * 2.0f,
-		                        (layout.height - _impl->titleHeight * titleScale) / 2.0f,
+		const SDL_FRect dst = { titleX0, bar.y + (bar.h - _impl->titleHeight * titleScale) / 2.0f,
 		                        _impl->titleWidth * titleScale, _impl->titleHeight * titleScale };
 		if (titleScale > 0.0f && !SDL_RenderTexture(_impl->renderer, _impl->titleTexture.get(), &src, &dst))
 			return false;
