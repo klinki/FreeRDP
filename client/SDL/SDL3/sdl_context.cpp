@@ -1011,6 +1011,8 @@ bool SdlContext::addDisplayWindow(SDL_DisplayID id)
 	    SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS;
 	auto title = sdl::utils::windowTitle(context()->settings);
 	auto w = SdlWindow::create(id, title, flags);
+	if (w.window())
+		SDL_ShowWindow(w.window());
 	_windows.emplace(w.id(), std::move(w));
 	return true;
 }
