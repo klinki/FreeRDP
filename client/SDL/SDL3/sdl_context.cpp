@@ -1138,15 +1138,9 @@ bool SdlContext::handleEvent(const SDL_MouseMotionEvent& ev)
 
 bool SdlContext::handleTopBarMotion(const SDL_MouseMotionEvent& ev)
 {
-	/* A local topbar gesture owns motion until its matching button release. A
-	 * remote gesture must continue to receive motion even when the pointer
-	 * crosses the overlay. */
-	if (_topBarGestureOwner == TopBarGestureOwner::Local)
-		return true;
-	if (_topBarGestureOwner == TopBarGestureOwner::Remote)
-		return false;
-
-	/* Active move/resize gesture: apply pointer delta to the stored bar rect. */
+	/* Active move/resize gesture takes precedence over hover handling below:
+	 * it must run even though the gesture owner is Local (which would
+	 * otherwise return early), or drags never move. */
 	if (_topBarDrag != TopBarDragMode::None)
 	{
 		auto window = getWindowForId(_topBarDragWindow);
@@ -1161,8 +1155,8 @@ bool SdlContext::handleTopBarMotion(const SDL_MouseMotionEvent& ev)
 		auto rect = _topBarDragRect;
 		if (_topBarDrag == TopBarDragMode::Move)
 		{
+			/* Glued to the top like mstsc: horizontal dragging only. */
 			rect.x += cur.x - _topBarDragGrab.x;
-			rect.y += cur.y - _topBarDragGrab.y;
 		}
 		else
 		{
@@ -1177,13 +1171,22 @@ bool SdlContext::handleTopBarMotion(const SDL_MouseMotionEvent& ev)
 				rect.w += cur.x - _topBarDragGrab.x;
 			}
 		}
-		rect = SdlTopBar::clampToViewport(rect, window->pixelViewport());
+		rect = SdlTopBar::clampToViewport(rect, window->pixelViewport(),
+		                                  window->topBarCompact());
 		window->setTopBarRect(rect);
 		_topBarPointer = cur;
 		if (!redrawWindows())
 			WLog_Print(_log, WLOG_WARN, "Unable to redraw the SDL connection bar");
 		return true;
 	}
+
+	/* A local topbar gesture owns motion until its matching button release. A
+	 * remote gesture must continue to receive motion even when the pointer
+	 * crosses the overlay. */
+	if (_topBarGestureOwner == TopBarGestureOwner::Local)
+		return true;
+	if (_topBarGestureOwner == TopBarGestureOwner::Remote)
+		return false;
 
 	const auto settings = context()->settings;
 	if (!_topBarWindowId ||
@@ -1413,6 +1416,21 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 
 		switch (gesture.button)
 		{
+			case SdlTopBarButton::Compact:
+			{
+				/* Test toggle between the normal (3/4) and compact (1/2)
+				 * bar heights. */
+				window->setTopBarCompact(!window->topBarCompact());
+				auto rect = window->topBarRect();
+				rect.h = SdlTopBar::fixedHeight(window->pixelViewport(),
+				                                window->topBarCompact());
+				rect = SdlTopBar::clampToViewport(rect, window->pixelViewport(),
+				                                  window->topBarCompact());
+				window->setTopBarRect(rect);
+				if (!redrawWindows())
+					return false;
+				break;
+			}
 			case SdlTopBarButton::Pin:
 				_topBarPinned = !_topBarPinned;
 				_topBarVisible = true;
@@ -1474,7 +1492,12 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 		if (overVisibleBar && ev.button == SDL_BUTTON_LEFT)
 		{
 			const auto grab = screenToPixel(ev.windowID, { ev.x, ev.y });
-			if (window->topBarResizeAt(ev.x, ev.y))
+			const bool isResize = window->topBarResizeAt(ev.x, ev.y);
+			const bool isMove = window->topBarMoveAt(ev.x, ev.y);
+			WLog_Print(_log, WLOG_DEBUG,
+			           "topbar press win=%u resize=%d move=%d at %.0f,%.0f",
+			           (unsigned)ev.windowID, (int)isResize, (int)isMove, grab.x, grab.y);
+			if (isResize)
 			{
 				_topBarDrag = TopBarDragMode::Resize;
 				_topBarDragWindow = ev.windowID;
@@ -1484,7 +1507,7 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 				    grab.x < _topBarDragRect.x + _topBarDragRect.w / 2.0f;
 				std::ignore = SDL_CaptureMouse(true);
 			}
-			else if (window->topBarMoveAt(ev.x, ev.y))
+			else if (isMove)
 			{
 				_topBarDrag = TopBarDragMode::Move;
 				_topBarDragWindow = ev.windowID;
