@@ -47,6 +47,7 @@ struct Layout
 	float button = 0.0f;
 	float grip = 0.0f;
 	float buttonY = 0.0f;
+	float compactX = 0.0f;
 	float pinX = 0.0f;
 	float minimizeX = 0.0f;
 	float restoreX = 0.0f;
@@ -64,18 +65,20 @@ Layout layoutFor(const SdlTopBarRect& bar, const SDL_Rect& viewport)
 {
 	const auto scale = topBarScale(viewport);
 	Layout layout{};
-	layout.height = 40.0f * scale;
+	layout.height = bar.h;
 	layout.margin = 10.0f * scale;
 	layout.gap = 4.0f * scale;
-	layout.button = 30.0f * scale;
+	/* Buttons shrink with the bar so the compact mode stays proportionate. */
+	layout.button = std::clamp(bar.h - 6.0f * scale, 14.0f * scale, 30.0f * scale);
 	layout.grip = 8.0f * scale;
-	layout.buttonY = bar.y + (layout.height - layout.button) / 2.0f;
+	layout.buttonY = bar.y + (bar.h - layout.button) / 2.0f;
 	layout.barX = bar.x;
 	layout.barW = bar.w;
 	layout.closeX = bar.x + bar.w - layout.margin - layout.button;
 	layout.restoreX = layout.closeX - layout.gap - layout.button;
 	layout.minimizeX = layout.restoreX - layout.gap - layout.button;
 	layout.pinX = layout.minimizeX - layout.gap - layout.button;
+	layout.compactX = layout.pinX - layout.gap - layout.button;
 	return layout;
 }
 
@@ -85,6 +88,9 @@ SDL_FRect buttonRect(const Layout& layout, SdlTopBarButton button)
 	float x = 0.0f;
 	switch (button)
 	{
+		case SdlTopBarButton::Compact:
+			x = layout.compactX;
+			break;
 		case SdlTopBarButton::Pin:
 			x = layout.pinX;
 			break;
@@ -161,19 +167,32 @@ void drawClose(SDL_Renderer* renderer, const SDL_FRect& rect)
 	std::ignore = drawLine(renderer, left, top, right, bottom);
 	std::ignore = drawLine(renderer, right, top, left, bottom);
 }
+
+void drawCompact(SDL_Renderer* renderer, const SDL_FRect& rect)
+{
+	/* Density glyph: three horizontal lines, middle one shorter. */
+	for (int i = 0; i < 3; i++)
+	{
+		const auto y = rect.y + rect.h * (0.32f + 0.18f * static_cast<float>(i));
+		const auto inset = (i == 1) ? rect.w * 0.36f : rect.w * 0.24f;
+		std::ignore = drawLine(renderer, rect.x + inset, y, rect.x + rect.w - inset, y);
+	}
+}
 } // namespace
 
-float SdlTopBar::fixedHeight(const SDL_Rect& viewport)
+float SdlTopBar::fixedHeight(const SDL_Rect& viewport, bool compact)
 {
-	return 40.0f * topBarScale(viewport);
+	/* Normal 30px, compact 20px (3/4 and 1/2 of the original 40px bar). */
+	return (compact ? 20.0f : 30.0f) * topBarScale(viewport);
 }
 
 float SdlTopBar::minWidth(const SDL_Rect& viewport)
 {
 	const auto scale = topBarScale(viewport);
-	/* grips + 4 buttons + gaps + a sliver of title so the bar stays grabbable */
-	return 2.0f * 8.0f * scale + 4.0f * 30.0f * scale + 3.0f * 4.0f * scale +
-	       2.0f * 10.0f * scale + 60.0f * scale;
+	/* grips + 5 buttons + gaps + margins + a sliver of title so the bar stays
+	 * grabbable */
+	return 2.0f * 8.0f * scale + 5.0f * 30.0f * scale + 4.0f * 4.0f * scale +
+	       2.0f * 10.0f * scale + 40.0f * scale;
 }
 
 float SdlTopBar::defaultWidth(const SDL_Rect& viewport)
@@ -182,14 +201,14 @@ float SdlTopBar::defaultWidth(const SDL_Rect& viewport)
 	return std::min(static_cast<float>(viewport.w), 280.0f * scale);
 }
 
-SdlTopBarRect SdlTopBar::defaultRect(const SDL_Rect& viewport)
+SdlTopBarRect SdlTopBar::defaultRect(const SDL_Rect& viewport, bool compact)
 {
 	const auto w = defaultWidth(viewport);
-	const auto h = fixedHeight(viewport);
+	const auto h = fixedHeight(viewport, compact);
 	return { (static_cast<float>(viewport.w) - w) / 2.0f, 0.0f, w, h };
 }
 
-SdlTopBarRect SdlTopBar::clampToViewport(SdlTopBarRect bar, const SDL_Rect& viewport)
+SdlTopBarRect SdlTopBar::clampToViewport(SdlTopBarRect bar, const SDL_Rect& viewport, bool compact)
 {
 	const auto minW = minWidth(viewport);
 	if (bar.w < minW)
@@ -204,7 +223,7 @@ SdlTopBarRect SdlTopBar::clampToViewport(SdlTopBarRect bar, const SDL_Rect& view
 		bar.y = 0.0f;
 	if (bar.y + bar.h > static_cast<float>(viewport.h))
 		bar.y = static_cast<float>(viewport.h) - bar.h;
-	bar.h = fixedHeight(viewport);
+	bar.h = fixedHeight(viewport, compact);
 	return bar;
 }
 
@@ -276,11 +295,12 @@ bool SdlTopBar::contains(const SdlTopBarRect& bar, const SDL_FPoint& pointer) co
 	       pointer.y < bar.y + bar.h;
 }
 
-bool SdlTopBar::nearTop(const SDL_Rect& viewport, const SDL_FPoint& pointer) const
+bool SdlTopBar::nearTop(const SDL_Rect& viewport, const SDL_FPoint& pointer,
+                         bool compact) const
 {
 	if (!_impl)
 		return false;
-	const auto height = fixedHeight(viewport);
+	const auto height = fixedHeight(viewport, compact);
 	return pointer.y >= 0.0f && pointer.y < std::max(8.0f, height * 0.16f) && pointer.x >= 0.0f &&
 	       pointer.x < static_cast<float>(viewport.w);
 }
@@ -316,8 +336,9 @@ SdlTopBarButton SdlTopBar::hitTest(const SdlTopBarRect& bar, const SDL_Rect& vie
 		return SdlTopBarButton::None;
 
 	const auto layout = layoutFor(bar, viewport);
-	for (const auto button : { SdlTopBarButton::Pin, SdlTopBarButton::Minimize,
-	                           SdlTopBarButton::Restore, SdlTopBarButton::Close })
+	for (const auto button : { SdlTopBarButton::Compact, SdlTopBarButton::Pin,
+	                           SdlTopBarButton::Minimize, SdlTopBarButton::Restore,
+	                           SdlTopBarButton::Close })
 	{
 		if (pointIn(buttonRect(layout, button), pointer))
 			return button;
@@ -355,6 +376,9 @@ bool SdlTopBar::draw(const SdlTopBarRect& bar, const SDL_Rect& viewport, bool pi
 			return false;
 		switch (button)
 		{
+			case SdlTopBarButton::Compact:
+				drawCompact(_impl->renderer, rect);
+				break;
 			case SdlTopBarButton::Pin:
 				drawPin(_impl->renderer, rect);
 				break;
@@ -373,15 +397,21 @@ bool SdlTopBar::draw(const SdlTopBarRect& bar, const SDL_Rect& viewport, bool pi
 		return true;
 	};
 
-	if (!drawButton(SdlTopBarButton::Pin) || !drawButton(SdlTopBarButton::Minimize) ||
-	    !drawButton(SdlTopBarButton::Restore) || !drawButton(SdlTopBarButton::Close))
+	if (!drawButton(SdlTopBarButton::Compact) || !drawButton(SdlTopBarButton::Pin) ||
+	    !drawButton(SdlTopBarButton::Minimize) || !drawButton(SdlTopBarButton::Restore) ||
+	    !drawButton(SdlTopBarButton::Close))
 		return false;
 
 	if (_impl->titleTexture && _impl->titleWidth > 0 && _impl->titleHeight > 0)
 	{
 		const auto titleX0 = bar.x + layout.grip + layout.margin;
-		const auto maxWidth = std::max(0.0f, layout.pinX - layout.gap - titleX0);
-		const auto titleScale = std::min(1.0f, maxWidth / static_cast<float>(_impl->titleWidth));
+		const auto maxWidth = std::max(0.0f, layout.compactX - layout.gap - titleX0);
+		const auto widthScale =
+		    std::min(1.0f, maxWidth / static_cast<float>(_impl->titleWidth));
+		/* Fit the 20px font into thinner bars as well. */
+		const auto heightScale =
+		    std::min(1.0f, bar.h / (static_cast<float>(_impl->titleHeight) * 1.4f));
+		const auto titleScale = std::min(widthScale, heightScale);
 		const SDL_FRect src = { 0.0f, 0.0f, static_cast<float>(_impl->titleWidth),
 		                        static_cast<float>(_impl->titleHeight) };
 		const SDL_FRect dst = { titleX0, bar.y + (bar.h - _impl->titleHeight * titleScale) / 2.0f,

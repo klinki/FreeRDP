@@ -26,6 +26,7 @@
 enum class SdlTopBarButton
 {
 	None,
+	Compact,
 	Pin,
 	Minimize,
 	Restore,
@@ -56,17 +57,18 @@ class SdlTopBar
 	SdlTopBar& operator=(SdlTopBar&& other) noexcept;
 
 	/* Default rect: centered horizontally at the top, default width. */
-	[[nodiscard]] static SdlTopBarRect defaultRect(const SDL_Rect& viewport);
-	[[nodiscard]] static float fixedHeight(const SDL_Rect& viewport);
+	[[nodiscard]] static SdlTopBarRect defaultRect(const SDL_Rect& viewport, bool compact);
+	[[nodiscard]] static float fixedHeight(const SDL_Rect& viewport, bool compact);
 	[[nodiscard]] static float minWidth(const SDL_Rect& viewport);
 	[[nodiscard]] static float defaultWidth(const SDL_Rect& viewport);
 	[[nodiscard]] static SdlTopBarRect clampToViewport(SdlTopBarRect bar,
-	                                                   const SDL_Rect& viewport);
+	                                                   const SDL_Rect& viewport, bool compact);
 
 	[[nodiscard]] bool draw(const SdlTopBarRect& bar, const SDL_Rect& viewport, bool pinned,
 	                        const SDL_FPoint& pointer) const;
 	[[nodiscard]] bool contains(const SdlTopBarRect& bar, const SDL_FPoint& pointer) const;
-	[[nodiscard]] bool nearTop(const SDL_Rect& viewport, const SDL_FPoint& pointer) const;
+	[[nodiscard]] bool nearTop(const SDL_Rect& viewport, const SDL_FPoint& pointer,
+	                           bool compact) const;
 	[[nodiscard]] bool hitResize(const SdlTopBarRect& bar, const SDL_Rect& viewport,
 	                             const SDL_FPoint& pointer) const;
 	[[nodiscard]] bool hitMove(const SdlTopBarRect& bar, const SDL_Rect& viewport,
