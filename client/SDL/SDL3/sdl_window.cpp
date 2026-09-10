@@ -574,8 +574,8 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 		if (viewport.w <= 0 || viewport.h <= 0)
 			return false;
 		if (!_topBarRectInit)
-			_topBarRect = SdlTopBar::defaultRect(viewport);
-		_topBarRect = SdlTopBar::clampToViewport(_topBarRect, viewport);
+			_topBarRect = SdlTopBar::defaultRect(viewport, _topBarCompact);
+		_topBarRect = SdlTopBar::clampToViewport(_topBarRect, viewport, _topBarCompact);
 		if (!_topBar->draw(_topBarRect, viewport, pinned, pointer))
 			return false;
 	}
@@ -598,6 +598,16 @@ void SdlWindow::resetTopBarRect()
 {
 	_topBarRect = {};
 	_topBarRectInit = false;
+}
+
+bool SdlWindow::topBarCompact() const
+{
+	return _topBarCompact;
+}
+
+void SdlWindow::setTopBarCompact(bool compact)
+{
+	_topBarCompact = compact;
 }
 
 static bool windowRenderPoint(SDL_Renderer* renderer, float x, float y, SDL_FPoint& point)
@@ -645,7 +655,7 @@ bool SdlWindow::topBarNearTop(float x, float y) const
 	if (!windowRenderPoint(_renderer, x, y, pointer))
 		return false;
 
-	return _topBar->nearTop(windowViewport(_window), pointer);
+	return _topBar->nearTop(windowViewport(_window), pointer, _topBarCompact);
 }
 
 SdlTopBarButton SdlWindow::topBarButtonAt(float x, float y) const

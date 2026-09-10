@@ -133,9 +133,12 @@ class SdlWindow
 	std::unique_ptr<SdlTopBar> _topBar;
 	SdlTopBarRect _topBarRect{};
 	bool _topBarRectInit = false;
+	bool _topBarCompact = true;
 
   public:
 	[[nodiscard]] SdlTopBarRect topBarRect() const;
 	void setTopBarRect(const SdlTopBarRect& rect);
 	void resetTopBarRect();
+	[[nodiscard]] bool topBarCompact() const;
+	void setTopBarCompact(bool compact);
 };
