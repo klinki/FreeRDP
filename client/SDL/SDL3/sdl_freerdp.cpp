@@ -180,7 +180,7 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 				 * dialogs. do not process the dialog return value events here.
 				 */
 				const int prc = SDL_PeepEvents(&windowEvent, 1, SDL_GETEVENT, SDL_EVENT_FIRST,
-				                               SDL_EVENT_USER_RETRY_DIALOG);
+				                               SDL_EVENT_USER_RECONNECTING);
 				if (prc < 0)
 				{
 					if (sdl_log_error(prc, sdl->getWLog(), "SDL_PeepEvents"))
@@ -342,6 +342,20 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 						if (!sdl->minimizeAllWindows())
 							throw ErrorMsg{ -1, windowEvent.type, "sdl->minimizeAllWindows" };
 						break;
+					case SDL_EVENT_USER_RECONNECTING:
+					{
+						/* Transport-dead overlay: dim + "Reconnecting..."
+						 * immediately on trigger; best-effort full repaint
+						 * on clear (the next server frame repaints anyway). */
+						if (windowEvent.user.code != 0)
+						{
+							if (!sdl->redrawStalled())
+								throw ErrorMsg{ -1, windowEvent.type, "sdl->redrawStalled" };
+						}
+						else
+							std::ignore = sdl->repaintAll();
+					}
+					break;
 					case SDL_EVENT_USER_POINTER_NULL:
 						if (!sdl->setCursor(SdlContext::CURSOR_NULL))
 							throw ErrorMsg{ -1, windowEvent.type, "sdl->setCursor" };
@@ -370,6 +384,11 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 						break;
 				}
 			}
+			/* Stalled-animation tick: WaitEventTimeout wakes us ~1s with no
+			 * events; advance the Reconnecting dots while the RDP thread
+			 * retries. Best-effort — failures here must not kill the loop. */
+			if (!sdl->shallAbort() && sdl->isReconnecting())
+				std::ignore = sdl->redrawStalled();
 		}
 		rc = 1;
 	}

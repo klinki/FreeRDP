@@ -64,6 +64,17 @@ class SdlContext
 
 	void setConnected(bool val);
 	[[nodiscard]] bool isConnected() const;
+	/* Transport-dead, outcome unknown: set by the RDP thread around
+	 * auto-reconnect attempts. While set, session windows show a dimmed
+	 * "Reconnecting..." overlay instead of a silent frozen frame. */
+	void setReconnecting(bool val);
+	[[nodiscard]] bool isReconnecting() const;
+	/* Present the stalled overlay (dim + animated dots) on all windows.
+	 * Main thread only; needs no GDI — reuses each window's last frame. */
+	[[nodiscard]] bool redrawStalled();
+	/* Best-effort full repaint from the last frame (clears the overlay).
+	 * Harmless no-op when disconnected; the next server frame repaints. */
+	[[nodiscard]] bool repaintAll();
 	void cleanup();
 
 	[[nodiscard]] bool resizeable() const;
@@ -238,6 +249,7 @@ class SdlContext
 	wLog* _log = nullptr;
 
 	std::atomic<bool> _connected = false;
+	std::atomic<bool> _reconnecting = false;
 	bool _cursor_visible = true;
 	std::unique_ptr<rdpPointer, void (*)(rdpPointer*)> _cursor;
 	CursorType _cursorType = CURSOR_NULL;

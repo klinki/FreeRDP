@@ -607,6 +607,9 @@ void SdlContext::sdl_client_cleanup(int exit_code, const std::string& error_msg)
 	WINPR_ASSERT(settings);
 
 	_rdpThreadRunning = false;
+	/* Tearing down: the error dialog or quit owns user feedback from here.
+	 * Store directly — no overlay event, the main loop is draining. */
+	_reconnecting = false;
 	bool showError = false;
 	if (freerdp_settings_get_bool(settings, FreeRDP_AuthenticationOnly))
 		WLog_Print(getWLog(), WLOG_INFO, "Authentication only, exit status %s [%" PRId32 "]",
@@ -748,9 +751,15 @@ int SdlContext::sdl_client_thread_run(std::string& error_msg)
 
 		if (!freerdp_check_event_handles(context()))
 		{
+			/* Transport reported dead, outcome unknown: dim the session
+			 * with a "Reconnecting..." overlay instead of a silent frozen
+			 * frame while auto-reconnect runs. Cleared on success below;
+			 * on final failure the error dialog / quit takes over. */
+			setReconnecting(true);
 			if (client_auto_reconnect(instance))
 			{
 				// Retry was successful, discard dialog
+				setReconnecting(false);
 				getDialog().show(false);
 				continue;
 			}
@@ -2026,6 +2035,40 @@ void SdlContext::setConnected(bool val)
 bool SdlContext::isConnected() const
 {
 	return _connected;
+}
+
+void SdlContext::setReconnecting(bool val)
+{
+	if (_reconnecting.exchange(val) == val)
+		return;
+	/* Main thread presents the overlay / repaints; the RDP thread only
+	 * flips the atomic and notifies. */
+	std::ignore = sdl_push_user_event(SDL_EVENT_USER_RECONNECTING, val ? 1 : 0);
+}
+
+bool SdlContext::isReconnecting() const
+{
+	return _reconnecting;
+}
+
+bool SdlContext::redrawStalled()
+{
+	const int dots = static_cast<int>((SDL_GetTicks() / 500) % 3) + 1;
+	for (auto& window : _windows)
+	{
+		if (!window.second.updateStalledSurface(dots))
+			return false;
+	}
+	return true;
+}
+
+bool SdlContext::repaintAll()
+{
+	auto surface = _primary.get();
+	if (!surface || (surface->w <= 0) || (surface->h <= 0))
+		return true;
+	const SDL_Rect full = { 0, 0, surface->w, surface->h };
+	return drawToWindows({ full });
 }
 
 rdpContext* SdlContext::context() const

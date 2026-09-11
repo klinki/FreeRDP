@@ -21,10 +21,24 @@
 #include <sstream>
 #include <cmath>
 
+#include <SDL3_ttf/SDL_ttf.h>
+
 #include "sdl_window.hpp"
 #include "sdl_utils.hpp"
 
+#include "dialogs/res/sdl3_resource_manager.hpp"
+
 #include <freerdp/utils/string.h>
+
+namespace
+{
+/* Stalled-overlay tuning: screen dim alpha (48/255 ≈ 19%, inside the
+ * 10–25% band — adjust here) and indicator font size. */
+constexpr Uint8 stalledDimAlpha = 48;
+constexpr float stalledFontPts = 32.0f;
+constexpr SDL_Color stalledTextColor = { 0xf2, 0xf6, 0xfb, 0xff };
+constexpr SDL_Color stalledShadowColor = { 0x00, 0x00, 0x00, 0xc0 };
+} // namespace
 
 SdlWindow::SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect& rect,
                      [[maybe_unused]] Uint32 flags)
@@ -578,6 +592,123 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 			_topBarRect = SdlTopBar::defaultRect(viewport, _topBarCompact);
 		_topBarRect = SdlTopBar::clampToViewport(_topBarRect, viewport, _topBarCompact);
 		if (!_topBar->draw(_topBarRect, viewport, pinned, pointer))
+			return false;
+	}
+
+	return SDL_RenderPresent(_renderer);
+}
+
+SdlWindow::StalledText::~StalledText()
+{
+	if (font)
+		TTF_CloseFont(font);
+	for (int i = 0; i < 3; i++)
+	{
+		if (tex[i])
+			SDL_DestroyTexture(tex[i]);
+		if (shadow[i])
+			SDL_DestroyTexture(shadow[i]);
+	}
+}
+
+bool SdlWindow::ensureStalledText()
+{
+	if (_stalled && _stalled->font)
+		return true;
+	if (!_renderer)
+		return false;
+
+	if (!_stalled)
+	{
+		_stalled = std::make_unique<StalledText>();
+		if (!_stalled)
+			return false;
+	}
+
+	auto ops = SDL3ResourceManager::get(SDLResourceManager::typeFonts(),
+	                                    "OpenSans-VariableFont_wdth,wght.ttf");
+	if (!ops)
+		return false;
+
+	_stalled->font = TTF_OpenFontIO(ops, true, stalledFontPts);
+	if (!_stalled->font)
+		return false;
+
+	for (int i = 0; i < 3; i++)
+	{
+		const std::string text =
+		    "Reconnecting" + std::string(static_cast<size_t>(i) + 1, '.');
+		auto render = [&](const SDL_Color& color)
+		{
+			auto surface = std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)>(
+			    TTF_RenderText_Blended(_stalled->font, text.c_str(), 0, color),
+			    SDL_DestroySurface);
+			if (!surface || (surface->w <= 0) || (surface->h <= 0))
+				return static_cast<SDL_Texture*>(nullptr);
+			_stalled->texW[i] = surface->w;
+			_stalled->texH[i] = surface->h;
+			return SDL_CreateTextureFromSurface(_renderer, surface.get());
+		};
+		_stalled->tex[i] = render(stalledTextColor);
+		_stalled->shadow[i] = render(stalledShadowColor);
+	}
+	return true;
+}
+
+bool SdlWindow::updateStalledSurface(int dots)
+{
+	if (!_renderer)
+		return false;
+
+	ensureRenderTarget();
+
+	/* Re-present the last accumulated frame (or blank when none yet),
+	 * then dim everything — session content and topbar alike. The render
+	 * target itself is never touched, so the next normal frame paints
+	 * clean with no explicit clear needed. */
+	if (!SDL_SetRenderTarget(_renderer, nullptr))
+		return false;
+	if (_renderTarget)
+	{
+		if (!SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr))
+			return false;
+	}
+	else
+	{
+		if (!SDL_SetRenderDrawColor(_renderer, 0, 0, 0, 0xff))
+			return false;
+		if (!SDL_RenderClear(_renderer))
+			return false;
+	}
+
+	const auto viewport = pixelViewport();
+	if (viewport.w <= 0 || viewport.h <= 0)
+		return false;
+
+	if (!SDL_SetRenderDrawBlendMode(_renderer, SDL_BLENDMODE_BLEND))
+		return false;
+	if (!SDL_SetRenderDrawColor(_renderer, 0, 0, 0, stalledDimAlpha))
+		return false;
+	const SDL_FRect dim = { 0.0f, 0.0f, static_cast<float>(viewport.w),
+		                    static_cast<float>(viewport.h) };
+	if (!SDL_RenderFillRect(_renderer, &dim))
+		return false;
+
+	const int phase = (dots < 1 || dots > 3) ? 2 : dots - 1;
+	if (ensureStalledText() && _stalled->tex[phase])
+	{
+		const float tw = static_cast<float>(_stalled->texW[phase]);
+		const float th = static_cast<float>(_stalled->texH[phase]);
+		const SDL_FRect dst = { (static_cast<float>(viewport.w) - tw) / 2.0f,
+			                    (static_cast<float>(viewport.h) - th) / 2.0f, tw, th };
+		/* Soft shadow for readability over bright remote content. */
+		if (_stalled->shadow[phase])
+		{
+			const SDL_FRect shadow = { dst.x + 2.0f, dst.y + 2.0f, dst.w, dst.h };
+			std::ignore =
+			    SDL_RenderTexture(_renderer, _stalled->shadow[phase], nullptr, &shadow);
+		}
+		if (!SDL_RenderTexture(_renderer, _stalled->tex[phase], nullptr, &dst))
 			return false;
 	}
 

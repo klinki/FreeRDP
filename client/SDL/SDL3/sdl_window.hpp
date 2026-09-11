@@ -86,6 +86,11 @@ class SdlWindow
 	[[nodiscard]] bool blit(SDL_Surface* surface, const SDL_Rect& src, SDL_Rect& dst);
 	[[nodiscard]] bool updateSurface(bool showTopBar = false, bool pinned = true,
 	                                 const SDL_FPoint& pointer = {});
+	/* Stalled-transport overlay: re-presents the last frame dimmed with a
+	 * centered "Reconnecting..." indicator (dots = 1..3, caller animates).
+	 * Needs no GDI — safe while the transport is down. Never touches the
+	 * accumulated render target, so the next normal frame paints clean. */
+	[[nodiscard]] bool updateStalledSurface(int dots);
 	[[nodiscard]] bool topBarContains(float x, float y) const;
 	[[nodiscard]] bool topBarNearTop(float x, float y) const;
 	[[nodiscard]] SdlTopBarButton topBarButtonAt(float x, float y) const;
@@ -134,6 +139,22 @@ class SdlWindow
 	SdlTopBarRect _topBarRect{};
 	bool _topBarRectInit = false;
 	bool _topBarCompact = true;
+	/* Stalled-overlay cache (main thread only): one font, one texture per
+	 * dot phase plus shadow copies. Built lazily on first stalled present;
+	 * stays empty on font failure, in which case the overlay still dims
+	 * without text. Raw pointers with explicit cleanup (TTF types stay
+	 * out of this header). */
+	struct StalledText
+	{
+		~StalledText();
+		struct TTF_Font* font = nullptr;
+		struct SDL_Texture* tex[3] = {};
+		struct SDL_Texture* shadow[3] = {};
+		int texW[3] = {};
+		int texH[3] = {};
+	};
+	std::unique_ptr<StalledText> _stalled;
+	[[nodiscard]] bool ensureStalledText();
 
   public:
 	[[nodiscard]] SdlTopBarRect topBarRect() const;
