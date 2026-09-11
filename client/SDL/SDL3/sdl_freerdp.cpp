@@ -189,6 +189,40 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 
 				WLog_Print(sdl->getWLog(), WLOG_TRACE, "got event %s [0x%08" PRIx32 "]",
 				           sdl::utils::toString(windowEvent.type).c_str(), windowEvent.type);
+				/* Motion coalescing: while the main thread stalls (render bursts,
+				 * window sync), motion events backlog; replaying every stale
+				 * position makes remote windows jump. Collapse consecutive
+				 * motion to the latest position, even across windows (a drag
+				 * crossing displays is one gesture): same button state and
+				 * device only, button press/release always breaks the run.
+				 * Relative deltas are summed so nothing is lost. */
+				if (windowEvent.type == SDL_EVENT_MOUSE_MOTION)
+				{
+					SDL_Event next{};
+					for (;;)
+					{
+						const int nrc = SDL_PeepEvents(
+						    &next, 1, SDL_PEEKEVENT, SDL_EVENT_MOUSE_MOTION,
+						    SDL_EVENT_MOUSE_MOTION);
+						if (nrc <= 0)
+							break;
+						if ((next.motion.state != windowEvent.motion.state) ||
+						    (next.motion.which != windowEvent.motion.which))
+							break;
+						const int drc = SDL_PeepEvents(
+						    &next, 1, SDL_GETEVENT, SDL_EVENT_MOUSE_MOTION,
+						    SDL_EVENT_MOUSE_MOTION);
+						if (drc <= 0)
+							break;
+						windowEvent.motion.windowID = next.motion.windowID;
+						windowEvent.motion.x = next.motion.x;
+						windowEvent.motion.y = next.motion.y;
+						windowEvent.motion.xrel += next.motion.xrel;
+						windowEvent.motion.yrel += next.motion.yrel;
+						windowEvent.motion.timestamp = next.motion.timestamp;
+					}
+				}
+
 				/* The connection dialog paints on window events, so let it see them even
 				 * after the session is gone: it may still show an error message. */
 				if (sdl->getDialog().handleEvent(windowEvent))
