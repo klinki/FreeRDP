@@ -1,8 +1,24 @@
 # Connection stall: frozen screen with no user feedback
 
-Status: open, report only (2026-09-11). No code changed.
+Status: implemented in worktree (2026-09-11), needs manual stall test.
 Related: `bugs/connection-failures.md` (aborts/errors),
 `bugs/rapid-pace-freeze.md` (render saturation looks identical on screen).
+
+## Implementation
+
+- `SdlContext::_reconnecting` (atomic) + `SDL_EVENT_USER_RECONNECTING`:
+  RDP thread sets it around `client_auto_reconnect` in
+  `sdl_client_thread_run`; main thread presents / clears.
+- `SdlWindow::updateStalledSurface(dots)`: re-presents the last frame,
+  dims fullscreen black @48/255 (~19%, tunable via `stalledDimAlpha`),
+  centers cached `Reconnecting.`/`..`/`...` (32pt OpenSans + shadow).
+  Render target untouched → next normal frame paints clean, no explicit
+  clear needed.
+- Animation: main-loop 1s timeout tick advances dots (500ms phase).
+- Honest scope: covers the transport-dead → retry window only. Silent
+  TCP death is still bounded by OS timeout (no heartbeat knob —
+  `SupportHeartbeatPdu` is deprecated); render-only stalls deliberately
+  do not trigger it.
 
 ## Symptom
 
