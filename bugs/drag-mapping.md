@@ -15,6 +15,18 @@ dragged window detaches from the cursor by a large offset (user reports ~500px
 class gaps; one capture shows cursor ~500px from the grabbed window mid-drag
 with the button held). Keyboard unaffected (no coordinates involved).
 
+## Directional observations (2026-09-11, user-reported, uninstrumented)
+
+- **M27UP → Dell:** cursor grabbed at the middle of the dragged window's
+  top bar appears on the **right side** of the window once on the Dell.
+  Dragging further left → gap **grows**; dragging back right → gap
+  **shrinks**; back on M27UP → cursor correct again (middle of top bar).
+- **Dell → M27UP:** cursor appears **above** the dragged window once on
+  the M27UP. Dragging back to the Dell → correct position again.
+- Read: the residual error is **position-dependent** (gap scales with
+  distance), **destination-display-only**, and **self-correcting on
+  return** — in both directions. Not yet confirmed on the wire.
+
 ## Proven facts (measured, not inferred)
 
 - Input pipeline delivers intact: 4,337 fastpath Mouse-Move PDUs on the
@@ -45,6 +57,17 @@ with the button held). Keyboard unaffected (no coordinates involved).
   same-instant flips with off-screen values — gone after fix.
 - User feel after fix: better but not done — window still detaches from
   cursor at the boundary (large gap persists).
+- Slow-drag wire verdict (2026-09-11, `20260911-085454-33384`,
+  M27UP→Dell, 9.6s deliberate drag, 798 moves): grab `DOWN (3015,1212)`
+  → release `UP (371,1489)`, x strictly decreasing (one 1px up-blip),
+  max step 25px. Boundary crossing `(1921,1365)→(1916,1363)` is a clean
+  5px step. Pacing p50 8ms / p95 13ms, no backlog bursts. Zero teleports,
+  zero wrap artifacts, zero stale replays — none of the discontinuity
+  mechanisms fired during a drag the user watched detach. End click
+  `DOWN/UP (1146,1824)` identical, no bounce (awaiting on-screen target
+  from user as a calibration anchor). Open flag: y drifted +305px over
+  the drag — hand drift vs y-component error, inseparable without local
+  coords.
 - Signed 16-bit delta reanalysis (2026-09-11, 13,421 events,
   `20260911-064816-94958`): max real displacement 830px, only 3 events
   exceed 500px. The scary 65,504px jumps were small edge-crossing moves
@@ -90,29 +113,44 @@ with the button held). Keyboard unaffected (no coordinates involved).
 
 ## Open hypotheses (ranked)
 
-1. **Cross-window stale replay after main-thread stall (3 discontinuities
-   observed, staleness unproven).** Motion backlog may replay positions
-   from different windows/times adjacent. Needs event-age evidence
-   (creation vs dequeue vs send) to graduate from discontinuity to stale.
-   Fix in worktree: order-preserving global coalescing (latest position
-   wins across windows; the run ends at the first queued non-motion
-   event so press/release and topology changes keep order; relative
-   deltas summed). Awaiting one re-drag test.
-2. **Present lag.** Window position on screen may trail under drag burst
+1. **Wrong-display scale following the pointer across the boundary.**
+   The gap grows with distance (multiplicative signature), appears only
+   on the destination display, and vanishes on return — fits events
+   converted with the *source* display's scale/offset after the pointer
+   crossed (e.g. M27UP ×2 applied to Dell coords). Same family as the
+   cross-window stale replay below, but in mapping rather than timing.
+   Decisive test: fit sent = a·local + b per display from one slow
+   instrumented drag — a≠1 names scale, b≠0 names offset.
+2. **Cross-window stale replay after main-thread stall (3 discontinuities
+   observed in fast/bursty sessions, staleness unproven).** Falsified as
+   the cause of the slow-drag symptom: the 2026-09-11 symptomatic slow
+   drag shows zero discontinuities. Remains possible for fast flings.
+   Needs event-age evidence (creation vs dequeue vs send) to graduate
+   from discontinuity to stale. Fix in worktree: order-preserving global
+   coalescing (latest position wins across windows; the run ends at the
+   first queued non-motion event so press/release and topology changes
+   keep order; relative deltas summed). Awaiting one re-drag test.
+3. **Server-side DPI virtualization (Windows moves the window itself).**
+   M27UP@200% vs Dell@100%: when a window crosses DPIs, Windows rescales
+   + re-anchors it mid-cross independent of anything we send. Predicts a
+   visual jump even with a perfect wire — distinguishable only by the
+   timestamp-correlation experiment (positions right, framesDPI-shifted).
+   Untouched.
+4. **Present lag.** Window position on screen may trail under drag burst
    because the main thread cannot present at drag rate (same root as
    rapid-pace freeze: render-upload bursts + event-backlog replay as one
    mechanism). `t=42.6` jump-cut is consistent with coalescing working,
    but wire-clean alone does not prove the mapping — deciding evidence
    is whether positions and displayed frames correspond to the right
    time.
-3. **Event storm at crossing** (`Cocoa_SyncWindow` 79% sample):
+5. **Event storm at crossing** (`Cocoa_SyncWindow` 79% sample):
    display-change events firing as pointer crosses stall the main thread
    exactly when smoothness matters. Untouched.
-4. **Stale events from a previous topology/mode.** Teleports cluster around
+6. **Stale events from a previous topology/mode.** Teleports cluster around
    drags and mode switches; a backlog of pre-switch events delivered late
    would carry then-valid, now-foreign coords. Fits the maximize-incident
    shape. Check: event timestamps vs switch time.
-5. **Two event sources for one pointer** (e.g. relative+absolute both firing):
+7. **Two event sources for one pointer** (e.g. relative+absolute both firing):
    would produce paired contradictory values. No second source identified yet.
 
 ## Tried
@@ -139,12 +177,14 @@ with the button held). Keyboard unaffected (no coordinates involved).
 
 ## Next step (in progress)
 
-One recorded Dell->4K crossing correlating four timestamps per motion:
-event creation time, dequeue time, outgoing wire coordinates, and frame
-presentation time. That distinguishes input backlog from presentation
-backlog — the deciding evidence is whether positions and displayed
-frames correspond to the right time, not "zero same-instant jumps"
-(fast movement and coalescing can legitimately produce large steps, so
-that is retired as a closing criterion). Mapping stays open until then.
+Two cheap calibration items, no code, no rebuild:
+1. On-screen target of the `(1146,1824)` end click — one (local→sent)
+   anchor.
+2. Deliberate clicks on known landmarks, 3–4 per display: fits
+   sent = a·local + b per display and per direction (a≠1 names scale,
+   b≠0 names offset), settling H1 vs H3 in one shot.
+Same runs feed the timestamp correlation (creation, dequeue, wire
+coords, frame presentation) that separates input backlog, presentation
+lag, and server DPI moves. Mapping stays open until then.
 Open follow-ups (not started): mid-session reconfiguration staleness
 (nap/wake offset refresh), frame pacing under burst.
