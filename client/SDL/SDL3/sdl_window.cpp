@@ -722,6 +722,13 @@ SdlWindow SdlWindow::create(SDL_DisplayID id, const std::string& title, Uint32 f
 
 static SDL_Window* createDummy(SDL_DisplayID id)
 {
+	/* Startup monitor probe: must never become visible. Previous versions
+	 * created a visible window and toggled it fullscreen per display to
+	 * read back pixel dimensions — a fullscreen slideshow across all
+	 * displays before any network connect (fully meaningless when the
+	 * host is offline and connect fails). Keep the probe hidden; pixel
+	 * dimensions are derived from display bounds x content scale below,
+	 * so no positioning or fullscreen transition is needed. */
 	const auto x = SDL_WINDOWPOS_CENTERED_DISPLAY(id);
 	const auto y = SDL_WINDOWPOS_CENTERED_DISPLAY(id);
 	const int w = 64;
@@ -739,60 +746,90 @@ static SDL_Window* createDummy(SDL_DisplayID id)
 	SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true);
 	SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN, false);
 	SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
-	SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, false);
+	SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, true);
 
 	auto window = SDL_CreateWindowWithProperties(props);
 	SDL_DestroyProperties(props);
 
-	/* Workaround: we need to properly position the window on the correct monitor
-	 * before going fullscreen. Otherwise we will get the primary monitor details.
-	 */
+	return window;
+}
+
+/* Windowless monitor probe: no SDL_Window at all, hence no slideshow.
+ * Pixel dimensions = logical display bounds x content scale. Per-window
+ * scale is read from a hidden dummy (never shown, never fullscreen) so
+ * Windows/macOS per-monitor DPI still resolves without any visible flash. */
+static float probeDisplayScale(SDL_DisplayID id)
+{
+	std::unique_ptr<SDL_Window, void (*)(SDL_Window*)> window(createDummy(id), SDL_DestroyWindow);
+	float scale = 0.0f;
 	if (window)
 	{
-		SDL_Rect rect = {};
-		std::ignore = SDL_GetDisplayBounds(id, &rect);
-		std::ignore = SDL_SetWindowPosition(window, rect.x, rect.y);
-		std::ignore = SDL_SetWindowFullscreen(window, true);
+		scale = SDL_GetWindowDisplayScale(window.get());
+		SDL_Event event{};
+		while (SDL_PollEvent(&event))
+			;
 	}
-	return window;
+	if (scale <= 0.0f)
+		scale = SDL_GetDisplayContentScale(id);
+	if (scale <= 0.0f)
+		scale = 1.0f;
+	return scale;
 }
 
 rdpMonitor SdlWindow::query(SDL_DisplayID id, bool forceAsPrimary)
 {
-	std::unique_ptr<SDL_Window, void (*)(SDL_Window*)> window(createDummy(id), SDL_DestroyWindow);
-	if (!window)
+	SDL_Rect bounds = {};
+	if (!SDL_GetDisplayBounds(id, &bounds) || (bounds.w <= 0) || (bounds.h <= 0))
 		return {};
 
-	std::unique_ptr<SDL_Renderer, void (*)(SDL_Renderer*)> renderer(
-	    SDL_CreateRenderer(window.get(), nullptr), SDL_DestroyRenderer);
-
-	if (!SDL_SyncWindow(window.get()))
+	const float scale = probeDisplayScale(id);
+	const auto pw = static_cast<INT32>(std::roundf(static_cast<float>(bounds.w) * scale));
+	const auto ph = static_cast<INT32>(std::roundf(static_cast<float>(bounds.h) * scale));
+	if ((pw <= 0) || (ph <= 0))
 		return {};
 
-	SDL_Event event{};
-	while (SDL_PollEvent(&event))
-		;
+	const auto primary = SDL_GetPrimaryDisplay();
+	const auto orientation = SDL_GetCurrentDisplayOrientation(id);
+	const auto rdp_orientation = sdl::utils::orientaion_to_rdp(orientation);
+	const auto dpi = static_cast<UINT32>(std::roundf(scale * 100.0f));
 
-	return query(window.get(), id, forceAsPrimary);
+	rdpMonitor monitor{};
+	monitor.orig_screen = id;
+	monitor.x = forceAsPrimary ? 0 : bounds.x;
+	monitor.y = forceAsPrimary ? 0 : bounds.y;
+	monitor.width = pw;
+	monitor.height = ph;
+	monitor.is_primary = forceAsPrimary || (id == primary);
+	monitor.attributes.desktopScaleFactor = dpi;
+	monitor.attributes.deviceScaleFactor = 100;
+	monitor.attributes.orientation = rdp_orientation;
+	monitor.attributes.physicalWidth = WINPR_ASSERTING_INT_CAST(uint32_t, pw);
+	monitor.attributes.physicalHeight = WINPR_ASSERTING_INT_CAST(uint32_t, ph);
+
+	const auto cat = SDL_LOG_CATEGORY_APPLICATION;
+	SDL_LogDebug(cat, "monitor.orig_screen                   %" PRIu32, monitor.orig_screen);
+	SDL_LogDebug(cat, "monitor.x                             %" PRId32, monitor.x);
+	SDL_LogDebug(cat, "monitor.y                             %" PRId32, monitor.y);
+	SDL_LogDebug(cat, "monitor.width                         %" PRId32, monitor.width);
+	SDL_LogDebug(cat, "monitor.height                        %" PRId32, monitor.height);
+	SDL_LogDebug(cat, "monitor.is_primary                    %" PRIu32, monitor.is_primary);
+	return monitor;
 }
 
 SDL_Rect SdlWindow::rect(SDL_DisplayID id, bool forceAsPrimary)
 {
-	std::unique_ptr<SDL_Window, void (*)(SDL_Window*)> window(createDummy(id), SDL_DestroyWindow);
-	if (!window)
+	SDL_Rect bounds = {};
+	if (!SDL_GetDisplayBounds(id, &bounds))
 		return {};
-
-	std::unique_ptr<SDL_Renderer, void (*)(SDL_Renderer*)> renderer(
-	    SDL_CreateRenderer(window.get(), nullptr), SDL_DestroyRenderer);
-
-	if (!SDL_SyncWindow(window.get()))
-		return {};
-
-	SDL_Event event{};
-	while (SDL_PollEvent(&event))
-		;
-
-	return rect(window.get(), forceAsPrimary);
+	const float scale = probeDisplayScale(id);
+	const auto pw = static_cast<int>(std::roundf(static_cast<float>(bounds.w) * scale));
+	const auto ph = static_cast<int>(std::roundf(static_cast<float>(bounds.h) * scale));
+	SDL_Rect rect = {};
+	rect.x = forceAsPrimary ? 0 : bounds.x;
+	rect.y = forceAsPrimary ? 0 : bounds.y;
+	rect.w = pw;
+	rect.h = ph;
+	return rect;
 }
 
 bool SdlWindow::tryFallback(bool isFullscreen)
