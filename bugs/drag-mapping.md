@@ -15,7 +15,28 @@ dragged window detaches from the cursor by a large offset (user reports ~500px
 class gaps; one capture shows cursor ~500px from the grabbed window mid-drag
 with the button held). Keyboard unaffected (no coordinates involved).
 
-## Directional observations (2026-09-11, user-reported, uninstrumented)
+## Decisive measurement (2026-09-11, bracketed Dell→M27UP routine)
+
+Same Notepad window measured by wire corner-clicks on both displays:
+
+- Dell rect (stable across 7+ min, two independent measurements):
+  756×512 both times.
+- M27UP rect: 1308×899 before, 1297×911 after the round trip (~1% noise).
+- Cross-DPI size ratio: 1308/756 = 1.73, 899/512 = 1.76 ≈ **1.75 =
+  the negotiated desktop scale ratio** (`sdl-monitor-scale:3=175/100`).
+- The drag itself (19.5s, 1604 moves): zero jumps, endpoints'
+  grab-vs-release relative offsets agree within ~30px.
+
+Verdict: the window **changes size by the DPI ratio when crossing
+displays, by Windows design** (per-monitor DPI virtualization). The
+"detachment" is the window resizing under the cursor mid-cross — any
+RDP client (mstsc included) shows the same. No client mapping error at
+either endpoint; H3 convicted, H1 dead. Remaining client work is
+pacing/feel only, not correctness.
+
+## Directional observations (2026-09-11, user-reported, uninstrumented;
+now explained by the above: the window resizing mid-cross shifts edges
+relative to a stationary cursor)
 
 - **M27UP → Dell:** cursor grabbed at the middle of the dragged window's
   top bar appears on the **right side** of the window once on the Dell.
@@ -113,14 +134,23 @@ with the button held). Keyboard unaffected (no coordinates involved).
 
 ## Open hypotheses (ranked)
 
-1. **Wrong-display scale following the pointer across the boundary.**
-   The gap grows with distance (multiplicative signature), appears only
-   on the destination display, and vanishes on return — fits events
-   converted with the *source* display's scale/offset after the pointer
-   crossed (e.g. M27UP ×2 applied to Dell coords). Same family as the
-   cross-window stale replay below, but in mapping rather than timing.
-   Decisive test: fit sent = a·local + b per display from one slow
-   instrumented drag — a≠1 names scale, b≠0 names offset.
+1. **Wrong-display scale following the pointer across the boundary —
+   mechanism NOT found in code (2026-09-11 audit).** The multimon motion
+   pipeline is additive-only: per-window `ConvertEventToRenderCoordinates`
+   + constant per-window `applyMonitorOffset`; `removeLocalScaling` is a
+   no-op outside smart-sizing (`useLocalScale()` false in multimon);
+   `SdlTouch` forwards with no scale; relative mode needs
+   `MouseUseRelativeMove` + negotiated support + hidden cursor (all
+   unlikely here). Nothing in this path can produce a growing gap — a
+   fit showing a≠1 would implicate the renderer's coordinate scale, not
+   our offsets. Downgraded pending the landmark-click fit.
+2. **Server-side DPI virtualization (Windows moves the window itself) —
+   promoted to lead for the growing gap.** M27UP@200% vs Dell@100%: when
+   a window crosses DPIs, Windows rescales + re-anchors it mid-cross
+   independent of anything we send. Predicts a visual gap that grows
+   with distance on a perfect wire — exactly the reported signature —
+   and the audit above leaves no client-side multiplier standing.
+   Distinguishable only by the fit (a=1,b=0 per display ⇒ server).
 2. **Cross-window stale replay after main-thread stall (3 discontinuities
    observed in fast/bursty sessions, staleness unproven).** Falsified as
    the cause of the slow-drag symptom: the 2026-09-11 symptomatic slow
