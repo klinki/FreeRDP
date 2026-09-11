@@ -1670,6 +1670,13 @@ SDL_FPoint SdlContext::screenToPixel(SDL_WindowID id, const SDL_FPoint& pos)
 	return rpos;
 }
 
+SDL_FPoint SdlContext::screenToRdp(SDL_WindowID id, const SDL_FPoint& pos)
+{
+	auto rpos = screenToPixel(id, pos);
+	applyMonitorOffset(id, rpos.x, rpos.y);
+	return rpos;
+}
+
 SDL_FPoint SdlContext::pixelToScreen(SDL_WindowID id, const SDL_FPoint& pos)
 {
 	auto w = getWindowForId(id);
