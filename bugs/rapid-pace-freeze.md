@@ -65,3 +65,43 @@ Frame pacing under burst, not faster uploads: when the main thread falls
 behind, coalesce superseded dirty regions and present the latest instead of
 grinding through every queued rect (what mstsc does). Validate with the repro
 recipe above: drag Terminal, no beachball, input stays live.
+
+## Benchmark: flashing-stripes console test (2026-09-09)
+
+Recipe: console app emitting quick flashing stripes (rapid full-frame
+high-frequency detail changes) while interacting. This stresses encode bitrate,
+decode, upload, and present simultaneously — the pipeline worst case.
+Reference point: office Windows-to-Windows mstsc over WAN feels smoother than
+the current client on 3 ms home Wi-Fi; transport measured clean (zero
+retransmits in 16k+ datagrams, ~60 Hz server cadence intact), so the entire
+deficit is client-side present pacing.
+Acceptance bar: sustained ~50 fps, no beachball, input stays live throughout.
+ Wire evidence: `~/rdp-debug/20260909-212852-65076/` (capture + TLS secrets +
+client.log); video evidence to be added on retake with `-capture_cursor 1`.
+
+## 2026-09-09 debug sessions (free-rdp-debug.py rig)
+
+- Rig: `free-rdp-debug.py` (ring capture + client.log + TLS secrets +
+  session.txt per run) + `freeze-snapshot.sh` (sample/CPU/load/GPU/sockets).
+- Decrypted-TLS proof: 4,337 fastpath Mouse-Move PDUs match 4,357 arrival log
+  lines; keyboard/sync present. Input pipeline healthy end to end. Retracts the
+  earlier "zero input on wire" verdict (artifact of UDP-only captures).
+- Sample of frozen PID: main thread ~60% `SDL_UpdateTexture` (Metal upload) +
+  ~40% `RenderPresent`; RDP thread healthy in recv/ACK. Render-bound, network
+  innocent. Self-recovery on burst end confirmed by user.
+- UNKNOWN (open): left-half screen blur with razor edge at x~1912 in one
+  screen recording during a drag; possibly compositor/capture tile under GPU
+  saturation, not RDP content. Cursor invisible in those frames (no
+  `-capture_cursor`), so no offset measured.
+- Display IDs renumber between sessions (lid/topology changes); scale
+  overrides keyed by SDL ID can silently target wrong monitors. Override
+  application now logged at INFO with display names.
+- Unrelated server-side kill (DavidPC event log 23:54:55, 0x80090330 + TCP
+  1236 local abort, both ends agree to the second): path flap, not our code.
+- `+async-update` is a no-op here (`FORCE_ASYNC_UPDATE_OFF` hardcoded in
+  update.c:49, upstream #10153 + CVE cluster behind it). Do NOT enable.
+
+## Connection failures — see bugs/connection-failures.md
+
+Transport/server-side kills and black-screen-at-connect are tracked
+separately; this file stays render-path only. (Moved 2026-09-10.)
