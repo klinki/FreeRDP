@@ -321,7 +321,9 @@ bool sdlInput::keyboard_focus_in()
 	SDL_GetMouseState(&fx, &fy);
 
 	auto w = SDL_GetMouseFocus();
-	const auto& pos = _sdl->screenToRdp(SDL_GetWindowID(w), SDL_FPoint{ fx, fy });
+	SDL_FPoint pos{};
+	if (!w || !_sdl->screenToRdp(SDL_GetWindowID(w), { fx, fy }, pos))
+		return true;
 
 	return freerdp_client_send_button_event(_sdl->common(), FALSE, PTR_FLAGS_MOVE,
 	                                        static_cast<Sint32>(pos.x), static_cast<Sint32>(pos.y));

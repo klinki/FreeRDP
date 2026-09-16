@@ -1,11 +1,88 @@
 # Cross-monitor drag: cursor↔window divergence (multimon input mapping)
 
-Status: open, under active diagnosis (2026-09-11). Focus-offset flips FIXED
-(`fabad8d5e`); residual cursor↔window detachment persists. Mapping stays
-open alongside present-lag / stale-replay — in-range wire values alone do
-not prove a position was right for that instant. Do not confuse
+Status: captured-drag input-mapping defect FIXED and
+validated on the VM with M27UP 4K/175% and Dell FHD/100% (2026-09-16).
+Focus-offset flips were previously fixed (`fabad8d5e`). Present-lag /
+stale-replay hypotheses for other historical symptoms remain separate;
+in-range wire values alone do not prove a position was right for that instant. Do not confuse
 with `bugs/rapid-pace-freeze.md` (render saturation) — different symptom,
 different layer, though both bite during drags.
+
+## Fix and validation (2026-09-16)
+
+`screenToRdp` now resolves the destination RDP window from the queued event's
+logical position and live window bounds, then applies that window's renderer
+transform and normalized monitor offset. Motion, button events, and focus moves
+share the mapping. Event window IDs remain unchanged for capture/focus ownership;
+relative deltas retain the original source conversion. Outside selected client
+windows, mapping falls back to the source window. The draw path is unchanged.
+
+With the fix, both measured endpoints match ordinary movement exactly:
+
+- Dell `(1100,-811)` → input `(1100,1349)`, including M27UP-origin held motion
+  and button release (previously `(280,538)` during the drag).
+- M27UP `(2552,-811)` → input `(3184,538)`, including Dell-origin held motion
+  and button release (previously `(2552,1349)` during the drag).
+
+Two round trips with 12-second holds and two destination releases were executed.
+All 3,098 held motion events match the destination transform within integer
+truncation (<1 pixel), retaining the source window ID. Computer Use checked both
+destination images after release: the release point lies on the title bar with
+the expected DPI-adjusted grab offset. Build, `TestSDLInputMapping` (13 geometry
+cases), `TestSDLMonitorScale`, and `git diff --check` passed. The test session
+established UDP and logged receive migration. No simultaneous two-screen video
+was captured; visual checks cover placement after release, with traces covering
+the held paths. The normal fixed build was reconnected after removing probes.
+
+Evidence and replayable trace analysis:
+`tools/udp-review-tests/logs/drag-20260916/fixed/`.
+
+## Diagnosis — captured drag used the source display transform (2026-09-16)
+
+Autonomous slow Notepad drags on the original M27UP + Dell pair now establish
+a client input error before transport. M27UP uses 2× local backing pixels with
+Windows scale 175%; Dell uses 1× local backing pixels with Windows scale 100%.
+The UDP tunnel was established and receive migration was logged. Both drags
+paused for 12 seconds with the button held, then returned to the starting point.
+
+The table compares ordinary motion and a captured drag at **the same macOS
+global pointer position**. Coordinates were logged immediately before
+`freerdp_client_send_button_event` in `SdlTouch::handleEvent`, after conversion
+and monitor offset. These are measured final API arguments, not packet captures.
+
+| Destination / macOS pointer | Ordinary motion | Drag from other display | Drag minus ordinary |
+| --- | --- | --- | --- |
+| Dell / (1100,-811) | (1100,1349) | (280,538) | (-820,-811) |
+| M27UP / (2552,-811) | (3184,538) | (2552,1349) | (-632,+811) |
+
+All 948 held motion events in the M27UP-origin round trip kept SDL window 7;
+all 1181 in the Dell-origin round trip kept window 8. Thus the existing
+conversion keeps using the **source** renderer's scale and **source** monitor
+offset after the physical pointer enters the other display. Event age at the
+send point was below 19 ms in both runs; no long input backlog is needed to
+explain this mismatch. Returning to the source restores its correct mapping.
+
+This supersedes the old audit's claim that the additive offset pipeline could
+not produce a growing gap: conversion contains a per-window multiplier, and
+capture keeps selecting the wrong multiplier after crossing. It also retracts
+the attribution of the detachment to normal Windows DPI resizing alone. Window
+resizing by the negotiated 1.75 ratio remains real, but it cannot explain
+different client input coordinates at the same physical pointer location.
+
+Fix direction: reconstruct the event's global logical position from its
+source-window-relative coordinates, select the destination client surface
+containing that position, then use that surface's pixel transform and negotiated
+desktop origin. Share this mapping across motion and button transitions; retain
+capture so release delivery stays reliable. Merely calling
+`SDL_GetDisplayForWindow` on the captured event window still selects the source
+display and does not fix this case. Prefer the event's position to polling the
+latest global pointer, which could mis-map queued events.
+
+Full setup, timing, caveats and logs: [drag-experiment-20260916.md](drag-experiment-20260916.md).
+This was measured before the fix described above. Simultaneous images of both
+surfaces during the hold were not captured; the coordinate mismatch itself was
+directly measured. The sections below preserve earlier evidence and hypotheses,
+with their prior ranking superseded by this finding.
 
 ## Symptom
 
@@ -27,16 +104,20 @@ Same Notepad window measured by wire corner-clicks on both displays:
 - The drag itself (19.5s, 1604 moves): zero jumps, endpoints'
   grab-vs-release relative offsets agree within ~30px.
 
-Verdict: the window **changes size by the DPI ratio when crossing
-displays, by Windows design** (per-monitor DPI virtualization). The
-"detachment" is the window resizing under the cursor mid-cross — any
-RDP client (mstsc included) shows the same. No client mapping error at
-either endpoint; H3 convicted, H1 dead. Remaining client work is
-pacing/feel only, not correctness.
+Verdict (partially retracted 2026-09-11): the window **changes size by
+the DPI ratio when crossing displays, by Windows design** (per-monitor DPI
+virtualization) — measured, stands. But the attached claim that "any RDP
+client shows the same detachment" was **inference, never measured**, and
+the user reports mstsc does NOT detach — retracted. No client mapping
+error at either endpoint (measured); the mid-drag detachment difference
+vs mstsc is unexplained. Candidates: (a) different reported scale
+factors → different resize magnitude (we report 175/100 override); (b)
+our pacing/coalescing jump-cuts interacting with the live resize; (c)
+mstsc compensating the grab offset across the resize. Decisive test:
+same drag under mstsc with a wire capture — same pcap setup works for
+any client — then compare wire + behavior apples-to-apples.
 
-## Directional observations (2026-09-11, user-reported, uninstrumented;
-now explained by the above: the window resizing mid-cross shifts edges
-relative to a stationary cursor)
+## Directional observations (2026-09-11, user-reported, uninstrumented)
 
 - **M27UP → Dell:** cursor grabbed at the middle of the dragged window's
   top bar appears on the **right side** of the window once on the Dell.

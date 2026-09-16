@@ -24,6 +24,7 @@
 #include "sdl_context.hpp"
 #include "sdl_config.hpp"
 #include "sdl_channels.hpp"
+#include "sdl_input_mapping.hpp"
 #include "sdl_monitor.hpp"
 #include "sdl_pointer.hpp"
 #include "sdl_touch.hpp"
@@ -854,10 +855,8 @@ void SdlContext::applyMonitorOffset(SDL_WindowID window, float& x, float& y) con
 	if (!freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon))
 		return;
 
-	/* Input mapping uses the dedicated input offsets (raw negotiated RDP
-	 * coordinates), never the draw offsets: those are origin-normalized for
-	 * GDI surface indexing and shift input by -origin whenever a monitor
-	 * lives at negative desktop coordinates. */
+	/* The window offsets normalize the negotiated monitor origin into the
+	 * desktop surface's nonnegative coordinate space, also used by input. */
 	auto w = getWindowForId(window);
 	x -= static_cast<float>(w->offsetX());
 	y -= static_cast<float>(w->offsetY());
@@ -1140,9 +1139,14 @@ bool SdlContext::handleEvent(const SDL_MouseMotionEvent& ev)
 	copy.motion = ev;
 	if (!eventToPixelCoordinates(ev.windowID, copy))
 		return true;
-	removeLocalScaling(copy.motion.x, copy.motion.y);
+	/* Relative deltas retain the source renderer's scale. Absolute positions
+	 * can belong to a different monitor while SDL captures a held drag. */
 	removeLocalScaling(copy.motion.xrel, copy.motion.yrel);
-	applyMonitorOffset(copy.motion.windowID, copy.motion.x, copy.motion.y);
+	SDL_FPoint pos{};
+	if (!screenToRdp(ev.windowID, { ev.x, ev.y }, pos))
+		return true;
+	copy.motion.x = pos.x;
+	copy.motion.y = pos.y;
 
 	return SdlTouch::handleEvent(this, copy.motion);
 }
@@ -1377,14 +1381,14 @@ bool SdlContext::handleEvent(const SDL_MouseButtonEvent& ev)
 
 	if (!getWindowForId(windowId))
 		return true;
-	SDL_Event copy = {};
-	copy.button = ev;
-	copy.button.windowID = windowId;
-	if (!eventToPixelCoordinates(windowId, copy))
+	SDL_FPoint pos{};
+	if (!screenToRdp(windowId, { ev.x, ev.y }, pos))
 		return true;
-	removeLocalScaling(copy.button.x, copy.button.y);
-	applyMonitorOffset(copy.button.windowID, copy.button.x, copy.button.y);
-	return SdlTouch::handleEvent(this, copy.button);
+	auto copy = ev;
+	copy.windowID = windowId;
+	copy.x = pos.x;
+	copy.y = pos.y;
+	return SdlTouch::handleEvent(this, copy);
 }
 
 bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
@@ -1679,11 +1683,43 @@ SDL_FPoint SdlContext::screenToPixel(SDL_WindowID id, const SDL_FPoint& pos)
 	return rpos;
 }
 
-SDL_FPoint SdlContext::screenToRdp(SDL_WindowID id, const SDL_FPoint& pos)
+bool SdlContext::screenToRdp(SDL_WindowID id, const SDL_FPoint& pos, SDL_FPoint& rpos)
 {
-	auto rpos = screenToPixel(id, pos);
-	applyMonitorOffset(id, rpos.x, rpos.y);
-	return rpos;
+	auto target = getWindowForId(id);
+	if (!target)
+		return false;
+
+	auto local = pos;
+	if (freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon))
+	{
+		const auto sourceBounds = target->bounds();
+		if (!sdl_pointer_in_window(pos, sourceBounds, sourceBounds))
+		{
+			/* Use this event's position, not the latest global mouse state: queued
+			 * events must not inherit a newer pointer position. Only map into RDP
+			 * windows; outside them, retain the source mapping and button capture. */
+			for (auto& entry : _windows)
+			{
+				if (const auto point =
+				        sdl_pointer_in_window(pos, sourceBounds, entry.second.bounds()))
+				{
+					target = &entry.second;
+					local = *point;
+					break;
+				}
+			}
+		}
+	}
+
+	rpos = local;
+	if (auto renderer = target->renderer())
+	{
+		if (!SDL_RenderCoordinatesFromWindow(renderer, local.x, local.y, &rpos.x, &rpos.y))
+			return false;
+		removeLocalScaling(rpos.x, rpos.y);
+	}
+	applyMonitorOffset(target->id(), rpos.x, rpos.y);
+	return true;
 }
 
 SDL_FPoint SdlContext::pixelToScreen(SDL_WindowID id, const SDL_FPoint& pos)
