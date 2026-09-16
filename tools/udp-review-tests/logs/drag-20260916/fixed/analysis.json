@@ -1,0 +1,66 @@
+{
+  "dell-roundtrip": {
+    "events": 1192,
+    "source_window": 8,
+    "hold_endpoint": [
+      3184.0,
+      538.0
+    ],
+    "release": [
+      632.0,
+      1349.0
+    ],
+    "max_error_px": 0.8000000000001819,
+    "age_median_ms": 0.318,
+    "age_p95_ms": 2.245,
+    "age_max_ms": 19.949
+  },
+  "dell-release": {
+    "events": 477,
+    "source_window": 8,
+    "hold_endpoint": [
+      3184.0,
+      538.0
+    ],
+    "release": [
+      3184.0,
+      538.0
+    ],
+    "max_error_px": 0.0,
+    "age_median_ms": 0.345,
+    "age_p95_ms": 2.327,
+    "age_max_ms": 18.505
+  },
+  "m27-roundtrip": {
+    "events": 954,
+    "source_window": 7,
+    "hold_endpoint": [
+      1100.0,
+      1349.0
+    ],
+    "release": [
+      3184.0,
+      538.0
+    ],
+    "max_error_px": 0.9700000000000273,
+    "age_median_ms": 0.355,
+    "age_p95_ms": 3.22,
+    "age_max_ms": 13.202
+  },
+  "m27-release": {
+    "events": 475,
+    "source_window": 7,
+    "hold_endpoint": [
+      1100.0,
+      1349.0
+    ],
+    "release": [
+      1100.0,
+      1349.0
+    ],
+    "max_error_px": 0.9700000000000273,
+    "age_median_ms": 0.351,
+    "age_p95_ms": 2.337,
+    "age_max_ms": 10.158
+  }
+}

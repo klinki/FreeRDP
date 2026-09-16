@@ -1,0 +1,69 @@
+[  1%] Built target remdesk-common
+[  1%] Built target encomsp-client
+[  1%] Built target urbdrc-common
+[  1%] Built target drdynvc-client
+[  1%] Built target rdpsnd-common
+[  2%] Built target sdl-common-aad-view
+[  7%] Built target freerdp-primitives
+[ 15%] Built target freerdp-codecs
+[ 16%] Built target sdl-common-client-res
+[ 17%] Built target sdl3_client_res
+[ 48%] Built target winpr
+[ 48%] Built target echo-client
+[ 48%] Built target ainput-client
+[ 50%] Built target disp-client
+[ 51%] Built target geometry-client
+[ 52%] Built target video-client
+[ 52%] Built target location-client
+[ 56%] Built target sdl3-dialogs
+[ 86%] Built target freerdp
+[ 86%] Built target audin-client
+[ 86%] Built target remdesk-client
+[ 86%] Built target smartcard-client
+[ 86%] Built target urbdrc-client
+[ 86%] Built target drive-client
+[ 87%] Built target urbdrc-client-libusb
+[ 88%] Built target cliprdr-client
+[ 88%] Built target audin-client-mac
+[ 90%] Built target rdpsnd-client
+[ 90%] Built target rdpsnd-client-fake
+[ 91%] Built target rdpgfx-client
+[ 92%] Built target rdpei-client
+[ 93%] Built target rail-client
+[ 93%] Built target rdpsnd-client-mac
+[ 94%] Built target printer-client
+[ 94%] Built target printer-client-cups
+[ 95%] Built target rdpdr-client
+[ 95%] Built target sdl-common-prefs
+[ 97%] Built target freerdp-client
+[ 97%] Building CXX object client/SDL/SDL3/CMakeFiles/sdl3-freerdp.dir/sdl_context.cpp.o
+In file included from /Users/david/projects/FreeRDP/client/SDL/SDL3/sdl_context.cpp:22:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/client/cmdline.h:27:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/settings.h:36:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/settings_types_private.h:25:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:942:6: warning: 'SEC_WINPR_NTLM_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_NTLM_SETTINGS_V2 [-Wdeprecated-declarations]
+  942 |             SEC_WINPR_NTLM_SETTINGS* ntlmSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:916:1: note: 'SEC_WINPR_NTLM_SETTINGS' has been explicitly marked deprecated here
+  916 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:561:43: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  561 | #define WINPR_DEPRECATED_VAR(text, obj) [[deprecated("[deprecated] " text)]] obj
+      |                                           ^
+In file included from /Users/david/projects/FreeRDP/client/SDL/SDL3/sdl_context.cpp:22:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/client/cmdline.h:27:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/settings.h:36:
+In file included from /Users/david/projects/FreeRDP/include/freerdp/settings_types_private.h:25:
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:943:6: warning: 'SEC_WINPR_KERBEROS_SETTINGS' is deprecated: [deprecated] [since 3.31.0] use SEC_WINPR_KERBEROS_SETTINGS_V2 [-Wdeprecated-declarations]
+  943 |             SEC_WINPR_KERBEROS_SETTINGS* kerberosSettings;
+      |             ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/sspi.h:924:1: note: 'SEC_WINPR_KERBEROS_SETTINGS' has been explicitly marked deprecated here
+  924 | WINPR_DEPRECATED_VAR(
+      | ^
+/Users/david/projects/FreeRDP/winpr/include/winpr/platform.h:561:43: note: expanded from macro 'WINPR_DEPRECATED_VAR'
+  561 | #define WINPR_DEPRECATED_VAR(text, obj) [[deprecated("[deprecated] " text)]] obj
+      |                                           ^
+2 warnings generated.
+[ 97%] Linking CXX executable sdl-freerdp
+ld: warning: ignoring duplicate libraries: 'dialogs/res/libsdl3_client_res.a'
+[100%] Built target sdl3-freerdp
