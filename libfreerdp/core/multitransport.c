@@ -20,6 +20,7 @@
 #include <winpr/assert.h>
 #include <freerdp/config.h>
 #include <freerdp/log.h>
+#include <freerdp/timer.h>
 
 #include <winpr/thread.h>
 #include <winpr/synch.h>
@@ -64,6 +65,7 @@ struct rdp_multitransport
 	HANDLE stateEvent; /* auto-reset, signaled when async establishment completes */
 	BOOL closing;
 	BOOL threadRunning;
+	FreeRDP_TimerID maintenanceTimer;
 	/* Soft-Sync migration state (MS-RDPEDYC 3.1.5.3): DVC stays on TCP until
 	 * migration is authorized, even when the tunnel is up. */
 	BOOL softSyncNegotiated;
@@ -720,6 +722,10 @@ void multitransport_free(rdpMultitransport* multitransport)
 {
 	if (!multitransport)
 		return;
+	/* These callbacks run on the mainloop. rdp_free may already have stopped
+	 * the timer service; reconnect removes just this transport's timer. */
+	if (multitransport->maintenanceTimer && multitransport->rdp->timer)
+		(void)freerdp_timer_remove(multitransport->rdp->context, multitransport->maintenanceTimer);
 	/* Signal cancellation first so blocking establishment loops exit promptly,
 	 * then join the worker before destroying shared state it may access. */
 	EnterCriticalSection(&multitransport->lock);
@@ -1155,6 +1161,18 @@ BOOL multitransport_send_autodetect(rdpMultitransport* multi, BOOL isRequest, UI
 	return TRUE;
 }
 
+static uint64_t multitransport_maintenance(WINPR_ATTR_UNUSED rdpContext* context, void* userdata,
+                                           WINPR_ATTR_UNUSED FreeRDP_TimerID timerID,
+                                           WINPR_ATTR_UNUSED uint64_t timestamp, uint64_t interval)
+{
+	rdpMultitransport* multi = userdata;
+	EnterCriticalSection(&multi->lock);
+	if (multi->udp)
+		(void)rdpeudp_check_health(multi->udp);
+	LeaveCriticalSection(&multi->lock);
+	return interval;
+}
+
 int multitransport_check_fds(rdpMultitransport* multi)
 {
 	if (!multi)
@@ -1165,6 +1183,20 @@ int multitransport_check_fds(rdpMultitransport* multi)
 	LeaveCriticalSection(&multi->lock);
 	if (!connected)
 		return 0;
+	/* The timer's mainloop event wakes even if the peer stops sending.
+	 * Socket readiness and TCP heartbeats cannot enforce a gap deadline. */
+	if (!multi->maintenanceTimer && multi->rdp->context && multi->rdp->timer)
+	{
+		multi->maintenanceTimer = freerdp_timer_add(multi->rdp->context, 1000000000,
+		                                            multitransport_maintenance, multi, true);
+		if (!multi->maintenanceTimer)
+		{
+			WLog_ERR(TAG, "Could not start UDP reassembly watchdog");
+			return MULTITRANSPORT_TRANSPORT_FAILED;
+		}
+	}
+	if (!rdpeudp_check_health(udp))
+		return MULTITRANSPORT_TRANSPORT_FAILED;
 
 	/* Drain all pending Tunnel DATA without blocking */
 	int dispatched = 0;
@@ -1187,7 +1219,7 @@ int multitransport_check_fds(rdpMultitransport* multi)
 		if (fr == 0)
 			break; /* timeout, no PDU */
 		if (fr < 0)
-			break; /* error/incomplete; do not spin, wait for next wakeup */
+			return MULTITRANSPORT_TRANSPORT_FAILED;
 		/* MS-RDPBCGR 2.2.14: count everything following the Tunnel PDU
 		 * header toward TUNNEL bandwidth measurements. */
 		if ((subLen + payloadLen) > 0 && multi->rdp && multi->rdp->autodetect)
@@ -1366,6 +1398,8 @@ int multitransport_check_fds(rdpMultitransport* multi)
 	LeaveCriticalSection(&multi->lock);
 	if (udp)
 	{
+		if (!rdpeudp_check_health(udp))
+			return MULTITRANSPORT_TRANSPORT_FAILED;
 		(void)rdpeudp_check_keepalive(udp, 5000);
 		rdpeudp_update_event(udp);
 	}
@@ -1373,6 +1407,18 @@ int multitransport_check_fds(rdpMultitransport* multi)
 }
 
 /* ---- unit-test driver (see multitransport.h) ---- */
+BOOL multitransport_test_attach_udp(rdpContext* context, rdpUdpTransport* udp)
+{
+	if (!context || !context->rdp || !context->rdp->multitransport || !udp)
+		return FALSE;
+	rdpMultitransport* multi = context->rdp->multitransport;
+	if (multi->udp)
+		return FALSE;
+	multi->udp = udp;
+	rdpeudp_test_set_connected(udp, TRUE);
+	return TRUE;
+}
+
 static rdpRdp g_mt_test_rdp; /* fixture peer; settings allocated once, never freed */
 
 rdpMultitransport* multitransport_test_new(void)

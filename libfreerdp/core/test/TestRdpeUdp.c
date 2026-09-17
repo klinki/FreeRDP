@@ -23,6 +23,9 @@
 #include <winpr/crt.h>
 #include <winpr/stream.h>
 #include <winpr/wtsapi.h>
+#include <winpr/synch.h>
+#include <freerdp/error.h>
+#include <freerdp/transport_io.h>
 
 #include "../rdpeudp.h"
 #include "../multitransport.h"
@@ -1445,6 +1448,460 @@ static int rx_state(rdpUdpTransport* udp, RdpUdpTestRecvState* out)
 		} \
 	} while (0)
 
+/* Reach the wrap through the real receiver, including a DataSeq wrap when
+ * firstDataSeq > 1. No test-only mutation of sequencing state is needed. */
+static int rx_before_channel_wrap(rdpUdpTransport* udp, UINT16 firstDataSeq)
+{
+	static const BYTE body[] = { 'P' };
+	for (UINT32 c = 1; c < UINT16_MAX; c++)
+	{
+		const RxScriptPkt pkt = {
+			(UINT16)(firstDataSeq + c - 1), (UINT16)c, body, sizeof(body), FALSE, 0, FALSE, TRUE
+		};
+		if (rx_feed(udp, &pkt) != 0)
+			return -1;
+	}
+	return 0;
+}
+
+typedef struct
+{
+	UINT16 dataOffset; /* relative to the first transmission of channel 0xffff */
+	UINT16 channel;
+	BYTE body;
+	BOOL dummy;
+	UINT16 expected;
+	const char* delivered;
+} RxWrapStep;
+
+static int test_rx_channel_wrap(void)
+{
+	static const RxWrapStep skippedZero[] = {
+		{ 0, 0xffff, 'F', FALSE, 0, "F" },
+		{ 1, 1, 'A', FALSE, 2, "FA" },
+		{ 2, 2, 'B', FALSE, 3, "FAB" },
+		{ 3, 0xffff, 'F', FALSE, 3, "FAB" }, /* retransmit, fresh DataSeq */
+		{ 4, 1, 'A', FALSE, 3, "FAB" },
+	};
+	static const RxWrapStep ordinaryZero[] = {
+		{ 0, 0xffff, 'F', FALSE, 0, "F" },
+		{ 1, 0, 'Z', FALSE, 1, "FZ" },
+		{ 2, 1, 'A', FALSE, 2, "FZA" },
+		{ 3, 2, 'B', FALSE, 3, "FZAB" },
+	};
+	static const RxWrapStep reorderedZero[] = {
+		{ 2, 1, 'A', FALSE, 0xffff, "" },
+		{ 1, 0, 'Z', FALSE, 0xffff, "" },
+		{ 0, 0xffff, 'F', FALSE, 2, "FZA" },
+		{ 3, 2, 'B', FALSE, 3, "FZAB" },
+	};
+	static const RxWrapStep reorderedSkip[] = {
+		{ 2, 2, 'B', FALSE, 0xffff, "" },
+		{ 1, 1, 'A', FALSE, 0xffff, "" },
+		{ 0, 0xffff, 'F', FALSE, 3, "FAB" },
+	};
+	static const RxWrapStep lostZero[] = {
+		{ 0, 0xffff, 'F', FALSE, 0, "F" },
+		{ 2, 1, 'A', FALSE, 0, "F" }, /* DataSeq +1 (channel zero) lost */
+		{ 3, 1, 'A', FALSE, 0, "F" },
+		{ 4, 0, 'Z', FALSE, 2, "FZA" }, /* retransmitted zero must deliver */
+		{ 5, 2, 'B', FALSE, 3, "FZAB" },
+	};
+	static const RxWrapStep retransmittedBoundary[] = {
+		/* Originals F/Z/A at DataSeq +0/+1/+2 were lost. Consecutive
+		 * DataSeqs on retransmitted F/A do NOT prove that zero was skipped. */
+		{ 3, 0xffff, 'F', FALSE, 0, "F" },
+		{ 4, 1, 'A', FALSE, 0, "F" },
+		{ 5, 0, 'Z', FALSE, 2, "FZA" },
+	};
+	static const RxWrapStep reorderedProbe[] = {
+		{ 0, 0xffff, 'F', FALSE, 0, "F" },
+		{ 2, 1, 'A', FALSE, 0, "F" },
+		{ 1, 0, 'X', TRUE, 2, "FA" }, /* last gap filled by a dummy */
+		{ 3, 2, 'B', FALSE, 3, "FAB" },
+	};
+	static const RxWrapStep reorderedDuplicate[] = {
+		{ 0, 0xffff, 'F', FALSE, 0, "F" },
+		{ 2, 1, 'A', FALSE, 0, "F" },  /* retransmission arrives first */
+		{ 1, 1, 'A', FALSE, 2, "FA" }, /* original closes the DataSeq gap */
+		{ 3, 2, 'B', FALSE, 3, "FAB" },
+	};
+	static const RxWrapStep ordinaryGap[] = {
+		{ 0, 0xffff, 'F', FALSE, 0, "F" },
+		{ 1, 0, 'Z', FALSE, 1, "FZ" },
+		{ 3, 2, 'B', FALSE, 1, "FZ" },
+		{ 4, 1, 'A', FALSE, 3, "FZAB" },
+	};
+	static const struct
+	{
+		const char* name;
+		const RxWrapStep* steps;
+		size_t count;
+		UINT16 firstDataSeq;
+	} cases[] = {
+		/* 0x0491/ffff -> 0x0492/0001 from the frozen-session capture. */
+		{ "captured wrap", skippedZero, ARRAYSIZE(skippedZero), 1171 },
+		{ "simultaneous DataSeq wrap", skippedZero, ARRAYSIZE(skippedZero), 1 },
+		{ "ordinary zero", ordinaryZero, ARRAYSIZE(ordinaryZero), 1 },
+		{ "reordered zero", reorderedZero, ARRAYSIZE(reorderedZero), 1 },
+		{ "reordered skip", reorderedSkip, ARRAYSIZE(reorderedSkip), 1 },
+		{ "lost zero", lostZero, ARRAYSIZE(lostZero), 1 },
+		{ "retransmitted boundary", retransmittedBoundary, ARRAYSIZE(retransmittedBoundary), 1 },
+		{ "reordered dummy", reorderedProbe, ARRAYSIZE(reorderedProbe), 1 },
+		{ "reordered duplicate", reorderedDuplicate, ARRAYSIZE(reorderedDuplicate), 1 },
+		{ "ordinary gap", ordinaryGap, ARRAYSIZE(ordinaryGap), 1 },
+	};
+	for (size_t i = 0; i < ARRAYSIZE(cases); i++)
+	{
+		rdpUdpTransport* udp = rdpeudp_test_new();
+		RdpUdpTestRecvState st = { 0 };
+		RX_CHECK(udp != nullptr);
+		RX_CHECK(rx_before_channel_wrap(udp, cases[i].firstDataSeq) == 0);
+		const UINT16 base = (UINT16)(cases[i].firstDataSeq + UINT16_MAX - 1);
+		for (size_t j = 0; j < cases[i].count; j++)
+		{
+			const RxWrapStep* step = &cases[i].steps[j];
+			const RxScriptPkt pkt = { (UINT16)(base + step->dataOffset),
+				                      step->channel,
+				                      &step->body,
+				                      1,
+				                      FALSE,
+				                      0,
+				                      step->dummy,
+				                      TRUE };
+			BYTE actual[8] = { 0 };
+			const size_t len = strlen(step->delivered);
+			RX_CHECK(rx_feed(udp, &pkt) == 0);
+			RX_CHECK(rx_state(udp, &st) == 0);
+			if ((st.expectedChannelSeq != step->expected) ||
+			    (st.recvStreamLen != UINT16_MAX - 1 + len))
+			{
+				(void)fprintf(stderr, "channel wrap case '%s', step %zu: next=%04x len=%zu\n",
+				              cases[i].name, j, st.expectedChannelSeq, st.recvStreamLen);
+				RX_CHECK(FALSE);
+			}
+			RX_CHECK(rdpeudp_test_recv_data(udp, UINT16_MAX - 1, actual, len));
+			RX_CHECK(memcmp(actual, step->delivered, len) == 0);
+		}
+		rdpeudp_test_free(udp);
+	}
+	/* A slid window (or a late first AOA) can hide a lost original zero.
+	 * Even once the remaining bitmap is contiguous, do not infer a skip. */
+	for (size_t mode = 0; mode < 2; mode++)
+	{
+		rdpUdpTransport* udp = rdpeudp_test_new();
+		RdpUdpTestRecvState st = { 0 };
+		static const BYTE f[] = { 'F' };
+		static const BYTE a[] = { 'A' };
+		static const BYTE z[] = { 'Z' };
+		const RxScriptPkt last = { 0xffff, 0xffff, f, 1, FALSE, 0, FALSE, TRUE };
+		const RxScriptPkt ahead = { 1, 1, a, 1, FALSE, 0, FALSE, TRUE };
+		const RxScriptPkt slide = { 128, 0, nullptr, 0, mode != 0, 1, TRUE, TRUE };
+		const RxScriptPkt recover = { 129, 0, z, 1, FALSE, 0, FALSE, TRUE };
+		BYTE actual[3] = { 0 };
+		RX_CHECK(udp != nullptr);
+		RX_CHECK(rx_before_channel_wrap(udp, 1) == 0);
+		RX_CHECK(rx_feed(udp, &last) == 0);
+		RX_CHECK(rx_feed(udp, &ahead) == 0);
+		RX_CHECK(rx_feed(udp, &slide) == 0);
+		for (UINT16 d = 2; d < 128; d++)
+		{
+			const RxScriptPkt probe = { d, 0, nullptr, 0, FALSE, 0, TRUE, TRUE };
+			RX_CHECK(rx_feed(udp, &probe) == 0);
+		}
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 129);
+		RX_CHECK(st.expectedChannelSeq == 0);
+		RX_CHECK(st.recvStreamLen == UINT16_MAX);
+		RX_CHECK(rx_feed(udp, &recover) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.expectedChannelSeq == 2);
+		RX_CHECK(st.recvStreamLen == UINT16_MAX + 2);
+		RX_CHECK(rdpeudp_test_recv_data(udp, UINT16_MAX - 1, actual, sizeof(actual)));
+		RX_CHECK(memcmp(actual, "FZA", sizeof(actual)) == 0);
+		rdpeudp_test_free(udp);
+	}
+	return 0;
+}
+
+static int test_rx_recovered_loss_wrap(void)
+{
+	/* A retransmission restores channel 2, but the missing original DataSeq
+	 * later leaves the ACK window. It must not poison a confirmed peer's next
+	 * ffff -> 1 wrap. Exercise both zero-skipping and ordinary zero-using peers. */
+	for (size_t skipsZero = 0; skipsZero < 2; skipsZero++)
+	{
+		rdpUdpTransport* udp = rdpeudp_test_new();
+		RdpUdpTestRecvState st = { 0 };
+		static const BYTE body[] = { 'X' };
+		UINT16 dseq = 1;
+		RX_CHECK(udp != nullptr);
+		for (UINT32 c = 1; c <= UINT16_MAX; c++)
+		{
+			const RxScriptPkt pkt = { dseq++, (UINT16)c, body, 1, FALSE, 0, FALSE, TRUE };
+			RX_CHECK(rx_feed(udp, &pkt) == 0);
+		}
+		if (!skipsZero)
+		{
+			const RxScriptPkt zero = { dseq++, 0, body, 1, FALSE, 0, FALSE, TRUE };
+			RX_CHECK(rx_feed(udp, &zero) == 0);
+		}
+		const RxScriptPkt first = { dseq++, 1, body, 1, FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &first) == 0);
+		dseq++; /* original channel 2 lost */
+		const RxScriptPkt ahead = { dseq++, 3, body, 1, FALSE, 0, FALSE, TRUE };
+		const RxScriptPkt recovery = { dseq++, 2, body, 1, FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &ahead) == 0);
+		RX_CHECK(rx_feed(udp, &recovery) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0 && st.expectedChannelSeq == 4);
+		for (UINT32 c = 4; c <= UINT16_MAX; c++)
+		{
+			const RxScriptPkt pkt = { dseq++, (UINT16)c, body, 1, FALSE, 0, FALSE, TRUE };
+			RX_CHECK(rx_feed(udp, &pkt) == 0);
+		}
+		/* The ordinary peer's real zero is also lost and later retransmitted. */
+		if (!skipsZero)
+			dseq++;
+		const RxScriptPkt next = { dseq++, 1, body, 1, FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &next) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.expectedChannelSeq == (skipsZero ? 2 : 0));
+		if (!skipsZero)
+		{
+			const RxScriptPkt zero = { dseq++, 0, body, 1, FALSE, 0, FALSE, TRUE };
+			RX_CHECK(rx_feed(udp, &zero) == 0);
+		}
+		RX_CHECK(rx_state(udp, &st) == 0 && st.expectedChannelSeq == 2);
+		RX_CHECK(st.recvStreamLen == 2 * (size_t)UINT16_MAX + 1 + (skipsZero ? 0 : 2));
+		rdpeudp_test_free(udp);
+	}
+	return 0;
+}
+
+typedef struct
+{
+	BYTE data[512];
+	size_t len;
+	size_t count;
+} RxAckCapture;
+
+static SSIZE_T rx_capture_ack(void* context, const BYTE* data, size_t len)
+{
+	RxAckCapture* capture = context;
+	if (len > sizeof(capture->data))
+		return -1;
+	memcpy(capture->data, data, len);
+	capture->len = len;
+	capture->count++;
+	return (SSIZE_T)len;
+}
+
+static BOOL rx_decode_ack(const RxAckCapture* capture, BOOL vector, UINT16 expectedBase,
+                          const BOOL* expected, size_t count)
+{
+	BYTE data[sizeof(capture->data)] = { 0 };
+	RdpUdp2Layout layout = { 0 };
+	BOOL dummy = FALSE;
+	size_t offset = 0;
+	memcpy(data, capture->data, capture->len);
+	if (!rdpeudp2_unprotect(data, capture->len, &dummy, &offset) || dummy ||
+	    !rdpeudp2_parse_layout(data + offset, capture->len - offset, &layout))
+		return FALSE;
+	if (!vector)
+		return layout.hasAck && !layout.hasAckvec && (layout.ackBase == expectedBase);
+	if (!layout.hasAckvec || layout.hasAck)
+		return FALSE;
+	UINT16 base = 0;
+	BOOL* received = nullptr;
+	size_t decoded = 0;
+	if (!rdpeudp_parse_ackvec(layout.ackvec, layout.ackvecLen, &base, &received, &decoded))
+		return FALSE;
+	BOOL ok = (base == expectedBase) && (decoded >= count);
+	for (size_t i = 0; ok && (i < decoded); i++)
+		ok = received[i] == ((i < count) ? expected[i] : FALSE);
+	free(received);
+	return ok;
+}
+
+static int test_rx_prompt_ack(void)
+{
+	rdpUdpTransport* udp = rdpeudp_test_new();
+	RxAckCapture capture = { 0 };
+	RdpUdpTestRecvState st = { 0 };
+	static const BYTE body[] = { 'X' };
+	const BOOL gap[] = { FALSE, TRUE, TRUE };
+	RX_CHECK(udp != nullptr);
+	rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+	const RxScriptPkt probe = { 0, 0, body, 1, FALSE, 0, TRUE, TRUE };
+	RX_CHECK(rx_feed(udp, &probe) == 0 && capture.count == 0);
+	const RxScriptPkt ahead = { 2, 2, body, 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed(udp, &ahead) == 0 && capture.count == 1);
+	RX_CHECK(rx_state(udp, &st) == 0 && st.recvStreamLen == 0);
+	RX_CHECK(rx_decode_ack(&capture, TRUE, 1, gap, 2));
+	const RxScriptPkt retry = { 3, 2, body, 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed(udp, &retry) == 0 && capture.count == 2);
+	RX_CHECK(rx_decode_ack(&capture, TRUE, 1, gap, 3));
+	const RxScriptPkt recover = { 1, 1, body, 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed(udp, &recover) == 0 && capture.count == 3);
+	RX_CHECK(rx_decode_ack(&capture, FALSE, 3, nullptr, 0));
+	RX_CHECK(rx_state(udp, &st) == 0 && st.recvStreamLen == 2);
+	const RxScriptPkt keepalive = { 4, 0, body, 1, FALSE, 0, TRUE, TRUE };
+	RX_CHECK(rx_feed(udp, &keepalive) == 0 && capture.count == 4);
+	RX_CHECK(rx_decode_ack(&capture, FALSE, 4, nullptr, 0));
+	/* An ACK-only packet must not cause an ACK loop. */
+	RX_CHECK(rdpeudp_test_feed(udp, capture.data, capture.len) && capture.count == 4);
+	const RxScriptPkt duplicate = { 5, 2, body, 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed(udp, &duplicate) == 0 && capture.count == 5);
+	RX_CHECK(rx_decode_ack(&capture, FALSE, 5, nullptr, 0));
+	RX_CHECK(rx_state(udp, &st) == 0 && st.recvStreamLen == 2);
+	rdpeudp_test_free(udp);
+	/* A channel gap can exist without any DataSeq gap (the captured freeze).
+	 * It still gets an immediate cumulative ACK despite delivering no bytes. */
+	udp = rdpeudp_test_new();
+	RX_CHECK(udp != nullptr);
+	ZeroMemory(&capture, sizeof(capture));
+	rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+	const RxScriptPkt contiguous = { 1, 2, body, 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed(udp, &contiguous) == 0 && capture.count == 1);
+	RX_CHECK(rx_decode_ack(&capture, FALSE, 1, nullptr, 0));
+	RX_CHECK(rx_state(udp, &st) == 0 && st.recvStreamLen == 0);
+	rdpeudp_test_free(udp);
+	return 0;
+}
+
+static int test_rx_stall(void)
+{
+	static const BYTE body[] = { 'X' };
+	const RxScriptPkt ahead = { 2, 2, body, 1, FALSE, 0, FALSE, TRUE };
+	const RxScriptPkt recover = { 1, 1, body, 1, FALSE, 0, FALSE, TRUE };
+	for (size_t mode = 0; mode < 3; mode++)
+	{
+		rdpUdpTransport* udp = rdpeudp_test_new();
+		RxAckCapture capture = { 0 };
+		RX_CHECK(udp != nullptr);
+		rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+		rdpeudp_test_set_time(udp, 100);
+		RX_CHECK(rx_feed(udp, &ahead) == 0);
+		rdpeudp_test_set_time(udp, 100 + RDPEUDP_REASSEMBLY_TIMEOUT_MS - 1);
+		RX_CHECK(rdpeudp_test_check_health(udp));
+		/* Duplicate traffic and dummy probes must not refresh gap age. */
+		const RxScriptPkt duplicate = { 3, 2, body, 1, FALSE, 0, FALSE, TRUE };
+		const RxScriptPkt probe = { 4, 0, body, 1, FALSE, 0, TRUE, TRUE };
+		RX_CHECK(rx_feed(udp, &duplicate) == 0);
+		RX_CHECK(rx_feed(udp, &probe) == 0);
+		if (mode == 1)
+			RX_CHECK(rx_feed(udp, &recover) == 0);
+		rdpeudp_test_set_time(udp, 100 + RDPEUDP_REASSEMBLY_TIMEOUT_MS);
+		if (mode == 2)
+			RX_CHECK(rx_feed(udp, &recover) == 0); /* too late; failure stays latched */
+		RX_CHECK(rdpeudp_test_check_health(udp) == (mode == 1));
+		const size_t ackCount = capture.count;
+		rdpeudp_test_set_time(udp, 600000);
+		RX_CHECK(rdpeudp_test_check_health(udp) == (mode == 1));
+		if (mode != 1)
+		{
+			RX_CHECK(rx_feed(udp, &recover) == 0);
+			RX_CHECK(capture.count == ackCount);
+		}
+		rdpeudp_test_free(udp);
+	}
+	/* Advancing through one hole gives the next missing channel its own deadline. */
+	rdpUdpTransport* udp = rdpeudp_test_new();
+	RX_CHECK(udp != nullptr);
+	rdpeudp_test_set_time(udp, 100);
+	const RxScriptPkt third = { 3, 3, body, 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed(udp, &third) == 0);
+	rdpeudp_test_set_time(udp, 9000);
+	RX_CHECK(rx_feed(udp, &recover) == 0);
+	rdpeudp_test_set_time(udp, 18000);
+	RX_CHECK(rdpeudp_test_check_health(udp));
+	rdpeudp_test_set_time(udp, 19000);
+	RX_CHECK(!rdpeudp_test_check_health(udp));
+	rdpeudp_test_free(udp);
+	/* Completely idle (including no real data yet) is not a reassembly gap. */
+	udp = rdpeudp_test_new();
+	RX_CHECK(udp != nullptr);
+	rdpeudp_test_set_time(udp, 600000);
+	RX_CHECK(rdpeudp_test_check_health(udp));
+	rdpeudp_test_free(udp);
+	/* Receive-map overflow must fail before ACKing data we cannot retain. */
+	udp = rdpeudp_test_new();
+	RxAckCapture capture = { 0 };
+	RX_CHECK(udp != nullptr);
+	rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+	RX_CHECK(rx_feed(udp, &ahead) == 0 && capture.count == 1);
+	const RxScriptPkt collision = { 3, 258, body, 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed(udp, &collision) == 0 && capture.count == 1);
+	RX_CHECK(!rdpeudp_test_check_health(udp));
+	rdpeudp_test_free(udp);
+	return 0;
+}
+
+static int rx_idle_tcp(WINPR_ATTR_UNUSED rdpTransport* transport, WINPR_ATTR_UNUSED wStream* stream)
+{
+	return 0; /* A healthy, idle primary connection; no sockets involved. */
+}
+
+static int test_rx_watchdog_mainloop(void)
+{
+	int rc = -1;
+	freerdp* instance = freerdp_new();
+	rdpUdpTransport* udp = nullptr;
+	if (!instance || !freerdp_context_new(instance))
+		goto out;
+	rdpContext* context = instance->context;
+	rdpTransportIo io = *freerdp_get_io_callbacks(context);
+	io.ReadPdu = rx_idle_tcp;
+	if (!freerdp_set_io_callbacks(context, &io) || !freerdp_check_fds(instance))
+		goto out;
+	/* Repeat across reconnect cleanup: a stale UDP instance or timer must not
+	 * survive, and the next tunnel must get a working watchdog of its own. */
+	for (size_t attempt = 0; attempt < 2; attempt++)
+	{
+		udp = rdpeudp_test_new();
+		if (!udp)
+			goto out;
+		rdpeudp_test_set_time(udp, 100);
+		static const BYTE body[] = { 'X' };
+		const RxScriptPkt gap = { 2, 2, body, 1, FALSE, 0, FALSE, TRUE };
+		if (rx_feed(udp, &gap) != 0 || !multitransport_test_attach_udp(context, udp))
+			goto out;
+		rdpUdpTransport* attached = udp;
+		udp = nullptr; /* owned by context */
+		if (!freerdp_check_fds(instance))
+			goto out;
+		HANDLE events[64] = { 0 };
+		const DWORD count = freerdp_get_event_handles(context, events, ARRAYSIZE(events));
+		if (count == 0)
+			goto out;
+		/* Clear the synthetic packet's readiness; only the real timer can wake us. */
+		for (DWORD i = 0; i < count; i++)
+			(void)ResetEvent(events[i]);
+		rdpeudp_test_set_time(attached, 100 + RDPEUDP_REASSEMBLY_TIMEOUT_MS);
+		const DWORD wake = WaitForMultipleObjects(count, events, FALSE, 3000);
+		if ((wake < WAIT_OBJECT_0) || (wake >= WAIT_OBJECT_0 + count))
+			goto out;
+		if (freerdp_check_fds(instance) ||
+		    (freerdp_get_last_error(context) != FREERDP_ERROR_CONNECT_TRANSPORT_FAILED) ||
+		    (freerdp_error_info(instance) != ERRINFO_SUCCESS))
+			goto out;
+		if (!freerdp_disconnect_before_reconnect_context(context) ||
+		    !freerdp_set_io_callbacks(context, &io) || !freerdp_check_fds(instance))
+			goto out;
+	}
+	rc = 0;
+out:
+	if (rc != 0)
+		(void)fprintf(stderr, "UDP watchdog mainloop/reconnect regression FAILED\n");
+	rdpeudp_test_free(udp);
+	if (instance)
+	{
+		freerdp_context_free(instance);
+		freerdp_free(instance);
+	}
+	return rc;
+}
+
 static int test_rx_integration(void)
 {
 	rdpUdpTransport* udp = nullptr;
@@ -1955,6 +2412,21 @@ int TestRdpeUdp(int argc, char* argv[])
 		(void)fprintf(stderr, "test_rx_integration FAILED\n");
 		return -1;
 	}
+	if (test_rx_channel_wrap() != 0)
+	{
+		(void)fprintf(stderr, "test_rx_channel_wrap FAILED\n");
+		return -1;
+	}
+	if (test_rx_recovered_loss_wrap() != 0)
+	{
+		(void)fprintf(stderr, "test_rx_recovered_loss_wrap FAILED\n");
+		return -1;
+	}
+	if (test_rx_prompt_ack() != 0 || test_rx_stall() != 0 || test_rx_watchdog_mainloop() != 0)
+	{
+		(void)fprintf(stderr, "receive ACK/watchdog regression FAILED\n");
+		return -1;
+	}
 	if (test_soft_sync_alloc() != 0)
 	{
 		(void)fprintf(stderr, "test_soft_sync_alloc FAILED\n");
@@ -1964,4 +2436,3 @@ int TestRdpeUdp(int argc, char* argv[])
 	(void)printf("TestRdpeUdp passed\n");
 	return 0;
 }
-

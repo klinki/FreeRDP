@@ -1011,6 +1011,20 @@ struct rdp_udp_transport
 	 * recvDataSeen[i] = received(DataSeq = base+i). */
 	UINT16 recvDataBase;
 	BOOL recvDataSeen[RDPEUDP2_WINDOW_MAX * 2];
+	/* Once an unreceived datagram leaves the window, a contiguous bitmap
+	 * no longer proves that a missing channel number was never sent. */
+	BOOL recvSequenceHistoryLost;
+	/* Learned only from an unambiguous wrap, and scoped to this transport. */
+	BOOL peerSkipsChannelZero;
+	BOOL peerUsesChannelZero;
+	BOOL recvGapActive;
+	UINT64 recvGapSince;
+	BOOL recvFailed;
+	/* Socketless fixtures can drive time and inspect the actual ACK wire bytes. */
+	BOOL testClockEnabled;
+	UINT64 testClockMs;
+	RdpUdpTestSendCallback testSend;
+	void* testSendContext;
 	BOOL needAoa;
 	BYTE overhead;
 	BYTE delayAckMax;
@@ -1067,6 +1081,34 @@ void rdpeudp_set_abort_event(rdpUdpTransport* udp, HANDLE abortEvent)
 static UINT64 udp_now_ms(void)
 {
 	return GetTickCount64();
+}
+
+static UINT64 rdpeudp_recv_now(const rdpUdpTransport* udp)
+{
+	return udp->testClockEnabled ? udp->testClockMs : udp_now_ms();
+}
+
+BOOL rdpeudp_check_health(rdpUdpTransport* udp)
+{
+	if (!udp)
+		return FALSE;
+	EnterCriticalSection(&udp->lock);
+	const UINT64 now = rdpeudp_recv_now(udp);
+	if (!udp->recvFailed && udp->recvGapActive &&
+	    (now - udp->recvGapSince >= RDPEUDP_REASSEMBLY_TIMEOUT_MS))
+	{
+		size_t buffered = 0;
+		for (size_t i = 0; i < ARRAYSIZE(udp->recvMap); i++)
+			buffered += udp->recvMap[i].occupied ? 1 : 0;
+		WLog_ERR(TAG,
+		         "UDP reassembly stalled for %" PRIu64 " ms: expected channel %04" PRIx16
+		         ", buffered=%zu, DataSeq base=%04" PRIx16 "; reconnect required",
+		         now - udp->recvGapSince, udp->expectedChannelSeq, buffered, udp->recvDataBase);
+		udp->recvFailed = TRUE;
+	}
+	const BOOL healthy = !udp->recvFailed;
+	LeaveCriticalSection(&udp->lock);
+	return healthy;
 }
 
 void rdpeudp_compute_mtu(UINT16 ourUp, UINT16 ourDown, UINT16 peerUp, UINT16 peerDown,
@@ -1653,7 +1695,8 @@ static BOOL rdpeudp_udp_send_stream(rdpUdpTransport* udp, wStream* s)
 	const BYTE* data = Stream_Buffer(s);
 	if (len == 0)
 		return FALSE;
-	const SSIZE_T sent = freerdp_udp_send(udp->sockfd, data, len);
+	const SSIZE_T sent = udp->testSend ? udp->testSend(udp->testSendContext, data, len)
+	                                   : freerdp_udp_send(udp->sockfd, data, len);
 	if (sent != (SSIZE_T)len)
 		return FALSE;
 	udp->lastSendTs = udp_now_ms();
@@ -1708,6 +1751,21 @@ static void rdpeudp_ack_single_locked(rdpUdpTransport* udp, UINT16 dseq)
 	}
 }
 
+static void rdpeudp_slide_recv_data_locked(rdpUdpTransport* udp, size_t advance)
+{
+	const size_t win = ARRAYSIZE(udp->recvDataSeen);
+	const size_t count = (advance < win) ? advance : win;
+	for (size_t i = 0; i < count; i++)
+	{
+		if (!udp->recvDataSeen[i])
+			udp->recvSequenceHistoryLost = TRUE;
+	}
+	if (advance > win)
+		udp->recvSequenceHistoryLost = TRUE;
+	memmove(udp->recvDataSeen, udp->recvDataSeen + count, (win - count) * sizeof(BOOL));
+	memset(udp->recvDataSeen + (win - count), 0, count * sizeof(BOOL));
+}
+
 static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 {
 	/* V1: fixed 1-start base, never rebase from first arrival. Out-of-order
@@ -1740,9 +1798,7 @@ static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 		const INT16 adv = (INT16)(newBase - udp->recvDataBase);
 		if (adv > 0)
 		{
-			const size_t a = ((size_t)adv < WIN) ? (size_t)adv : WIN;
-			memmove(udp->recvDataSeen, udp->recvDataSeen + a, (WIN - a) * sizeof(BOOL));
-			memset(udp->recvDataSeen + (WIN - a), 0, a * sizeof(BOOL));
+			rdpeudp_slide_recv_data_locked(udp, (size_t)adv);
 			udp->recvDataBase = newBase;
 			diff = (INT16)(dseq - udp->recvDataBase);
 		}
@@ -1761,6 +1817,78 @@ static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq)
 	udp->lastAckSent = dseq;
 	udp->stats.recvPackets++;
 }
+
+static BOOL rdpeudp_can_skip_channel_zero_locked(const rdpUdpTransport* udp)
+{
+	/* Some Windows peers send channel ffff -> 0001. Do not reserve zero
+	 * globally: a normal peer can send it, lose it, or retransmit it with a
+	 * fresh DataSeq. Initially infer omission only when ALL datagrams through the
+	 * buffered channel 1 have arrived, with no discarded receive history.
+	 * An original channel 0 would have preceded channel 1's first send and
+	 * therefore must already be buffered. Adjacent DataSeqs alone are not
+	 * sufficient: they could both belong to retransmissions. */
+	if ((udp->expectedChannelSeq != 0) || udp->peerUsesChannelZero || !udp->recvMap[1].occupied ||
+	    (udp->recvMap[1].channelSeq != 1))
+		return FALSE;
+	/* An old lost datagram can be replaced by a new DataSeq carrying the same
+	 * channel bytes. It must not disable a convention already proven here. */
+	if (udp->peerSkipsChannelZero)
+		return TRUE;
+	if (udp->recvSequenceHistoryLost)
+		return FALSE;
+	for (size_t i = 0; i < ARRAYSIZE(udp->recvDataSeen); i++)
+	{
+		if (udp->recvDataSeen[i])
+			return FALSE;
+	}
+	return TRUE;
+}
+
+static void rdpeudp_deliver_recv_data_locked(rdpUdpTransport* udp)
+{
+	const UINT16 previous = udp->expectedChannelSeq;
+	while (TRUE)
+	{
+		UdpRecvSlot* slot = &udp->recvMap[udp->expectedChannelSeq % RDPEUDP2_RECV_MAP];
+		if (!slot->occupied || (slot->channelSeq != udp->expectedChannelSeq))
+		{
+			if (!rdpeudp_can_skip_channel_zero_locked(udp))
+				break;
+			WLog_WARN(TAG, "Peer omitted channel sequence 0 at wrap; %s, continuing at channel 1",
+			          udp->peerSkipsChannelZero ? "previously confirmed peer convention"
+			                                    : "complete DataSeq history");
+			udp->peerSkipsChannelZero = TRUE;
+			udp->expectedChannelSeq = 1;
+			continue;
+		}
+		if (!Stream_EnsureRemainingCapacity(udp->recvStream, slot->len))
+		{
+			WLog_ERR(TAG, "UDP receive stream allocation failed; reconnect required");
+			udp->recvFailed = TRUE;
+			break;
+		}
+		if (udp->expectedChannelSeq == 0)
+		{
+			udp->peerUsesChannelZero = TRUE;
+			udp->peerSkipsChannelZero = FALSE;
+		}
+		if (slot->len > 0)
+			Stream_Write(udp->recvStream, slot->data, slot->len);
+		free(slot->data);
+		ZeroMemory(slot, sizeof(*slot));
+		udp->expectedChannelSeq++;
+	}
+	/* Stream_Write advances position only; publish bytes via length. */
+	Stream_SealLength(udp->recvStream);
+	BOOL pending = FALSE;
+	for (size_t i = 0; i < ARRAYSIZE(udp->recvMap); i++)
+		pending |= udp->recvMap[i].occupied;
+	if (pending && (!udp->recvGapActive || (previous != udp->expectedChannelSeq)))
+		udp->recvGapSince = rdpeudp_recv_now(udp);
+	udp->recvGapActive = pending;
+}
+
+static BOOL rdpeudp2_send_ack(rdpUdpTransport* udp);
 
 /* ---- unit-test driver (no sockets; see rdpeudp.h) ----
  * rdpeudp_test_feed runs the production v2 receive block below, shared with
@@ -1783,6 +1911,8 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 {
 	if (!udp || !buf || (len == 0))
 		return FALSE;
+	if (!rdpeudp_check_health(udp))
+		return TRUE; /* Failure is sticky; do not accept or ACK further data. */
 	{
 		BOOL dummy = FALSE;
 		size_t off = 0;
@@ -1836,21 +1966,19 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 				const INT16 adv = (INT16)(L.aoa - udp->recvDataBase);
 				if (adv > 0)
 				{
-					const size_t WIN = ARRAYSIZE(udp->recvDataSeen);
-					const size_t a = ((size_t)adv < WIN) ? (size_t)adv : WIN;
-					memmove(udp->recvDataSeen, udp->recvDataSeen + a,
-					        (WIN - a) * sizeof(BOOL));
-					memset(udp->recvDataSeen + (WIN - a), 0, a * sizeof(BOOL));
+					const BOOL historyLost = udp->recvSequenceHistoryLost;
+					rdpeudp_slide_recv_data_locked(udp, (size_t)adv);
+					/* The initial probe epoch precedes channel data. A late
+					 * first AOA must not erase evidence of a real data gap. */
+					if (!udp->haveRealData)
+						udp->recvSequenceHistoryLost = historyLost;
 					udp->recvDataBase = (UINT16)(udp->recvDataBase + adv);
 				}
 				udp->haveSeenAoa = TRUE;
 			}
 			rdpeudp_note_recv_data_seq_locked(udp, L.dataSeq);
 			if (dummy)
-			{
-				LeaveCriticalSection(&udp->lock);
-				return TRUE;
-			}
+				goto deliver;
 			udp->haveRealData = TRUE;
 		}
 
@@ -1926,6 +2054,14 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 			if (!dup && (drem <= 65535))
 			{
 				const size_t slot = (size_t)(cseq % RDPEUDP2_RECV_MAP);
+				if (udp->recvMap[slot].occupied)
+				{
+					/* These bytes may already have been ACKed. Never overwrite
+					 * them and silently leave an unrecoverable TLS stream gap. */
+					WLog_ERR(TAG, "UDP channel receive window overflow; reconnect required");
+					udp->recvFailed = TRUE;
+					goto deliver;
+				}
 				free(udp->recvMap[slot].data);
 				udp->recvMap[slot].data = nullptr;
 				udp->recvMap[slot].len = 0;
@@ -1938,37 +2074,24 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 					udp->recvMap[slot].channelSeq = cseq;
 					udp->recvMap[slot].occupied = TRUE;
 				}
-
-				/* Deliver in-order channel stream */
-				while (TRUE)
+				else
 				{
-					const size_t eslot =
-					    (size_t)(udp->expectedChannelSeq % RDPEUDP2_RECV_MAP);
-					if (!udp->recvMap[eslot].occupied ||
-					    (udp->recvMap[eslot].channelSeq != udp->expectedChannelSeq))
-						break;
-					if (!Stream_EnsureRemainingCapacity(
-					        udp->recvStream, udp->recvMap[eslot].len))
-						break;
-					if (udp->recvMap[eslot].len > 0)
-						Stream_Write(udp->recvStream, udp->recvMap[eslot].data,
-						             udp->recvMap[eslot].len);
-					free(udp->recvMap[eslot].data);
-					udp->recvMap[eslot].data = nullptr;
-					udp->recvMap[eslot].len = 0;
-					udp->recvMap[eslot].occupied = FALSE;
-					udp->expectedChannelSeq++;
+					WLog_ERR(TAG, "UDP receive allocation failed; reconnect required");
+					udp->recvFailed = TRUE;
 				}
-				/* Stream_Write advances position only; publish bytes via length. */
-				Stream_SealLength(udp->recvStream);
-				if (udp->sockEvent && (udp->sockEvent != INVALID_HANDLE_VALUE))
-					(void)WSASetEvent(udp->sockEvent);
-				if (udp->udpEvent && (udp->udpEvent != INVALID_HANDLE_VALUE))
-					(void)SetEvent(udp->udpEvent);
 			}
 		}
 
+	deliver:
+		/* A duplicate or dummy can close the last DataSeq gap at wrap. */
+		rdpeudp_deliver_recv_data_locked(udp);
+		const BOOL ack = L.hasDataHeader && udp->haveRealData && !udp->recvFailed &&
+		                 ((udp->sockfd >= 0) || udp->testSend);
 		LeaveCriticalSection(&udp->lock);
+		/* ACK receipt, including buffered and duplicate channel data. Waiting
+		 * for TLS consumption withholds ACKs precisely when a channel is lost. */
+		if (ack)
+			(void)rdpeudp2_send_ack(udp);
 		if (udp->sockEvent && (udp->sockEvent != INVALID_HANDLE_VALUE))
 			(void)WSASetEvent(udp->sockEvent);
 		if (udp->udpEvent && (udp->udpEvent != INVALID_HANDLE_VALUE))
@@ -1976,6 +2099,30 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 	}
 
 	return TRUE;
+}
+
+void rdpeudp_test_set_time(rdpUdpTransport* udp, UINT64 now)
+{
+	if (!udp)
+		return;
+	EnterCriticalSection(&udp->lock);
+	udp->testClockEnabled = TRUE;
+	udp->testClockMs = now;
+	LeaveCriticalSection(&udp->lock);
+}
+
+void rdpeudp_test_set_send(rdpUdpTransport* udp, RdpUdpTestSendCallback callback, void* context)
+{
+	if (!udp)
+		return;
+	/* Configure before feeding packets; the fixture is single-threaded. */
+	udp->testSend = callback;
+	udp->testSendContext = context;
+}
+
+BOOL rdpeudp_test_check_health(rdpUdpTransport* udp)
+{
+	return rdpeudp_check_health(udp);
 }
 
 BOOL rdpeudp_test_recv_state(const rdpUdpTransport* udp, RdpUdpTestRecvState* out)
@@ -1992,6 +2139,19 @@ BOOL rdpeudp_test_recv_state(const rdpUdpTransport* udp, RdpUdpTestRecvState* ou
 	out->recvStreamLen = Stream_Length(udp->recvStream);
 	LeaveCriticalSection((CRITICAL_SECTION*)&udp->lock);
 	return TRUE;
+}
+
+BOOL rdpeudp_test_recv_data(const rdpUdpTransport* udp, size_t offset, BYTE* data, size_t len)
+{
+	if (!udp || !data)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&udp->lock);
+	const size_t available = Stream_Length(udp->recvStream);
+	const BOOL valid = (offset <= available) && (len <= available - offset);
+	if (valid && (len > 0))
+		memcpy(data, Stream_Buffer(udp->recvStream) + offset, len);
+	LeaveCriticalSection((CRITICAL_SECTION*)&udp->lock);
+	return valid;
 }
 
 BOOL rdpeudp_test_seen(const rdpUdpTransport* udp, size_t i)
@@ -2012,6 +2172,7 @@ void rdpeudp_test_set_connected(rdpUdpTransport* udp, BOOL connected)
 		return;
 	EnterCriticalSection(&udp->lock);
 	udp->connected = connected;
+	udp->tunnelEstablished = connected;
 	LeaveCriticalSection(&udp->lock);
 }
 
@@ -2342,7 +2503,7 @@ static BOOL rdpeudp2_wait_acked(rdpUdpTransport* udp, UINT16 channelSeq, DWORD t
 	const UINT64 deadline = udp_now_ms() + timeoutMs;
 	while (udp_now_ms() < deadline)
 	{
-		if (udp_aborted(udp))
+		if (udp_aborted(udp) || !rdpeudp_check_health(udp))
 			return FALSE;
 		BOOL empty = TRUE;
 		EnterCriticalSection(&udp->lock);
@@ -2595,7 +2756,7 @@ static SSIZE_T rdpeudp2_recv_reliable(rdpUdpTransport* udp, BYTE* buffer, size_t
 	const UINT64 deadline = udp_now_ms() + timeoutMs;
 	while (udp_now_ms() < deadline)
 	{
-		if (udp_aborted(udp))
+		if (udp_aborted(udp) || !rdpeudp_check_health(udp))
 			return -1;
 		EnterCriticalSection(&udp->lock);
 		const size_t avail = Stream_Length(udp->recvStream) - udp->recvPos;
@@ -2615,8 +2776,6 @@ static SSIZE_T rdpeudp2_recv_reliable(rdpUdpTransport* udp, BYTE* buffer, size_t
 				udp->recvPos = 0;
 			}
 			LeaveCriticalSection(&udp->lock);
-			/* ACK what we consumed (also serves as keepalive) */
-			(void)rdpeudp2_send_ack(udp);
 			return (SSIZE_T)copy;
 		}
 		LeaveCriticalSection(&udp->lock);
@@ -2625,13 +2784,6 @@ static SSIZE_T rdpeudp2_recv_reliable(rdpUdpTransport* udp, BYTE* buffer, size_t
 		if (step > 50)
 			step = 50;
 		(void)rdpeudp_recv_one(udp, step, nullptr, nullptr, nullptr, nullptr);
-
-		/* Send periodic ACKs so sender window progresses even without data */
-		EnterCriticalSection(&udp->lock);
-		const BOOL needAck = (Stream_Length(udp->recvStream) > udp->recvPos);
-		LeaveCriticalSection(&udp->lock);
-		if (needAck)
-			(void)rdpeudp2_send_ack(udp);
 	}
 
 	errno = EAGAIN;

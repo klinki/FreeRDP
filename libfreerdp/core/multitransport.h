@@ -117,6 +117,9 @@ FREERDP_LOCAL BOOL multitransport_send_autodetect(rdpMultitransport* multi, BOOL
  * Returns >0 if a packet was dispatched, 0 if none, <0 on error. */
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL int multitransport_check_fds(rdpMultitransport* multi);
+/* An established reliable tunnel cannot fall back unilaterally after losing
+ * stream bytes: the peer still routes incoming DVCs over it. Reconnect RDP. */
+#define MULTITRANSPORT_TRANSPORT_FAILED (-2)
 
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL HANDLE multitransport_get_event(rdpMultitransport* multi);
@@ -132,6 +135,8 @@ FREERDP_LOCAL rdpMultitransport* multitransport_new(rdpRdp* rdp, UINT16 protocol
  * reassembly allocations: n >= 0 fails the (n+1)-th wrapped allocation (0 =
  * fail next), negative disables. Single-threaded test use only. */
 FREERDP_API void multitransport_test_free(rdpMultitransport* multi);
+/** Attach a socketless established tunnel to a real context; takes ownership on success. */
+FREERDP_API BOOL multitransport_test_attach_udp(rdpContext* context, rdpUdpTransport* udp);
 
 WINPR_ATTR_MALLOC(multitransport_test_free, 1)
 WINPR_ATTR_NODISCARD

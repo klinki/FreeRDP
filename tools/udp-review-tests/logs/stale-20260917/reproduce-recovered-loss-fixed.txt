@@ -1,0 +1,13 @@
+CASE: all originals received
+[10:09:14:025] [10121:ee9add81] [WARN][com.freerdp.core.rdpeudp] - [rdpeudp_deliver_recv_data_locked]: Peer omitted channel sequence 0 at wrap; complete DataSeq history, continuing at channel 1
+first wrap expected 0x2 DataSeq base 0x1 delivered 65536
+after recovery expected 0x4 DataSeq base 0x4 delivered 65538
+[10:09:14:150] [10121:ee9add81] [WARN][com.freerdp.core.rdpeudp] - [rdpeudp_deliver_recv_data_locked]: Peer omitted channel sequence 0 at wrap; previously confirmed peer convention, continuing at channel 1
+second wrap expected 0x2 DataSeq base 0x1 delivered 131071
+CASE: one original lost then channel recovered
+[10:09:14:259] [10121:ee9add81] [WARN][com.freerdp.core.rdpeudp] - [rdpeudp_deliver_recv_data_locked]: Peer omitted channel sequence 0 at wrap; complete DataSeq history, continuing at channel 1
+first wrap expected 0x2 DataSeq base 0x1 delivered 65536
+after recovery expected 0x4 DataSeq base 0x1 delivered 65538
+[10:09:14:368] [10121:ee9add81] [WARN][com.freerdp.core.rdpeudp] - [rdpeudp_deliver_recv_data_locked]: Peer omitted channel sequence 0 at wrap; previously confirmed peer convention, continuing at channel 1
+second wrap expected 0x2 DataSeq base 0x1 delivered 131071
+PASS: recovered packet loss no longer blocks the next wrap; both cases deliver identical bytes.

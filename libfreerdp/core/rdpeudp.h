@@ -117,6 +117,8 @@
  * TCP is unaffected), and MS's own reference waits an order of magnitude
  * longer, so patience here is safe. */
 #define RDPEUDP_SEND_TIMEOUT_MS 10000
+/* A channel gap with later bytes buffered is a stall; an idle desktop is not. */
+#define RDPEUDP_REASSEMBLY_TIMEOUT_MS 10000
 
 typedef struct rdp_udp_transport rdpUdpTransport;
 
@@ -424,12 +426,24 @@ WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* datagram, size_t len);
 /** Snapshot scalar receive state (bitmap via rdpeudp_test_seen below). */
 FREERDP_API BOOL rdpeudp_test_recv_state(const rdpUdpTransport* udp, RdpUdpTestRecvState* out);
+/** Copy a range of the delivered channel stream without consuming it. */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_test_recv_data(const rdpUdpTransport* udp, size_t offset, BYTE* data,
+                                        size_t len);
 /** TRUE if DataSeq (base+i) is recorded received; FALSE if out of range. */
 WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_test_seen(const rdpUdpTransport* udp, size_t i);
-/** Force the connected flag (lets the multitransport test fixture skip the
- * socket handshake; no I/O is performed). */
+/** Mark a socketless fixture connected with its tunnel established; no I/O. */
 FREERDP_API void rdpeudp_test_set_connected(rdpUdpTransport* udp, BOOL connected);
+/** Test-only send sink and monotonic clock override, configured before use. */
+typedef SSIZE_T (*RdpUdpTestSendCallback)(void* context, const BYTE* data, size_t len);
+FREERDP_API void rdpeudp_test_set_send(rdpUdpTransport* udp, RdpUdpTestSendCallback callback,
+                                       void* context);
+FREERDP_API void rdpeudp_test_set_time(rdpUdpTransport* udp, UINT64 now);
+FREERDP_API BOOL rdpeudp_test_check_health(rdpUdpTransport* udp);
+
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL rdpeudp_check_health(rdpUdpTransport* udp);
 
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL rdpeudp_is_connected(const rdpUdpTransport* udp);
