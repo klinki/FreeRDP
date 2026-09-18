@@ -1,6 +1,7 @@
 # UI freeze under rapid motion — render-thread saturation (not network)
 
-Status: diagnosed 2026-09-09, unfixed. Self-recovering performance cliff, not a
+Status: diagnosed 2026-09-09; SDL redraw scheduling fix implemented 2026-09-18,
+awaiting live video-playback validation. Self-recovering performance cliff, not a
 deadlock or crash. No crash report exists; the process stays alive throughout.
 
 ## Symptom
@@ -54,8 +55,8 @@ and everything recovers when the burst ends.
 
 ## Mitigations (no code)
 
-- `+async-update`: decouples decode from the render thread; measures the true
-  upload/present ceiling.
+- `+async-update` cannot help this build: it is forced off in `update.c`, as
+  confirmed by the startup log (see the note below).
 - `/size:1920x1080`: quarters upload bandwidth; expected ~4x sustainable fps
   if upload-bound (predicted, not yet measured).
 
@@ -105,3 +106,56 @@ client.log); video evidence to be added on retake with `-capture_cursor 1`.
 
 Transport/server-side kills and black-screen-at-connect are tracked
 separately; this file stays render-path only. (Moved 2026-09-10.)
+
+## Video playback recurrence and redraw scheduling fix (2026-09-18)
+
+See [the retained incident report](../VIDEO-PLAYBACK-FINDINGS-20260918.md) for
+profiles, packet statistics, and the recovery comparison. During the freeze all
+170 main-thread samples were in drawing; after recovery 181/182 were waiting
+normally for UI events. Video continued while mouse and keyboard control failed.
+
+The previous `SDL_EVENT_USER_UPDATE` handler drained a FIFO of damage batches
+until empty. A continuous video producer could keep that loop running without
+returning to input handling. Every completed frame also posted a separate SDL
+event, letting stale redraw notifications accumulate.
+
+The implementation now:
+
+- Keeps at most one pending redraw notification in normal operation.
+- Merges overlapping damage against the latest framebuffer instead of retaining
+  old frame batches; sparse regions remain separate.
+- Caps the pending region list at 32 rectangles, falling back to a bounding box
+  when necessary. This preserves all damage while bounding uploads per UI turn.
+- Draws one snapshot per redraw event, pumps native input, then returns to the
+  event loop. Damage arriving during drawing posts another event behind already
+  queued input.
+- Clears pending damage when the connection ends.
+
+Compressed frames are still decoded in order. This is presentation scheduling;
+it does not change the transport, H.264 decoder, or server codec selection.
+
+`TestSDLUpdateQueue` covers large bursts, bounded damage coverage, sparse monitor
+updates, queued keyboard input during continued production, failed wakeups,
+session reset, wakeups consumed by dialogs, and a concurrent producer/consumer. The standalone test passed
+normally and with AddressSanitizer/UndefinedBehaviorSanitizer.
+
+Live acceptance check after restarting with the new build: reopen the same video
+tab and leave it playing while moving the pointer, typing, and operating the
+connection bar. Repeat across the two displays and while dragging windows. Input
+must remain responsive, and stopping video must leave no stale regions. This
+check remains pending; video block artifacts and YUV444 worker contention are
+separate unresolved questions.
+
+Validation completed: the full SDL client built successfully in
+`build/video-responsive`; `TestSDLUpdateQueue`, `TestSDLInputMapping`, and
+`TestSDLMonitorScale` all passed through CTest. The updated queue test also passed
+with AddressSanitizer and UndefinedBehaviorSanitizer. The executable passed its
+`/version` startup check before and after installation.
+
+The usual debug-launcher executable at
+`build/videotoolbox/client/SDL/SDL3/sdl-freerdp` was replaced atomically with this
+build on 2026-09-18 at 18:54 CEST. The running session was not restarted. The new
+executable resolves its FreeRDP libraries from `build/video-responsive`, so retain
+that build directory. The prior executable is preserved locally at
+`diagnostics/video-playback-20260918/sdl-freerdp-before-redraw-fix`; build hashes and
+test output are in `redraw-fix-build.json` and `redraw-fix-tests.log` beside it.

@@ -345,6 +345,7 @@ void SdlContext::postDisconnect(freerdp* instance)
 
 	auto sdl = get_context(instance->context);
 	sdl->setConnected(false);
+	sdl->_updates.clear();
 
 	gdi_free(instance);
 }
@@ -598,8 +599,7 @@ BOOL SdlContext::endPaint(rdpContext* context)
 		rects.push_back({ rgn.x, rgn.y, rgn.w, rgn.h });
 	}
 
-	sdl->push(std::move(rects));
-	return sdl_push_user_event(SDL_EVENT_USER_UPDATE);
+	return sdl->push(rects);
 }
 
 void SdlContext::sdl_client_cleanup(int exit_code, const std::string& error_msg)
@@ -2204,22 +2204,14 @@ int64_t SdlContext::monitorId(uint32_t index) const
 	return _monitorIds.at(index);
 }
 
-void SdlContext::push(std::vector<SDL_Rect>&& rects)
+bool SdlContext::push(const std::vector<SDL_Rect>& rects)
 {
-	std::unique_lock lock(_queue_mux);
-	_queue.emplace(std::move(rects));
+	return _updates.push(rects, SDL_EVENT_USER_UPDATE);
 }
 
 std::vector<SDL_Rect> SdlContext::pop()
 {
-	std::unique_lock lock(_queue_mux);
-	if (_queue.empty())
-	{
-		return {};
-	}
-	auto val = std::move(_queue.front());
-	_queue.pop();
-	return val;
+	return _updates.pop();
 }
 
 bool SdlContext::setFullscreen(bool enter, bool forceOriginalDisplay)
