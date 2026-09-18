@@ -25,7 +25,6 @@
 #include <sstream>
 #include <vector>
 #include <mutex>
-#include <queue>
 #include <thread>
 #include <atomic>
 
@@ -41,6 +40,7 @@
 #include "sdl_clip.hpp"
 #include "sdl_input.hpp"
 #include "sdl_rail.hpp"
+#include "sdl_update_queue.hpp"
 
 #include "dialogs/sdl_connection_dialog_wrapper.hpp"
 
@@ -98,7 +98,7 @@ class SdlContext
 	[[nodiscard]] const std::vector<SDL_DisplayID>& monitorIds() const;
 	[[nodiscard]] int64_t monitorId(uint32_t index) const;
 
-	void push(std::vector<SDL_Rect>&& rects);
+	[[nodiscard]] bool push(const std::vector<SDL_Rect>& rects);
 	[[nodiscard]] std::vector<SDL_Rect> pop();
 
 	void setHasCursor(bool val);
@@ -248,8 +248,7 @@ class SdlContext
 	std::unique_ptr<rdpPointer, void (*)(rdpPointer*)> _cursor;
 	CursorType _cursorType = CURSOR_NULL;
 	std::vector<SDL_DisplayID> _monitorIds;
-	std::mutex _queue_mux;
-	std::queue<std::vector<SDL_Rect>> _queue;
+	SdlUpdateQueue _updates;
 	/* SDL */
 	bool _fullscreen = false;
 	bool _resizeable = false;
