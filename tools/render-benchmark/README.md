@@ -60,3 +60,7 @@ For a sequence test, capture the three mode URLs separately so a failure can
 be tied to a sparse update, a single moving region, or a rectangle crossing a
 monitor seam. The page's frame counter and elapsed time are workload metrics;
 they do not measure input latency or network throughput.
+
+The page redraws its canvas and does not control the rectangles Windows sends
+over RDP. In particular, sparse canvas tiles do not guarantee sparse RDP updates.
+Record the negotiated codec and client upload counters when comparing runs.

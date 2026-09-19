@@ -173,3 +173,22 @@ The original subjects are retained below for unambiguous lookup, including gener
 | `399e8d454` | [docs] Resolve drag mapping: DPI resize convicted, wire verdicts filed |
 | `3b6f9b67b` | [client,sdl] Fix captured drags across mixed-DPI monitors |
 | `c8fde9472` | [core] Recover reliable UDP sequence wraps and stalled streams |
+
+## Additions after the original review — 2026-09-19
+
+The 64-commit snapshot above remains the original reviewed range. These later
+commits extend the feature map through `e297cbd0f`, oldest to newest.
+
+| Commit | Date | Feature | Kind | Contribution |
+| --- | --- | --- | --- | --- |
+| `9caf7000a` | 2026-09-17 | Contribution organization | Documentation | Preserve the original commit-to-feature map. |
+| `5ba31f4ea` | 2026-09-18 | Video playback responsiveness | Investigation | Record SDL event-loop starvation during continuous video updates. |
+| `8a3702904` | 2026-09-18 | Video playback responsiveness | Fix + tests | Bound redraw processing so continuous updates leave time for input. |
+| `f6d34cd3f` | 2026-09-19 | SDL rendering observability | Diagnostics + workload + tests | Add opt-in per-window upload/draw/present metrics and a repeatable offline workload. |
+| `dc9f13f80` | 2026-09-19 | Per-monitor rendering efficiency | Implementation + tests | Clip dirty regions to visible window areas, skip unaffected windows, and preserve full initialization/resize redraws. |
+| `e297cbd0f` | 2026-09-19 | Texture upload batching | Implementation + tests | Upload all dirty regions before drawing; validate scaled source bounds and test stale-pixel preservation. |
+
+The three rendering commits are separate for review and future extraction.
+Batching builds on the clipping/lifecycle change; the instrumentation is optional
+at runtime. See [rendering validation](RENDER-OPTIMIZATION-VALIDATION-20260919.md)
+for test coverage, AVC444 VM observations, measurements, and remaining limits.
