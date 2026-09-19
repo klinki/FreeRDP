@@ -27,6 +27,7 @@
 #include "sdl_input_mapping.hpp"
 #include "sdl_monitor.hpp"
 #include "sdl_pointer.hpp"
+#include "sdl_render_geometry.hpp"
 #include "sdl_touch.hpp"
 
 #include <sdl_common_utils.hpp>
@@ -2014,10 +2015,52 @@ bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects)
 {
 	if (rects.empty())
 		return true;
+	if (!isConnected())
+		return true;
+
+	const auto settings = context()->settings;
+	const bool multimon = freerdp_settings_get_bool(settings, FreeRDP_UseMultimon);
+	const bool scaled = useLocalScale();
 
 	for (auto& window : _windows)
 	{
-		if (!drawToWindow(window.second, rects))
+		auto& target = window.second;
+		if (scaled)
+		{
+			if (!drawToWindow(target, rects))
+				return false;
+			continue;
+		}
+
+		/* Recreate and clear the target before deciding that this window has no
+		 * overlap. A newly created target requires a full source repaint even if
+		 * the current damage belongs to another monitor. */
+		if (!target.ensureRenderTarget())
+			return false;
+		/* Keep each framebuffer snapshot and its clipping/draw operation under
+		 * the same recursive lock used by drawToWindow. This preserves the
+		 * existing unlock between windows while avoiding stale surfaces during a
+		 * resize or reconnect. */
+		std::unique_lock lock(_critical);
+		auto surface = _primary.get();
+		if (!surface || (surface->w <= 0) || (surface->h <= 0))
+			return false;
+		const SDL_Rect sourceBounds = { 0, 0, surface->w, surface->h };
+		if (target.needsFullRedraw(surface->w, surface->h))
+		{
+			if (!drawToWindow(target))
+				return false;
+			continue;
+		}
+
+		SDL_Point offset{ 0, 0 };
+		if (multimon)
+			offset = { target.offsetX(), target.offsetY() };
+		const auto clipped = sdl::render::clipSourceRects(rects, sourceBounds, offset,
+		                                                  target.pixelViewport());
+		if (clipped.empty())
+			continue;
+		if (!drawToWindow(target, clipped))
 			return false;
 	}
 

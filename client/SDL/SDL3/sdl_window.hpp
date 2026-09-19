@@ -51,6 +51,9 @@ class SdlWindow
 	[[nodiscard]] SDL_Window* window() const;
 	[[nodiscard]] SDL_Renderer* renderer() const;
 	[[nodiscard]] SdlRenderMetrics& renderMetrics() { return _renderMetrics; }
+	[[nodiscard]] bool ensureRenderTarget();
+	[[nodiscard]] bool needsFullRedraw() const;
+	[[nodiscard]] bool needsFullRedraw(int surfaceWidth, int surfaceHeight) const;
 
 	[[nodiscard]] Sint32 offsetX() const;
 	void setOffsetX(Sint32 x);
@@ -123,14 +126,14 @@ class SdlWindow
 	[[nodiscard]] static enum HighDPIMode isHighDPIWindowsMode(SDL_Window* window);
 
   private:
-	void ensureRenderTarget();
-
 	SDL_Window* _window = nullptr;
 	SDL_Renderer* _renderer = nullptr;
 	SDL_Texture* _renderTarget = nullptr;
 	SDL_Texture* _gdiTexture = nullptr;
 	int _gdiTextureW = 0;
 	int _gdiTextureH = 0;
+	bool _renderTargetNeedsFullRedraw = false;
+	bool _gdiTextureNeedsFullRedraw = false;
 	int _initialW = 0;
 	int _initialH = 0;
 	SDL_DisplayID _displayID = 0;
