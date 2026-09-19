@@ -31,6 +31,7 @@ set(SRCS
     sdl_input.hpp
     sdl_input_mapping.hpp
     sdl_update_queue.hpp
+    sdl_render_metrics.hpp
     sdl_touch.cpp
     sdl_touch.hpp
     sdl_pointer.cpp
@@ -96,6 +97,13 @@ installwithrpath(TARGETS ${MODULE_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR} COMP
 install_freerdp_desktop("${MODULE_NAME}" "${SDL_CLIENT_UUID}")
 
 if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
+  add_executable(TestSDLRenderMetrics test/TestSDLRenderMetrics.cpp)
+  target_link_libraries(TestSDLRenderMetrics PRIVATE Threads::Threads)
+  set_target_properties(TestSDLRenderMetrics PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                        "${TESTING_OUTPUT_DIRECTORY}")
+  add_test(NAME TestSDLRenderMetrics COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLRenderMetrics)
+  set_property(TARGET TestSDLRenderMetrics PROPERTY FOLDER "FreeRDP/Client/Test")
+
   add_executable(TestSDLUpdateQueue test/TestSDLUpdateQueue.cpp)
   if(WITH_SDL_LINK_SHARED)
     target_link_libraries(TestSDLUpdateQueue PRIVATE SDL3::SDL3 Threads::Threads)
