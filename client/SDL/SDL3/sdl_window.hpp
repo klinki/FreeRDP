@@ -126,6 +126,16 @@ class SdlWindow
 	[[nodiscard]] static enum HighDPIMode isHighDPIWindowsMode(SDL_Window* window);
 
   private:
+	struct DrawOperation
+	{
+		SDL_Rect src{};
+		SDL_FRect dst{};
+	};
+
+	[[nodiscard]] bool ensureGdiTexture(SDL_Surface* surface);
+	[[nodiscard]] bool uploadTexture(SDL_Surface* surface, const SDL_Rect& srcRect);
+	[[nodiscard]] bool drawOperations(const std::vector<DrawOperation>& operations);
+
 	SDL_Window* _window = nullptr;
 	SDL_Renderer* _renderer = nullptr;
 	SDL_Texture* _renderTarget = nullptr;

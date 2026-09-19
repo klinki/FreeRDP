@@ -94,6 +94,11 @@ struct Canvas
 	{
 		return pixels[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)];
 	}
+
+	const Pixel& at(int x, int y) const
+	{
+		return pixels[static_cast<size_t>(y) * static_cast<size_t>(width) + static_cast<size_t>(x)];
+	}
 };
 
 bool expect(bool condition, const std::string& message)
@@ -169,6 +174,43 @@ bool same(const Canvas& expected, SDL_Surface* actual, const std::string& name)
 			const Pixel got{ r, g, b, a };
 			if (!(got == expected.pixels[static_cast<size_t>(y) * static_cast<size_t>(expected.width) +
 			                              static_cast<size_t>(x)]))
+				return expect(false, name + ": first differing pixel at (" + std::to_string(x) + "," +
+			                              std::to_string(y) + ")");
+		}
+	}
+	return true;
+}
+
+bool captureTarget(SdlWindow& window, Canvas& target, const std::string& name)
+{
+	SurfacePtr actual(SDL_RenderReadPixels(window.renderer(), nullptr), SDL_DestroySurface);
+	if (!actual || actual->w != target.width || actual->h != target.height)
+		return expect(false, name + ": readback dimensions differ");
+	for (int y = 0; y < target.height; y++)
+	{
+		for (int x = 0; x < target.width; x++)
+		{
+			Uint8 r = 0;
+			Uint8 g = 0;
+			Uint8 b = 0;
+			Uint8 a = 0;
+			if (!SDL_ReadSurfacePixel(actual.get(), x, y, &r, &g, &b, &a))
+				return expect(false, name + ": unable to decode readback pixel");
+			target.at(x, y) = { r, g, b, a };
+		}
+	}
+	return true;
+}
+
+bool same(const Canvas& first, const Canvas& second, const std::string& name)
+{
+	if (first.width != second.width || first.height != second.height)
+		return expect(false, name + ": canvas dimensions differ");
+	for (int y = 0; y < first.height; y++)
+	{
+		for (int x = 0; x < first.width; x++)
+		{
+			if (!(first.at(x, y) == second.at(x, y)))
 				return expect(false, name + ": first differing pixel at (" + std::to_string(x) + "," +
 			                              std::to_string(y) + ")");
 		}
@@ -297,11 +339,11 @@ bool rendererLifecycle()
 	    !readTarget(window, smallerExpected, "source-size target pixel mismatch"))
 		return false;
 
-	// Exercise the scaled upload/draw path as a smoke check and verify that it
-	// leaves pixels outside the scaled full-source destination untouched.
+	// Exercise the scaled upload/draw path. The offscreen regions must be a
+	// no-op, including when they are submitted after a valid scaled update.
 	if (!expect(window.fill(clear.r, clear.g, clear.b, clear.a), "scaled target clear failed"))
 		return false;
-	const SDL_FPoint scale{ 1.5f, 0.75f };
+	const SDL_FPoint scale{ 1.25f, 0.75f };
 	const std::vector<SDL_Rect> scaledOffscreen = { { -30, -20, 4, 4 }, { 30, 20, 4, 4 } };
 	Canvas scaledUntouched(15, 11, clear);
 	if (!expect(window.drawScaledRects(smallerSurface.get(), scale, scaledOffscreen),
@@ -310,29 +352,64 @@ bool rendererLifecycle()
 		return false;
 	if (!expect(window.fill(clear.r, clear.g, clear.b, clear.a), "scaled target refill failed"))
 		return false;
-	if (!expect(window.drawScaledRects(smallerSurface.get(), scale), "scaled full draw failed"))
+
+	const Pixel solidColor{ 41, 123, 201, 255 };
+	Frame solid(9, 7, 0);
+	for (auto& pixel : solid.pixels)
+		pixel = solidColor;
+	const auto solidSurface = makeSurface(solid);
+	if (!expect(solidSurface != nullptr, "constant scaled source creation failed"))
 		return false;
-	SurfacePtr scaled(SDL_RenderReadPixels(window.renderer(), nullptr), SDL_DestroySurface);
-	if (!expect(scaled != nullptr, "scaled target readback failed"))
+
+	// Capture a complete scaled frame as the renderer reference. Comparing the
+	// renderer's own output avoids assumptions about nearest versus linear
+	// interpolation while still exposing missing or stale texture pixels.
+	if (!expect(window.drawScaledRects(solidSurface.get(), scale), "scaled full draw failed"))
 		return false;
-	const int scaledWidth = 14; // ceil(9 * 1.5)
+	Canvas scaledFull(15, 11, clear);
+	if (!captureTarget(window, scaledFull, "scaled full target readback"))
+		return false;
+
+	// Seed the streaming texture with different pixels so missing uploads in
+	// the tiled pass cannot be hidden by the previous full reference frame.
+	if (!expect(window.drawScaledRects(smallerSurface.get(), scale),
+	            "scaled texture stale-pixel setup failed"))
+		return false;
+	if (!expect(window.fill(clear.r, clear.g, clear.b, clear.a), "scaled tiled target clear failed"))
+		return false;
+	const std::vector<SDL_Rect> scaledTiles = {
+		{ 0, 0, 5, 4 }, { 4, 0, 5, 4 }, { 0, 3, 4, 4 }, { 3, 3, 6, 4 },
+	};
+	if (!expect(window.drawScaledRects(solidSurface.get(), scale, scaledTiles),
+	            "scaled tiled draw failed"))
+		return false;
+	Canvas scaledTiled(15, 11, clear);
+	if (!captureTarget(window, scaledTiled, "scaled tiled target readback") ||
+	    !same(scaledFull, scaledTiled, "scaled full versus tiled output"))
+		return false;
+
+	if (!expect(window.drawScaledRects(solidSurface.get(), scale, scaledOffscreen),
+	            "scaled post-update offscreen draw failed"))
+		return false;
+	Canvas scaledAfterOffscreen(15, 11, clear);
+	if (!captureTarget(window, scaledAfterOffscreen, "scaled post-update offscreen readback") ||
+	    !same(scaledTiled, scaledAfterOffscreen, "scaled offscreen changed output"))
+		return false;
+
+	// The destination dimensions are derived from the same fractional scale;
+	// only assert coverage and untouched pixels here, leaving interpolation to
+	// the full-versus-tiled comparison above.
+	const int scaledWidth = 12; // ceil(9 * 1.25)
 	const int scaledHeight = 6; // ceil(7 * .75)
 	bool changed = false;
-	for (int y = 0; y < scaled->h; y++)
+	for (int y = 0; y < scaledFull.height; y++)
 	{
-		for (int x = 0; x < scaled->w; x++)
+		for (int x = 0; x < scaledFull.width; x++)
 		{
-			Uint8 r = 0;
-			Uint8 g = 0;
-			Uint8 b = 0;
-			Uint8 a = 0;
-			if (!SDL_ReadSurfacePixel(scaled.get(), x, y, &r, &g, &b, &a))
-				return expect(false, "scaled target pixel unreadable");
-			const Pixel pixel{ r, g, b, a };
 			const bool inside = x < scaledWidth && y < scaledHeight;
 			if (inside)
-				changed = changed || !(pixel == clear);
-			else if (!(pixel == clear))
+				changed = changed || !(scaledFull.at(x, y) == clear);
+			else if (!(scaledFull.at(x, y) == clear))
 				return expect(false, "scaled draw painted outside its destination");
 		}
 	}

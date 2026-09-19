@@ -39,6 +39,20 @@ constexpr Uint8 stalledDimAlpha = 48;
 constexpr float stalledFontPts = 32.0f;
 constexpr SDL_Color stalledTextColor = { 0xf2, 0xf6, 0xfb, 0xff };
 constexpr SDL_Color stalledShadowColor = { 0x00, 0x00, 0x00, 0xc0 };
+
+[[nodiscard]] SDL_FRect scaledDestination(const SDL_Rect& srcRect, const SDL_FPoint& scale)
+{
+	float ix = 0.0f;
+	float iy = 0.0f;
+	const auto modx = std::modf(static_cast<float>(srcRect.x) * scale.x, &ix);
+	const auto mody = std::modf(static_cast<float>(srcRect.y) * scale.y, &iy);
+	const auto sw = std::ceil(static_cast<float>(srcRect.w) * scale.x) + std::ceil(modx);
+	const auto sh = std::ceil(static_cast<float>(srcRect.h) * scale.y) + std::ceil(mody);
+	return { static_cast<float>(static_cast<Sint32>(ix)),
+	         static_cast<float>(static_cast<Sint32>(iy)),
+	         static_cast<float>(static_cast<Sint32>(sw)),
+	         static_cast<float>(static_cast<Sint32>(sh)) };
+}
 } // namespace
 
 SdlWindow::SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect& rect,
@@ -367,23 +381,45 @@ bool SdlWindow::drawRects(SDL_Surface* surface, SDL_Point offset,
 	if (!surface || !ensureRenderTarget())
 		return false;
 	const bool fullRedraw = rects.empty() || needsFullRedraw(surface->w, surface->h);
+	std::vector<DrawOperation> operations;
 	if (fullRedraw)
 	{
-		if (!drawRect(surface, offset, { 0, 0, surface->w, surface->h }))
+		operations.push_back({ { 0, 0, surface->w, surface->h },
+		                       { static_cast<float>(offset.x), static_cast<float>(offset.y),
+		                         static_cast<float>(surface->w), static_cast<float>(surface->h) } });
+	}
+	else
+	{
+		const SDL_Rect sourceBounds = { 0, 0, surface->w, surface->h };
+		const auto viewport = pixelViewport();
+		operations.reserve(rects.size());
+		for (const auto& srcRect : rects)
+		{
+			const auto clipped =
+			    sdl::render::clipSourceRect(srcRect, sourceBounds, offset, viewport);
+			if ((clipped.w <= 0) || (clipped.h <= 0))
+				continue;
+			operations.push_back({ clipped,
+			                       { static_cast<float>(static_cast<Sint64>(offset.x) + clipped.x),
+			                         static_cast<float>(static_cast<Sint64>(offset.y) + clipped.y),
+			                         static_cast<float>(clipped.w), static_cast<float>(clipped.h) } });
+		}
+	}
+
+	if (!operations.empty() && !ensureGdiTexture(surface))
+		return false;
+	for (const auto& operation : operations)
+	{
+		if (!uploadTexture(surface, operation.src))
 			return false;
+	}
+	if (!drawOperations(operations))
+		return false;
+
+	if (fullRedraw)
+	{
 		_renderTargetNeedsFullRedraw = false;
 		_gdiTextureNeedsFullRedraw = false;
-		return true;
-	}
-	const SDL_Rect sourceBounds = { 0, 0, surface->w, surface->h };
-	const auto viewport = pixelViewport();
-	for (const auto& srcRect : rects)
-	{
-		const auto clipped = sdl::render::clipSourceRect(srcRect, sourceBounds, offset, viewport);
-		if ((clipped.w <= 0) || (clipped.h <= 0))
-			continue;
-		if (!drawRect(surface, offset, clipped))
-			return false;
 	}
 	return true;
 }
@@ -391,18 +427,15 @@ bool SdlWindow::drawRects(SDL_Surface* surface, SDL_Point offset,
 bool SdlWindow::drawScaledRect(SDL_Surface* surface, const SDL_FPoint& scale,
                                const SDL_Rect& srcRect)
 {
-	SDL_Rect dstRect = {};
-	float ix = 0.0f;
-	float iy = 0.0f;
-	const auto modx = std::modf(static_cast<float>(srcRect.x) * scale.x, &ix);
-	const auto mody = std::modf(static_cast<float>(srcRect.y) * scale.y, &iy);
-	auto sw = std::ceil(static_cast<float>(srcRect.w) * scale.x) + std::ceil(modx);
-	auto sh = std::ceil(static_cast<float>(srcRect.h) * scale.y) + std::ceil(mody);
-	dstRect.x = static_cast<Sint32>(ix);
-	dstRect.w = static_cast<Sint32>(sw);
-	dstRect.y = static_cast<Sint32>(iy);
-	dstRect.h = static_cast<Sint32>(sh);
-	return blit(surface, srcRect, dstRect);
+	if (!surface)
+		return false;
+	const auto clipped = sdl::render::intersection(srcRect, { 0, 0, surface->w, surface->h });
+	if (clipped.w <= 0 || clipped.h <= 0)
+		return true;
+	const auto dst = scaledDestination(clipped, scale);
+	SDL_Rect dstRect = { static_cast<Sint32>(dst.x), static_cast<Sint32>(dst.y),
+	                     static_cast<Sint32>(dst.w), static_cast<Sint32>(dst.h) };
+	return blit(surface, clipped, dstRect);
 }
 
 bool SdlWindow::drawScaledRects(SDL_Surface* surface, const SDL_FPoint& scale,
@@ -411,18 +444,39 @@ bool SdlWindow::drawScaledRects(SDL_Surface* surface, const SDL_FPoint& scale,
 	if (!surface || !ensureRenderTarget())
 		return false;
 	const bool fullRedraw = rects.empty() || needsFullRedraw(surface->w, surface->h);
+	std::vector<DrawOperation> operations;
+	const SDL_Rect sourceBounds = { 0, 0, surface->w, surface->h };
 	if (fullRedraw)
 	{
-		if (!drawScaledRect(surface, scale, { 0, 0, surface->w, surface->h }))
+		const auto srcRect = sourceBounds;
+		operations.push_back({ srcRect, scaledDestination(srcRect, scale) });
+	}
+	else
+	{
+		operations.reserve(rects.size());
+		for (const auto& srcRect : rects)
+		{
+			const auto clipped = sdl::render::intersection(srcRect, sourceBounds);
+			if ((clipped.w <= 0) || (clipped.h <= 0))
+				continue;
+			operations.push_back({ clipped, scaledDestination(clipped, scale) });
+		}
+	}
+
+	if (!operations.empty() && !ensureGdiTexture(surface))
+		return false;
+	for (const auto& operation : operations)
+	{
+		if (!uploadTexture(surface, operation.src))
 			return false;
+	}
+	if (!drawOperations(operations))
+		return false;
+
+	if (fullRedraw)
+	{
 		_renderTargetNeedsFullRedraw = false;
 		_gdiTextureNeedsFullRedraw = false;
-		return true;
-	}
-	for (const auto& srcRect : rects)
-	{
-		if (!drawScaledRect(surface, scale, srcRect))
-			return false;
 	}
 	return true;
 }
@@ -579,31 +633,43 @@ SdlWindow::HighDPIMode SdlWindow::isHighDPIWindowsMode(SDL_Window* window)
 	return MODE_WINDOWS;
 }
 
-bool SdlWindow::blit(SDL_Surface* surface, const SDL_Rect& srcRect, SDL_Rect& dstRect)
+bool SdlWindow::ensureGdiTexture(SDL_Surface* surface)
 {
-	if (!_renderer || !surface)
+	if (!_renderer || !surface || surface->w <= 0 || surface->h <= 0)
 		return false;
-	if (!ensureRenderTarget())
-		return false;
+	if (_gdiTexture && _gdiTextureW == surface->w && _gdiTextureH == surface->h)
+		return true;
 
-	/* Lazily create or recreate the persistent GDI texture */
-	if (!_gdiTexture || _gdiTextureW != surface->w || _gdiTextureH != surface->h)
+	if (_gdiTexture)
 	{
-		if (_gdiTexture)
-			SDL_DestroyTexture(_gdiTexture);
-		_gdiTexture = SDL_CreateTexture(_renderer, surface->format, SDL_TEXTUREACCESS_STREAMING,
-		                                surface->w, surface->h);
-		if (!_gdiTexture)
-		{
-			SDL_LogError(SDL_LOG_CATEGORY_RENDER, "SDL_CreateTexture: %s", SDL_GetError());
-			return false;
-		}
-		_gdiTextureW = surface->w;
-		_gdiTextureH = surface->h;
-		_gdiTextureNeedsFullRedraw = true;
+		SDL_DestroyTexture(_gdiTexture);
+		_gdiTexture = nullptr;
 	}
+	_gdiTexture = SDL_CreateTexture(_renderer, surface->format, SDL_TEXTUREACCESS_STREAMING,
+	                                surface->w, surface->h);
+	if (!_gdiTexture)
+	{
+		SDL_LogError(SDL_LOG_CATEGORY_RENDER, "SDL_CreateTexture: %s", SDL_GetError());
+		_gdiTextureW = 0;
+		_gdiTextureH = 0;
+		return false;
+	}
+	_gdiTextureW = surface->w;
+	_gdiTextureH = surface->h;
+	_gdiTextureNeedsFullRedraw = true;
+	return true;
+}
 
-	/* Upload only the dirty region */
+bool SdlWindow::uploadTexture(SDL_Surface* surface, const SDL_Rect& srcRect)
+{
+	if (!_renderer || !surface || !surface->pixels || !_gdiTexture || srcRect.w <= 0 ||
+	    srcRect.h <= 0)
+		return false;
+	const Sint64 right = static_cast<Sint64>(srcRect.x) + srcRect.w;
+	const Sint64 bottom = static_cast<Sint64>(srcRect.y) + srcRect.h;
+	if (srcRect.x < 0 || srcRect.y < 0 || right > surface->w || bottom > surface->h)
+		return false;
+
 	const auto* details = SDL_GetPixelFormatDetails(surface->format);
 	const int bpp = details ? details->bytes_per_pixel : 4;
 	const auto* pixels = static_cast<const uint8_t*>(surface->pixels) +
@@ -617,22 +683,53 @@ bool SdlWindow::blit(SDL_Surface* surface, const SDL_Rect& srcRect, SDL_Rect& ds
 		return false;
 	}
 	uploadTimer.stop();
+	return true;
+}
 
-	/* Render onto persistent render target to accumulate dirty rects */
-	auto drawTimer = _renderMetrics.beginDraw();
+bool SdlWindow::drawOperations(const std::vector<DrawOperation>& operations)
+{
+	if (operations.empty())
+		return true;
+	if (!_renderer || !_renderTarget || !_gdiTexture)
+		return false;
 	if (!SDL_SetRenderTarget(_renderer, _renderTarget))
 		return false;
 
-	SDL_FRect fsrc = { static_cast<float>(srcRect.x), static_cast<float>(srcRect.y),
-		               static_cast<float>(srcRect.w), static_cast<float>(srcRect.h) };
-	SDL_FRect fdst = { static_cast<float>(dstRect.x), static_cast<float>(dstRect.y),
-		               static_cast<float>(dstRect.w), static_cast<float>(dstRect.h) };
-	if (!SDL_RenderTexture(_renderer, _gdiTexture, &fsrc, &fdst))
+	for (const auto& operation : operations)
 	{
-		SDL_LogError(SDL_LOG_CATEGORY_RENDER, "SDL_RenderTexture: %s", SDL_GetError());
-		return false;
+		if (operation.src.w <= 0 || operation.src.h <= 0 || operation.dst.w <= 0.0f ||
+		    operation.dst.h <= 0.0f)
+			return false;
+		const SDL_FRect src = { static_cast<float>(operation.src.x),
+		                        static_cast<float>(operation.src.y),
+		                        static_cast<float>(operation.src.w),
+		                        static_cast<float>(operation.src.h) };
+		auto drawTimer = _renderMetrics.beginDraw();
+		if (!SDL_RenderTexture(_renderer, _gdiTexture, &src, &operation.dst))
+		{
+			SDL_LogError(SDL_LOG_CATEGORY_RENDER, "SDL_RenderTexture: %s", SDL_GetError());
+			return false;
+		}
+		drawTimer.stop();
 	}
 	return true;
+}
+
+bool SdlWindow::blit(SDL_Surface* surface, const SDL_Rect& srcRect, SDL_Rect& dstRect)
+{
+	if (!_renderer || !surface)
+		return false;
+	if (!ensureRenderTarget())
+		return false;
+	if (!ensureGdiTexture(surface) || !uploadTexture(surface, srcRect))
+		return false;
+
+	const DrawOperation operation = { srcRect,
+	                                  { static_cast<float>(dstRect.x),
+	                                    static_cast<float>(dstRect.y),
+	                                    static_cast<float>(dstRect.w),
+	                                    static_cast<float>(dstRect.h) } };
+	return drawOperations({ operation });
 }
 
 bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& pointer)
