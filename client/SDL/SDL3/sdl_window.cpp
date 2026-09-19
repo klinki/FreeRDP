@@ -70,6 +70,7 @@ SdlWindow::SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect&
 
 	_window = SDL_CreateWindowWithProperties(props);
 	SDL_DestroyProperties(props);
+	_renderMetrics.setIdentity(_window ? SDL_GetWindowID(_window) : 0, id);
 	SDL_SetHint(SDL_HINT_APP_NAME, "");
 	std::ignore = SDL_SyncWindow(_window);
 
@@ -86,7 +87,8 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
       _gdiTexture(other._gdiTexture), _gdiTextureW(other._gdiTextureW),
       _gdiTextureH(other._gdiTextureH), _initialW(other._initialW), _initialH(other._initialH),
       _displayID(other._displayID), _offset_x(other._offset_x), _offset_y(other._offset_y),
-      _monitor(other._monitor), _topBar(std::move(other._topBar))
+      _renderMetrics(std::move(other._renderMetrics)), _monitor(other._monitor),
+      _topBar(std::move(other._topBar))
 {
 	other._window = nullptr;
 	other._renderer = nullptr;
@@ -546,13 +548,18 @@ bool SdlWindow::blit(SDL_Surface* surface, const SDL_Rect& srcRect, SDL_Rect& ds
 	const int bpp = details ? details->bytes_per_pixel : 4;
 	const auto* pixels = static_cast<const uint8_t*>(surface->pixels) +
 	                     (1ll * srcRect.y * surface->pitch) + (1ll * srcRect.x * bpp);
+	auto uploadTimer = _renderMetrics.beginUpload(
+	    static_cast<uint64_t>(srcRect.w) * srcRect.h,
+	    static_cast<uint64_t>(srcRect.w) * srcRect.h * bpp);
 	if (!SDL_UpdateTexture(_gdiTexture, &srcRect, pixels, surface->pitch))
 	{
 		SDL_LogError(SDL_LOG_CATEGORY_RENDER, "SDL_UpdateTexture: %s", SDL_GetError());
 		return false;
 	}
+	uploadTimer.stop();
 
 	/* Render onto persistent render target to accumulate dirty rects */
+	auto drawTimer = _renderMetrics.beginDraw();
 	if (!SDL_SetRenderTarget(_renderer, _renderTarget))
 		return false;
 
@@ -595,6 +602,7 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 			return false;
 	}
 
+	auto presentTimer = _renderMetrics.beginPresent();
 	return SDL_RenderPresent(_renderer);
 }
 

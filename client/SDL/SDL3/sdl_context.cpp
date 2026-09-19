@@ -946,6 +946,27 @@ bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& re
 
 	std::unique_lock lock(_critical);
 	auto surface = _primary.get();
+	auto& metrics = window.renderMetrics();
+	uint64_t attemptedPixels = 0;
+	if (metrics.enabled() && surface)
+	{
+		if (rects.empty())
+			attemptedPixels = static_cast<uint64_t>(surface->w) * surface->h;
+		else
+		{
+			for (const auto& rect : rects)
+			{
+				if ((rect.w > 0) && (rect.h > 0))
+					attemptedPixels += static_cast<uint64_t>(rect.w) * rect.h;
+			}
+		}
+	}
+	metrics.beginFrame(attemptedPixels);
+	struct EndMetricsFrame
+	{
+		SdlRenderMetrics& metrics;
+		~EndMetricsFrame() { metrics.endFrame(); }
+	} endMetricsFrame{ metrics };
 
 	if (useLocalScale())
 	{

@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FreeRDP render benchmark</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #08111c; }
+    body { font: 14px/1.35 ui-monospace, SFMono-Regular, Consolas, monospace; }
+    #screen { display: block; width: 100vw; height: 100vh; image-rendering: auto; }
+    #hud {
+      position: fixed; left: 12px; bottom: 10px; padding: 7px 10px;
+      color: #d8e8f6; background: rgba(3, 10, 18, .82); border: 1px solid #49657a;
+      border-radius: 3px; white-space: pre; user-select: none; pointer-events: none;
+    }
+    .done { color: #8ff0bd; }
+  </style>
+</head>
+<body>
+<canvas id="screen" aria-label="deterministic render benchmark"></canvas>
+<div id="hud">starting…</div>
+<script>
+'use strict';
+
+/*
+ * A self-contained canvas workload for FreeRDP SDL rendering tests. It uses
+ * no network resources, fonts, or browser APIs beyond Canvas 2D and
+ * requestAnimationFrame. The drawing coordinates are integer canvas pixels,
+ * so a checkpoint can be compared across runs without a timing dependency.
+ *
+ * Query parameters:
+ *   mode=one|sparse|cross|cycle   (default: cycle)
+ *   duration=SECONDS              (default: 30; 0 means checkpoint only)
+ *   seed=INTEGER                   (default: 20260919)
+ *   width=PIXELS&height=PIXELS    (default: 1920x1080)
+ *   fps=NUMBER                    (logical animation rate, default: 60)
+ *   phase=SECONDS                 (cycle phase length, default: duration / 3)
+ *   checkpoint=1                  (render the static checkpoint immediately)
+ *   hud=0                         (hide the status overlay for screenshots)
+ */
+
+const query = new URLSearchParams(location.search);
+const numberParam = (name, fallback, min, max) => {
+  const raw = query.get(name);
+  if (raw === null || raw.trim() === '') return fallback;
+  const value = Number(raw);
+  return Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback;
+};
+const integerParam = (name, fallback, min, max) => Math.floor(numberParam(name, fallback, min, max));
+
+const canvas = document.getElementById('screen');
+const hud = document.getElementById('hud');
+const width = integerParam('width', 1920, 64, 8192);
+const height = integerParam('height', 1080, 64, 8192);
+const duration = numberParam('duration', 30, 0, 3600);
+const seed = integerParam('seed', 20260919, 0, 0x7fffffff) >>> 0;
+const fps = numberParam('fps', 60, 1, 120);
+const requestedMode = (query.get('mode') || 'cycle').toLowerCase();
+const mode = ['one', 'sparse', 'cross', 'cycle'].includes(requestedMode) ? requestedMode : 'cycle';
+const cyclePhaseSeconds = numberParam('phase', Math.max(1, duration / 3), .25, 3600);
+const checkpointOnly = query.get('checkpoint') === '1' || duration === 0;
+
+canvas.width = width;
+canvas.height = height;
+const ctx = canvas.getContext('2d', { alpha: false, desynchronized: false });
+if (!ctx) throw new Error('Canvas 2D is unavailable');
+ctx.imageSmoothingEnabled = false;
+
+const TAU = Math.PI * 2;
+const palette = [
+  '#0b1724', '#102a3d', '#154763', '#1e6a83', '#36b1a2', '#8fe08f',
+  '#f1c75b', '#ef8e4d', '#d95062', '#965590', '#5966bb', '#d8e8f6'
+];
+
+function mixSeed(value) {
+  let x = (value ^ 0x9e3779b9) >>> 0;
+  x ^= x >>> 16; x = Math.imul(x, 0x21f0aaad) >>> 0;
+  x ^= x >>> 15; x = Math.imul(x, 0x735a2d97) >>> 0;
+  return (x ^ (x >>> 15)) >>> 0;
+}
+
+function randAt(index) {
+  let x = (mixSeed(seed) + Math.imul(index >>> 0, 0x45d9f3b)) >>> 0;
+  x ^= x >>> 16; x = Math.imul(x, 0x7feb352d) >>> 0;
+  x ^= x >>> 15; x = Math.imul(x, 0x846ca68b) >>> 0;
+  return ((x ^ (x >>> 16)) >>> 0) / 0x100000000;
+}
+
+function rect(x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(Math.round(x), Math.round(y), Math.max(0, Math.round(w)), Math.max(0, Math.round(h)));
+}
+
+function strokeRect(x, y, w, h, color, lineWidth = 2) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lineWidth;
+  ctx.strokeRect(Math.round(x) + .5, Math.round(y) + .5, Math.round(w) - 1, Math.round(h) - 1);
+}
+
+function label(text, x, y, size = 18, color = '#d8e8f6') {
+  ctx.font = `${size}px ui-monospace, SFMono-Regular, Consolas, monospace`;
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = color;
+  ctx.fillText(text, Math.round(x), Math.round(y));
+}
+
+function drawStaticBackdrop(frame) {
+  rect(0, 0, width, height, palette[0]);
+  const band = Math.max(24, Math.floor(height / 18));
+  for (let y = 0; y < height; y += band) {
+    rect(0, y, width, Math.min(band, height - y), (y / band) % 2 ? palette[1] : palette[0]);
+  }
+
+  // A regular grid exposes one-pixel shifts and stale pixels at every edge.
+  ctx.strokeStyle = 'rgba(76, 145, 169, .32)';
+  ctx.lineWidth = 1;
+  const grid = Math.max(32, Math.floor(Math.min(width, height) / 18));
+  for (let x = 0; x <= width; x += grid) {
+    ctx.beginPath(); ctx.moveTo(x + .5, 0); ctx.lineTo(x + .5, height); ctx.stroke();
+  }
+  for (let y = 0; y <= height; y += grid) {
+    ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(width, y + .5); ctx.stroke();
+  }
+
+  const top = Math.max(56, Math.floor(height * .075));
+  rect(0, 0, width, top, '#07101a');
+  label('FreeRDP / SDL3 deterministic render workload', 20, 14, Math.max(16, Math.floor(height / 58)));
+  label(`seed=${seed}  canvas=${width}x${height}`, 20, top - 25, Math.max(12, Math.floor(height / 90)), '#8fb2c9');
+
+  // Stable high-contrast markers around the drawable edges.
+  const marker = Math.max(8, Math.floor(Math.min(width, height) / 80));
+  rect(0, top, marker, marker, palette[5]);
+  rect(width - marker, top, marker, marker, palette[8]);
+  rect(0, height - marker, marker, marker, palette[7]);
+  rect(width - marker, height - marker, marker, marker, palette[6]);
+
+  // Stable color bars keep visual corruption obvious in screenshots.
+  const barsY = height - Math.max(58, Math.floor(height * .09));
+  const barsH = Math.max(18, Math.floor(height * .028));
+  const barsW = Math.max(1, Math.floor(width / palette.length));
+  for (let i = 0; i < palette.length; i++) rect(i * barsW, barsY, barsW + 1, barsH, palette[i]);
+  label('static checkpoint rendered when the timed run ends', 20, barsY + barsH + 8,
+        Math.max(12, Math.floor(height / 95)), '#8fb2c9');
+}
+
+function drawOne(frame) {
+  const top = Math.max(56, Math.floor(height * .075));
+  const areaY = top + Math.max(28, Math.floor(height * .04));
+  const areaH = Math.max(64, height - areaY - Math.max(90, Math.floor(height * .14)));
+  const panelW = Math.max(140, Math.floor(width * .23));
+  const travel = Math.max(1, width - panelW - 2 * Math.max(14, Math.floor(width * .06)));
+  const x = Math.max(14, Math.floor(width * .06)) + Math.round((frame % 360) / 359 * travel);
+  const y = areaY + Math.round((Math.sin(frame * .045) * .28 + .5) * Math.max(1, areaH - Math.floor(height * .3)));
+  const panelH = Math.max(52, Math.floor(height * .26));
+
+  rect(x, y, panelW, panelH, palette[8]);
+  strokeRect(x, y, panelW, panelH, palette[11], 3);
+  rect(x + 12, y + 12, panelW - 24, Math.max(12, Math.floor(panelH * .17)), palette[10]);
+  for (let i = 0; i < 7; i++) {
+    const barW = Math.max(4, Math.floor((panelW - 34) * (.25 + randAt(frame * 11 + i) * .7)));
+    rect(x + 17, y + 38 + i * Math.max(12, Math.floor(panelH / 9)), barW, 7, palette[2 + (i % 5)]);
+  }
+  label('ONE REGION', x + 14, y + panelH - 24, Math.max(11, Math.floor(height / 100)), '#ffffff');
+}
+
+function drawSparse(frame) {
+  const top = Math.max(56, Math.floor(height * .075));
+  const left = Math.max(16, Math.floor(width * .06));
+  const right = width - left;
+  const bottom = height - Math.max(100, Math.floor(height * .14));
+  const cols = Math.max(8, Math.floor(width / 160));
+  const rows = Math.max(4, Math.floor(height / 120));
+  const tileW = Math.max(12, Math.floor((right - left) / cols) - 8);
+  const tileH = Math.max(10, Math.floor((bottom - top) / rows) - 8);
+  const phase = frame % 120;
+  for (let i = 0; i < cols * rows; i++) {
+    const x = left + (i % cols) * Math.floor((right - left) / cols);
+    const y = top + Math.floor(i / cols) * Math.floor((bottom - top) / rows);
+    const live = ((i * 17 + phase * 13 + Math.floor(frame / 120) * 7) % 31) < 5;
+    if (!live) continue;
+    const color = palette[2 + ((i + Math.floor(frame / 11)) % 9)];
+    rect(x, y, tileW, tileH, color);
+    strokeRect(x, y, tileW, tileH, palette[11], 1);
+    if (tileW > 28) rect(x + 4, y + 4, Math.max(3, tileW * .18), tileH - 8, palette[(i + 5) % palette.length]);
+  }
+  label('SPARSE TILES', left, bottom + 10, Math.max(12, Math.floor(height / 90)), '#c4e2ef');
+}
+
+function drawCross(frame) {
+  const top = Math.max(56, Math.floor(height * .075));
+  const seam = Math.floor(width / 2);
+  const areaY = top + Math.max(28, Math.floor(height * .04));
+  const areaH = Math.max(100, height - areaY - Math.max(100, Math.floor(height * .14)));
+  const panelW = Math.max(200, Math.floor(width * .58));
+  const panelH = Math.max(100, Math.floor(height * .43));
+  const cycle = frame % 480;
+  const x = Math.round(seam - panelW + ((cycle < 240 ? cycle : 480 - cycle) / 240) * panelW * 1.2);
+  const y = areaY + Math.round(Math.sin(frame * .025) * Math.min(30, height * .04));
+
+  // Explicit seam markers emulate neighboring monitor edges.
+  rect(seam - 2, top, 4, height - top, '#f4d35e');
+  rect(seam - 1, top, 2, height - top, '#ffffff');
+  label('MONITOR A', Math.max(16, seam - Math.floor(width * .45)), top + 12,
+        Math.max(12, Math.floor(height / 90)), '#8fb2c9');
+  label('MONITOR B', Math.min(width - 150, seam + 18), top + 12,
+        Math.max(12, Math.floor(height / 90)), '#8fb2c9');
+
+  rect(x, y, panelW, panelH, palette[3]);
+  strokeRect(x, y, panelW, panelH, '#ffffff', 3);
+  rect(x + 16, y + 16, panelW - 32, Math.max(16, Math.floor(panelH * .2)), palette[9]);
+  for (let i = 0; i < 10; i++) {
+    const yy = y + 50 + i * Math.max(12, Math.floor(panelH / 12));
+    const ww = Math.max(5, Math.floor((panelW - 46) * (.2 + randAt(frame * 5 + i) * .72)));
+    rect(x + 23, yy, ww, 7, palette[4 + (i % 6)]);
+  }
+  label('CROSS-MONITOR LARGE AREA', x + 18, y + panelH - 26, Math.max(11, Math.floor(height / 100)), '#ffffff');
+}
+
+function drawFrame(frame, selectedMode) {
+  drawStaticBackdrop(frame);
+  if (selectedMode === 'one') drawOne(frame);
+  else if (selectedMode === 'sparse') drawSparse(frame);
+  else drawCross(frame);
+}
+
+function fnv1a(bytes) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < bytes.length; i++) {
+    hash ^= bytes[i];
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+function pixelHash() {
+  return fnv1a(ctx.getImageData(0, 0, width, height).data);
+}
+
+function selectedModeAt(timeSeconds) {
+  if (mode !== 'cycle') return mode;
+  const index = Math.min(2, Math.floor(timeSeconds / cyclePhaseSeconds));
+  return ['one', 'sparse', 'cross'][index];
+}
+
+const staticFrame = (mixSeed(seed) % 997) + 997;
+let startedAt = 0;
+let lastFrame = -1;
+let rendered = 0;
+let finished = false;
+
+function renderCheckpoint() {
+  drawFrame(staticFrame, mode === 'cycle' ? 'cross' : mode);
+  const hash = pixelHash();
+  hud.textContent = `CHECKPOINT READY\nmode=${mode} seed=${seed} frame=${staticFrame}` +
+                    `\npixels=${width}x${height} hash=${hash}`;
+  hud.className = 'done';
+  finished = true;
+  window.renderBenchmark.state = 'checkpoint';
+  window.renderBenchmark.checkpoint = { frame: staticFrame, hash, mode, width, height, seed };
+}
+
+function tick(timestamp) {
+  if (!startedAt) startedAt = timestamp;
+  const elapsed = (timestamp - startedAt) / 1000;
+  const frame = Math.floor(elapsed * fps);
+  if (frame !== lastFrame) {
+    drawFrame(frame, selectedModeAt(elapsed));
+    lastFrame = frame;
+    rendered++;
+  }
+  const remaining = Math.max(0, duration - elapsed);
+  hud.textContent = `RUNNING ${mode}\nseed=${seed} frame=${frame} drawn=${rendered}` +
+                    `\nremaining=${remaining.toFixed(1)}s`;
+  window.renderBenchmark.state = 'running';
+  window.renderBenchmark.frames = rendered;
+  window.renderBenchmark.elapsed = elapsed;
+  if (elapsed >= duration) {
+    renderCheckpoint();
+    return;
+  }
+  requestAnimationFrame(tick);
+}
+
+window.renderBenchmark = {
+  config: { mode, duration, seed, width, height, fps, cyclePhaseSeconds, staticFrame },
+  state: 'starting', frames: 0, elapsed: 0, checkpoint: null,
+  renderCheckpoint,
+  getPixelHash: pixelHash
+};
+
+if (query.get('hud') === '0') hud.hidden = true;
+if (checkpointOnly) renderCheckpoint();
+else requestAnimationFrame(tick);
+</script>
+</body>
+</html>
