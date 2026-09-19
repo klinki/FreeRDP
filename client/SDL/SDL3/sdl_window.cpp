@@ -22,6 +22,7 @@
 #include <cmath>
 
 #include "sdl_window.hpp"
+#include "sdl_render_geometry.hpp"
 #include "sdl_utils.hpp"
 
 #include <freerdp/utils/string.h>
@@ -78,8 +79,11 @@ SdlWindow::SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect&
 SdlWindow::SdlWindow(SdlWindow&& other) noexcept
     : _window(other._window), _renderer(other._renderer), _renderTarget(other._renderTarget),
       _gdiTexture(other._gdiTexture), _gdiTextureW(other._gdiTextureW),
-      _gdiTextureH(other._gdiTextureH), _initialW(other._initialW), _initialH(other._initialH),
-      _displayID(other._displayID), _offset_x(other._offset_x), _offset_y(other._offset_y),
+      _gdiTextureH(other._gdiTextureH),
+      _renderTargetNeedsFullRedraw(other._renderTargetNeedsFullRedraw),
+      _gdiTextureNeedsFullRedraw(other._gdiTextureNeedsFullRedraw), _initialW(other._initialW),
+      _initialH(other._initialH), _displayID(other._displayID), _offset_x(other._offset_x),
+      _offset_y(other._offset_y),
       _renderMetrics(std::move(other._renderMetrics)), _monitor(other._monitor),
       _topBar(std::move(other._topBar))
 {
@@ -87,6 +91,8 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
 	other._renderer = nullptr;
 	other._renderTarget = nullptr;
 	other._gdiTexture = nullptr;
+	other._renderTargetNeedsFullRedraw = false;
+	other._gdiTextureNeedsFullRedraw = false;
 }
 
 SdlWindow::~SdlWindow()
@@ -280,27 +286,28 @@ bool SdlWindow::resize(const SDL_Point& size)
 	return SDL_SetWindowSize(_window, size.x, size.y);
 }
 
-void SdlWindow::ensureRenderTarget()
+bool SdlWindow::ensureRenderTarget()
 {
 	if (!_renderer)
-		return;
+		return false;
 
 	int w = 0;
 	int h = 0;
-	SDL_GetWindowSizeInPixels(_window, &w, &h);
+	if (!SDL_GetWindowSizeInPixels(_window, &w, &h))
+		return false;
 	if (w <= 0 || h <= 0)
-		return;
+		return false;
 
 	/* Recreate if missing or if window size changed */
 	if (_renderTarget)
 	{
 		float tw = 0;
 		float th = 0;
-		if (!SDL_GetTextureSize(_renderTarget, &tw, &th))
-			return;
-		if (static_cast<int>(tw) == w && static_cast<int>(th) == h)
-			return;
+		if (SDL_GetTextureSize(_renderTarget, &tw, &th) && static_cast<int>(tw) == w &&
+		    static_cast<int>(th) == h)
+			return true;
 		SDL_DestroyTexture(_renderTarget);
+		_renderTarget = nullptr;
 	}
 
 	_renderTarget =
@@ -309,17 +316,37 @@ void SdlWindow::ensureRenderTarget()
 	{
 		SDL_LogError(SDL_LOG_CATEGORY_RENDER, "SDL_CreateTexture (render target): %s",
 		             SDL_GetError());
-		return;
+		return false;
 	}
 	/* Verbatim, never blended: a transparent window's alpha<0xFF regions would render black. */
 	std::ignore = SDL_SetTextureBlendMode(_renderTarget, SDL_BLENDMODE_NONE);
+	_renderTargetNeedsFullRedraw = true;
 
-	/* Clear once: transparent so windows never flash black before painting. */
-	if (SDL_SetRenderTarget(_renderer, _renderTarget))
+	/* SDL does not guarantee the contents of a newly created target. Clear it
+	 * (transparent, so windows never flash black) before any presentation, and
+	 * retain the full-redraw flag until a source upload has painted the target. */
+	if (!SDL_SetRenderTarget(_renderer, _renderTarget) ||
+	    !SDL_SetRenderDrawColor(_renderer, 0x00, 0x00, 0x00, 0x00) || !SDL_RenderClear(_renderer))
 	{
-		std::ignore = SDL_SetRenderDrawColor(_renderer, 0x00, 0x00, 0x00, 0x00);
-		std::ignore = SDL_RenderClear(_renderer);
+		SDL_LogError(SDL_LOG_CATEGORY_RENDER, "SDL_RenderClear (render target): %s",
+		             SDL_GetError());
+		(void)SDL_SetRenderTarget(_renderer, nullptr);
+		SDL_DestroyTexture(_renderTarget);
+		_renderTarget = nullptr;
+		return false;
 	}
+	return true;
+}
+
+bool SdlWindow::needsFullRedraw() const
+{
+	return _renderTargetNeedsFullRedraw || _gdiTextureNeedsFullRedraw;
+}
+
+bool SdlWindow::needsFullRedraw(int surfaceWidth, int surfaceHeight) const
+{
+	return needsFullRedraw() || !_gdiTexture || _gdiTextureW != surfaceWidth ||
+	       _gdiTextureH != surfaceHeight;
 }
 
 bool SdlWindow::drawRect(SDL_Surface* surface, SDL_Point offset, const SDL_Rect& srcRect)
@@ -332,13 +359,25 @@ bool SdlWindow::drawRect(SDL_Surface* surface, SDL_Point offset, const SDL_Rect&
 bool SdlWindow::drawRects(SDL_Surface* surface, SDL_Point offset,
                           const std::vector<SDL_Rect>& rects)
 {
-	if (rects.empty())
+	if (!surface || !ensureRenderTarget())
+		return false;
+	const bool fullRedraw = rects.empty() || needsFullRedraw(surface->w, surface->h);
+	if (fullRedraw)
 	{
-		return drawRect(surface, offset, { 0, 0, surface->w, surface->h });
+		if (!drawRect(surface, offset, { 0, 0, surface->w, surface->h }))
+			return false;
+		_renderTargetNeedsFullRedraw = false;
+		_gdiTextureNeedsFullRedraw = false;
+		return true;
 	}
-	for (auto& srcRect : rects)
+	const SDL_Rect sourceBounds = { 0, 0, surface->w, surface->h };
+	const auto viewport = pixelViewport();
+	for (const auto& srcRect : rects)
 	{
-		if (!drawRect(surface, offset, srcRect))
+		const auto clipped = sdl::render::clipSourceRect(srcRect, sourceBounds, offset, viewport);
+		if ((clipped.w <= 0) || (clipped.h <= 0))
+			continue;
+		if (!drawRect(surface, offset, clipped))
 			return false;
 	}
 	return true;
@@ -364,9 +403,16 @@ bool SdlWindow::drawScaledRect(SDL_Surface* surface, const SDL_FPoint& scale,
 bool SdlWindow::drawScaledRects(SDL_Surface* surface, const SDL_FPoint& scale,
                                 const std::vector<SDL_Rect>& rects)
 {
-	if (rects.empty())
+	if (!surface || !ensureRenderTarget())
+		return false;
+	const bool fullRedraw = rects.empty() || needsFullRedraw(surface->w, surface->h);
+	if (fullRedraw)
 	{
-		return drawScaledRect(surface, scale, { 0, 0, surface->w, surface->h });
+		if (!drawScaledRect(surface, scale, { 0, 0, surface->w, surface->h }))
+			return false;
+		_renderTargetNeedsFullRedraw = false;
+		_gdiTextureNeedsFullRedraw = false;
+		return true;
 	}
 	for (const auto& srcRect : rects)
 	{
@@ -380,7 +426,8 @@ bool SdlWindow::fill(Uint8 r, Uint8 g, Uint8 b, Uint8 a)
 {
 	if (_renderer)
 	{
-		ensureRenderTarget();
+		if (!ensureRenderTarget())
+			return false;
 		if (!SDL_SetRenderTarget(_renderer, _renderTarget))
 			return false;
 		if (!SDL_SetRenderDrawColor(_renderer, r, g, b, a))
@@ -551,6 +598,7 @@ bool SdlWindow::ensureGdiTexture(SDL_Surface* surface)
 	std::ignore = SDL_SetTextureBlendMode(_gdiTexture, SDL_BLENDMODE_NONE);
 	_gdiTextureW = surface->w;
 	_gdiTextureH = surface->h;
+	_gdiTextureNeedsFullRedraw = true;
 	return true;
 }
 
@@ -558,8 +606,8 @@ bool SdlWindow::blit(SDL_Surface* surface, const SDL_Rect& srcRect, SDL_Rect& ds
 {
 	if (!_renderer || !surface)
 		return false;
-
-	ensureRenderTarget();
+	if (!ensureRenderTarget())
+		return false;
 
 	if (!ensureGdiTexture(surface))
 		return false;
@@ -601,8 +649,7 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 	if (!_renderer)
 		return false;
 
-	ensureRenderTarget();
-	if (!_renderTarget)
+	if (!ensureRenderTarget() || !_renderTarget)
 		return false;
 
 	/* Copy accumulated render target to screen and present */
@@ -743,7 +790,8 @@ bool SdlWindow::paintResizeFrame(SDL_Surface* surface, SDL_Point off, bool conte
 {
 	if (!_renderer || !surface)
 		return false;
-	ensureRenderTarget();
+	if (!ensureRenderTarget())
+		return false;
 
 	const int prevW = _gdiTextureW;
 	const int prevH = _gdiTextureH;
