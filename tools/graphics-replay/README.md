@@ -82,12 +82,49 @@ comes from the replay file and local replies are discarded. No RDP connection,
 authentication, remote input, or network packet injection occurs.
 
 Recorded ResetGraphics messages establish the monitor sizes and offsets.
-Windows remain hidden. `--renderer metal` uses the native GPU rendering path;
-`--renderer software` uses SDL's dummy video driver and software renderer.
+Windows remain hidden unless `--visible` is requested. `--renderer metal` uses
+the native GPU rendering path; `--renderer software` uses SDL's software
+renderer, with the dummy video driver for hidden runs and native windows for
+visible playback.
 **Both use the existing build's decoder**, including VideoToolbox when enabled.
 On macOS, an agent sandbox may block VideoToolbox buffer allocation; normal
 Terminal execution or approved local GPU access is needed. Decode errors or
 ignored codec updates invalidate the run instead of producing misleading metrics.
+
+## Watch the recording
+
+```sh
+./run-graphics-replay.sh --visible
+```
+
+This builds the optimized runner and plays the saved recording once using Metal
+at the captured delivery pace. It opens a window for each recorded monitor,
+preferring a local screen with matching pixel dimensions. Press **Escape** in a
+replay window, close either window, or quit the replay application to stop.
+Windows also close automatically at the end. Window titles identify them as
+offline replay; mouse and keyboard events do not control the recorded desktop.
+
+The windows retain the recording's pixel dimensions to preserve the production
+clipping behavior and pixel checks. They are not resizable; a recorded monitor
+larger than the available local displays may extend beyond the screen.
+No audio is included in the extracted graphics stream.
+
+The launcher uses `--paced` automatically for visible playback. To run an already
+built runner directly, use:
+
+```sh
+build/graphics-replay/optimized \
+  --input diagnostics/graphics-replay-20260920/baseline.gfx \
+  --renderer metal --visible --paced
+```
+
+Omit `--paced` on the direct command for maximum-speed playback, or add
+`--stop-seconds 30` for a short preview. The launcher forwards runner options in
+visible mode, including `--verify-every 25`; A/B-only options such as `--repeats`
+apply to its default hidden comparison mode. Visible results carry
+`"visible":true` and early exits carry `"cancelled":true`, so they cannot be
+mistaken for completed hidden benchmark trials. Display presentation and expose
+repaints add work; use the default hidden mode for comparable benchmarks.
 
 ## Correctness replay
 

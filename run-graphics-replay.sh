@@ -12,6 +12,12 @@ umask 077
 mkdir -p "$TASK_ROOT/build/graphics-replay"
 python3 tools/graphics-replay/build.py --source "$TASK_ROOT" --build "$CURRENT_BUILD" \
   --output "$TASK_ROOT/build/graphics-replay/optimized"
+for REPLAY_ARG in "$@"; do
+  if [ "$REPLAY_ARG" = "--visible" ]; then
+    exec "$TASK_ROOT/build/graphics-replay/optimized" --input "$REPLAY_INPUT" \
+      --renderer metal --paced "$@"
+  fi
+done
 python3 tools/graphics-replay/build.py --source "$BASELINE_SOURCE" --build "$BASELINE_BUILD" \
   --output "$TASK_ROOT/build/graphics-replay/baseline"
 exec python3 tools/graphics-replay/compare.py --input "$REPLAY_INPUT" \
