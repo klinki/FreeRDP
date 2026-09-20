@@ -80,7 +80,8 @@ def main():
             if len(results) != 1:
                 raise ValueError(f'Expected one result in {prefix}.log')
             result = results[0]
-            if result['verification_enabled'] or result['decode_errors'] or result['paced']:
+            if (result['verification_enabled'] or result['decode_errors'] or result['paced'] or
+                    result.get('visible') or result.get('cancelled')):
                 raise ValueError('Invalid benchmark mode or decoder errors')
             current = {k: result[k] for k in ('renderer', 'messages', 'measured_messages',
                        'start_capture_us', 'last_capture_us', 'paint_callbacks', 'measured_paints', 'gfx_stats')}
