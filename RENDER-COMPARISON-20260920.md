@@ -1,7 +1,7 @@
 # Physical multi-monitor rendering comparison — 2026-09-20
 
 The two optimized runs show substantially less total rendering work than the
-counters-only baseline. In a common active period, the latest optimized run
+counters-only baseline. In a common elapsed-time window, the latest optimized run
 submitted **41.9% fewer texture bytes** and spent **44.2% less wall time inside
 redraws** across both windows. The first optimized run showed reductions of
 50.0% and 54.4%, respectively. The clearest benefit is avoiding duplicate work
@@ -11,7 +11,9 @@ on the Dell; the M27UP video window's median redraw duration stays around
 These are observations from live sessions, not a controlled replay of identical
 RDP updates. They establish neither a process CPU reduction of the same size
 nor an increase in video FPS. The comparison measures clipping and batching
-together and does not isolate the benefit of batching.
+together and does not isolate the benefit of batching. Playback, pauses and
+typing were manually repeated without matching their timing across runs, so
+the percentages cannot be attributed entirely to the code changes.
 
 ## Recordings and snapshot
 
@@ -37,8 +39,12 @@ settings were matched when preparing the baseline. The shared launcher's Git
 revision in the baseline `session.txt` is not the baseline source revision.
 
 The user confirmed that the baseline and latest optimized runs used the same
-video and size on M27UP, keeping the Dell mostly static. Logs confirm the same
-desktop geometry and scaling in all three sessions:
+video and size on M27UP, keeping the Dell mostly static. They also clarified
+that each recording mixed playback, typing during playback, pausing, and typing
+while paused. Similar actions were repeated manually; neither their timing nor
+the exact video position was synchronized. These are useful interaction trials,
+but equal recording lengths do not make their workloads identical. Logs confirm
+the same desktop geometry and scaling in all three sessions:
 
 - Monitor 3: M27UP, 3840 × 2160 remote pixels, desktop scale 175%.
 - Monitor 2: Dell U2419HC, 1920 × 1080, desktop scale 100%.
@@ -51,7 +57,7 @@ The same launcher requests AVC444 in each run. These client logs do not contain
 per-frame codec IDs, so this check confirms the configured request and H.264
 decoder, not independently the negotiated AVC444 variant from packet contents.
 
-## Common active period
+## Common elapsed-time window
 
 The latest run's M27UP upload rate falls from hundreds of MB/s to approximately
 32 MB/s around 90 seconds after its first metrics interval. Whole-session
@@ -60,7 +66,8 @@ effect, the principal comparison selects complete intervals contained within
 **20–80 seconds after each run's first interval starts**. This excludes startup
 and the later low-activity period. The selection was made after examining the
 time series; it is an exploratory common elapsed-time window, not synchronized
-video frames or a marked playback interval.
+video frames or a marked playback interval. It does not guarantee uninterrupted
+playback or equivalent amounts of typing within the selected window.
 
 Actual retained durations are approximately 59 seconds per window, because
 intervals crossing either boundary are excluded. Rates use each window's
