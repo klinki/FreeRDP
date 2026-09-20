@@ -161,3 +161,19 @@ Validation also includes eight extractor tests and four replay-input tests,
 covering reordering, retransmissions, missing fragments, sequence wrapping,
 AES-GCM authentication failure, corrupt replay headers, truncated payloads,
 oversized messages and invalid timestamps/options. All passed.
+
+## Visible playback follow-up
+
+`./run-graphics-replay.sh --visible` now opens the recorded monitor windows and
+plays the optimized build at the recording's delivery pace. Escape or closing
+either window stops playback. The standalone runner accepts `--visible` and
+`--paced` separately. Visible and cancelled runs are marked in the result JSON
+and excluded from the A/B benchmark collector.
+
+Validation: a 30-second visible Metal replay processed 1,401 messages and passed
+55 pixel checkpoints with zero decoder errors. Short visible software and
+default hidden Metal runs each processed 100 messages and passed 19 checkpoints.
+Both existing build variants linked successfully with the new flag. Logs are
+`visible-smoke.log`, `visible-software-smoke.log`, and `hidden-after-visible.log`
+in the private diagnostics directory above. These checks are functional checks,
+not new performance measurements.

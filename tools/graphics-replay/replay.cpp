@@ -213,6 +213,8 @@ class SdlGraphicsReplay
 	uint64_t paintCount = 0, verified = 0, currentUs = 0;
 	uint64_t verifyEvery = 0, startUs = 0, stopUs = UINT64_MAX;
 	bool measured = false;
+	bool visible = false;
+	bool quitRequested = false;
 	bool callbackFailed = false;
 	std::string callbackError;
 	std::string rendererName;
@@ -306,6 +308,11 @@ class SdlGraphicsReplay
 		sdl->_windows.clear();
 		monitors.clear();
 		int64_t minX = 0, minY = 0;
+		int displayCount = 0;
+		std::unique_ptr<SDL_DisplayID, decltype(&SDL_free)> displays(
+		    visible ? SDL_GetDisplays(&displayCount) : nullptr, SDL_free);
+		check(!visible || (displays && displayCount > 0), "list playback displays");
+		std::vector<SDL_DisplayID> usedDisplays;
 		for (UINT32 n = 0; n < pdu.monitorCount; n++)
 		{
 			minX = std::min(minX, int64_t(pdu.monitorDefArray[n].left));
@@ -319,8 +326,35 @@ class SdlGraphicsReplay
 			check(x >= 0 && y >= 0 && width > 0 && height > 0 &&
 			      x + width <= pdu.width && y + height <= pdu.height, "monitor bounds");
 			SDL_Rect rect{ int(x), int(y), int(width), int(height) };
-			ReplayWindow window(SDL_GetPrimaryDisplay(), {0, 0, rect.w, rect.h});
+			auto display = SDL_GetPrimaryDisplay();
+			if (visible)
+			{
+				// Prefer a matching physical screen; keep the captured pixel size so
+				// showing the picture does not change clipping or verification.
+				for (int i = 0; i < displayCount; i++)
+				{
+					const auto candidate = displays.get()[i];
+					const auto mode = SDL_GetCurrentDisplayMode(candidate);
+					if (mode && int(mode->w * mode->pixel_density) == rect.w &&
+					    int(mode->h * mode->pixel_density) == rect.h &&
+					    std::find(usedDisplays.begin(), usedDisplays.end(), candidate) == usedDisplays.end())
+					{
+						display = candidate;
+						break;
+					}
+				}
+				usedDisplays.push_back(display);
+			}
+			const int position = visible ? SDL_WINDOWPOS_CENTERED_DISPLAY(display) : 0;
+			ReplayWindow window(display, {position, position, rect.w, rect.h});
 			check(window.window() && window.renderer(), "create replay window");
+			if (visible)
+			{
+				const auto title = "Offline FreeRDP replay - monitor " + std::to_string(n + 1) +
+				                   " (Esc to quit)";
+				check(SDL_SetWindowTitle(window.window(), title.c_str()) &&
+				      SDL_SetWindowResizable(window.window(), false), "configure playback window");
+			}
 			int w = 0, h = 0;
 			check(SDL_GetWindowSizeInPixels(window.window(), &w, &h) && w == rect.w && h == rect.h, "replay window pixel size differs from capture");
 			window.setOffsetX(-rect.x);
@@ -333,8 +367,63 @@ class SdlGraphicsReplay
 		}
 		// Initialize every viewport, including the old renderer's uninitialized target.
 		for (auto& entry : sdl->_windows)
+		{
 			check(sdl->drawToWindow(entry.second), "initial full repaint");
+			if (visible)
+			{
+				check(SDL_ShowWindow(entry.second.window()) && SDL_SyncWindow(entry.second.window()), "show playback window");
+				std::cerr << "Visible replay window " << entry.first << '\n';
+			}
+		}
 		flush();
+	}
+	bool pumpEvents()
+	{
+		if (!visible)
+		{
+			SDL_PumpEvents();
+			return true;
+		}
+		SDL_Event event{};
+		while (SDL_PollEvent(&event))
+		{
+			if (event.type == SDL_EVENT_QUIT ||
+			    (event.type == SDL_EVENT_KEY_DOWN && event.key.key == SDLK_ESCAPE) ||
+			    (event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED && sdl->_windows.count(event.window.windowID)))
+			{
+				quitRequested = true;
+				return false;
+			}
+			if (event.type != SDL_EVENT_WINDOW_EXPOSED &&
+			    event.type != SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
+				continue;
+			auto found = sdl->_windows.find(event.window.windowID);
+			if (found == sdl->_windows.end()) continue; // Events from a previous ResetGraphics.
+			auto& window = found->second;
+			if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
+			{
+				check(window.resizeToScale() && SDL_SyncWindow(window.window()), "restore recorded window size");
+				check(sdl->drawToWindow(window), "repaint resized playback window");
+			}
+			else
+				check(window.updateSurface(false), "repaint exposed playback window");
+		}
+		return true;
+	}
+	bool waitUntil(Clock::time_point deadline)
+	{
+		if (!visible)
+		{
+			std::this_thread::sleep_until(deadline);
+			return true;
+		}
+		// Continue handling close/Escape even during long idle gaps in the capture.
+		while (Clock::now() < deadline)
+		{
+			if (!pumpEvents()) return false;
+			std::this_thread::sleep_until(std::min(deadline, Clock::now() + std::chrono::milliseconds(8)));
+		}
+		return pumpEvents();
 	}
 	void flush()
 	{
@@ -406,7 +495,7 @@ int main(int argc, char** argv)
 	{
 		std::string file, backend = "software", output, metrics;
 		uint64_t maxMessages = UINT64_MAX, verifyEvery = 0, startUs = 0, stopUs = UINT64_MAX;
-		bool paced = false;
+		bool paced = false, visible = false;
 		for (int n = 1; n < argc; n++)
 		{
 			std::string arg = argv[n];
@@ -420,11 +509,13 @@ int main(int argc, char** argv)
 			else if (arg == "--start-seconds") startUs = seconds(value());
 			else if (arg == "--stop-seconds") stopUs = seconds(value());
 			else if (arg == "--paced") paced = true;
+			else if (arg == "--visible") visible = true;
 			else if (arg == "--help")
 			{
 				std::cout << "--input session.gfx [--renderer software|metal] [--metrics output.jsonl]\n"
 				             "[--start-seconds N] [--stop-seconds N] [--max-messages N] [--paced]\n"
-				             "[--verify-every N] [--save-final private/image-prefix]\n";
+				             "[--verify-every N] [--save-final private/image-prefix] [--visible]\n"
+				             "--visible shows monitor windows; Escape or close stops playback.\n";
 				return 0;
 			}
 			else throw std::runtime_error("unknown argument: " + arg);
@@ -446,12 +537,13 @@ int main(int argc, char** argv)
 			check(!std::ifstream(metrics).good(), "metrics file already exists");
 			check(setenv("FREERDP_SDL_RENDER_METRICS", metrics.c_str(), 1) == 0, "set metrics path");
 		}
-		if (backend == "software") check(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy"), "dummy driver");
+		if (backend == "software" && !visible) check(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy"), "dummy driver");
 		check(SDL_SetHint(SDL_HINT_RENDER_DRIVER, backend.c_str()), "renderer hint");
 		check(SDL_Init(SDL_INIT_VIDEO), "SDL_Init");
 		check(TTF_Init(), "TTF_Init");
 		{
 			SdlGraphicsReplay replay;
+			replay.visible = visible;
 			replay.verifyEvery = verifyEvery;
 			replay.saveFinal = output;
 			replay.startUs = startUs;
@@ -462,7 +554,8 @@ int main(int argc, char** argv)
 			for (const auto& message : messages)
 			{
 				if (fed >= maxMessages || message.us > stopUs) break;
-				if (paced) std::this_thread::sleep_until(playbackStart + std::chrono::microseconds(message.us));
+				if (!replay.pumpEvents()) break;
+				if (paced && !replay.waitUntil(playbackStart + std::chrono::microseconds(message.us))) break;
 				if (!replay.measured && message.us >= startUs)
 				{
 					replay.flush();
@@ -477,14 +570,13 @@ int main(int argc, char** argv)
 				check(!replay.callbackFailed, replay.callbackError);
 				if (replay.measured) { feedWallNs += ns(Clock::now() - begin); measuredMessages++; }
 				fed++;
-				SDL_PumpEvents();
 			}
 			const auto cpu = replay.measured ? cpuSeconds() - cpuStart : 0;
 			replay.flush();
 			const auto measurementEndNs = ns(Clock::now().time_since_epoch());
-			check(!replay.renderSamples.empty(), "no measured decoded paints; benchmark rejected");
-			check(replay.rendererName == backend, "SDL renderer fallback; benchmark rejected");
-			if (verifyEvery || !output.empty()) replay.verify(true);
+			check(replay.quitRequested || !replay.renderSamples.empty(), "no measured decoded paints; benchmark rejected");
+			check(replay.quitRequested || replay.rendererName == backend, "SDL renderer fallback; benchmark rejected");
+			if ((verifyEvery || !output.empty()) && replay.paintCount) replay.verify(true);
 			uint64_t sum = 0;
 			for (auto n : replay.renderSamples) sum += n;
 			std::sort(replay.renderSamples.begin(), replay.renderSamples.end());
@@ -503,6 +595,7 @@ int main(int argc, char** argv)
 			          << ",\"render_p99_ms\":" << percentile(99) << ",\"paint_callbacks\":" << replay.paintCount
 			          << ",\"measured_paints\":" << replay.renderSamples.size() << ",\"verified_checkpoints\":" << replay.verified
 			          << ",\"paced\":" << (paced ? "true" : "false") << ",\"verification_enabled\":" << ((verifyEvery || !output.empty()) ? "true" : "false")
+			          << ",\"visible\":" << (visible ? "true" : "false") << ",\"cancelled\":" << (replay.quitRequested ? "true" : "false")
 			          << ",\"gfx_stats\":{";
 			bool comma = false;
 			for (size_t i = 0; i < rdpgfx_stats_max_index(); i++)
