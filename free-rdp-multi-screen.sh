@@ -5,11 +5,16 @@
 # for Wireshark dissection. Logs go to /tmp/rdp-udp-test.log.
 #
 # Env overrides: SERVER (default davidpc), RDP_USER (default david),
-# FREERDP_BIN (default: our /tmp build).
+# FREERDP_BIN (default: this repository's build/video-responsive build).
 
 set -euo pipefail
 
-FREERDP_BIN="${FREERDP_BIN:-/tmp/freerdp-build/client/SDL/SDL3/sdl-freerdp}"
+repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+FREERDP_BIN="${FREERDP_BIN:-$repo/build/video-responsive/client/SDL/SDL3/sdl-freerdp}"
+if [[ ! -x "$FREERDP_BIN" ]]; then
+  printf 'FreeRDP executable not found: %s\n' "$FREERDP_BIN" >&2
+  exit 1
+fi
 SERVER="${SERVER:-davidpc}"
 RDP_USER="${RDP_USER:-david}"
 SECRETS_FILE="${SECRETS_FILE:-/tmp/rdp-secrets.txt}"
