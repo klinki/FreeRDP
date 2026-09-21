@@ -47,3 +47,34 @@ The analyzer reports uploaded bytes per second and p50/p95/p99 wall-duration
 percentiles. Since each interval has a bounded reservoir, those percentiles
 are approximate for long runs. Redraw counts are reported as counts and are
 never presented as a frame-rate measurement.
+
+## Schema version 2 (render records)
+
+Version 1 keys are unchanged. Version 2 adds per-window counters, all summed
+by the analyzer:
+
+* `present_skips`: windows skipped because clipping removed all damage
+  (per-monitor clipping working as intended when the Dell skips video damage).
+* `target_recreates` / `gdi_recreates`: texture recreations (resize/monitor
+  churn shows up here, not in upload bytes).
+* `topbar_draws`: overlay draws composited inside presents.
+* `stalled_presents`: reconnecting-overlay presents, excluded from
+  `present_calls` so identical-input A/B comparisons of `present_calls`
+  stay stable. Total onscreen presents are `present_calls + stalled_presents`.
+
+## Queue records (`freerdp.sdl_queue_metrics`, version 1)
+
+Process-global (window 0, monitor 0), written about once per second while the
+event queue is active: `pushes`, `attempted_rects`, `merged_rects`,
+`collapsed_events`, `pops`, `empty_pops`, `pop_rects`, `queue_wait_ns`
+(push-to-pop delay; average wait is `queue_wait_ns / pops`),
+`update_events_received`, `update_events_acted` (received but empty means a
+dialog consumed the wakeup), and `motions_coalesced`.
+
+These make input-scheduling claims falsifiable: one snapshot per update shows
+up as acted ≈ received with low average wait even under video load; motion
+coalescing shows up as `motions_coalesced` without lost damage. Offline
+graphics replay drives rendering without the event queue, so replay files
+normally contain no queue records — use live `run-with-counters.sh` sessions
+for responsiveness and replay A/B for decode/render throughput. The
+comparison tool ignores non-render records.
