@@ -49,6 +49,9 @@ class SdlRenderMetrics final
 
 	static constexpr uint64_t intervalNs = 1000000000ULL;
 	static constexpr size_t maxSamples = 256;
+	/* Version 2 adds per-window skip/churn counters. All version 1 keys
+	 * are unchanged so identical-input A/B comparisons stay comparable. */
+	static constexpr unsigned schemaVersion = 2;
 
 	class Timer final
 	{
@@ -156,6 +159,9 @@ class SdlRenderMetrics final
 	      _uploadCalls(other._uploadCalls), _uploadWallNs(other._uploadWallNs),
 	      _drawCalls(other._drawCalls), _drawWallNs(other._drawWallNs),
 	      _presentCalls(other._presentCalls), _presentWallNs(other._presentWallNs),
+	      _presentSkips(other._presentSkips), _targetRecreates(other._targetRecreates),
+	      _gdiRecreates(other._gdiRecreates), _topBarDraws(other._topBarDraws),
+	      _stalledPresents(other._stalledPresents),
 	      _redrawSamples(other._redrawSamples), _frameIntervalSamples(other._frameIntervalSamples)
 	{
 		other._file = nullptr;
@@ -191,6 +197,11 @@ class SdlRenderMetrics final
 			_drawWallNs = other._drawWallNs;
 			_presentCalls = other._presentCalls;
 			_presentWallNs = other._presentWallNs;
+			_presentSkips = other._presentSkips;
+			_targetRecreates = other._targetRecreates;
+			_gdiRecreates = other._gdiRecreates;
+			_topBarDraws = other._topBarDraws;
+			_stalledPresents = other._stalledPresents;
 			_redrawSamples = other._redrawSamples;
 			_frameIntervalSamples = other._frameIntervalSamples;
 
@@ -295,6 +306,70 @@ class SdlRenderMetrics final
 		_lastPresentValid = true;
 	}
 
+	/* Version 2 counters. All run on the UI/render thread only. Stalled
+	 * overlay presents are counted separately from present_calls so that
+	 * identical-input comparisons of present_calls stay stable; total
+	 * onscreen presents are present_calls + stalled_presents. */
+	void notePresentSkip() noexcept
+	{
+		if (!_enabled)
+			return;
+		ensureInterval(nowNs());
+		++_presentSkips;
+	}
+
+	void noteTargetRecreate() noexcept
+	{
+		if (!_enabled)
+			return;
+		ensureInterval(nowNs());
+		++_targetRecreates;
+	}
+
+	void noteGdiRecreate() noexcept
+	{
+		if (!_enabled)
+			return;
+		ensureInterval(nowNs());
+		++_gdiRecreates;
+	}
+
+	void noteTopBarDraw() noexcept
+	{
+		if (!_enabled)
+			return;
+		ensureInterval(nowNs());
+		++_topBarDraws;
+	}
+
+	void noteStalledPresent() noexcept
+	{
+		if (!_enabled)
+			return;
+		ensureInterval(nowNs());
+		++_stalledPresents;
+	}
+
+	/* Shared appender for process-global records (e.g. the update-queue
+	 * record written by SdlContext). Serialized with the same mutex as
+	 * per-window intervals so stdio sequences never interleave. */
+	static bool appendJsonLine(const char* line) noexcept
+	{
+		if (!line || line[0] == '\0')
+			return false;
+		const auto* path = std::getenv("FREERDP_SDL_RENDER_METRICS");
+		if (!path || path[0] == '\0')
+			return false;
+		std::lock_guard<std::mutex> lock(outputMutex());
+		FILE* file = std::fopen(path, "ab");
+		if (!file)
+			return false;
+		const bool ok =
+		    std::fputs(line, file) >= 0 && std::fputs("\n", file) >= 0 && std::fflush(file) == 0;
+		std::fclose(file);
+		return ok;
+	}
+
 	/* Force the current interval to disk. Normally the destructor and the next
 	 * beginFrame do this automatically. */
 	void flush() noexcept
@@ -368,6 +443,11 @@ class SdlRenderMetrics final
 		_drawWallNs = 0;
 		_presentCalls = 0;
 		_presentWallNs = 0;
+		_presentSkips = 0;
+		_targetRecreates = 0;
+		_gdiRecreates = 0;
+		_topBarDraws = 0;
+		_stalledPresents = 0;
 		_redrawSamples = Samples{};
 		_frameIntervalSamples = Samples{};
 	}
@@ -401,7 +481,7 @@ class SdlRenderMetrics final
 		std::lock_guard<std::mutex> lock(outputMutex());
 		const auto written = std::fprintf(
 		              _file,
-		              "{\"schema\":\"freerdp.sdl_render_metrics\",\"version\":1,"
+		              "{\"schema\":\"freerdp.sdl_render_metrics\",\"version\":2,"
 		              "\"window_id\":%llu,\"monitor_id\":%llu,"
 		              "\"interval_start_ns\":%llu,\"interval_duration_ns\":%llu,"
 		              "\"frames\":%llu,\"attempted_dirty_pixels\":%llu,"
@@ -409,6 +489,9 @@ class SdlRenderMetrics final
 		              "\"upload_calls\":%llu,\"upload_wall_ns\":%llu,"
 		              "\"draw_calls\":%llu,\"draw_wall_ns\":%llu,"
 		              "\"present_calls\":%llu,\"present_wall_ns\":%llu,"
+		              "\"present_skips\":%llu,\"target_recreates\":%llu,"
+		              "\"gdi_recreates\":%llu,\"topbar_draws\":%llu,"
+		              "\"stalled_presents\":%llu,"
 		              "\"redraw_sample_count\":%llu,\"redraw_wall_ns_samples\":",
 		              static_cast<unsigned long long>(_windowId),
 		              static_cast<unsigned long long>(_monitorId),
@@ -424,6 +507,11 @@ class SdlRenderMetrics final
 		              static_cast<unsigned long long>(_drawWallNs),
 		              static_cast<unsigned long long>(_presentCalls),
 		              static_cast<unsigned long long>(_presentWallNs),
+		              static_cast<unsigned long long>(_presentSkips),
+		              static_cast<unsigned long long>(_targetRecreates),
+		              static_cast<unsigned long long>(_gdiRecreates),
+		              static_cast<unsigned long long>(_topBarDraws),
+		              static_cast<unsigned long long>(_stalledPresents),
 		              static_cast<unsigned long long>(_redrawSamples.seen));
 		bool ok = written >= 0 && writeSamples(_file, _redrawSamples) &&
 		     std::fprintf(_file, ",\"frame_interval_sample_count\":%llu,\"frame_interval_wall_ns_samples\":",
@@ -475,6 +563,11 @@ class SdlRenderMetrics final
 	uint64_t _drawWallNs = 0;
 	uint64_t _presentCalls = 0;
 	uint64_t _presentWallNs = 0;
+	uint64_t _presentSkips = 0;
+	uint64_t _targetRecreates = 0;
+	uint64_t _gdiRecreates = 0;
+	uint64_t _topBarDraws = 0;
+	uint64_t _stalledPresents = 0;
 	Samples _redrawSamples;
 	Samples _frameIntervalSamples;
 };
