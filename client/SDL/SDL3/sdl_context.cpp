@@ -19,6 +19,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <string>
 #include <freerdp/client/cmdline.h>
 
 #include "sdl_context.hpp"
@@ -2059,11 +2061,15 @@ bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects)
 		const auto clipped = sdl::render::clipSourceRects(rects, sourceBounds, offset,
 		                                                  target.pixelViewport());
 		if (clipped.empty())
+		{
+			target.renderMetrics().notePresentSkip();
 			continue;
+		}
 		if (!drawToWindow(target, clipped))
 			return false;
 	}
 
+	flushQueueMetrics(false);
 	return true;
 }
 
@@ -2159,6 +2165,7 @@ bool SdlContext::redrawStalled()
 		if (!window.second.updateStalledSurface(dots))
 			return false;
 	}
+	flushQueueMetrics(false);
 	return true;
 }
 
@@ -2276,6 +2283,76 @@ bool SdlContext::push(const std::vector<SDL_Rect>& rects)
 std::vector<SDL_Rect> SdlContext::pop()
 {
 	return _updates.pop();
+}
+
+void SdlContext::noteMotionsCoalesced(uint64_t count)
+{
+	_queueAccum.motionsCoalesced += count;
+}
+
+void SdlContext::noteUpdateReceived()
+{
+	++_queueAccum.updateReceived;
+}
+
+void SdlContext::noteUpdateActed()
+{
+	++_queueAccum.updateActed;
+}
+
+void SdlContext::flushQueueMetrics(bool force)
+{
+	const auto snapshot = _updates.takeSnapshot();
+	_queueAccum.pushes += snapshot.pushes;
+	_queueAccum.attemptedRects += snapshot.attemptedRects;
+	_queueAccum.mergedRects += snapshot.mergedRects;
+	_queueAccum.collapsedEvents += snapshot.collapsedEvents;
+	_queueAccum.pops += snapshot.pops;
+	_queueAccum.emptyPops += snapshot.emptyPops;
+	_queueAccum.popRects += snapshot.popRects;
+	_queueAccum.queueWaitNs += snapshot.queueWaitNs;
+
+	if (!_queueAccum.active())
+		return;
+
+	const auto now = SDL_GetTicksNS();
+	if (_queueIntervalStartNs == 0)
+		_queueIntervalStartNs = now;
+	const uint64_t duration = now >= _queueIntervalStartNs ? now - _queueIntervalStartNs : 0;
+	/* Offline replay drives drawToWindows without the event queue, so it
+	 * never pops: with no pops there is nothing to attribute and no record
+	 * is written, keeping replay metrics comparable. */
+	if (!force && (duration < SdlRenderMetrics::intervalNs || _queueAccum.pops == 0))
+		return;
+
+	char line[1024];
+	std::snprintf(line, sizeof(line),
+	              "{\"schema\":\"freerdp.sdl_queue_metrics\",\"version\":1,"
+	              "\"window_id\":0,\"monitor_id\":0,"
+	              "\"interval_start_ns\":%llu,\"interval_duration_ns\":%llu,"
+	              "\"pushes\":%llu,\"attempted_rects\":%llu,"
+	              "\"merged_rects\":%llu,\"collapsed_events\":%llu,"
+	              "\"pops\":%llu,\"empty_pops\":%llu,\"pop_rects\":%llu,"
+	              "\"queue_wait_ns\":%llu,"
+	              "\"update_events_received\":%llu,\"update_events_acted\":%llu,"
+	              "\"motions_coalesced\":%llu}",
+	              static_cast<unsigned long long>(_queueIntervalStartNs),
+	              static_cast<unsigned long long>(duration),
+	              static_cast<unsigned long long>(_queueAccum.pushes),
+	              static_cast<unsigned long long>(_queueAccum.attemptedRects),
+	              static_cast<unsigned long long>(_queueAccum.mergedRects),
+	              static_cast<unsigned long long>(_queueAccum.collapsedEvents),
+	              static_cast<unsigned long long>(_queueAccum.pops),
+	              static_cast<unsigned long long>(_queueAccum.emptyPops),
+	              static_cast<unsigned long long>(_queueAccum.popRects),
+	              static_cast<unsigned long long>(_queueAccum.queueWaitNs),
+	              static_cast<unsigned long long>(_queueAccum.updateReceived),
+	              static_cast<unsigned long long>(_queueAccum.updateActed),
+	              static_cast<unsigned long long>(_queueAccum.motionsCoalesced));
+	line[sizeof(line) - 1] = '\0';
+	SdlRenderMetrics::appendJsonLine(line);
+	_queueAccum = QueueAccum{};
+	_queueIntervalStartNs = now;
 }
 
 bool SdlContext::setFullscreen(bool enter, bool forceOriginalDisplay)

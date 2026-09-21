@@ -24,6 +24,8 @@ DEFINITIONS = {
     "uploaded_bytes": "Sum of bytes submitted by upload calls, as reported by the renderer.",
     "percentiles": "p50/p95/p99 use nearest-rank over all retained samples after warmup; each interval keeps at most 256 reservoir samples, so these are approximate for long runs.",
     "warmup": "--warmup-intervals drops the first N records for each window/monitor group before aggregation.",
+    "render_v2": "Render schema version 2 adds present_skips, target_recreates, gdi_recreates, topbar_draws and stalled_presents. Version 1 keys are unchanged; stalled overlay presents are excluded from present_calls.",
+    "queue": "freerdp.sdl_queue_metrics records are process-global (window 0, monitor 0), written about once per second when the event queue is active. Offline replay drives rendering without the event queue, so replay files normally contain no queue records. queue_wait_ns is push-to-pop delay; average wait is queue_wait_ns / pops.",
 }
 
 
@@ -56,8 +58,9 @@ def _sum(records: Iterable[dict[str, Any]], key: str) -> int:
     return sum(_nonnegative_int(record.get(key)) for record in records)
 
 
-def _read_records(path: str) -> tuple[list[dict[str, Any]], int]:
+def _read_records(path: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], int]:
     records: list[dict[str, Any]] = []
+    queue_records: list[dict[str, Any]] = []
     errors = 0
     source = sys.stdin if path == "-" else Path(path).open(encoding="utf-8")
     try:
@@ -70,11 +73,27 @@ def _read_records(path: str) -> tuple[list[dict[str, Any]], int]:
                 print(f"{path}:{line_number}: invalid JSON ({error.msg})", file=sys.stderr)
                 errors += 1
                 continue
-            if not isinstance(value, dict) or value.get("schema") != "freerdp.sdl_render_metrics":
+            if not isinstance(value, dict):
+                print(f"{path}:{line_number}: skipped non-object record", file=sys.stderr)
+                errors += 1
+                continue
+            schema = value.get("schema")
+            if schema == "freerdp.sdl_queue_metrics":
+                if value.get("version") != 1:
+                    print(
+                        f"{path}:{line_number}: skipped unsupported queue metrics version "
+                        f"{value.get('version')!r}",
+                        file=sys.stderr,
+                    )
+                    errors += 1
+                    continue
+                queue_records.append(value)
+                continue
+            if schema != "freerdp.sdl_render_metrics":
                 print(f"{path}:{line_number}: skipped record with unknown schema", file=sys.stderr)
                 errors += 1
                 continue
-            if value.get("version") != 1:
+            if value.get("version") not in (1, 2):
                 print(
                     f"{path}:{line_number}: skipped unsupported metrics version "
                     f"{value.get('version')!r}",
@@ -86,7 +105,7 @@ def _read_records(path: str) -> tuple[list[dict[str, Any]], int]:
     finally:
         if path != "-":
             source.close()
-    return records, errors
+    return records, queue_records, errors
 
 
 def _group_records(records: list[dict[str, Any]]) -> dict[tuple[int, int], list[dict[str, Any]]]:
@@ -143,13 +162,41 @@ def _summarize(records: list[dict[str, Any]], warmup_intervals: int) -> dict[str
         "average_draw_wall_ms": _average_wall_ms(records, "draw_wall_ns", "draw_calls"),
         "present_calls": _sum(records, "present_calls"),
         "average_present_wall_ms": _average_wall_ms(records, "present_wall_ns", "present_calls"),
+        "present_skips": _sum(records, "present_skips"),
+        "target_recreates": _sum(records, "target_recreates"),
+        "gdi_recreates": _sum(records, "gdi_recreates"),
+        "topbar_draws": _sum(records, "topbar_draws"),
+        "stalled_presents": _sum(records, "stalled_presents"),
         "redraw_wall": _timing_stats(redraw_samples),
         "frame_interval_wall": _timing_stats(frame_samples),
     }
 
 
+def _summarize_queue(records: list[dict[str, Any]]) -> dict[str, Any]:
+    records = sorted(records, key=lambda record: _nonnegative_int(record.get("interval_start_ns")))
+    duration_ns = _sum(records, "interval_duration_ns")
+    pops = _sum(records, "pops")
+    wait_ns = _sum(records, "queue_wait_ns")
+    return {
+        "intervals": len(records),
+        "duration_s": duration_ns / 1_000_000_000.0,
+        "pushes": _sum(records, "pushes"),
+        "attempted_rects": _sum(records, "attempted_rects"),
+        "merged_rects": _sum(records, "merged_rects"),
+        "collapsed_events": _sum(records, "collapsed_events"),
+        "pops": pops,
+        "empty_pops": _sum(records, "empty_pops"),
+        "pop_rects": _sum(records, "pop_rects"),
+        "queue_wait_ns": wait_ns,
+        "average_queue_wait_ms": (wait_ns / 1_000_000.0 / pops) if pops else None,
+        "update_events_received": _sum(records, "update_events_received"),
+        "update_events_acted": _sum(records, "update_events_acted"),
+        "motions_coalesced": _sum(records, "motions_coalesced"),
+    }
+
+
 def _summarize_file(path: str, warmup_intervals: int) -> dict[str, Any]:
-    records, errors = _read_records(path)
+    records, queue_records, errors = _read_records(path)
     groups = _group_records(records)
     summaries = []
     for (window, monitor), group in sorted(groups.items()):
@@ -158,7 +205,13 @@ def _summarize_file(path: str, warmup_intervals: int) -> dict[str, Any]:
         summary["monitor_id"] = monitor
         summaries.append(summary)
     label = "stdin" if path == "-" else Path(path).stem
-    return {"label": label, "records": len(records), "parse_errors": errors, "groups": summaries}
+    return {
+        "label": label,
+        "records": len(records),
+        "parse_errors": errors,
+        "groups": summaries,
+        "queue": _summarize_queue(queue_records),
+    }
 
 
 def _format_number(value: Any) -> str:
@@ -198,6 +251,30 @@ def _print_text(result: dict[str, Any]) -> None:
                 f"p95={_format_number(timing['p95_wall_ms'])} "
                 f"p99={_format_number(timing['p99_wall_ms'])} samples={timing['samples']}"
             )
+        print(
+            f"    present_skips={group['present_skips']} "
+            f"target_recreates={group['target_recreates']} "
+            f"gdi_recreates={group['gdi_recreates']} "
+            f"topbar_draws={group['topbar_draws']} "
+            f"stalled_presents={group['stalled_presents']}"
+        )
+    queue = result.get("queue", {})
+    if queue.get("intervals"):
+        print(
+            f"  queue intervals={queue['intervals']} duration_s={_format_number(queue['duration_s'])} "
+            f"pushes={queue['pushes']} attempted_rects={queue['attempted_rects']} "
+            f"merged_rects={queue['merged_rects']} collapsed_events={queue['collapsed_events']}"
+        )
+        print(
+            f"    pops={queue['pops']} empty_pops={queue['empty_pops']} "
+            f"pop_rects={queue['pop_rects']} "
+            f"average_queue_wait_ms={_format_number(queue['average_queue_wait_ms'])} "
+            f"update_received={queue['update_events_received']} "
+            f"update_acted={queue['update_events_acted']} "
+            f"motions_coalesced={queue['motions_coalesced']}"
+        )
+    else:
+        print("  queue: no queue records (expected for offline replay)")
     if not result["groups"]:
         print("  no valid metric groups")
 

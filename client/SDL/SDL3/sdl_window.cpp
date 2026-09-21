@@ -354,6 +354,7 @@ bool SdlWindow::ensureRenderTarget()
 		_renderTarget = nullptr;
 		return false;
 	}
+	_renderMetrics.noteTargetRecreate();
 	return true;
 }
 
@@ -657,6 +658,7 @@ bool SdlWindow::ensureGdiTexture(SDL_Surface* surface)
 	_gdiTextureW = surface->w;
 	_gdiTextureH = surface->h;
 	_gdiTextureNeedsFullRedraw = true;
+	_renderMetrics.noteGdiRecreate();
 	return true;
 }
 
@@ -756,6 +758,7 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 		_topBarRect = SdlTopBar::clampToViewport(_topBarRect, viewport, _topBarCompact);
 		if (!_topBar->draw(_topBarRect, viewport, pinned, pointer))
 			return false;
+		_renderMetrics.noteTopBarDraw();
 	}
 
 	auto presentTimer = _renderMetrics.beginPresent();
@@ -876,6 +879,9 @@ bool SdlWindow::updateStalledSurface(int dots)
 			return false;
 	}
 
+	/* Stalled overlay presents are counted separately from present_calls so
+	 * that identical-input comparisons of present_calls stay stable. */
+	_renderMetrics.noteStalledPresent();
 	return SDL_RenderPresent(_renderer);
 }
 

@@ -106,6 +106,11 @@ int main()
 		auto timer = disabled.beginUpload(1, 4);
 		timer.stop();
 	}
+	disabled.notePresentSkip();
+	disabled.noteTargetRecreate();
+	disabled.noteGdiRecreate();
+	disabled.noteTopBarDraw();
+	disabled.noteStalledPresent();
 	if (disabledClock.reads != 0)
 		return 1;
 
@@ -136,6 +141,11 @@ int main()
 			clock.now = 250;
 		}
 		metrics.noteDraw(12);
+		metrics.notePresentSkip();
+		metrics.noteTargetRecreate();
+		metrics.noteGdiRecreate();
+		metrics.noteTopBarDraw();
+		metrics.noteStalledPresent();
 		clock.now = 300;
 		{
 			auto present = metrics.beginPresent();
@@ -182,6 +192,12 @@ int main()
 	    has(first, "\"upload_wall_ns\":50") == false ||
 	    has(first, "\"draw_wall_ns\":12") == false ||
 	    has(first, "\"present_wall_ns\":50") == false ||
+	    has(first, "\"version\":2") == false ||
+	    has(first, "\"present_skips\":1") == false ||
+	    has(first, "\"target_recreates\":1") == false ||
+	    has(first, "\"gdi_recreates\":1") == false ||
+	    has(first, "\"topbar_draws\":1") == false ||
+	    has(first, "\"stalled_presents\":1") == false ||
 	    has(first, "\"redraw_sample_count\":1") == false ||
 	    has(second, "\"attempted_dirty_pixels\":200") == false ||
 	    has(second, "\"frame_interval_sample_count\":1") == false ||

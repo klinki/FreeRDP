@@ -211,6 +211,59 @@ namespace
 		                  std::all_of(painted.begin(), painted.end(), [](bool val) { return val; }),
 		              "Concurrent producer lost damage or a wakeup");
 	}
+
+	bool queueStats(Uint32 type)
+	{
+		SdlUpdateQueue queue;
+		// Empty damage is not counted and schedules nothing.
+		if (!queue.push({}, type))
+			return false;
+		auto idle = queue.takeSnapshot();
+		if (!expect(idle.pushes == 1 && idle.attemptedRects == 0 && idle.pops == 0,
+		            "Empty push polluted queue stats"))
+			return false;
+
+		// Two overlapping rects merge into one; one tile survives.
+		if (!queue.push({ { 0, 0, 10, 10 }, { 5, 5, 10, 10 } }, type) || !takeEvent(type))
+			return false;
+		const auto merged = queue.pop();
+		if (!expect(merged.size() == 1, "Overlap was not merged"))
+			return false;
+		const auto afterMerge = queue.takeSnapshot();
+		if (!expect(afterMerge.pushes == 1 && afterMerge.attemptedRects == 2 &&
+		                afterMerge.mergedRects == 1 && afterMerge.pops == 1 &&
+		                afterMerge.popRects == 1 && afterMerge.emptyPops == 0,
+		            "Merge/pop stats are wrong"))
+			return false;
+
+		// Snapshot resets deltas; an empty pop is counted but waits nothing.
+		if (!expect(queue.pop().empty(), "Pop must consume its damage"))
+			return false;
+		const auto afterEmpty = queue.takeSnapshot();
+		if (!expect(afterEmpty.pops == 0 && afterEmpty.emptyPops == 1 &&
+		                afterEmpty.queueWaitNs == 0,
+		            "Empty pop stats are wrong"))
+			return false;
+
+		// Thousands of disjoint tiles force the bounded-list collapse.
+		std::vector<SDL_Rect> tiles;
+		for (int y = 0; y < 100; y++)
+		{
+			for (int x = 0; x < 100; x++)
+				tiles.push_back({ x * 12, y * 12, 5, 5 });
+		}
+		if (!queue.push(tiles, type) || !takeEvent(type))
+			return false;
+		const auto collapsed = queue.pop();
+		if (!expect(collapsed.size() <= SdlUpdateQueue::maxRects, "Upload count is unbounded"))
+			return false;
+		const auto afterCollapse = queue.takeSnapshot();
+		if (!expect(afterCollapse.collapsedEvents >= 1 && afterCollapse.pops == 1 &&
+		                afterCollapse.queueWaitNs >= 0,
+		            "Collapse stats are wrong"))
+			return false;
+		return expect(queue.takeSnapshot().pushes == 0, "Snapshot did not reset deltas");
+	}
 } // namespace
 
 int main()
@@ -219,7 +272,7 @@ int main()
 		return 1;
 	const auto type = SDL_RegisterEvents(1);
 	const bool ok = type != 0 && burst(type) && coverage(type) && inputFairness(type) &&
-	                wakeupFailureAndReset(type) && concurrentProducer(type);
+	                wakeupFailureAndReset(type) && concurrentProducer(type) && queueStats(type);
 	SDL_Quit();
 	return ok ? 0 : 1;
 }

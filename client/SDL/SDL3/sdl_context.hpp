@@ -110,6 +110,14 @@ class SdlContext
 	[[nodiscard]] bool push(const std::vector<SDL_Rect>& rects);
 	[[nodiscard]] std::vector<SDL_Rect> pop();
 
+	/* UI-thread evaluation counters for the process-global queue record.
+	 * Input scheduling claims (one snapshot per update, motion coalescing)
+	 * become falsifiable instead of inferred from redraw walls. */
+	void noteMotionsCoalesced(uint64_t count);
+	void noteUpdateReceived();
+	void noteUpdateActed();
+	void flushQueueMetrics(bool force = false);
+
 	void setHasCursor(bool val);
 	[[nodiscard]] bool hasCursor() const;
 
@@ -255,6 +263,28 @@ class SdlContext
 	CursorType _cursorType = CURSOR_NULL;
 	std::vector<SDL_DisplayID> _monitorIds;
 	SdlUpdateQueue _updates;
+	/* Process-global UI evaluation counters, flushed as one queue record
+	 * per second from the UI thread (drawToWindows / redrawStalled). */
+	struct QueueAccum final
+	{
+		uint64_t pushes = 0;
+		uint64_t attemptedRects = 0;
+		uint64_t mergedRects = 0;
+		uint64_t collapsedEvents = 0;
+		uint64_t pops = 0;
+		uint64_t emptyPops = 0;
+		uint64_t popRects = 0;
+		uint64_t queueWaitNs = 0;
+		uint64_t updateReceived = 0;
+		uint64_t updateActed = 0;
+		uint64_t motionsCoalesced = 0;
+		[[nodiscard]] bool active() const
+		{
+			return pushes != 0 || pops != 0 || updateReceived != 0 || motionsCoalesced != 0;
+		}
+	};
+	QueueAccum _queueAccum;
+	uint64_t _queueIntervalStartNs = 0;
 	/* SDL */
 	bool _fullscreen = false;
 	bool _resizeable = false;
