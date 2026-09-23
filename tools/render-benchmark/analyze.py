@@ -192,6 +192,9 @@ def _summarize_queue(records: list[dict[str, Any]]) -> dict[str, Any]:
         "update_events_received": _sum(records, "update_events_received"),
         "update_events_acted": _sum(records, "update_events_acted"),
         "motions_coalesced": _sum(records, "motions_coalesced"),
+        "yuv_tiles": _sum(records, "yuv_tiles"),
+        "yuv_work_created": _sum(records, "yuv_work_created"),
+        "yuv_work_reused": _sum(records, "yuv_work_reused"),
     }
 
 
@@ -272,6 +275,11 @@ def _print_text(result: dict[str, Any]) -> None:
             f"update_received={queue['update_events_received']} "
             f"update_acted={queue['update_events_acted']} "
             f"motions_coalesced={queue['motions_coalesced']}"
+        )
+        print(
+            f"    yuv_tiles={queue['yuv_tiles']} "
+            f"yuv_work_created={queue['yuv_work_created']} "
+            f"yuv_work_reused={queue['yuv_work_reused']}"
         )
     else:
         print("  queue: no queue records (expected for offline replay)")
