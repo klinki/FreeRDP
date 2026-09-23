@@ -71,6 +71,12 @@ event queue is active: `pushes`, `attempted_rects`, `merged_rects`,
 `update_events_received`, `update_events_acted` (received but empty means a
 dialog consumed the wakeup), and `motions_coalesced`.
 
+`yuv_tiles`, `yuv_work_created` and `yuv_work_reused` are process-wide YUV
+threadpool deltas polled from the codec layer. Steady video should show
+`yuv_work_created` near zero after warmup (slots reused across frames);
+a recreate storm points at callback/binding churn or repeated
+`yuv_context_reset`.
+
 These make input-scheduling claims falsifiable: one snapshot per update shows
 up as acted ≈ received with low average wait even under video load; motion
 coalescing shows up as `motions_coalesced` without lost damage. Offline

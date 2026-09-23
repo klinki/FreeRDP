@@ -278,6 +278,9 @@ class SdlContext
 		uint64_t updateReceived = 0;
 		uint64_t updateActed = 0;
 		uint64_t motionsCoalesced = 0;
+		uint64_t yuvTiles = 0;
+		uint64_t yuvWorkCreated = 0;
+		uint64_t yuvWorkReused = 0;
 		[[nodiscard]] bool active() const
 		{
 			return pushes != 0 || pops != 0 || updateReceived != 0 || motionsCoalesced != 0;
@@ -285,6 +288,9 @@ class SdlContext
 	};
 	QueueAccum _queueAccum;
 	uint64_t _queueIntervalStartNs = 0;
+	uint32_t _yuvLastTiles = 0;
+	uint32_t _yuvLastCreated = 0;
+	uint32_t _yuvLastReused = 0;
 	/* SDL */
 	bool _fullscreen = false;
 	bool _resizeable = false;
