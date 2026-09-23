@@ -1,6 +1,7 @@
 #include <winpr/sysinfo.h>
 #include <winpr/assert.h>
 #include <winpr/cast.h>
+#include <winpr/interlocked.h>
 #include <winpr/pool.h>
 
 #include <freerdp/settings.h>
@@ -52,6 +53,15 @@ typedef struct
 	UINT32 iStride[3];
 } YUV_ENCODE_WORK_PARAM;
 
+/* A reusable threadpool submission. The bound (callback, parameter) must
+ * match the submission, otherwise the slot is closed and recreated. */
+typedef struct
+{
+	PTP_WORK work;
+	PTP_WORK_CALLBACK cb;
+	void* param;
+} YUV_WORK_SLOT;
+
 struct S_YUV_CONTEXT
 {
 	UINT32 width, height;
@@ -60,11 +70,43 @@ struct S_YUV_CONTEXT
 	UINT32 heightStep;
 
 	UINT32 work_object_count;
-	PTP_WORK* work_objects;
+	/* Per-path reusable threadpool slots. Decode, combine and encode run
+	 * sequentially but share nothing, so each path keeps its own slots and
+	 * a slot's bound (callback, parameter) stays stable across frames.
+	 * The parameter pointers address the stable per-slot entries of the
+	 * work_*_params arrays below, which is what makes resubmission sound:
+	 * a reused slot always fires with the same slot address. */
+	YUV_WORK_SLOT* work_dec_slots;
+	YUV_WORK_SLOT* work_combine_slots;
+	YUV_WORK_SLOT* work_enc_slots;
 	YUV_ENCODE_WORK_PARAM* work_enc_params;
 	YUV_PROCESS_WORK_PARAM* work_dec_params;
 	YUV_COMBINE_WORK_PARAM* work_combined_params;
 };
+
+/* Process-wide YUV threadpool diagnostics for the metrics layer.
+ * Only submitting threads increment these (pool_decode/pool_decode_rect/
+ * pool_encode); worker callbacks never touch them. UI layers poll them
+ * with yuv_pool_stats() and report deltas. 32 bit suffices for profiling
+ * runs (tens of millions of tiles); all accesses use interlocked
+ * operations. */
+static LONG volatile g_yuv_tiles_submitted = 0;
+static LONG volatile g_yuv_work_created = 0;
+static LONG volatile g_yuv_work_reused = 0;
+
+void yuv_pool_stats(UINT32* WINPR_RESTRICT tiles, UINT32* WINPR_RESTRICT created,
+                    UINT32* WINPR_RESTRICT reused)
+{
+	if (tiles)
+		*tiles = (UINT32)InterlockedCompareExchange(&g_yuv_tiles_submitted, 0, 0);
+	if (created)
+		*created = (UINT32)InterlockedCompareExchange(&g_yuv_work_created, 0, 0);
+	if (reused)
+		*reused = (UINT32)InterlockedCompareExchange(&g_yuv_work_reused, 0, 0);
+}
+
+static void wait_slots(YUV_WORK_SLOT* WINPR_RESTRICT slots, UINT32 count);
+static void close_slots(YUV_WORK_SLOT* WINPR_RESTRICT slots, UINT32 count);
 
 static inline BOOL avc420_yuv_to_rgb(const BYTE* WINPR_RESTRICT pYUVData[3],
                                      const UINT32 iStride[3],
@@ -164,6 +206,12 @@ BOOL yuv_context_reset(YUV_CONTEXT* WINPR_RESTRICT context, UINT32 width, UINT32
 
 	if (context->useThreads)
 	{
+		/* Slot parameter arrays may move below; bound slots would fire with
+		 * stale addresses, so close everything first. No work can be in
+		 * flight here: every pool_* entry point drains before returning. */
+		close_slots(context->work_dec_slots, context->work_object_count);
+		close_slots(context->work_combine_slots, context->work_object_count);
+		close_slots(context->work_enc_slots, context->work_object_count);
 		context->heightStep = 16;
 		/* Preallocate workers for 16x16 tiles.
 		 * this is overallocation for most cases.
@@ -205,13 +253,29 @@ BOOL yuv_context_reset(YUV_CONTEXT* WINPR_RESTRICT context, UINT32 width, UINT32
 			context->work_combined_params = ctmp;
 		}
 
-		void* wtmp =
-		    winpr_aligned_recalloc((void*)context->work_objects, count, sizeof(PTP_WORK), 32);
+		void* wtmp = winpr_aligned_recalloc(context->work_dec_slots, count,
+		                                            sizeof(YUV_WORK_SLOT), 32);
 		if (!wtmp)
 			goto fail;
-		memset(wtmp, 0, count * sizeof(PTP_WORK));
+		memset(wtmp, 0, count * sizeof(YUV_WORK_SLOT));
 
-		context->work_objects = (PTP_WORK*)wtmp;
+		context->work_dec_slots = (YUV_WORK_SLOT*)wtmp;
+
+		void* ctmp2 = winpr_aligned_recalloc(context->work_combine_slots, count,
+		                                     sizeof(YUV_WORK_SLOT), 32);
+		if (!ctmp2)
+			goto fail;
+		memset(ctmp2, 0, count * sizeof(YUV_WORK_SLOT));
+
+		context->work_combine_slots = (YUV_WORK_SLOT*)ctmp2;
+
+		void* etmp = winpr_aligned_recalloc(context->work_enc_slots, count,
+		                                    sizeof(YUV_WORK_SLOT), 32);
+		if (!etmp)
+			goto fail;
+		memset(etmp, 0, count * sizeof(YUV_WORK_SLOT));
+
+		context->work_enc_slots = (YUV_WORK_SLOT*)etmp;
 		context->work_object_count = WINPR_ASSERTING_INT_CAST(uint32_t, count);
 	}
 	rc = TRUE;
@@ -246,7 +310,12 @@ void yuv_context_free(YUV_CONTEXT* context)
 		return;
 	if (context->useThreads)
 	{
-		winpr_aligned_free((void*)context->work_objects);
+		close_slots(context->work_dec_slots, context->work_object_count);
+		close_slots(context->work_combine_slots, context->work_object_count);
+		close_slots(context->work_enc_slots, context->work_object_count);
+		winpr_aligned_free(context->work_dec_slots);
+		winpr_aligned_free(context->work_combine_slots);
+		winpr_aligned_free(context->work_enc_slots);
 		winpr_aligned_free(context->work_combined_params);
 		winpr_aligned_free(context->work_enc_params);
 		winpr_aligned_free(context->work_dec_params);
@@ -282,8 +351,8 @@ static inline YUV_PROCESS_WORK_PARAM pool_decode_param(const RECTANGLE_16* WINPR
 	return current;
 }
 
-static BOOL submit_object(PTP_WORK* WINPR_RESTRICT work_object, PTP_WORK_CALLBACK cb,
-                          const void* WINPR_RESTRICT param, YUV_CONTEXT* WINPR_RESTRICT context)
+static BOOL submit_slot(YUV_WORK_SLOT* WINPR_RESTRICT slots, UINT32 index,
+                        PTP_WORK_CALLBACK cb, void* WINPR_RESTRICT param)
 {
 	union
 	{
@@ -293,36 +362,77 @@ static BOOL submit_object(PTP_WORK* WINPR_RESTRICT work_object, PTP_WORK_CALLBAC
 
 	cnv.cpv = param;
 
-	if (!work_object)
+	if (!slots || !param || !cb)
 		return FALSE;
 
-	*work_object = nullptr;
+	YUV_WORK_SLOT* slot = &slots[index];
+	if (!slot->work || (slot->cb != cb) || (slot->param != param))
+	{
+		/* First use, or a different caller reusing this path's slots
+		 * (e.g. AVC420 vs AVC444 process callbacks): replace the binding.
+		 * Callers only reuse slots after draining them, but draining again
+		 * is cheap once complete and keeps this helper safe on its own. */
+		if (slot->work)
+		{
+			winpr_WaitForThreadpoolWorkCallbacks(slot->work, FALSE);
+			winpr_CloseThreadpoolWork(slot->work);
+			slot->work = NULL;
+		}
+		slot->work = winpr_CreateThreadpoolWork(cb, cnv.pv, NULL);
+		if (!slot->work)
+			return FALSE;
+		slot->cb = cb;
+		slot->param = param;
+		InterlockedIncrement(&g_yuv_work_created);
+	}
+	else
+	{
+		InterlockedIncrement(&g_yuv_work_reused);
+	}
 
-	if (!param || !context)
-		return FALSE;
-
-	*work_object = CreateThreadpoolWork(cb, cnv.pv, nullptr);
-	if (!*work_object)
-		return FALSE;
-
-	SubmitThreadpoolWork(*work_object);
+	winpr_SubmitThreadpoolWork(slot->work);
+	InterlockedIncrement(&g_yuv_tiles_submitted);
 	return TRUE;
 }
 
-static void free_objects(PTP_WORK* work_objects, UINT32 waitCount)
+static void wait_slots(YUV_WORK_SLOT* WINPR_RESTRICT slots, UINT32 count)
 {
-	WINPR_ASSERT(work_objects || (waitCount == 0));
-
-	for (UINT32 i = 0; i < waitCount; i++)
+	if (!slots)
 	{
-		PTP_WORK cur = work_objects[i];
-		work_objects[i] = nullptr;
+		WINPR_ASSERT(count == 0);
+		return;
+	}
+
+	for (UINT32 i = 0; i < count; i++)
+	{
+		PTP_WORK cur = slots[i].work;
+		if (!cur)
+			continue;
+
+		winpr_WaitForThreadpoolWorkCallbacks(cur, FALSE);
+	}
+}
+
+static void close_slots(YUV_WORK_SLOT* WINPR_RESTRICT slots, UINT32 count)
+{
+	if (!slots)
+	{
+		WINPR_ASSERT(count == 0);
+		return;
+	}
+
+	for (UINT32 i = 0; i < count; i++)
+	{
+		PTP_WORK cur = slots[i].work;
+		slots[i].work = NULL;
+		slots[i].cb = NULL;
+		slots[i].param = NULL;
 
 		if (!cur)
 			continue;
 
-		WaitForThreadpoolWorkCallbacks(cur, FALSE);
-		CloseThreadpoolWork(cur);
+		winpr_WaitForThreadpoolWorkCallbacks(cur, FALSE);
+		winpr_CloseThreadpoolWork(cur);
 	}
 }
 
@@ -415,7 +525,7 @@ static BOOL pool_decode(YUV_CONTEXT* WINPR_RESTRICT context, PTP_WORK_CALLBACK c
 
 				if (context->work_object_count <= waitCount)
 				{
-					free_objects(context->work_objects, context->work_object_count);
+					wait_slots(context->work_dec_slots, context->work_object_count);
 					waitCount = 0;
 				}
 
@@ -424,7 +534,7 @@ static BOOL pool_decode(YUV_CONTEXT* WINPR_RESTRICT context, PTP_WORK_CALLBACK c
 				if (rectangle_is_empty(&z))
 					continue;
 				*cur = pool_decode_param(&z, context, pYUVData, iStride, DstFormat, dest, nDstStep);
-				if (!submit_object(&context->work_objects[waitCount], cb, cur, context))
+				if (!submit_slot(context->work_dec_slots, waitCount, cb, cur))
 					goto fail;
 				waitCount++;
 				y.top += YUV_TILE_SIZE;
@@ -435,7 +545,7 @@ static BOOL pool_decode(YUV_CONTEXT* WINPR_RESTRICT context, PTP_WORK_CALLBACK c
 	}
 	rc = TRUE;
 fail:
-	free_objects(context->work_objects, context->work_object_count);
+	wait_slots(context->work_dec_slots, context->work_object_count);
 	return rc;
 }
 
@@ -564,21 +674,21 @@ static BOOL pool_decode_rect(YUV_CONTEXT* WINPR_RESTRICT context, BYTE type,
 
 		if (context->work_object_count <= waitCount)
 		{
-			free_objects(context->work_objects, context->work_object_count);
+			wait_slots(context->work_combine_slots, context->work_object_count);
 			waitCount = 0;
 		}
 		current = &context->work_combined_params[waitCount];
 		*current = pool_decode_rect_param(&regionRects[x], context, type, pYUVData, iStride,
 		                                  pYUVDstData, iDstStride);
 
-		if (!submit_object(&context->work_objects[waitCount], cb, current, context))
+		if (!submit_slot(context->work_combine_slots, waitCount, cb, current))
 			goto fail;
 		waitCount++;
 	}
 
 	rc = TRUE;
 fail:
-	free_objects(context->work_objects, context->work_object_count);
+	wait_slots(context->work_combine_slots, context->work_object_count);
 	return rc;
 }
 
@@ -824,7 +934,7 @@ static BOOL pool_encode(YUV_CONTEXT* WINPR_RESTRICT context, PTP_WORK_CALLBACK c
 
 			if (context->work_object_count <= waitCount)
 			{
-				free_objects(context->work_objects, context->work_object_count);
+				wait_slots(context->work_enc_slots, context->work_object_count);
 				waitCount = 0;
 			}
 
@@ -832,7 +942,7 @@ static BOOL pool_encode(YUV_CONTEXT* WINPR_RESTRICT context, PTP_WORK_CALLBACK c
 			r.top += y * context->heightStep;
 			*current = pool_encode_fill(&r, context, pSrcData, nSrcStep, SrcFormat, iStride,
 			                            pYUVLumaData, pYUVChromaData);
-			if (!submit_object(&context->work_objects[waitCount], cb, current, context))
+			if (!submit_slot(context->work_enc_slots, waitCount, cb, current))
 				goto fail;
 			waitCount++;
 		}
@@ -840,7 +950,7 @@ static BOOL pool_encode(YUV_CONTEXT* WINPR_RESTRICT context, PTP_WORK_CALLBACK c
 
 	rc = TRUE;
 fail:
-	free_objects(context->work_objects, context->work_object_count);
+	wait_slots(context->work_enc_slots, context->work_object_count);
 	return rc;
 }
 
