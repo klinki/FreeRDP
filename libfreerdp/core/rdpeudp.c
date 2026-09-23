@@ -944,6 +944,15 @@ BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer, size_t*
 #define RDPEUDP2_WINDOW_MAX 64
 #define RDPEUDP2_RECV_MAP 256
 
+/* Channel-zero wrap watch: when the zero-skip fast path refuses (dirty
+ * DataSeq history from recovered loss), a missing channel 0 is watched
+ * briefly instead of stalling until the ring laps (forced reconnect, ~24s
+ * outage in production). Retransmits land in milliseconds; 250 ms / 64
+ * buffered chunks resolve an omitted zero with overwhelming evidence,
+ * while a delayed real zero still delivers normally inside the window. */
+#define RDPEUDP_WRAP_WATCH_TIMEOUT_MS 250
+#define RDPEUDP_WRAP_WATCH_CHUNKS 64
+
 typedef struct
 {
 	UINT16 dataSeq;
@@ -1017,6 +1026,10 @@ struct rdp_udp_transport
 	/* Learned only from an unambiguous wrap, and scoped to this transport. */
 	BOOL peerSkipsChannelZero;
 	BOOL peerUsesChannelZero;
+	/* Wrap watch for a missing channel 0 with dirty history (see
+	 * RDPEUDP_WRAP_WATCH_TIMEOUT_MS): inactive when expected != 0. */
+	BOOL wrapWatchActive;
+	UINT64 wrapWatchSince;
 	BOOL recvGapActive;
 	UINT64 recvGapSince;
 	BOOL recvFailed;
@@ -1844,22 +1857,79 @@ static BOOL rdpeudp_can_skip_channel_zero_locked(const rdpUdpTransport* udp)
 	return TRUE;
 }
 
+/* Wrap-head eligibility: the deliver head sits at the wrap (channel 0),
+ * this peer never used zero, and channel 1 is buffered. Anything else is
+ * a genuine stall, not a wrap decision. */
+static BOOL rdpeudp_wrap_head_stuck_locked(const rdpUdpTransport* udp)
+{
+	return (udp->expectedChannelSeq == 0) && !udp->peerUsesChannelZero &&
+	       udp->recvMap[1].occupied && (udp->recvMap[1].channelSeq == 1);
+}
+
+/* Bounded-wait zero skip. Returns TRUE when the watch resolved (skip to
+ * channel 1). force skips the wait and is used when the receive ring is
+ * about to lap in the feed path. A delayed real zero still takes the
+ * normal delivery path while the watch runs, so only a zero that never
+ * arrives is skipped. */
+static BOOL rdpeudp_wrap_maybe_resolve_locked(rdpUdpTransport* udp, BOOL force)
+{
+	if (!rdpeudp_wrap_head_stuck_locked(udp))
+		return FALSE;
+
+	const char* reason = nullptr;
+	if (!force)
+	{
+		const UINT64 now = rdpeudp_recv_now(udp);
+		if (!udp->wrapWatchActive)
+		{
+			udp->wrapWatchActive = TRUE;
+			udp->wrapWatchSince = now;
+			return FALSE;
+		}
+		size_t buffered = 0;
+		for (size_t i = 0; i < ARRAYSIZE(udp->recvMap); i++)
+			buffered += udp->recvMap[i].occupied ? 1 : 0;
+		const BOOL timedOut = (now - udp->wrapWatchSince >= RDPEUDP_WRAP_WATCH_TIMEOUT_MS);
+		const BOOL chunkLimit = (buffered >= RDPEUDP_WRAP_WATCH_CHUNKS);
+		if (!timedOut && !chunkLimit)
+			return FALSE;
+		reason = timedOut ? "watch timeout" : "watch chunk limit";
+	}
+	else
+	{
+		reason = "ring lap imminent";
+	}
+	WLog_WARN(TAG, "Peer omitted channel sequence 0 at wrap; %s, continuing at channel 1",
+	          reason);
+	udp->peerSkipsChannelZero = TRUE;
+	udp->expectedChannelSeq = 1;
+	udp->wrapWatchActive = FALSE;
+	return TRUE;
+}
+
 static void rdpeudp_deliver_recv_data_locked(rdpUdpTransport* udp)
 {
 	const UINT16 previous = udp->expectedChannelSeq;
+	if (previous != 0)
+		udp->wrapWatchActive = FALSE;
 	while (TRUE)
 	{
 		UdpRecvSlot* slot = &udp->recvMap[udp->expectedChannelSeq % RDPEUDP2_RECV_MAP];
 		if (!slot->occupied || (slot->channelSeq != udp->expectedChannelSeq))
 		{
-			if (!rdpeudp_can_skip_channel_zero_locked(udp))
-				break;
-			WLog_WARN(TAG, "Peer omitted channel sequence 0 at wrap; %s, continuing at channel 1",
-			          udp->peerSkipsChannelZero ? "previously confirmed peer convention"
-			                                    : "complete DataSeq history");
-			udp->peerSkipsChannelZero = TRUE;
-			udp->expectedChannelSeq = 1;
-			continue;
+			if (rdpeudp_can_skip_channel_zero_locked(udp))
+			{
+				WLog_WARN(TAG, "Peer omitted channel sequence 0 at wrap; %s, continuing at channel 1",
+				          udp->peerSkipsChannelZero ? "previously confirmed peer convention"
+				                                    : "complete DataSeq history");
+				udp->peerSkipsChannelZero = TRUE;
+				udp->expectedChannelSeq = 1;
+				udp->wrapWatchActive = FALSE;
+				continue;
+			}
+			if (rdpeudp_wrap_maybe_resolve_locked(udp, FALSE))
+				continue;
+			break;
 		}
 		if (!Stream_EnsureRemainingCapacity(udp->recvStream, slot->len))
 		{
@@ -1871,6 +1941,7 @@ static void rdpeudp_deliver_recv_data_locked(rdpUdpTransport* udp)
 		{
 			udp->peerUsesChannelZero = TRUE;
 			udp->peerSkipsChannelZero = FALSE;
+			udp->wrapWatchActive = FALSE;
 		}
 		if (slot->len > 0)
 			Stream_Write(udp->recvStream, slot->data, slot->len);
@@ -2053,31 +2124,45 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 
 			if (!dup && (drem <= 65535))
 			{
-				const size_t slot = (size_t)(cseq % RDPEUDP2_RECV_MAP);
-				if (udp->recvMap[slot].occupied)
+				/* Retried once after a forced wrap resolve (see below). */
+				for (int attempt = 0; attempt < 2; attempt++)
 				{
-					/* These bytes may already have been ACKed. Never overwrite
-					 * them and silently leave an unrecoverable TLS stream gap. */
-					WLog_ERR(TAG, "UDP channel receive window overflow; reconnect required");
-					udp->recvFailed = TRUE;
-					goto deliver;
-				}
-				free(udp->recvMap[slot].data);
-				udp->recvMap[slot].data = nullptr;
-				udp->recvMap[slot].len = 0;
-				udp->recvMap[slot].occupied = FALSE;
-				if ((drem == 0) || ((udp->recvMap[slot].data = malloc(drem)) != nullptr))
-				{
-					if (drem > 0)
-						memcpy(udp->recvMap[slot].data, dp, drem);
-					udp->recvMap[slot].len = drem;
-					udp->recvMap[slot].channelSeq = cseq;
-					udp->recvMap[slot].occupied = TRUE;
-				}
-				else
-				{
-					WLog_ERR(TAG, "UDP receive allocation failed; reconnect required");
-					udp->recvFailed = TRUE;
+					const size_t slot = (size_t)(cseq % RDPEUDP2_RECV_MAP);
+					if (!udp->recvMap[slot].occupied)
+					{
+						free(udp->recvMap[slot].data);
+						udp->recvMap[slot].data = nullptr;
+						udp->recvMap[slot].len = 0;
+						udp->recvMap[slot].occupied = FALSE;
+						if ((drem == 0) ||
+						    ((udp->recvMap[slot].data = malloc(drem)) != nullptr))
+						{
+							if (drem > 0)
+								memcpy(udp->recvMap[slot].data, dp, drem);
+							udp->recvMap[slot].len = drem;
+							udp->recvMap[slot].channelSeq = cseq;
+							udp->recvMap[slot].occupied = TRUE;
+						}
+						else
+						{
+							WLog_ERR(TAG, "UDP receive allocation failed; reconnect required");
+							udp->recvFailed = TRUE;
+						}
+						break;
+					}
+					if ((attempt > 0) || !rdpeudp_wrap_maybe_resolve_locked(udp, TRUE))
+					{
+						/* These bytes may already have been ACKed. Never overwrite
+						 * them and silently leave an unrecoverable TLS stream gap. */
+						WLog_ERR(TAG, "UDP channel receive window overflow; reconnect required");
+						udp->recvFailed = TRUE;
+						goto deliver;
+					}
+					/* Same wrap head the deliver path watches: with channel 1
+					 * buffered and zero absent, the ring is lapping on an
+					 * omitted zero, not on a real stall. Drain what unblocked
+					 * and retry this chunk once against the freed slots. */
+					rdpeudp_deliver_recv_data_locked(udp);
 				}
 			}
 		}

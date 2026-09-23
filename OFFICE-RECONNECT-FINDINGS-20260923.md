@@ -104,10 +104,22 @@ channelSeq anomaly — the TCP path itself dying (office WiFi/Tailscale
 hiccup or server-side kill). Distinct cause, same user-visible pain;
 worth correlating against Tailscale status if it recurs.
 
+## Update (fix, same branch)
+
+Implemented bounded-wait zero skip in `libfreerdp/core/rdpeudp.c`: the
+pristine-history fast path is unchanged; with dirty history a missing
+channel 0 starts a watch that resolves (skip to 1, learn the peer
+convention) after 250 ms or 64 buffered post-wrap chunks, and resolves
+immediately if the ring is about to lap. A delayed real zero still
+delivers normally inside the window. New unit tests
+(`test_rx_wrap_watch_timeout/chunks/delayed_zero` in `TestRdpeUdp.c`)
+pin all three paths plus the unchanged strict cases; full `TestCore`
+green. Live office validation (wraps stop reconnecting) still pending.
+
 ## What is proven vs open
 
 * Proven: wrap + omitted-zero + dirty-history → refused skip → overflow
   (packet-level, twice); join stall + static-dots fingerprint (dump-level).
 * Open: the exact loss source on the office path (WiFi vs Tailscale);
-  whether the 18:17 join stall self-resolves; the three fix directions
-  above are proposals, not patches.
+  whether the 18:17 join stall self-resolves; the remaining two fix
+  directions above are still proposals, not patches.
