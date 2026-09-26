@@ -24,6 +24,27 @@ accepted `auth_response`; managed arguments reject password, certificate bypass,
 console callback, and other authentication overrides. EOF and cancellation wake
 all pending requests and abort the RDP session.
 
+A client advertising `close_confirmation` accepts `start.confirmSessionClose`.
+When enabled, SDL window Close, fullscreen Close, and Quit queue a `close_request`
+with a unique `requestId` without waiting on the SDL thread. Repeated Close events
+are coalesced until a matching `close_response` with boolean `accepted` arrives.
+Rejecting resumes the session; accepting intentionally cancels it. Stale responses
+are ignored. Parent EOF and `cancel` always terminate without a close decision.
+The default is immediate close, preserving normal CLI behavior.
+
+A client advertising `session_thumbnail` accepts `start.thumbnailsEnabled` and
+`thumbnail_request` with a string `requestId`. While enabled and connected,
+completed GDI BGRA frames are downsampled to an owned snapshot at most once per
+second. PNG encoding and protocol delivery run on a separate worker. A correlated
+`thumbnail` event contains `pngBase64`, `width`, and `height`; the image preserves
+aspect ratio, is at most 320×200, and is limited to 262144 PNG bytes and 350000
+base64 characters. Requests are limited to one every two seconds and one pending
+request is retained. A `thumbnail_request` with `thumbnailsEnabled:false` and no
+request ID disables capture, clears cached pixels and pending/queued images, and
+invalidates an encoding in progress. Cancel/EOF also clear capture state. Images
+remain in process memory, are never logged or saved, and do not use screen capture
+or require screen recording permission.
+
 Protocol reading and writing run on worker threads. Focus and display APIs run
 on the SDL main thread. Authentication/certificate waits run on the RDP worker.
 Terminal events are produced after the completed session thread is joined;
@@ -33,5 +54,6 @@ The existing renderer, input handling, and reconnect overlay remain in use.
 Configure with `-DWITH_LAUNCHER_BRIDGE=ON -DSDL_LAUNCHER_TEST=ON`, build `TestSDLLauncherTransport`, and run
 `ctest --test-dir <build>/client/SDL/SDL3 -R TestSDLLauncherTransport` for socketpair
 regressions covering prompts, fragmented/oversized frames, stale commands,
-cancellation, EOF, versions, and terminal distinctions. The tests do not open a
+cancellation, EOF, versions, terminal distinctions, correlated Close decisions,
+bounded thumbnail PNGs, disabled capture, and worker teardown under backpressure. The tests do not open a
 remote connection or use real credentials.

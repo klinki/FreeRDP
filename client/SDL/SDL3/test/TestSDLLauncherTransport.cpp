@@ -1,6 +1,9 @@
 /** Actual private socket protocol regression tests; never contacts an RDP host. */
 #include "../sdl_launcher.hpp"
 #include <freerdp/error.h>
+#include <freerdp/crypto/crypto.h>
+#include <chrono>
+#include <thread>
 #include <winpr/crt.h>
 #include <future>
 #include <iostream>
@@ -82,6 +85,161 @@ namespace
 			      "\"" + fields + "}\n");
 		}
 	};
+	// Every wait has a deadline, including reader/worker teardown with a silent parent.
+	template <typename Predicate> void eventually(Predicate predicate, const char* message)
+	{
+		const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+		while (!predicate())
+		{
+			require(std::chrono::steady_clock::now() < deadline, message);
+			std::this_thread::sleep_for(std::chrono::milliseconds(2));
+		}
+	}
+	void startOptions(Connection& c, bool confirm, bool thumbnails)
+	{
+		c.command("start", std::string(",\"arguments\":[],\"displaySelections\":[],\"confirmSessionClose\":") +
+		                       (confirm ? "true" : "false") + ",\"thumbnailsEnabled\":" +
+		                       (thumbnails ? "true" : "false"));
+		// True options are observable atomics published by the receiver.
+		if (confirm)
+			eventually([&] { return c.bridge->closeConfirmationEnabled(); }, "Close option not applied");
+		if (thumbnails)
+			eventually([&] { return c.bridge->thumbnailsEnabled(); }, "Thumbnail option not applied");
+	}
+	void closeConfirmation()
+	{
+		Connection c;
+		startOptions(c, true, false);
+		// A close request can interrupt authentication; it need not wait for connected.
+		require(c.bridge->requestClose(), "Close confirmation was not queued");
+		auto request = c.next();
+		require(getString(request.get(), "type") == "close_request", "Missing close request");
+		const auto first = getString(request.get(), "requestId");
+		require(!first.empty() && !c.bridge->requestClose(), "Repeated close was not coalesced");
+		c.command("close_response", ",\"requestId\":\"stale\",\"accepted\":true");
+		c.command("close_response", ",\"requestId\":\"" + first + "\",\"accepted\":\"true\"");
+		std::this_thread::sleep_for(std::chrono::milliseconds(20));
+		require(!c.bridge->cancelled() && !c.bridge->requestClose(), "Stale/invalid close response applied");
+		c.command("close_response", ",\"requestId\":\"" + first + "\",\"accepted\":false");
+		eventually([&] { return c.bridge->requestClose(); }, "Rejecting close did not restore session");
+		request = c.next();
+		const auto second = getString(request.get(), "requestId");
+		require(second != first && !c.bridge->cancelled(), "New close request reused a completed ID");
+		c.command("close_response", ",\"requestId\":\"" + first + "\",\"accepted\":true");
+		c.command("close_response", ",\"requestId\":\"" + second + "\",\"accepted\":true");
+		eventually([&] { return c.bridge->cancelled(); }, "Confirming close did not cancel");
+		c.bridge->ended(0, "Synthetic confirmed close");
+		auto ended = c.next();
+		require(getString(ended.get(), "outcome") == "cancelled", "Confirmed close misclassified");
+	}
+	void closeCancellationAndEOF()
+	{
+		{
+			Connection c;
+			require(!c.bridge->requestClose() && c.bridge->cancelled(), "Default close must remain immediate");
+		}
+		for (bool eof : { false, true })
+		{
+			Connection c;
+			startOptions(c, true, true);
+			require(c.bridge->requestClose(), "Missing pending close");
+			std::ignore = c.next();
+			c.bridge->state("connected");
+			std::ignore = c.next();
+			// No frame exists: the thumbnail worker is waiting as well.
+			c.command("thumbnail_request", ",\"requestId\":\"pending\"");
+			if (eof)
+			{
+				close(c.peer);
+				c.peer = -1;
+			}
+			else
+				c.command("cancel");
+			eventually([&] { return c.bridge->cancelled(); }, "Cancel/EOF waited for close confirmation");
+			const auto began = std::chrono::steady_clock::now();
+			c.bridge.reset();
+			require(std::chrono::steady_clock::now() - began < std::chrono::seconds(2),
+			        "Pending close/thumbnail worker prevented bounded teardown");
+		}
+	}
+	UINT32 bigEndian(const BYTE* value)
+	{
+		return (static_cast<UINT32>(value[0]) << 24) | (static_cast<UINT32>(value[1]) << 16) |
+		       (static_cast<UINT32>(value[2]) << 8) | value[3];
+	}
+	std::vector<BYTE> syntheticFrame(UINT32 width, UINT32 height)
+	{
+		std::vector<BYTE> pixels(static_cast<size_t>(width) * height * 4);
+		UINT32 noise = 123456789;
+		for (auto& pixel : pixels)
+		{
+			noise ^= noise << 13;
+			noise ^= noise >> 17;
+			noise ^= noise << 5;
+			pixel = static_cast<BYTE>(noise);
+		}
+		return pixels;
+	}
+	void thumbnailBoundsAndDisable()
+	{
+		Connection c;
+		startOptions(c, false, true);
+		c.bridge->state("connected");
+		std::ignore = c.next();
+		const auto pixels = syntheticFrame(800, 600);
+		require(!c.bridge->captureThumbnail(nullptr, 800, 600, 3200) &&
+		            !c.bridge->captureThumbnail(pixels.data(), 800, 600, 1) &&
+		            !c.bridge->captureThumbnail(pixels.data(), 0, 600, 3200),
+		        "Invalid thumbnail source accepted");
+		require(c.bridge->captureThumbnail(pixels.data(), 800, 600, 3200), "Valid completed frame rejected");
+		require(!c.bridge->captureThumbnail(pixels.data(), 800, 600, 3200), "Thumbnail frame rate unbounded");
+		c.command("thumbnail_request", ",\"requestId\":\"frame-1\"");
+		c.command("thumbnail_request", ",\"requestId\":\"flood-ignored\"");
+		auto event = c.next();
+		require(getString(event.get(), "type") == "thumbnail" &&
+		            getString(event.get(), "requestId") == "frame-1", "Thumbnail request correlation lost");
+		const auto encoded = getString(event.get(), "pngBase64");
+		require(!encoded.empty() && encoded.size() <= 350000, "Unbounded thumbnail envelope");
+		BYTE* decoded = nullptr;
+		size_t size = 0;
+		crypto_base64_decode(encoded.c_str(), encoded.size(), &decoded, &size);
+		std::unique_ptr<BYTE, decltype(&free)> owned(decoded, free);
+		const BYTE signature[] = { 137, 80, 78, 71, 13, 10, 26, 10 };
+		require(decoded && size >= 24 && size <= 262144 && memcmp(decoded, signature, 8) == 0 &&
+		            memcmp(decoded + 12, "IHDR", 4) == 0, "Invalid or oversized thumbnail PNG");
+		const auto width = bigEndian(decoded + 16), height = bigEndian(decoded + 20);
+		require(width > 0 && width <= 320 && height > 0 && height <= 200 &&
+		            WINPR_JSON_GetNumberValue(WINPR_JSON_GetObjectItemCaseSensitive(event.get(), "width")) == width &&
+		            WINPR_JSON_GetNumberValue(WINPR_JSON_GetObjectItemCaseSensitive(event.get(), "height")) == height,
+		        "PNG and advertised dimensions differ");
+		c.command("thumbnail_request", ",\"thumbnailsEnabled\":false");
+		eventually([&] { return !c.bridge->thumbnailsEnabled(); }, "Disable capture command ignored");
+		require(!c.bridge->captureThumbnail(pixels.data(), 800, 600, 3200), "Disabled capture retained frame");
+		c.command("cancel");
+		eventually([&] { return c.bridge->cancelled(); }, "Thumbnail cancel ignored");
+		c.bridge->ended(0, "Synthetic thumbnail cancellation");
+		event = c.next();
+		require(getString(event.get(), "type") == "ended", "Flood produced a second thumbnail");
+	}
+	void thumbnailBackpressureTeardown()
+	{
+		Connection c;
+		startOptions(c, false, true);
+		c.bridge->state("connected");
+		std::ignore = c.next();
+		// Keep output larger than this socket buffer to exercise a stalled parent.
+		int size = 1024;
+		std::ignore = setsockopt(c.peer, SOL_SOCKET, SO_RCVBUF, &size, sizeof(size));
+		const auto pixels = syntheticFrame(320, 200);
+		require(c.bridge->captureThumbnail(pixels.data(), 320, 200, 1280), "Backpressure frame rejected");
+		c.command("thumbnail_request", ",\"requestId\":\"unread\"");
+		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		const auto began = std::chrono::steady_clock::now();
+		c.bridge.reset();
+		require(std::chrono::steady_clock::now() - began < std::chrono::seconds(2),
+		        "Unread thumbnail prevented bounded writer/worker teardown");
+	}
+
 	void promptAndStaleResponse()
 	{
 		Connection c;
@@ -280,6 +438,10 @@ int main()
 		malformedAndVersion();
 		lifecycle();
 		terminalDistinctions();
+		closeConfirmation();
+		closeCancellationAndEOF();
+		thumbnailBoundsAndDisable();
+		thumbnailBackpressureTeardown();
 	}
 	catch (const std::exception& e)
 	{
@@ -287,6 +449,6 @@ int main()
 		return 1;
 	}
 	std::cout
-	    << "Launcher transport prompt, framing, EOF, cancellation, and lifecycle tests passed\n";
+	    << "Launcher transport prompt, framing, EOF, cancellation, lifecycle, close confirmation, and thumbnail tests passed\n";
 	return 0;
 }
