@@ -7,6 +7,8 @@
 #include <CoreGraphics/CoreGraphics.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <ColorSync/ColorSync.h>
+#include <ImageIO/ImageIO.h>
+#include <freerdp/crypto/crypto.h>
 #include <cctype>
 #include <winpr/crt.h>
 #include <algorithm>
@@ -25,6 +27,44 @@ namespace
 {
 	SdlLauncher* launcher = nullptr;
 	constexpr size_t maxFrame = 1024 * 1024;
+	constexpr size_t maxThumbnailPNG = 262144;
+	// Only owned, already downsampled BGRA pixels reach the encoding worker.
+	std::string thumbnailPNG(const std::vector<BYTE>& pixels, UINT32 width, UINT32 height)
+	{
+		std::string result;
+		auto color = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+		auto provider = CGDataProviderCreateWithData(nullptr, pixels.data(), pixels.size(), nullptr);
+		auto image = color && provider
+		                 ? CGImageCreate(width, height, 8, 32, width * 4, color,
+		                                 kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst,
+		                                 provider, nullptr, false, kCGRenderingIntentDefault)
+		                 : nullptr;
+		auto data = CFDataCreateMutable(kCFAllocatorDefault, 0);
+		auto destination = image && data
+		                       ? CGImageDestinationCreateWithData(data, CFSTR("public.png"), 1, nullptr)
+		                       : nullptr;
+		if (destination)
+		{
+			CGImageDestinationAddImage(destination, image, nullptr);
+			if (CGImageDestinationFinalize(destination))
+			{
+				const auto size = CFDataGetLength(data);
+				if (size > 0 && static_cast<size_t>(size) <= maxThumbnailPNG)
+				{
+					std::unique_ptr<char, decltype(&free)> encoded(
+					    crypto_base64_encode(CFDataGetBytePtr(data), static_cast<size_t>(size)), free);
+					if (encoded && strlen(encoded.get()) <= 350000)
+						result = encoded.get();
+				}
+			}
+			CFRelease(destination);
+		}
+		if (data) CFRelease(data);
+		if (image) CGImageRelease(image);
+		if (provider) CGDataProviderRelease(provider);
+		if (color) CGColorSpaceRelease(color);
+		return result;
+	}
 	WINPR_JSON* item(WINPR_JSON* obj, const char* key)
 	{
 		return WINPR_JSON_GetObjectItemCaseSensitive(obj, key);
@@ -139,6 +179,7 @@ SdlLauncher::SdlLauncher(int fd, std::string sessionId, rdpContext* context)
 	std::ignore = setsockopt(_fd, SOL_SOCKET, SO_NOSIGPIPE, &yes, sizeof(yes));
 	_reader = std::thread(&SdlLauncher::readLoop, this);
 	_writer = std::thread(&SdlLauncher::writeLoop, this);
+	_thumbnailWorker = std::thread(&SdlLauncher::thumbnailLoop, this);
 }
 SdlLauncher::~SdlLauncher()
 {
@@ -157,6 +198,8 @@ SdlLauncher::~SdlLauncher()
 		_reader.join();
 	if (_writer.joinable())
 		_writer.join();
+	if (_thumbnailWorker.joinable())
+		_thumbnailWorker.join();
 	close(_fd);
 	launcher = nullptr;
 }
@@ -285,11 +328,60 @@ bool SdlLauncher::receive(Json event)
 		_focus = true;
 		return true;
 	}
+	if (type == "close_response")
+	{
+		bool accepted = false;
+		{
+			std::lock_guard lock(_mutex);
+			const auto value = item(event.get(), "accepted");
+			if (_closeRequest.empty() || str(event.get(), "requestId") != _closeRequest ||
+			    !WINPR_JSON_IsBool(value))
+				return true;
+			accepted = WINPR_JSON_IsTrue(value);
+			_closeRequest.clear();
+		}
+		if (accepted) cancel();
+		return true;
+	}
+	if (type == "thumbnail_request")
+	{
+		std::lock_guard lock(_mutex);
+		const auto enabled = item(event.get(), "thumbnailsEnabled");
+		if (WINPR_JSON_IsFalse(enabled))
+		{
+			_thumbnailEnabled = false;
+			++_thumbnailEpoch;
+			_thumbnail = {};
+			_thumbnailRequest.clear();
+			_outbound.erase(std::remove_if(_outbound.begin(), _outbound.end(), [](const auto& frame) {
+				return frame.find("\"type\":\"thumbnail\"") != std::string::npos;
+			}), _outbound.end());
+			_condition.notify_all();
+			return true;
+		}
+		const auto id = str(event.get(), "requestId");
+		const auto now = std::chrono::steady_clock::now();
+		if (!_connected || _cancelled || _terminal || id.empty() || id.size() > 128 ||
+		    now - _lastThumbnailRequest < std::chrono::seconds(2))
+			return true;
+		_lastThumbnailRequest = now;
+		_thumbnailEnabled = true;
+		_thumbnailRequest = id; // At most one pending request and one owned frame.
+		_condition.notify_all();
+		return true;
+	}
 	std::lock_guard lock(_mutex);
 	if (type == "start")
 	{
 		if (_started)
 			return false;
+		const auto confirm = item(event.get(), "confirmSessionClose");
+		const auto thumbnails = item(event.get(), "thumbnailsEnabled");
+		if ((confirm && !WINPR_JSON_IsBool(confirm)) ||
+		    (thumbnails && !WINPR_JSON_IsBool(thumbnails)))
+			return false;
+		_confirmSessionClose = WINPR_JSON_IsTrue(confirm);
+		_thumbnailEnabled = WINPR_JSON_IsTrue(thumbnails);
 		_started = true;
 		_start = std::move(event);
 	}
@@ -330,9 +422,127 @@ void SdlLauncher::cancel()
 {
 	if (_cancelled.exchange(true))
 		return;
+	{
+		std::lock_guard lock(_mutex);
+		_thumbnailEnabled = false;
+		++_thumbnailEpoch;
+		_thumbnail = {};
+		_thumbnailRequest.clear();
+		_closeRequest.clear();
+		_outbound.erase(std::remove_if(_outbound.begin(), _outbound.end(), [](const auto& frame) {
+			return frame.find("\"type\":\"thumbnail\"") != std::string::npos;
+		}), _outbound.end());
+	}
 	_condition.notify_all();
 	std::ignore = freerdp_abort_connect_context(_context);
 	std::ignore = sdl_push_quit();
+}
+bool SdlLauncher::closeConfirmationEnabled() const
+{
+	return _confirmSessionClose;
+}
+bool SdlLauncher::thumbnailsEnabled() const
+{
+	return _thumbnailEnabled;
+}
+bool SdlLauncher::requestClose()
+{
+	if (!_confirmSessionClose || _cancelled || _terminal)
+	{
+		cancel();
+		return false;
+	}
+	std::string id;
+	{
+		std::lock_guard lock(_mutex);
+		if (!_closeRequest.empty())
+			return false;
+		id = _sessionId + ":close:" + std::to_string(++_nextRequest);
+		_closeRequest = id;
+	}
+	auto event = message("close_request");
+	text(event.get(), "requestId", id.c_str());
+	if (!send(std::move(event))) cancel();
+	return true;
+}
+bool SdlLauncher::captureThumbnail(const BYTE* bgra, UINT32 width, UINT32 height, UINT32 stride)
+{
+	if (!bgra || width == 0 || height == 0 || width > 65536 || height > 65536 ||
+	    stride < static_cast<UINT64>(width) * 4 || !_thumbnailEnabled || !_connected ||
+	    _cancelled || _terminal)
+		return false;
+	UINT64 epoch;
+	{
+		std::lock_guard lock(_mutex);
+		const auto now = std::chrono::steady_clock::now();
+		if (now - _lastThumbnailFrame < std::chrono::seconds(1))
+			return false;
+		_lastThumbnailFrame = now;
+		epoch = _thumbnailEpoch;
+	}
+	const double scale = std::min({ 1.0, 320.0 / width, 200.0 / height });
+	Thumbnail frame;
+	frame.width = std::max(1u, static_cast<UINT32>(width * scale));
+	frame.height = std::max(1u, static_cast<UINT32>(height * scale));
+	frame.pixels.resize(static_cast<size_t>(frame.width) * frame.height * 4);
+	for (UINT32 y = 0; y < frame.height; y++)
+	{
+		const auto sourceY = static_cast<UINT64>(y) * height / frame.height;
+		for (UINT32 x = 0; x < frame.width; x++)
+		{
+			const auto sourceX = static_cast<UINT64>(x) * width / frame.width;
+			const auto source = bgra + sourceY * stride + sourceX * 4;
+			auto target = frame.pixels.data() + (static_cast<size_t>(y) * frame.width + x) * 4;
+			memcpy(target, source, 3);
+			target[3] = 255;
+		}
+	}
+	{
+		std::lock_guard lock(_mutex);
+		if (!_thumbnailEnabled || _cancelled || _terminal || epoch != _thumbnailEpoch)
+			return false;
+		_thumbnail = std::move(frame);
+	}
+	_condition.notify_all();
+	return true;
+}
+void SdlLauncher::thumbnailLoop()
+{
+	while (!_closing)
+	{
+		Thumbnail frame;
+		std::string id;
+		UINT64 epoch;
+		{
+			std::unique_lock lock(_mutex);
+			_condition.wait(lock, [&] {
+				return _closing || (_thumbnailEnabled && _connected && !_cancelled && !_terminal &&
+				                    !_thumbnailRequest.empty() && !_thumbnail.pixels.empty());
+			});
+			if (_closing) break;
+			frame = _thumbnail;
+			id = std::move(_thumbnailRequest);
+			_thumbnailRequest.clear();
+			epoch = _thumbnailEpoch;
+		}
+		const auto png = thumbnailPNG(frame.pixels, frame.width, frame.height);
+		if (png.empty()) continue;
+		auto event = message("thumbnail");
+		text(event.get(), "requestId", id.c_str());
+		text(event.get(), "pngBase64", png.c_str());
+		number(event.get(), "width", frame.width);
+		number(event.get(), "height", frame.height);
+		std::unique_ptr<char, decltype(&free)> encoded(WINPR_JSON_PrintUnformatted(event.get()), free);
+		if (!encoded) continue;
+		{
+			std::lock_guard lock(_mutex);
+			if (_closing || _cancelled || _terminal || !_thumbnailEnabled || !_connected ||
+			    epoch != _thumbnailEpoch || _outbound.size() >= 128)
+				continue;
+			_outbound.emplace_back(std::string(encoded.get()) + "\n");
+		}
+		_condition.notify_all();
+	}
 }
 bool SdlLauncher::cancelled() const
 {
@@ -412,7 +622,8 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 	text(hello.get(), "engineVersion", freerdp_get_version_string());
 	auto caps = WINPR_JSON_AddArrayToObject(hello.get(), "capabilities");
 	for (const auto cap : { "auth", "certificate", "focus", "display_uuid", "retry",
-	                        "per_monitor_scaling", "dynamic_resolution", "multimon" })
+	                        "per_monitor_scaling", "dynamic_resolution", "multimon",
+	                        "close_confirmation", "session_thumbnail" })
 		std::ignore = WINPR_JSON_AddItemToArray(caps, WINPR_JSON_CreateString(cap));
 	std::ignore = displays(WINPR_JSON_AddArrayToObject(hello.get(), "displays"));
 	if (!send(std::move(hello)))
@@ -614,6 +825,7 @@ SSIZE_T SdlLauncher::retry(size_t current, const char* module)
 }
 void SdlLauncher::state(const char* phase)
 {
+	_connected = strcmp(phase, "connected") == 0;
 	if (strcmp(phase, "connected") == 0)
 	{
 		_hadConnected = true;
