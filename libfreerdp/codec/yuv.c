@@ -564,7 +564,7 @@ static BOOL pool_decode(YUV_CONTEXT* WINPR_RESTRICT context, PTP_WORK_CALLBACK c
 	}
 	rc = TRUE;
 fail:
-	wait_slots(context->work_dec_slots, context->work_object_count);
+	wait_slots(context->work_dec_slots, waitCount);
 	return rc;
 }
 
@@ -710,7 +710,7 @@ static BOOL pool_decode_rect(YUV_CONTEXT* WINPR_RESTRICT context, BYTE type,
 
 	rc = TRUE;
 fail:
-	wait_slots(context->work_combine_slots, context->work_object_count);
+	wait_slots(context->work_combine_slots, waitCount);
 	return rc;
 }
 
@@ -1012,7 +1012,7 @@ static BOOL pool_encode(YUV_CONTEXT* WINPR_RESTRICT context, PTP_WORK_CALLBACK c
 
 	rc = TRUE;
 fail:
-	wait_slots(context->work_enc_slots, context->work_object_count);
+	wait_slots(context->work_enc_slots, waitCount);
 	return rc;
 }
 
