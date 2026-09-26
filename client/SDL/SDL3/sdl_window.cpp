@@ -118,9 +118,9 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
 
 SdlWindow::~SdlWindow()
 {
-	/* SdlTopBar owns textures created from this renderer. Destroy it before
-	 * SDL_DestroyRenderer so its texture deleters never see stale handles. */
+	/* Release owned textures before SDL_DestroyRenderer destroys them. */
 	_topBar.reset();
+	_stalled.reset();
 	if (_gdiTexture)
 		SDL_DestroyTexture(_gdiTexture);
 	if (_renderTarget)
