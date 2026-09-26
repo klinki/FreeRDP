@@ -58,7 +58,7 @@ set(SRCS
 option(WITH_LAUNCHER_BRIDGE "Build the private native macOS launcher bridge" ON)
 if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON)
   list(APPEND SRCS sdl_launcher.cpp sdl_launcher.hpp)
-  list(APPEND LIBS "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync")
+  list(APPEND LIBS "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO")
   add_compile_definitions(WITH_SDL_LAUNCHER_BRIDGE)
 endif()
 
@@ -159,6 +159,6 @@ if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON AND SDL_LAUNCHER_TEST)
   enable_testing()
   add_executable(TestSDLLauncherTransport test/TestSDLLauncherTransport.cpp sdl_launcher.cpp)
   target_link_libraries(TestSDLLauncherTransport PRIVATE winpr freerdp freerdp-client Threads::Threads
-                        SDL3::SDL3 "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync")
+                        SDL3::SDL3 "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO")
   add_test(NAME TestSDLLauncherTransport COMMAND TestSDLLauncherTransport)
 endif()

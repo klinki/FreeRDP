@@ -1,6 +1,7 @@
 /** Optional private protocol for the native macOS launcher. */
 #pragma once
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <map>
@@ -35,6 +36,11 @@ class SdlLauncher
 	bool cancelled() const;
 	bool hadConnected() const;
 	void serviceFocus(); // SDL main thread only
+	bool requestClose(); // SDL main thread: queues a decision; never waits.
+	bool closeConfirmationEnabled() const;
+	bool thumbnailsEnabled() const;
+	// Composing RDP thread only, after the completed BGRA frame's writes finish.
+	bool captureThumbnail(const BYTE* bgra, UINT32 width, UINT32 height, UINT32 stride);
 	static bool isAuthenticationError(UINT32 error);
 
   private:
@@ -43,6 +49,7 @@ class SdlLauncher
 	bool send(Json event);
 	void readLoop();
 	void writeLoop();
+	void thumbnailLoop();
 	bool receive(Json event);
 	std::vector<std::pair<std::string, UINT32>> displays(WINPR_JSON* array);
 	void terminal(const char* outcome, int code, const std::string& detail);
@@ -59,7 +66,17 @@ class SdlLauncher
 		Json response{ nullptr, WINPR_JSON_Delete };
 	};
 	std::map<std::string, Pending> _pending;
-	std::thread _reader, _writer;
+	struct Thumbnail
+	{
+		std::vector<BYTE> pixels;
+		UINT32 width = 0, height = 0;
+	};
+	Thumbnail _thumbnail;
+	std::string _thumbnailRequest, _closeRequest;
+	UINT64 _thumbnailEpoch = 0;
+	std::chrono::steady_clock::time_point _lastThumbnailFrame{}, _lastThumbnailRequest{};
+	std::thread _reader, _writer, _thumbnailWorker;
+	std::atomic<bool> _confirmSessionClose{ false }, _thumbnailEnabled{ false }, _connected{ false };
 	std::atomic<bool> _cancelled{ false }, _closing{ false }, _focus{ false };
 	std::atomic<bool> _hadConnected{ false }, _terminal{ false };
 	bool _credentialsRead = false;
