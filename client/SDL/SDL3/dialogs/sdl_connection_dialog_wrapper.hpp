@@ -55,6 +55,7 @@ class SdlConnectionDialogWrapper
 	SdlConnectionDialogWrapper& operator=(SdlConnectionDialogWrapper&& other) = delete;
 
 	void create(rdpContext* context);
+	void setSuppressed(bool suppressed);
 	void destroy();
 
 	[[nodiscard]] bool isRunning() const;
@@ -117,6 +118,7 @@ class SdlConnectionDialogWrapper
 
 	mutable std::mutex _mux;
 	std::unique_ptr<SDLConnectionDialog> _connection_dialog;
+	bool _suppressed = false;
 	std::queue<EventArg> _queue;
 	wLog* _log = nullptr;
 };

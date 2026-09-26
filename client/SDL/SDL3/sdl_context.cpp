@@ -22,6 +22,9 @@
 #include <freerdp/client/cmdline.h>
 
 #include "sdl_context.hpp"
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+#include "sdl_launcher.hpp"
+#endif
 #include "sdl_config.hpp"
 #include "sdl_channels.hpp"
 #include "sdl_input_mapping.hpp"
@@ -64,6 +67,47 @@ SdlContext::SdlContext(rdpContext* context)
 	instance->PresentGatewayMessage = sdl_present_gateway_message;
 	instance->ChooseSmartcard = sdl_choose_smartcard;
 	instance->RetryDialog = sdl_retry_dialog;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	instance->AuthenticateEx = [](freerdp* i, char** u, char** p, char** d,
+	                              rdp_auth_reason reason) -> BOOL
+	{
+		if (auto bridge = SdlLauncher::active())
+			return bridge->authenticate(u, p, d, reason);
+		return sdl_authenticate_ex(i, u, p, d, reason);
+	};
+	instance->VerifyCertificateEx = [](freerdp* i, const char* host, UINT16 port, const char* cn,
+	                                   const char* subject, const char* issuer, const char* fp,
+	                                   DWORD flags) -> DWORD
+	{
+		if (auto bridge = SdlLauncher::active())
+			return bridge->certificate(host, port, cn, subject, issuer, fp, nullptr, nullptr,
+			                           nullptr, flags);
+		return sdl_verify_certificate_ex(i, host, port, cn, subject, issuer, fp, flags);
+	};
+	instance->VerifyChangedCertificateEx =
+	    [](freerdp* i, const char* host, UINT16 port, const char* cn, const char* subject,
+	       const char* issuer, const char* fp, const char* oldSubject, const char* oldIssuer,
+	       const char* oldFp, DWORD flags) -> DWORD
+	{
+		if (auto bridge = SdlLauncher::active())
+			return bridge->certificate(host, port, cn, subject, issuer, fp, oldSubject, oldIssuer,
+			                           oldFp, flags);
+		return sdl_verify_changed_certificate_ex(i, host, port, cn, subject, issuer, fp, oldSubject,
+		                                         oldIssuer, oldFp, flags);
+	};
+	instance->RetryDialog = [](freerdp* i, const char* what, size_t current, void* user) -> SSIZE_T
+	{
+		if (auto bridge = SdlLauncher::active())
+			return bridge->retry(current, what);
+		return sdl_retry_dialog(i, what, current, user);
+	};
+	instance->LogonErrorInfo = [](freerdp* i, UINT32 data, UINT32 type) -> int
+	{
+		if (SdlLauncher::active())
+			return 0;
+		return sdl_logon_error_info(i, data, type);
+	};
+#endif
 
 #ifdef WITH_WEBVIEW
 	instance->GetAccessToken = sdl_webview_get_access_token;
@@ -330,6 +374,10 @@ BOOL SdlContext::postConnect(freerdp* instance)
 	                        true))
 		return FALSE;
 	sdl->setConnected(true);
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active())
+		bridge->state("connected");
+#endif
 	return TRUE;
 }
 
@@ -628,7 +676,10 @@ void SdlContext::sdl_client_cleanup(int exit_code, const std::string& error_msg)
 				break;
 			default:
 			{
-				getDialog().showError(error_msg);
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+				if (!SdlLauncher::active())
+#endif
+					getDialog().showError(error_msg);
 			}
 			break;
 		}
@@ -637,6 +688,7 @@ void SdlContext::sdl_client_cleanup(int exit_code, const std::string& error_msg)
 	if (!showError)
 		getDialog().show(false);
 
+	_exitDetail = error_msg;
 	_exitCode = exit_code;
 	std::ignore = sdl_push_user_event(SDL_EVENT_USER_QUIT);
 	SDL_CleanupTLS();
@@ -648,7 +700,44 @@ int SdlContext::sdl_client_thread_connect(std::string& error_msg)
 	WINPR_ASSERT(instance);
 
 	_rdpThreadRunning = true;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active())
+		bridge->state("connecting");
+#endif
 	BOOL rc = freerdp_connect(instance);
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	// A rejected credential is offered back for editing; never silently reuse it.
+	if (auto bridge = SdlLauncher::active())
+	{
+		while (!rc && !bridge->cancelled() &&
+		       SdlLauncher::isAuthenticationError(freerdp_get_last_error(context())))
+		{
+			auto settings = context()->settings;
+			const auto duplicate = [settings](FreeRDP_Settings_Keys_String key) -> char*
+			{
+				const auto value = freerdp_settings_get_string(settings, key);
+				return value ? _strdup(value) : nullptr;
+			};
+			char *u = duplicate(FreeRDP_Username), *d = duplicate(FreeRDP_Domain), *p = nullptr;
+			const bool accepted = bridge->authenticate(&u, &p, &d, AUTH_NLA, true);
+			if (accepted)
+			{
+				std::ignore = freerdp_settings_set_string(settings, FreeRDP_Username, u);
+				std::ignore = freerdp_settings_set_string(settings, FreeRDP_Domain, d);
+				std::ignore = freerdp_settings_set_string(settings, FreeRDP_Password, p);
+			}
+			if (p)
+				SecureZeroMemory(p, strlen(p));
+			free(u);
+			free(d);
+			free(p);
+			if (!accepted)
+				break;
+			bridge->state("connecting");
+			rc = freerdp_connect(instance);
+		}
+	}
+#endif
 
 	rdpSettings* settings = context()->settings;
 	WINPR_ASSERT(settings);
@@ -758,7 +847,20 @@ int SdlContext::sdl_client_thread_run(std::string& error_msg)
 			 * frame while auto-reconnect runs. Cleared on success below;
 			 * on final failure the error dialog / quit takes over. */
 			setReconnecting(true);
-			if (client_auto_reconnect(instance))
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+			const auto reconnect =
+			    SdlLauncher::active()
+			        ? client_auto_reconnect_ex(instance,
+			                                   [](freerdp*) -> BOOL
+			                                   {
+				                                   auto bridge = SdlLauncher::active();
+				                                   return !bridge || !bridge->cancelled();
+			                                   })
+			        : client_auto_reconnect(instance);
+#else
+			const auto reconnect = client_auto_reconnect(instance);
+#endif
+			if (reconnect)
 			{
 				// Retry was successful, discard dialog
 				setReconnecting(false);
@@ -1343,6 +1445,10 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 		case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
 		{
 			SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Window closed, terminating RDP session...");
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+			if (auto bridge = SdlLauncher::active())
+				bridge->cancel();
+#endif
 			freerdp_abort_connect_context(context());
 		}
 		break;
@@ -2141,6 +2247,10 @@ void SdlContext::setReconnecting(bool val)
 {
 	if (_reconnecting.exchange(val) == val)
 		return;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active())
+		bridge->state(val ? "reconnecting" : "connected");
+#endif
 	/* Main thread presents the overlay / repaints; the RDP thread only
 	 * flips the atomic and notifies. */
 	std::ignore = sdl_push_user_event(SDL_EVENT_USER_RECONNECTING, val ? 1 : 0);
