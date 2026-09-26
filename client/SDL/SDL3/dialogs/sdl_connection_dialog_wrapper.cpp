@@ -39,8 +39,16 @@ void SdlConnectionDialogWrapper::create(rdpContext* context)
 	const auto enabled =
 	    freerdp_settings_get_bool(context->settings, FreeRDP_UseCommonStdioCallbacks);
 	_connection_dialog.reset();
-	if (!enabled)
+	if (!enabled && !_suppressed)
 		_connection_dialog = std::make_unique<SDLConnectionDialog>(context);
+}
+
+void SdlConnectionDialogWrapper::setSuppressed(bool suppressed)
+{
+	std::unique_lock lock(_mux);
+	_suppressed = suppressed;
+	if (suppressed)
+		_connection_dialog.reset();
 }
 
 void SdlConnectionDialogWrapper::destroy()
@@ -210,6 +218,8 @@ void SdlConnectionDialogWrapper::push(EventArg&& arg)
 {
 	{
 		std::unique_lock lock(_mux);
+		if (_suppressed)
+			return;
 		_queue.push(std::move(arg));
 	}
 
