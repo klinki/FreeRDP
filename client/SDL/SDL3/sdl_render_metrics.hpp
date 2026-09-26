@@ -454,8 +454,14 @@ class SdlRenderMetrics final
 
 	void ensureInterval(uint64_t now) noexcept
 	{
-		if (!_intervalActive)
-			startInterval(now);
+		if (!_intervalActive || (!_frameActive && now >= _intervalStartNs &&
+		                         now - _intervalStartNs >= intervalNs))
+		{
+			if (_intervalActive)
+				writeInterval(now);
+			if (_enabled)
+				startInterval(now);
+		}
 	}
 
 	static bool writeSamples(FILE* file, const Samples& samples) noexcept

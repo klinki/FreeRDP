@@ -213,5 +213,35 @@ int main()
 	if (std::getline(input, extra))
 		return 1;
 	input.close();
+
+	/* Skipped and stalled windows never begin a normal frame. Their counters
+	 * must still produce separate intervals for warmup filtering. */
+	for (const bool stalled : { false, true })
+	{
+		const auto counterPath = directory / (stalled ? "stalled.jsonl" : "skipped.jsonl");
+		if (!setMetricPath(counterPath.string()))
+			return 1;
+		{
+			SdlRenderMetrics metrics(19, 4, &FakeClock::read, &clock);
+			for (uint64_t i = 0; i < 3; i++)
+			{
+				clock.now = 100 + i * SdlRenderMetrics::intervalNs;
+				if (stalled)
+					metrics.noteStalledPresent();
+				else
+					metrics.notePresentSkip();
+			}
+		}
+		std::ifstream counters(counterPath);
+		for (int i = 0; i < 3; i++)
+		{
+			std::string line;
+			if (!std::getline(counters, line) ||
+			    !has(line, stalled ? "\"stalled_presents\":1" : "\"present_skips\":1"))
+				return 1;
+		}
+		if (std::getline(counters, extra))
+			return 1;
+	}
 	return 0;
 }
