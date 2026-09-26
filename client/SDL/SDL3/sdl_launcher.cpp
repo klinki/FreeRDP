@@ -26,6 +26,26 @@
 namespace
 {
 	SdlLauncher* launcher = nullptr;
+	constexpr unsigned bridgeProtocolVersion = 1;
+	constexpr const char* bridgeCapabilities[] = {
+		"auth", "certificate", "focus", "retry", "display_uuid", "per_monitor_scaling",
+		"dynamic_resolution", "multimon", "close_confirmation", "session_thumbnail"
+	};
+	// The nonconnecting query and the live handshake must advertise the same features.
+	bool addCapabilities(WINPR_JSON* message)
+	{
+		auto array = WINPR_JSON_AddArrayToObject(message, "capabilities");
+		if (!array)
+			return false;
+		for (const auto capability : bridgeCapabilities)
+		{
+			SdlLauncher::Json item(WINPR_JSON_CreateString(capability), WINPR_JSON_Delete);
+			if (!item || !WINPR_JSON_AddItemToArray(array, item.get()))
+				return false;
+			std::ignore = item.release();
+		}
+		return true;
+	}
 	constexpr size_t maxFrame = 1024 * 1024;
 	constexpr size_t maxThumbnailPNG = 262144;
 	// Only owned, already downsampled BGRA pixels reach the encoding worker.
@@ -207,10 +227,21 @@ SdlLauncher* SdlLauncher::active()
 {
 	return launcher;
 }
+SdlLauncher::Json SdlLauncher::capabilities()
+{
+	Json result(WINPR_JSON_CreateObject(), WINPR_JSON_Delete);
+	if (!result || !WINPR_JSON_AddIntegerToObject(result.get(), "schemaVersion", 1) ||
+	    !WINPR_JSON_AddStringToObject(result.get(), "client", "sdl3") ||
+	    !WINPR_JSON_AddStringToObject(result.get(), "engineVersion", freerdp_get_version_string()) ||
+	    !WINPR_JSON_AddIntegerToObject(result.get(), "bridgeProtocolVersion", bridgeProtocolVersion) ||
+	    !addCapabilities(result.get()))
+		return { nullptr, WINPR_JSON_Delete };
+	return result;
+}
 SdlLauncher::Json SdlLauncher::message(const char* type)
 {
 	Json result(WINPR_JSON_CreateObject(), WINPR_JSON_Delete);
-	number(result.get(), "v", 1);
+	number(result.get(), "v", bridgeProtocolVersion);
 	text(result.get(), "type", type);
 	text(result.get(), "sessionId", _sessionId.c_str());
 	return result;
@@ -620,11 +651,11 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 {
 	auto hello = message("hello");
 	text(hello.get(), "engineVersion", freerdp_get_version_string());
-	auto caps = WINPR_JSON_AddArrayToObject(hello.get(), "capabilities");
-	for (const auto cap : { "auth", "certificate", "focus", "display_uuid", "retry",
-	                        "per_monitor_scaling", "dynamic_resolution", "multimon",
-	                        "close_confirmation", "session_thumbnail" })
-		std::ignore = WINPR_JSON_AddItemToArray(caps, WINPR_JSON_CreateString(cap));
+	if (!addCapabilities(hello.get()))
+	{
+		error = "Cannot encode launcher capabilities";
+		return false;
+	}
 	std::ignore = displays(WINPR_JSON_AddArrayToObject(hello.get(), "displays"));
 	if (!send(std::move(hello)))
 	{

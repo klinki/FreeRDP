@@ -8,6 +8,25 @@ connected Unix stream socket and passing `/launcher-fd:3` and
 close-on-exec after startup. Diagnostics use the existing logging channels,
 never the protocol socket.
 
+`/launcher-capabilities` is a standalone, nonconnecting query. It must be the sole
+argument: combining it with a destination, credentials, transport options, config
+file, or any other argument exits nonzero with no stdout. In a bridge-enabled
+build it writes exactly one JSON object and a newline to stdout, then exits 0:
+
+```json
+{"schemaVersion":1,"client":"sdl3","engineVersion":"3.31.2-dev0","bridgeProtocolVersion":1,"capabilities":["auth","certificate","focus","retry","display_uuid","per_monitor_scaling","dynamic_resolution","multimon","close_confirmation","session_thumbnail"]}
+```
+
+`engineVersion` is the build's actual `freerdp_get_version_string()` value. The
+capability array and protocol version share their source with the live `hello`.
+The query runs before context creation, configuration loading, SDL initialization,
+display enumeration, windows, transport setup, or networking, so it also works
+headlessly and while the Mac is locked. Builds without compiled bridge support
+reject the query with exit 1, no stdout, and a diagnostic on stderr. Older binaries
+may likewise reject it; their existing socket `hello` remains available to a
+launcher that supports legacy discovery. The query does not alter the live
+handshake format or enumerate current displays.
+
 Messages are UTF-8, newline-delimited JSON with `v:1`, `type`, and `sessionId`.
 Frames are limited to 1 MiB. After SDL initialization on its main thread the
 client sends `hello` with engine version, capabilities, and display inventory.
@@ -51,9 +70,13 @@ Terminal events are produced after the completed session thread is joined;
 ordinary `PostDisconnect` callbacks during automatic reconnect are not terminal.
 The existing renderer, input handling, and reconnect overlay remain in use.
 
-Configure with `-DWITH_LAUNCHER_BRIDGE=ON -DSDL_LAUNCHER_TEST=ON`, build `TestSDLLauncherTransport`, and run
-`ctest --test-dir <build>/client/SDL/SDL3 -R TestSDLLauncherTransport` for socketpair
-regressions covering prompts, fragmented/oversized frames, stale commands,
+Configure with `-DWITH_LAUNCHER_BRIDGE=ON -DSDL_LAUNCHER_TEST=ON`, build
+`sdl3-freerdp` and `TestSDLLauncherTransport`, and run
+`ctest --test-dir <build>/client/SDL/SDL3 -R 'TestSDLLauncher'` for the actual-binary
+capability query and socketpair regressions covering prompts, fragmented/oversized frames, stale commands,
 cancellation, EOF, versions, terminal distinctions, correlated Close decisions,
-bounded thumbnail PNGs, disabled capture, and worker teardown under backpressure. The tests do not open a
-remote connection or use real credentials.
+bounded thumbnail PNGs, disabled capture, and worker teardown under backpressure.
+The query test requires Python 3 and checks exact JSON, poisoned SDL drivers,
+blocking configuration, and rejection of combined arguments before network access.
+It also runs with `-DWITH_LAUNCHER_BRIDGE=OFF` to verify clean query rejection.
+The tests do not open a remote connection or use real credentials.
