@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 
 
 def main():
@@ -37,6 +38,9 @@ def main():
             key, value = line.split(' = ', 1)
             flags[key] = shlex.split(value)
     link = shlex.split((generated / 'link.txt').read_text())
+    if sys.platform == 'darwin':
+        # Non-LTO cache objects retain unused callbacks to private library symbols.
+        link.append('-Wl,-dead_strip')
     compiler = link[0]
     obj = output.with_suffix('.o')
     command = [compiler, '-I' + str(overlay), '-I' + str(source / 'client/SDL/SDL3')]
