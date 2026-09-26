@@ -23,6 +23,7 @@ int main(void) {
         reviewWaitCalls=0; double start=now();
         for(int i=0;i<2000;i++) if(!yuv420_context_decode(ctx,planes,strides,h,PIXEL_FORMAT_BGRA32,out,w*4,&small,1))return 1;
         printf("small rect, phase %d: %.3f us/call, wait calls=%lu/call\n",phase,(now()-start)*1e6/2000,reviewWaitCalls/2000);
+        if (reviewWaitCalls != 2000) return 1;
     }
     yuv_context_free(ctx);free(y);free(u);free(v);free(out);return 0;
 }
