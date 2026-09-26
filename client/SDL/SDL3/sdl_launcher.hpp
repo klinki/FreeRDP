@@ -22,6 +22,8 @@ class SdlLauncher
 	SdlLauncher(const SdlLauncher&) = delete;
 	SdlLauncher& operator=(const SdlLauncher&) = delete;
 	static SdlLauncher* active();
+	// Pure discovery: no context, transport, SDL, display, or configuration access.
+	static Json capabilities();
 	bool prepare(std::vector<std::string>& arguments, std::string& error);
 	bool authenticate(char** username, char** password, char** domain, rdp_auth_reason reason,
 	                  bool rejected = false);

@@ -56,7 +56,9 @@ set(SRCS
 )
 
 option(WITH_LAUNCHER_BRIDGE "Build the private native macOS launcher bridge" ON)
+set(SDL_LAUNCHER_BRIDGE_ENABLED OFF)
 if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON)
+  set(SDL_LAUNCHER_BRIDGE_ENABLED ON)
   list(APPEND SRCS sdl_launcher.cpp sdl_launcher.hpp)
   list(APPEND LIBS "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO")
   add_compile_definitions(WITH_SDL_LAUNCHER_BRIDGE)
@@ -155,8 +157,16 @@ endif()
 add_subdirectory(man)
 
 option(SDL_LAUNCHER_TEST "Build private launcher transport tests" OFF)
-if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON AND SDL_LAUNCHER_TEST)
+if(SDL_LAUNCHER_TEST AND APPLE)
   enable_testing()
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  add_test(NAME TestSDLLauncherCapabilities
+           COMMAND ${Python3_EXECUTABLE}
+                   ${CMAKE_CURRENT_SOURCE_DIR}/test/TestSDLLauncherCapabilities.py
+                   $<TARGET_FILE:sdl3-freerdp> ${SDL_LAUNCHER_BRIDGE_ENABLED})
+  set_tests_properties(TestSDLLauncherCapabilities PROPERTIES TIMEOUT 30)
+endif()
+if(SDL_LAUNCHER_BRIDGE_ENABLED AND SDL_LAUNCHER_TEST)
   add_executable(TestSDLLauncherTransport test/TestSDLLauncherTransport.cpp sdl_launcher.cpp)
   target_link_libraries(TestSDLLauncherTransport PRIVATE winpr freerdp freerdp-client Threads::Threads
                         SDL3::SDL3 "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO")
