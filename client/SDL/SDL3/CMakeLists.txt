@@ -125,7 +125,8 @@ if(NOT WIN32 AND NOT APPLE)
   endif()
 endif()
 
-if(APPLE AND WITH_WINPR_JSON)
+option(WITH_LAUNCHER_BRIDGE "Build the private native macOS launcher bridge" ON)
+if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON)
   list(APPEND SRCS sdl_launcher.cpp sdl_launcher.hpp)
   list(APPEND LIBS "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync")
   add_compile_definitions(WITH_SDL_LAUNCHER_BRIDGE)
@@ -244,7 +245,7 @@ endif()
 add_subdirectory(man)
 
 option(SDL_LAUNCHER_TEST "Build private launcher transport tests" OFF)
-if(APPLE AND WITH_WINPR_JSON AND SDL_LAUNCHER_TEST)
+if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON AND SDL_LAUNCHER_TEST)
   enable_testing()
   add_executable(TestSDLLauncherTransport test/TestSDLLauncherTransport.cpp sdl_launcher.cpp)
   target_link_libraries(TestSDLLauncherTransport PRIVATE winpr freerdp freerdp-client Threads::Threads
