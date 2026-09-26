@@ -710,6 +710,28 @@ static void SDLCALL rdp_file_cb(void* userdata, const char* const* filelist,
 
 int main(int argc, char* argv[])
 {
+	// Handle discovery before even creating the context: that loads SDL preferences.
+	for (int x = 1; x < argc; x++)
+	{
+		if (strcmp(argv[x], "/launcher-capabilities") != 0)
+			continue;
+		if (argc != 2)
+		{
+			fprintf(stderr, "/launcher-capabilities must be the sole argument\n");
+			return 1;
+		}
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+		auto capabilities = SdlLauncher::capabilities();
+		std::unique_ptr<char, decltype(&free)> encoded(
+		    capabilities ? WINPR_JSON_PrintUnformatted(capabilities.get()) : nullptr, free);
+		if (!encoded)
+			return 1;
+		return (fprintf(stdout, "%s\n", encoded.get()) > 0 && fflush(stdout) == 0) ? 0 : 1;
+#else
+		fprintf(stderr, "Launcher bridge support is not compiled in\n");
+		return 1;
+#endif
+	}
 #if defined(_WIN32)
 	sdl::win32::release_transient_console();
 #endif

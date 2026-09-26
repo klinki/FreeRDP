@@ -240,6 +240,29 @@ namespace
 		        "Unread thumbnail prevented bounded writer/worker teardown");
 	}
 
+	void handshakeCapabilities()
+	{
+		Connection c;
+		// prepare emits hello before consuming cancel. No UI or remote connection is needed.
+		c.command("cancel");
+		std::vector<std::string> arguments;
+		std::string error;
+		require(!c.bridge->prepare(arguments, error), "Discovery cancellation was ignored");
+		auto hello = c.next();
+		auto query = SdlLauncher::capabilities();
+		require(getString(hello.get(), "type") == "hello" && query, "Missing capability discovery");
+		require(getString(hello.get(), "engineVersion") == getString(query.get(), "engineVersion"),
+		        "Query and handshake engine versions differ");
+		auto helloCaps = WINPR_JSON_GetObjectItemCaseSensitive(hello.get(), "capabilities");
+		auto queryCaps = WINPR_JSON_GetObjectItemCaseSensitive(query.get(), "capabilities");
+		std::unique_ptr<char, decltype(&free)> helloEncoded(WINPR_JSON_PrintUnformatted(helloCaps), free);
+		std::unique_ptr<char, decltype(&free)> queryEncoded(WINPR_JSON_PrintUnformatted(queryCaps), free);
+		require(WINPR_JSON_IsArray(helloCaps) && WINPR_JSON_IsArray(queryCaps) &&
+		            helloEncoded && queryEncoded && strcmp(helloEncoded.get(), queryEncoded.get()) == 0,
+		        "Query and live handshake capabilities differ");
+		require(WINPR_JSON_IsArray(WINPR_JSON_GetObjectItemCaseSensitive(hello.get(), "displays")),
+		        "Handshake lost its display inventory");
+	}
 	void promptAndStaleResponse()
 	{
 		Connection c;
@@ -433,6 +456,7 @@ int main()
 {
 	try
 	{
+		handshakeCapabilities();
 		promptAndStaleResponse();
 		concurrentPromptsAndCertificate();
 		malformedAndVersion();
