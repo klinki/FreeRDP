@@ -275,7 +275,10 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 					case SDL_EVENT_QUIT:
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 						if (auto bridge = SdlLauncher::active())
-							bridge->cancel();
+						{
+							std::ignore = bridge->requestClose();
+							break;
+						}
 #endif
 						std::ignore = freerdp_abort_connect_context(sdl->context());
 						break;

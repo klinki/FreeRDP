@@ -619,6 +619,12 @@ BOOL SdlContext::endPaint(rdpContext* context)
 	auto gdi = context->gdi;
 	WINPR_ASSERT(gdi);
 	WINPR_ASSERT(gdi->primary);
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	// The composing thread owns this completed BGRA frame. Only a bounded copy runs here;
+	// PNG encoding and IPC run on a worker outside the render critical section.
+	if (auto bridge = SdlLauncher::active())
+		std::ignore = bridge->captureThumbnail(gdi->primary_buffer, gdi->width, gdi->height, gdi->stride);
+#endif
 
 	HGDI_DC hdc = gdi->primary->hdc;
 	WINPR_ASSERT(hdc);
@@ -1447,7 +1453,10 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 			SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Window closed, terminating RDP session...");
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 			if (auto bridge = SdlLauncher::active())
-				bridge->cancel();
+			{
+				std::ignore = bridge->requestClose();
+				break;
+			}
 #endif
 			freerdp_abort_connect_context(context());
 		}
@@ -1585,6 +1594,13 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 			case SdlTopBarButton::Restore:
 				return toggleFullscreen();
 			case SdlTopBarButton::Close:
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+				if (auto bridge = SdlLauncher::active())
+				{
+					std::ignore = bridge->requestClose();
+					return true;
+				}
+#endif
 				return freerdp_abort_connect_context(context()) != FALSE;
 			case SdlTopBarButton::None:
 				break;
