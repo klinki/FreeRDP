@@ -1915,11 +1915,16 @@ void SdlContext::applyMonitorScaleOverride(rdpMonitor& monitor) const
 	if (!sdl_apply_monitor_scale_override(_monitorScaleOverrides, monitor))
 		return;
 
-	WLog_Print(_log, WLOG_DEBUG,
-	           "monitor %" PRIu32 " scale override: desktopScaleFactor %" PRIu32 " -> %" PRIu32
-	           ", deviceScaleFactor %" PRIu32 " -> %" PRIu32,
-	           monitor.orig_screen, desktopScaleFactor, monitor.attributes.desktopScaleFactor,
-	           deviceScaleFactor, monitor.attributes.deviceScaleFactor);
+	/* INFO, not DEBUG: a silent mismatch here (e.g. SDL display IDs renumbered
+	 * between sessions) inverts the server's DPI map. The name pins the
+	 * override to a physical display. */
+	const char* name = SDL_GetDisplayName(monitor.orig_screen);
+	WLog_Print(_log, WLOG_INFO,
+	           "monitor %" PRIu32 " ('%s') scale override: desktopScaleFactor %" PRIu32
+	           " -> %" PRIu32 ", deviceScaleFactor %" PRIu32 " -> %" PRIu32,
+	           monitor.orig_screen, name ? name : "?", desktopScaleFactor,
+	           monitor.attributes.desktopScaleFactor, deviceScaleFactor,
+	           monitor.attributes.deviceScaleFactor);
 }
 
 CriticalSection& SdlContext::lock()
