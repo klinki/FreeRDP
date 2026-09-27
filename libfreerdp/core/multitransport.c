@@ -32,6 +32,17 @@
 #include "udp.h"
 #include "autodetect.h"
 
+/* Hexdump helper for the UDP_TRACE sites below (temporary with the macro:
+ * exact failing tunnel bytes for live runs, no add/remove churn). */
+static void udp_trace_bytes(const char* label, const BYTE* data, size_t len)
+{
+	size_t hn = (len < 170) ? len : 170;
+	UDP_TRACE("%s len=%zu [", label, len);
+	for (size_t hi = 0; hi < hn; hi++)
+		UDP_TRACE("%02x ", data[hi]);
+	UDP_TRACE("]%s\n", (len > hn) ? " (truncated)" : "");
+}
+
 struct rdp_multitransport
 {
 	rdpRdp* rdp;
@@ -79,6 +90,30 @@ struct rdp_multitransport
 };
 
 #define TAG FREERDP_TAG("core.multitransport")
+
+/* Test-only OOM injection for the Soft-Sync mapping/reassembly allocations
+ * below (mt_test_malloc/realloc). When armed (>= 0), each wrapped allocation
+ * decrements the counter and the one reaching 0 fails; negative disables.
+ * Callers run under multi->lock; tests are single-threaded. */
+static int g_mt_fail_alloc_after = -1;
+
+static void* mt_test_malloc(size_t n)
+{
+	if (g_mt_fail_alloc_after == 0)
+		return nullptr;
+	if (g_mt_fail_alloc_after > 0)
+		g_mt_fail_alloc_after--;
+	return malloc(n);
+}
+
+static void* mt_test_realloc(void* p, size_t n)
+{
+	if (g_mt_fail_alloc_after == 0)
+		return nullptr;
+	if (g_mt_fail_alloc_after > 0)
+		g_mt_fail_alloc_after--;
+	return realloc(p, n);
+}
 
 static state_run_t multitransport_client_request_udp(rdpMultitransport* multi, UINT32 reqId,
                                                      UINT16 reqProto, const BYTE* cookie);
@@ -781,7 +816,7 @@ static BOOL multitransport_install_mapping_locked(rdpMultitransport* multi, cons
 	multi->mappingInstalled = FALSE;
 	if (count > 0)
 	{
-		UINT32* ids = malloc(count * sizeof(UINT32));
+		UINT32* ids = mt_test_malloc(count * sizeof(UINT32));
 		size_t got = 0;
 		if (!ids)
 			return FALSE; /* OOM: stay TCP-safe */
@@ -840,7 +875,7 @@ void multitransport_soft_sync_recv_feed(rdpMultitransport* multi, const BYTE* ch
 			return;
 		}
 		free(multi->ssReqBuf);
-		multi->ssReqBuf = malloc(chunkLen);
+		multi->ssReqBuf = mt_test_malloc(chunkLen);
 		if (!multi->ssReqBuf)
 		{
 			LeaveCriticalSection(&multi->lock);
@@ -867,7 +902,7 @@ void multitransport_soft_sync_recv_feed(rdpMultitransport* multi, const BYTE* ch
 				LeaveCriticalSection(&multi->lock);
 				return;
 			}
-			multi->ssReqBuf = malloc(chunkLen);
+			multi->ssReqBuf = mt_test_malloc(chunkLen);
 			if (!multi->ssReqBuf)
 			{
 				LeaveCriticalSection(&multi->lock);
@@ -891,7 +926,7 @@ void multitransport_soft_sync_recv_feed(rdpMultitransport* multi, const BYTE* ch
 				LeaveCriticalSection(&multi->lock);
 				return;
 			}
-			BYTE* grown = realloc(multi->ssReqBuf, multi->ssReqLen + chunkLen);
+			BYTE* grown = mt_test_realloc(multi->ssReqBuf, multi->ssReqLen + chunkLen);
 			if (!grown)
 			{
 				free(multi->ssReqBuf);
@@ -1016,6 +1051,25 @@ static BOOL multitransport_is_drdynvc_channel(rdpRdp* rdp, UINT16 channelId)
 	return FALSE;
 }
 
+/* Static channel id of drdynvc in OUR mcs table, for routing UDP-received
+ * DVC PDUs into the same ReceiveChannelData path TCP uses. */
+static BOOL multitransport_drdynvc_channel_id(rdpRdp* rdp, UINT16* channelIdOut)
+{
+	if (!rdp || !rdp->mcs || !rdp->mcs->channels)
+		return FALSE;
+	for (UINT32 i = 0; i < rdp->mcs->channelCount; i++)
+	{
+		const rdpMcsChannel* ch = &rdp->mcs->channels[i];
+		if (strncmp(ch->Name, "drdynvc", 7) == 0)
+		{
+			if (channelIdOut)
+				*channelIdOut = ch->ChannelId;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 BOOL multitransport_send_channel_packet(rdpMultitransport* multi, UINT16 channelId,
                                          size_t totalSize, UINT32 flags, const BYTE* chunk,
                                          size_t chunkLen)
@@ -1038,16 +1092,21 @@ BOOL multitransport_send_channel_packet(rdpMultitransport* multi, UINT16 channel
 	if (!multitransport_is_drdynvc_channel(multi->rdp, channelId))
 		return FALSE;
 
-	wStream* pkt = rdpeudp_build_channel_packet(channelId, (UINT32)totalSize, flags, chunk,
-	                                            chunkLen);
-	if (!pkt)
+	/* N1/Q1: HigherLayerData carries raw DVC PDUs (symmetric with the
+	 * receive splitter), not the legacy 13-byte envelope. Each call
+	 * carries one WHOLE DVC PDU: the caller (channels.c UDP branch) must
+	 * not SVC-chunk-split here, since only the first SVC chunk holds the
+	 * DVC header and the splitter takes DATA as "to end" (a truncated
+	 * piece would be accepted whole and the rest misparsed). One call =
+	 * one Tunnel DATA payload = one PDU. totalSize/flags carry no
+	 * per-chunk metadata in raw framing. */
+	WINPR_UNUSED(totalSize);
+	WINPR_UNUSED(flags);
+	if (!chunk || (chunkLen == 0))
 		return FALSE;
-	const size_t plen = Stream_Length(pkt);
-	BYTE* pbuf = Stream_Buffer(pkt);
-	/* Tunnel DATA payload is the channel packet bytes */
-	const SSIZE_T rc = rdpeudp_tunnel_send(udp, pbuf, plen);
-	Stream_Release(pkt);
-	if (rc != (SSIZE_T)plen)
+	/* Tunnel DATA payload is the raw DVC chunk bytes */
+	const SSIZE_T rc = rdpeudp_tunnel_send(udp, chunk, chunkLen);
+	if (rc != (SSIZE_T)chunkLen)
 	{
 		WLog_WARN(TAG, "UDP channel send failed, falling back to TCP");
 		return FALSE;
@@ -1147,6 +1206,7 @@ int multitransport_check_fds(rdpMultitransport* multi)
 				                           &subDataLen))
 				{
 					WLog_WARN(TAG, "bad UDP tunnel subheader, ignoring rest");
+					udp_trace_bytes("UDP-TUNNEL-SUB", subBuf, subLen);
 					break;
 				}
 				const BOOL isReq =
@@ -1174,35 +1234,88 @@ int multitransport_check_fds(rdpMultitransport* multi)
 			}
 		}
 
-		/* HigherLayerData carries channel PDUs (may be empty when the PDU
-		 * only carried autodetect subheaders). Gate on recv migration:
-		 * pre-migration UDP channel data (if any) is ignored to preserve
-		 * TCP ordering; peer should not send it per Soft-Sync rules. */
+		/* HigherLayerData carries RAW DVC PDUs (may be empty when the PDU
+		 * only carried autodetect subheaders). Live servers put one DVC
+		 * PDU per Tunnel DATA with no outer envelope (observed: CREATEs);
+		 * each PDU is self-delimiting (CREATE: NUL name, DATA_FIRST:
+		 * Length, DATA: to end). Gate on recv migration, with observed
+		 * migration: without Soft-Sync the server routes DVC over UDP as
+		 * soon as the tunnel is up, so latch on the first valid DVC PDU
+		 * (loud INFO) instead of dropping peer-sent bytes forever while
+		 * TCP stays silent. TCP ordering is preserved because the server
+		 * sends this traffic only over UDP. */
 		if (payloadLen == 0)
 			continue;
+		rdpRdp* rdpEarly = multi->rdp;
+		const BOOL serverModeEarly =
+		    rdpEarly && rdpEarly->context && rdpEarly->settings &&
+		    freerdp_settings_get_bool(rdpEarly->settings, FreeRDP_ServerMode);
+		if (!multitransport_is_udp_recv_migrated(multi))
+		{
+			BOOL softSync = FALSE;
+			EnterCriticalSection(&multi->lock);
+			softSync = multi->softSyncNegotiated;
+			LeaveCriticalSection(&multi->lock);
+			if (!softSync)
+			{
+				size_t probeLen = 0;
+				if (rdpeudp_dvc_pdu_length(payloadBuf, payloadLen, serverModeEarly,
+				                           &probeLen))
+				{
+					EnterCriticalSection(&multi->lock);
+					multi->udpRecvMigrated = TRUE;
+					LeaveCriticalSection(&multi->lock);
+					WLog_INFO(TAG,
+					          "UDP recv migrated on first DVC PDU (%zu bytes, no Soft-Sync)",
+					          payloadLen);
+				}
+			}
+		}
 		if (!multitransport_is_udp_recv_migrated(multi))
 		{
 			WLog_DBG(TAG, "UDP channel data pre-migration, ignoring (%zu bytes)",
 			         payloadLen);
 			continue;
 		}
+		/* Split loop: one or more whole DVC PDUs per HigherLayerData,
+		 * each fed to the normal ReceiveChannelData path with FIRST|LAST
+		 * (same entry TCP chunks use). Anything unparseable stops the
+		 * loop loudly instead of being misdelivered. */
 		{
-			UINT16 channelId = 0;
-			UINT32 totalSize = 0;
-			UINT32 flags = 0;
-			const BYTE* chunk = nullptr;
-			size_t chunkLen = 0;
-			if (!rdpeudp_parse_channel_packet(payloadBuf, payloadLen, &channelId,
-			                                   &totalSize, &flags, &chunk, &chunkLen))
+			UINT16 drdynvcId = 0;
+			if (!multitransport_drdynvc_channel_id(multi->rdp, &drdynvcId))
 			{
-				WLog_WARN(TAG, "bad UDP channel packet, ignoring");
+				WLog_WARN(TAG, "no drdynvc static channel, dropping UDP DVC data");
 				continue;
 			}
+			size_t poff = 0;
 			rdpRdp* rdp = multi->rdp;
 			if (!rdp || !rdp->context || !rdp->context->instance)
 				continue;
+			/* Direction for CREATE parsing (N4): our client receives
+			 * CREATE requests, our server receives CREATE responses. */
 			const BOOL serverMode =
 			    freerdp_settings_get_bool(rdp->settings, FreeRDP_ServerMode);
+			while (poff < payloadLen)
+			{
+				size_t pduLen = 0;
+				if (!rdpeudp_dvc_pdu_length(payloadBuf + poff, payloadLen - poff,
+				                            serverMode, &pduLen) ||
+				    (pduLen == 0) || (poff + pduLen > payloadLen))
+				{
+					WLog_WARN(TAG, "bad UDP DVC PDU at offset %zu/%zu, dropping rest",
+					          poff, payloadLen);
+					udp_trace_bytes("UDP-TUNNEL-DVC", payloadBuf + poff,
+					                payloadLen - poff);
+					break;
+				}
+				UINT16 channelId = drdynvcId;
+				const BYTE* chunk = payloadBuf + poff;
+				size_t chunkLen = pduLen;
+				UINT32 totalSize = (UINT32)pduLen;
+				UINT32 flags =
+				    (UINT32)(CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+				poff += pduLen;
 			if (!serverMode)
 			{
 				freerdp* instance = rdp->context->instance;
@@ -1246,6 +1359,7 @@ int multitransport_check_fds(rdpMultitransport* multi)
 			}
 		}
 	}
+	}
 	/* Keepalive if idle; re-arm readiness (drain + reset + recheck inside). */
 	EnterCriticalSection(&multi->lock);
 	udp = multi->udp;
@@ -1256,4 +1370,121 @@ int multitransport_check_fds(rdpMultitransport* multi)
 		rdpeudp_update_event(udp);
 	}
 	return dispatched;
+}
+
+/* ---- unit-test driver (see multitransport.h) ---- */
+static rdpRdp g_mt_test_rdp; /* fixture peer; settings allocated once, never freed */
+
+rdpMultitransport* multitransport_test_new(void)
+{
+	if (!g_mt_test_rdp.settings)
+	{
+		g_mt_test_rdp.settings = freerdp_settings_new(0);
+		if (!g_mt_test_rdp.settings)
+			return nullptr;
+	}
+	rdpMultitransport* multi = multitransport_new(&g_mt_test_rdp, 0);
+	if (!multi)
+		return nullptr;
+	/* Fixture: negotiated with a connected (socketless) UDP transport, so the
+	 * mapping install/feed hooks run exactly as in production. */
+	multi->softSyncNegotiated = TRUE;
+	multi->udp = rdpeudp_test_new();
+	if (!multi->udp)
+	{
+		multitransport_free(multi);
+		return nullptr;
+	}
+	rdpeudp_test_set_connected(multi->udp, TRUE);
+	return multi;
+}
+
+void multitransport_test_free(rdpMultitransport* multi)
+{
+	g_mt_fail_alloc_after = -1; /* never leak an armed hook into the next test */
+	multitransport_free(multi);
+}
+
+void multitransport_test_fail_alloc_after(int n)
+{
+	g_mt_fail_alloc_after = n;
+}
+
+void multitransport_test_recv_feed(rdpMultitransport* multi, const BYTE* chunk, size_t chunkLen,
+                                   UINT32 flags)
+{
+	if (!multi)
+		return;
+	multitransport_soft_sync_recv_feed(multi, chunk, chunkLen, flags);
+}
+
+void multitransport_test_request_sent(rdpMultitransport* multi, const BYTE* pdu, size_t len)
+{
+	if (!multi)
+		return;
+	multitransport_on_soft_sync_request_sent(multi, pdu, len);
+}
+
+void multitransport_test_response_sent(rdpMultitransport* multi)
+{
+	if (!multi)
+		return;
+	multitransport_on_soft_sync_response_sent(multi);
+}
+
+void multitransport_test_response_received(rdpMultitransport* multi)
+{
+	if (!multi)
+		return;
+	multitransport_on_soft_sync_response_received(multi);
+}
+
+BOOL multitransport_test_recvmigrated(const rdpMultitransport* multi)
+{
+	BOOL v = FALSE;
+	if (!multi)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	v = multi->udpRecvMigrated;
+	LeaveCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	return v;
+}
+
+BOOL multitransport_test_sendmigrated(const rdpMultitransport* multi)
+{
+	BOOL v = FALSE;
+	if (!multi)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	v = multi->udpSendMigrated;
+	LeaveCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	return v;
+}
+
+BOOL multitransport_test_dvc_routed(const rdpMultitransport* multi, UINT32 dvcId)
+{
+	BOOL rc = FALSE;
+	if (!multi)
+		return FALSE;
+	EnterCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	/* Mapping decision without the connection/send gates: installed &&
+	 * (migrate-all or listed). Mirrors multitransport_is_dvc_migrated. */
+	if (multi->mappingInstalled)
+	{
+		if (!multi->mappingActive)
+			rc = TRUE;
+		else
+		{
+			for (size_t i = 0; i < multi->udpDvcCount; i++)
+			{
+				if (multi->udpDvcIds[i] == dvcId)
+				{
+					rc = TRUE;
+					break;
+				}
+			}
+		}
+	}
+	LeaveCriticalSection((CRITICAL_SECTION*)&multi->lock);
+	return rc;
 }
