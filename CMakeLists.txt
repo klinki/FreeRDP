@@ -28,6 +28,10 @@ if(POLICY CMP0177)
 endif()
 project(FreeRDP LANGUAGES C)
 
+if(APPLE)
+  enable_language(OBJC OBJCXX)
+endif()
+
 add_custom_target(fuzzers COMMENT "Build fuzzers")
 
 if(NOT PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)

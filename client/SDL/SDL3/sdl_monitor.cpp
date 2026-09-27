@@ -260,6 +260,11 @@ BOOL sdl_detect_monitors(SdlContext* sdl, UINT32* pMaxWidth, UINT32* pMaxHeight)
 	WINPR_ASSERT(settings);
 
 	const auto& ids = sdl->getDisplayIds();
+	if (ids.empty())
+	{
+		WLog_ERR(TAG, "No displays available for monitor detection");
+		return FALSE;
+	}
 	if (!sdl->validateMonitorScaleOverrides())
 		return FALSE;
 
@@ -281,6 +286,12 @@ BOOL sdl_detect_monitors(SdlContext* sdl, UINT32* pMaxWidth, UINT32* pMaxHeight)
 			WLog_ERR(TAG,
 			         "Found %" PRIu32 " monitor IDs, but only have %" PRIuz " monitors connected",
 			         nr, ids.size());
+			return FALSE;
+		}
+
+		if (!freerdp_settings_get_pointer(settings, FreeRDP_MonitorIds))
+		{
+			WLog_ERR(TAG, "Monitor selection count is set without monitor IDs");
 			return FALSE;
 		}
 
@@ -314,9 +325,10 @@ BOOL sdl_detect_monitors(SdlContext* sdl, UINT32* pMaxWidth, UINT32* pMaxHeight)
 	if (!sdl_apply_display_properties(sdl))
 		return FALSE;
 
-	auto size = static_cast<uint32_t>(sdl->monitorIds().size());
-	if (!freerdp_settings_set_uint32(settings, FreeRDP_NumMonitorIds, size))
-		return FALSE;
+	/* NumMonitorIds describes the explicit MonitorIds settings array, not
+	 * the automatically detected selection stored in SdlContext. Changing
+	 * only its count makes the next PreConnect dereference a missing array
+	 * when credentials are retried in the same client process. */
 
 	return sdl_detect_single_window(sdl, pMaxWidth, pMaxHeight);
 }
