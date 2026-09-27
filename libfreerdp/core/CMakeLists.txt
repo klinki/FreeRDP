@@ -110,6 +110,10 @@ set(${MODULE_PREFIX}_SRCS
     heartbeat.h
     multitransport.c
     multitransport.h
+    rdpeudp.c
+    rdpeudp.h
+    udp.c
+    udp.h
     timezone.c
     timezone.h
     childsession.c

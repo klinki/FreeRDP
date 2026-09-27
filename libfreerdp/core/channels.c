@@ -47,6 +47,7 @@
 #include "client.h"
 #include "server.h"
 #include "channels.h"
+#include "multitransport.h"
 
 #define TAG FREERDP_TAG("core.channels")
 
@@ -77,6 +78,69 @@ BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_
 	{
 		WLog_ERR(TAG, "freerdp_channel_send: unknown channelId %" PRIu16 "", channelId);
 		return FALSE;
+	}
+
+	/* Pinned UDP path for drdynvc: decide once per PDU to avoid splitting
+	 * chunks across TCP/UDP (which breaks ordering/reassembly).
+	 * If UDP fails before any chunk was sent, fall back to TCP for the whole
+	 * PDU. If it fails mid-PDU, fail without TCP duplicate (caller retries
+	 * or disconnects; UDP failure usually means network down anyway). */
+	if (rdp->multitransport && multitransport_is_udp_connected(rdp->multitransport))
+	{
+		BOOL isDrdynvc = FALSE;
+		for (UINT32 i = 0; i < mcs->channelCount; i++)
+		{
+			if ((mcs->channels[i].ChannelId == channelId) &&
+			    (strncmp(mcs->channels[i].Name, "drdynvc", 7) == 0))
+			{
+				isDrdynvc = TRUE;
+				break;
+			}
+		}
+		if (isDrdynvc)
+		{
+			size_t udpLeft = size;
+			const BYTE* udpData = data;
+			UINT32 udpFlags = CHANNEL_FLAG_FIRST;
+			const UINT32 VCChunkSize =
+			    freerdp_settings_get_uint32(rdp->settings, FreeRDP_VCChunkSize);
+			const BOOL ServerMode =
+			    freerdp_settings_get_bool(rdp->settings, FreeRDP_ServerMode);
+			size_t sentChunks = 0;
+			BOOL udpFailed = FALSE;
+			while (udpLeft > 0)
+			{
+				size_t cSize = (udpLeft > VCChunkSize) ? VCChunkSize : udpLeft;
+				UINT32 cFlags = udpFlags;
+				if (cSize == udpLeft)
+					cFlags |= CHANNEL_FLAG_LAST;
+				if (!ServerMode && (channel->options & CHANNEL_OPTION_SHOW_PROTOCOL))
+					cFlags |= CHANNEL_FLAG_SHOW_PROTOCOL;
+				if (!multitransport_send_channel_packet(rdp->multitransport, channelId,
+				                                        size, cFlags, udpData, cSize))
+				{
+					udpFailed = TRUE;
+					break;
+				}
+				udpData += cSize;
+				udpLeft -= cSize;
+				udpFlags = 0;
+				sentChunks++;
+			}
+			if (!udpFailed)
+				return TRUE;
+			/* Fall back to TCP only if nothing went out on UDP (no duplicates) */
+			if (sentChunks == 0)
+			{
+				WLog_DBG(TAG, "UDP PDU send failed on first chunk, TCP fallback");
+			}
+			else
+			{
+				WLog_WARN(TAG, "UDP PDU failed mid-PDU after %zu chunks, no TCP duplicate",
+				          sentChunks);
+				return FALSE;
+			}
+		}
 	}
 
 	flags = CHANNEL_FLAG_FIRST;
@@ -300,6 +364,19 @@ BOOL freerdp_channel_send_packet(rdpRdp* rdp, UINT16 channelId, size_t totalSize
 {
 	if (totalSize > UINT32_MAX)
 		return FALSE;
+
+	/* Only single-chunk (atomic) PDUs may go via UDP here. Multi-chunk PDUs
+	 * must go via freerdp_channel_send() whole-PDU pinned path to avoid
+	 * splitting chunks across TCP/UDP. */
+	const BOOL atomic = (totalSize == chunkSize) && (flags & CHANNEL_FLAG_FIRST) &&
+	                    (flags & CHANNEL_FLAG_LAST);
+	if (atomic && rdp && rdp->multitransport &&
+	    multitransport_is_udp_connected(rdp->multitransport))
+	{
+		if (multitransport_send_channel_packet(rdp->multitransport, channelId, totalSize,
+		                                       flags, data, chunkSize))
+			return TRUE;
+	}
 
 	UINT16 sec_flags = 0;
 	wStream* s = rdp_send_stream_init(rdp, &sec_flags);

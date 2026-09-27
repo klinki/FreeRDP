@@ -30,6 +30,8 @@ typedef struct rdp_multitransport rdpMultitransport;
 
 #include <winpr/stream.h>
 
+#include "rdpeudp.h"
+
 typedef enum
 {
 	INITIATE_REQUEST_PROTOCOL_UDPFECR = 0x01,
@@ -58,6 +60,36 @@ FREERDP_LOCAL BOOL multitransport_client_send_response(rdpMultitransport* multi,
                                                        HRESULT hr);
 
 FREERDP_LOCAL void multitransport_free(rdpMultitransport* multi);
+
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL multitransport_is_udp_connected(const rdpMultitransport* multi);
+
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL rdpUdpTransport* multitransport_get_udp(rdpMultitransport* multi);
+
+/* Channel data over UDP ([MS-RDPEMT] RDP_TUNNEL_DATA + plaintext channel PDU).
+ * Tries UDP tunnel first if connected and channel is UDP-capable (drdynvc);
+ * returns TRUE if sent over UDP, FALSE to fall back to TCP. */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL multitransport_send_channel_packet(rdpMultitransport* multi, UINT16 channelId,
+                                                       size_t totalSize, UINT32 flags,
+                                                       const BYTE* chunk, size_t chunkLen);
+
+/* Autodetect PDU over UDP ([MS-RDPBCGR] 2.2.14 via RDP_TUNNEL_DATA).
+ * isRequest selects SEC_AUTODETECT_REQ vs RSP framing. Returns TRUE if sent. */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL multitransport_send_autodetect(rdpMultitransport* multi, BOOL isRequest,
+                                                   UINT16 secFlags, const BYTE* pdu,
+                                                   size_t pduLen);
+
+/* Background receive for Tunnel DATA channel packets.
+ * Polls UDP tunnel (non-blocking) and dispatches to channel layer.
+ * Returns >0 if a packet was dispatched, 0 if none, <0 on error. */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL int multitransport_check_fds(rdpMultitransport* multi);
+
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL HANDLE multitransport_get_event(rdpMultitransport* multi);
 
 WINPR_ATTR_MALLOC(multitransport_free, 1)
 WINPR_ATTR_NODISCARD
