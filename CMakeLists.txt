@@ -29,6 +29,10 @@ endif()
 project(FreeRDP LANGUAGES C)
 set(PROJECT_ISSUE_URL https://github.com/FreeRDP/FreeRDP/issues)
 
+if(APPLE)
+  enable_language(OBJC OBJCXX)
+endif()
+
 add_custom_target(fuzzers COMMENT "Build fuzzers")
 
 if(NOT PROJECT_SOURCE_DIR STREQUAL PROJECT_BINARY_DIR)
