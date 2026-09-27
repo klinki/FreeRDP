@@ -1,0 +1,118 @@
+{
+  "runs": [
+    {
+      "packets_per_round": 394173,
+      "bytes_per_round": 439631285,
+      "rounds": 8,
+      "transport_bytes": 9232,
+      "wall_ns_per_packet": 720.898,
+      "cpu_ns_per_packet": 720.235,
+      "pair": 0,
+      "version": "before"
+    },
+    {
+      "packets_per_round": 394173,
+      "bytes_per_round": 439631285,
+      "rounds": 8,
+      "transport_bytes": 9744,
+      "wall_ns_per_packet": 731.964,
+      "cpu_ns_per_packet": 730.38,
+      "pair": 0,
+      "version": "after"
+    },
+    {
+      "packets_per_round": 394173,
+      "bytes_per_round": 439631285,
+      "rounds": 8,
+      "transport_bytes": 9744,
+      "wall_ns_per_packet": 733.442,
+      "cpu_ns_per_packet": 732.808,
+      "pair": 1,
+      "version": "after"
+    },
+    {
+      "packets_per_round": 394173,
+      "bytes_per_round": 439631285,
+      "rounds": 8,
+      "transport_bytes": 9232,
+      "wall_ns_per_packet": 734.459,
+      "cpu_ns_per_packet": 733.113,
+      "pair": 1,
+      "version": "before"
+    },
+    {
+      "packets_per_round": 394173,
+      "bytes_per_round": 439631285,
+      "rounds": 8,
+      "transport_bytes": 9232,
+      "wall_ns_per_packet": 731.079,
+      "cpu_ns_per_packet": 730.343,
+      "pair": 2,
+      "version": "before"
+    },
+    {
+      "packets_per_round": 394173,
+      "bytes_per_round": 439631285,
+      "rounds": 8,
+      "transport_bytes": 9744,
+      "wall_ns_per_packet": 736.256,
+      "cpu_ns_per_packet": 735.599,
+      "pair": 2,
+      "version": "after"
+    },
+    {
+      "packets_per_round": 394173,
+      "bytes_per_round": 439631285,
+      "rounds": 8,
+      "transport_bytes": 9744,
+      "wall_ns_per_packet": 743.448,
+      "cpu_ns_per_packet": 742.199,
+      "pair": 3,
+      "version": "after"
+    },
+    {
+      "packets_per_round": 394173,
+      "bytes_per_round": 439631285,
+      "rounds": 8,
+      "transport_bytes": 9232,
+      "wall_ns_per_packet": 747.432,
+      "cpu_ns_per_packet": 744.091,
+      "pair": 3,
+      "version": "before"
+    },
+    {
+      "packets_per_round": 394173,
+      "bytes_per_round": 439631285,
+      "rounds": 8,
+      "transport_bytes": 9232,
+      "wall_ns_per_packet": 749.921,
+      "cpu_ns_per_packet": 748.781,
+      "pair": 4,
+      "version": "before"
+    },
+    {
+      "packets_per_round": 394173,
+      "bytes_per_round": 439631285,
+      "rounds": 8,
+      "transport_bytes": 9744,
+      "wall_ns_per_packet": 913.273,
+      "cpu_ns_per_packet": 798.889,
+      "pair": 4,
+      "version": "after"
+    }
+  ],
+  "summary": {
+    "before": {
+      "cpu_ns_per_packet": 733.113,
+      "wall_ns_per_packet": 734.459,
+      "transport_bytes": 9232
+    },
+    "after": {
+      "cpu_ns_per_packet": 735.599,
+      "wall_ns_per_packet": 736.256,
+      "transport_bytes": 9744
+    },
+    "cpu_change_percent": 0.3391018847026306,
+    "cpu_added_ns_per_packet": 2.48599999999999
+  }
+}

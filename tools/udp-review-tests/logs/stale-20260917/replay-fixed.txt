@@ -1,0 +1,17 @@
+frame 272950 time 2026-09-17T08:15:10.008802 channel 0xffff expected 0x0 DataSeq base 0x759 delivered bytes 69962604
+[10:09:57:683] [10625:ee9add81] [WARN][com.freerdp.core.rdpeudp] - [rdpeudp_deliver_recv_data_locked]: Peer omitted channel sequence 0 at wrap; complete DataSeq history, continuing at channel 1
+frame 272961 time 2026-09-17T08:15:10.039819 channel 0x0001 expected 0x2 DataSeq base 0x75a delivered bytes 69962932
+frame 569939 time 2026-09-17T08:45:29.817445 channel 0xffff expected 0x0 DataSeq base 0x773 delivered bytes 98311242
+[10:10:05:490] [10625:ee9add81] [WARN][com.freerdp.core.rdpeudp] - [rdpeudp_deliver_recv_data_locked]: Peer omitted channel sequence 0 at wrap; previously confirmed peer convention, continuing at channel 1
+frame 569944 time 2026-09-17T08:45:29.848631 channel 0x0001 expected 0x2 DataSeq base 0x774 delivered bytes 98311663
+frame 783467 time 2026-09-17T09:09:21.810088 channel 0xb9a2 expected 0xb9a3 DataSeq base 0xc128 delivered bytes 119494966
+frame 867658 time 2026-09-17T09:18:05.785535 channel 0xffff expected 0x0 DataSeq base 0x797 delivered bytes 127664092
+[10:10:13:170] [10625:ee9add81] [WARN][com.freerdp.core.rdpeudp] - [rdpeudp_deliver_recv_data_locked]: Peer omitted channel sequence 0 at wrap; previously confirmed peer convention, continuing at channel 1
+frame 867663 time 2026-09-17T09:18:05.802162 channel 0x0001 expected 0x2 DataSeq base 0x798 delivered bytes 127664268
+frame 867664 time 2026-09-17T09:18:05.831882 channel 0x0002 expected 0x3 DataSeq base 0x799 delivered bytes 127664617
+frame 867742 time 2026-09-17T09:18:10.806120 channel 0x0006 expected 0xe DataSeq base 0x7df delivered bytes 127668980
+frame 868213 time 2026-09-17T09:22:37.706570 channel 0x000e expected 0xf DataSeq base 0x822 delivered bytes 127669048
+frame 868217 time 2026-09-17T09:22:37.715947 channel  expected 0xf DataSeq base 0x823 delivered bytes 127669048
+Packets: 198590 final expected: 0xf final DataSeq base: 0x823 delivered bytes: 127669048
+Last stream progress: (868213, '2026-09-17T09:22:37.706570', '0x000e', 127669048)
+PASS: all three wraps, no watchdog failure, exact independently reconstructed stream SHA-256 362775d852643ece44d620db1e1f3ee28cabc91a254f76a399b743de5bdea4bb
