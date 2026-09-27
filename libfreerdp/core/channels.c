@@ -51,6 +51,77 @@
 
 #define TAG FREERDP_TAG("core.channels")
 
+/* DVC PDU Cmd values (MS-RDPEDYC 2.2.3): high nibble of first byte. */
+#define DVC_CMD_SOFT_SYNC_REQUEST 0x08
+#define DVC_CMD_SOFT_SYNC_RESPONSE 0x09
+
+static BOOL channel_is_drdynvc(rdpRdp* rdp, UINT16 channelId)
+{
+	rdpMcs* mcs = nullptr;
+	if (!rdp)
+		return FALSE;
+	mcs = rdp->mcs;
+	if (!mcs || !mcs->channels)
+		return FALSE;
+	for (UINT32 i = 0; i < mcs->channelCount; i++)
+	{
+		if ((mcs->channels[i].ChannelId == channelId) &&
+		    (strncmp(mcs->channels[i].Name, "drdynvc", 7) == 0))
+			return TRUE;
+	}
+	return FALSE;
+}
+
+static BOOL dvc_pdu_cmd(const BYTE* data, size_t size, UINT8* cmdOut)
+{
+	UINT8 cmd = 0;
+	if (!data || (size < 1))
+		return FALSE;
+	cmd = (UINT8)((data[0] >> 4) & 0x0F);
+	if (cmdOut)
+		*cmdOut = cmd;
+	return (cmd == DVC_CMD_SOFT_SYNC_REQUEST) || (cmd == DVC_CMD_SOFT_SYNC_RESPONSE);
+}
+
+/* DVC channel ID for PDUs that carry one (CREATE/DATA_FIRST/DATA/CLOSE, plain or
+ * compressed). Returns FALSE for capability/soft-sync/unknown/short PDUs. */
+static BOOL dvc_get_id(const BYTE* data, size_t size, UINT32* dvcIdOut)
+{
+	UINT8 cmd = 0;
+	UINT8 cbChId = 0;
+	size_t idLen = 0;
+	if (!data || (size < 1))
+		return FALSE;
+	cmd = (UINT8)((data[0] >> 4) & 0x0F);
+	cbChId = (UINT8)(data[0] & 0x03);
+	switch (cmd)
+	{
+		case 0x01: /* CREATE_REQUEST */
+		case 0x02: /* DATA_FIRST */
+		case 0x03: /* DATA */
+		case 0x04: /* CLOSE */
+		case 0x06: /* DATA_FIRST_COMPRESSED */
+		case 0x07: /* DATA_COMPRESSED */
+			break;
+		default:
+			return FALSE;
+	}
+	idLen = (cbChId == 0) ? 1 : ((cbChId == 1) ? 2 : 4);
+	if (size < 1 + idLen)
+		return FALSE;
+	UINT32 id = 0;
+	if (idLen == 1)
+		id = data[1];
+	else if (idLen == 2)
+		id = (UINT32)data[1] | ((UINT32)data[2] << 8);
+	else
+		id = (UINT32)data[1] | ((UINT32)data[2] << 8) | ((UINT32)data[3] << 16) |
+		       ((UINT32)data[4] << 24);
+	if (dvcIdOut)
+		*dvcIdOut = id;
+	return TRUE;
+}
+
 BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_t size)
 {
 	size_t left = 0;
@@ -80,24 +151,31 @@ BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_
 		return FALSE;
 	}
 
+	/* Soft-Sync control PDUs MUST stay on TCP (main connection) per
+	 * MS-RDPEDYC 3.1.5.3, never on the UDP tunnel. Snoop for migration. */
+	UINT8 softSyncCmd = 0;
+	const BOOL isSoftSyncPdu =
+	    channel_is_drdynvc(rdp, channelId) && dvc_pdu_cmd(data, size, &softSyncCmd);
+
 	/* Pinned UDP path for drdynvc: decide once per PDU to avoid splitting
 	 * chunks across TCP/UDP (which breaks ordering/reassembly).
+	 * Gated on negotiated migration state (MS-RDPEDYC 3.1.5.3), not mere
+	 * tunnel connectivity: with Soft-Sync, migration requires the handshake;
+	 * without it, migration is allowed only pre-ACTIVE to avoid reordering
+	 * TCP in-flight vs new UDP traffic.
 	 * If UDP fails before any chunk was sent, fall back to TCP for the whole
 	 * PDU. If it fails mid-PDU, fail without TCP duplicate (caller retries
 	 * or disconnects; UDP failure usually means network down anyway). */
-	if (rdp->multitransport && multitransport_is_udp_connected(rdp->multitransport))
+	if (!isSoftSyncPdu && rdp->multitransport &&
+	    multitransport_is_udp_send_migrated(rdp->multitransport) &&
+	    channel_is_drdynvc(rdp, channelId))
 	{
-		BOOL isDrdynvc = FALSE;
-		for (UINT32 i = 0; i < mcs->channelCount; i++)
-		{
-			if ((mcs->channels[i].ChannelId == channelId) &&
-			    (strncmp(mcs->channels[i].Name, "drdynvc", 7) == 0))
-			{
-				isDrdynvc = TRUE;
-				break;
-			}
-		}
-		if (isDrdynvc)
+		/* Per-DVC routing (S2): only DVCs listed under UDPFECR migrate when a
+		 * mapping is active; unlisted DVCs stay on TCP (no silent broadening).
+		 * PDUs without a DVC ID (e.g. capability) stay on TCP. */
+		UINT32 sendDvcId = 0;
+		if (dvc_get_id(data, size, &sendDvcId) &&
+		    multitransport_is_dvc_migrated(rdp->multitransport, sendDvcId))
 		{
 			size_t udpLeft = size;
 			const BYTE* udpData = data;
@@ -173,6 +251,19 @@ BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_
 		flags = 0;
 	}
 
+	/* Soft-Sync migration hooks for TCP control PDUs sent above. Only migrate
+	 * when UDPFECR is actually offered (honor tunnel lists). */
+	if (isSoftSyncPdu && rdp->multitransport)
+	{
+		const BOOL serverMode =
+		    freerdp_settings_get_bool(rdp->settings, FreeRDP_ServerMode);
+		if (serverMode && (softSyncCmd == DVC_CMD_SOFT_SYNC_REQUEST))
+			multitransport_on_soft_sync_request_sent(rdp->multitransport, data, size);
+		else if (!serverMode && (softSyncCmd == DVC_CMD_SOFT_SYNC_RESPONSE) &&
+		         rdpeudp_soft_sync_response_offers_udp(data, size))
+			multitransport_on_soft_sync_response_sent(rdp->multitransport);
+	}
+
 	return TRUE;
 }
 
@@ -210,6 +301,16 @@ BOOL freerdp_channel_process(freerdp* instance, wStream* s, UINT16 channelId, si
 		return FALSE;
 	}
 
+	/* Soft-Sync migration snooping (TCP drdynvc chunks, T1: reassembles
+	 * fragmented requests; single-chunk requests complete immediately). */
+	if (instance && instance->context && instance->context->rdp &&
+	    instance->context->rdp->multitransport &&
+	    channel_is_drdynvc(instance->context->rdp, channelId) && (chunkLength >= 1))
+	{
+		multitransport_soft_sync_recv_feed(instance->context->rdp->multitransport,
+		                                     Stream_Pointer(s), chunkLength, flags);
+	}
+
 	IFCALLRET(instance->ReceiveChannelData, rc, instance, channelId, Stream_Pointer(s), chunkLength,
 	          flags, length);
 	if (!rc)
@@ -237,6 +338,21 @@ BOOL freerdp_channel_peer_process(freerdp_peer* client, wStream* s, UINT16 chann
 	const size_t chunkLength = Stream_GetRemainingLength(s);
 	if (chunkLength > UINT32_MAX)
 		return FALSE;
+
+	/* Soft-Sync migration snooping (TCP drdynvc, single-chunk control PDU). */
+	if (client && client->context && client->context->rdp &&
+	    client->context->rdp->multitransport &&
+	    ((flags & (CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST)) ==
+	     (CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST)) &&
+	    channel_is_drdynvc(client->context->rdp, channelId) && (chunkLength >= 1))
+	{
+		UINT8 rcmd = 0;
+		if (dvc_pdu_cmd(Stream_Pointer(s), chunkLength, &rcmd) &&
+		    (rcmd == DVC_CMD_SOFT_SYNC_RESPONSE) &&
+		    rdpeudp_soft_sync_response_offers_udp(Stream_Pointer(s), chunkLength))
+			multitransport_on_soft_sync_response_received(
+			    client->context->rdp->multitransport);
+	}
 
 	if (client->VirtualChannelRead)
 	{
@@ -367,11 +483,19 @@ BOOL freerdp_channel_send_packet(rdpRdp* rdp, UINT16 channelId, size_t totalSize
 
 	/* Only single-chunk (atomic) PDUs may go via UDP here. Multi-chunk PDUs
 	 * must go via freerdp_channel_send() whole-PDU pinned path to avoid
-	 * splitting chunks across TCP/UDP. */
+	 * splitting chunks across TCP/UDP. Gated on migration state. Soft-Sync
+	 * control PDUs always stay on TCP. */
 	const BOOL atomic = (totalSize == chunkSize) && (flags & CHANNEL_FLAG_FIRST) &&
 	                    (flags & CHANNEL_FLAG_LAST);
-	if (atomic && rdp && rdp->multitransport &&
-	    multitransport_is_udp_connected(rdp->multitransport))
+	UINT8 ssc = 0;
+	const BOOL isSoftSync =
+	    atomic && channel_is_drdynvc(rdp, channelId) && dvc_pdu_cmd(data, chunkSize, &ssc);
+	UINT32 atomicDvc = 0;
+	const BOOL atomicRoutable =
+	    atomic && !isSoftSync && rdp && rdp->multitransport &&
+	    channel_is_drdynvc(rdp, channelId) && dvc_get_id(data, chunkSize, &atomicDvc) &&
+	    multitransport_is_dvc_migrated(rdp->multitransport, atomicDvc);
+	if (atomicRoutable)
 	{
 		if (multitransport_send_channel_packet(rdp->multitransport, channelId, totalSize,
 		                                       flags, data, chunkSize))

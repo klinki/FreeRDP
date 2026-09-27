@@ -368,6 +368,25 @@ static BOOL wts_read_drdynvc_pdu_ready(rdpPeerChannel* channel, wStream* s, UINT
 	UINT32 ChannelId = 0;
 	rdpPeerChannel* dvc = nullptr;
 	wHashTable* table = nullptr;
+	if (!haveChannelId && (Cmd == SOFT_SYNC_RESPONSE_PDU))
+	{
+		/* Soft-Sync Response (MS-RDPEDYC 2.2.5.2): use the shared strict
+		 * validator (U1: identical bytes as every other decision point). The
+		 * header byte was already consumed; rewind so the helper sees the
+		 * whole PDU. */
+		Stream_Rewind(s, 1);
+		{
+			const BYTE* pdu = Stream_Pointer(s);
+			const size_t len = Stream_GetRemainingLength(s);
+			const BOOL offersUdpFecr = drdynvc_soft_sync_response_offers_udp(pdu, len);
+			WLog_DBG(TAG, "SoftSync response offersUdpFecr=%d", offersUdpFecr);
+			if (offersUdpFecr && channel && channel->vcm && channel->vcm->rdp &&
+			    channel->vcm->rdp->multitransport)
+				multitransport_on_soft_sync_response_received(
+				    channel->vcm->rdp->multitransport);
+		}
+		return TRUE;
+	}
 	if (haveChannelId)
 	{
 		const unsigned val = wts_read_variable_uint(s, cbChId, &ChannelId);
