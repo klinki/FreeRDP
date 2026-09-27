@@ -163,9 +163,8 @@ BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_
 	 * tunnel connectivity: with Soft-Sync, migration requires the handshake;
 	 * without it, migration is allowed only pre-ACTIVE to avoid reordering
 	 * TCP in-flight vs new UDP traffic.
-	 * The UDP send is atomic per PDU (Q1: no SVC split, one Tunnel DATA),
-	 * so on failure nothing went out and TCP fallback below cannot
-	 * duplicate. */
+	 * A failed UDP write may already have delivered bytes; propagate failure
+	 * rather than resending the PDU over TCP. */
 	if (!isSoftSyncPdu && rdp->multitransport &&
 	    multitransport_is_udp_send_migrated(rdp->multitransport) &&
 	    channel_is_drdynvc(rdp, channelId))
@@ -184,17 +183,15 @@ BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_
 			 * piece as a complete PDU (DATA = "to end") and misparses the
 			 * rest as a fresh command. Transport/TLS packet fragmentation
 			 * stays below this boundary (RDP-UDP2 FEC fragments large
-			 * datagrams). The send is atomic: on failure nothing went out on
-			 * UDP, so TCP fallback below cannot duplicate. */
+			 * datagrams). A failed write must terminate this send because
+			 * the peer may already have received part or all of the PDU. */
 			const BOOL ServerMode =
 			    freerdp_settings_get_bool(rdp->settings, FreeRDP_ServerMode);
 			UINT32 pduFlags = CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST;
 			if (!ServerMode && (channel->options & CHANNEL_OPTION_SHOW_PROTOCOL))
 				pduFlags |= CHANNEL_FLAG_SHOW_PROTOCOL;
-			if (multitransport_send_channel_packet(rdp->multitransport, channelId,
-			                                        size, pduFlags, data, size))
-				return TRUE;
-			WLog_DBG(TAG, "UDP PDU send failed, TCP fallback");
+			return multitransport_send_channel_packet(rdp->multitransport, channelId,
+			                                           size, pduFlags, data, size);
 		}
 	}
 
@@ -474,9 +471,8 @@ BOOL freerdp_channel_send_packet(rdpRdp* rdp, UINT16 channelId, size_t totalSize
 	    multitransport_is_dvc_migrated(rdp->multitransport, atomicDvc);
 	if (atomicRoutable)
 	{
-		if (multitransport_send_channel_packet(rdp->multitransport, channelId, totalSize,
-		                                       flags, data, chunkSize))
-			return TRUE;
+		return multitransport_send_channel_packet(rdp->multitransport, channelId, totalSize,
+		                                           flags, data, chunkSize);
 	}
 
 	UINT16 sec_flags = 0;

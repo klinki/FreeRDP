@@ -2311,19 +2311,25 @@ int rdp_check_fds(rdpRdp* rdp)
 			return -1;
 	}
 
-	/* Drain UDP multitransport tunnel (channel data over UDP) without blocking.
-	 * Failures here must not kill TCP; just log and continue on TCP. */
+	if ((status >= 0) && !freerdp_timer_poll(rdp->timer))
+		return -1;
+
+	/* An established UDP tunnel failure requires reconnect: migrated incoming
+	 * channels cannot be restored by silently continuing on TCP. */
 	if (rdp->multitransport)
 	{
 		const int mst = multitransport_check_fds(rdp->multitransport);
+		if (mst == MULTITRANSPORT_TRANSPORT_FAILED)
+		{
+			freerdp_set_last_error_if_not(rdp->context, FREERDP_ERROR_CONNECT_TRANSPORT_FAILED);
+			return -1;
+		}
 		if (mst < 0)
 			WLog_Print(rdp->log, WLOG_WARN, "multitransport_check_fds() - %i", mst);
 	}
 
 	if (status < 0)
 		WLog_Print(rdp->log, WLOG_DEBUG, "transport_check_fds() - %i", status);
-	else
-		status = freerdp_timer_poll(rdp->timer);
 
 	return status;
 }
@@ -2553,6 +2559,10 @@ BOOL rdp_reset(rdpRdp* rdp)
 
 	bulk_reset(rdp->bulk);
 
+	/* A reconnect must discard the old UDP stream, migration state and watchdog
+	 * before a new tunnel is negotiated (including reconnects that use TCP only). */
+	multitransport_free(rdp->multitransport);
+	rdp->multitransport = nullptr;
 	rdp_reset_free(rdp);
 
 	if (!freerdp_settings_set_pointer_len(settings, FreeRDP_ServerRandom, nullptr, 0))
@@ -2570,6 +2580,13 @@ BOOL rdp_reset(rdpRdp* rdp)
 	rc = rdp_new_common(rdp);
 	if (!rc)
 		goto fail;
+	rdp->multitransport = multitransport_new(rdp, INITIATE_REQUEST_PROTOCOL_UDPFECL |
+	                                                  INITIATE_REQUEST_PROTOCOL_UDPFECR);
+	if (!rdp->multitransport)
+	{
+		rc = FALSE;
+		goto fail;
+	}
 
 	if (!transport_set_layer(rdp->transport, TRANSPORT_LAYER_TCP))
 		goto fail;
@@ -2591,6 +2608,7 @@ void rdp_free(rdpRdp* rdp)
 	if (rdp)
 	{
 		freerdp_timer_free(rdp->timer);
+		rdp->timer = nullptr;
 		rdp_reset_free(rdp);
 
 		freerdp_settings_free(rdp->settings);
