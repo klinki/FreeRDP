@@ -1,0 +1,284 @@
+/**
+ * FreeRDP: A Remote Desktop Protocol Implementation
+ * RDP-UDP transport ([MS-RDPEUDP], [MS-RDPEUDP2], [MS-RDPEMT])
+ *
+ * Copyright 2026 FreeRDP Contributors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#ifndef FREERDP_LIB_CORE_RDPEUDP_H
+#define FREERDP_LIB_CORE_RDPEUDP_H
+
+#include <winpr/windows.h>
+#include <winpr/stream.h>
+#include <winpr/synch.h>
+
+#include <freerdp/api.h>
+#include <freerdp/freerdp.h>
+#include <freerdp/settings.h>
+
+#include <openssl/bio.h>
+
+/* [MS-RDPEUDP] 2.2.2.1 RDPUDP_FEC_HEADER flags (big-endian on the wire) */
+#define RDPUDP_FLAG_SYN 0x0001
+#define RDPUDP_FLAG_FIN 0x0002
+#define RDPUDP_FLAG_ACK 0x0004
+#define RDPUDP_FLAG_DATA 0x0008
+#define RDPUDP_FLAG_FEC 0x0010
+#define RDPUDP_FLAG_CN 0x0020
+#define RDPUDP_FLAG_CWR 0x0040
+#define RDPUDP_FLAG_SACK_OPTION 0x0080
+#define RDPUDP_FLAG_ACK_OF_ACKS 0x0100
+#define RDPUDP_FLAG_SYNLOSSY 0x0200
+#define RDPUDP_FLAG_ACKDELAYED 0x0400
+#define RDPUDP_FLAG_CORRELATIONID 0x0800
+#define RDPUDP_FLAG_SYNEX 0x1000
+
+/* [MS-RDPEUDP] 2.2.2.9 protocol versions */
+#define RDPUDP_PROTOCOL_VERSION_1 0x0001
+#define RDPUDP_PROTOCOL_VERSION_2 0x0002
+#define RDPUDP_PROTOCOL_VERSION_3 0x0101 /* means: switch to MS-RDPEUDP2 */
+#define RDPUDP_SYNEX_VERSION_VALID 0x0001
+
+/* [MS-RDPEUDP2] 2.2.1.1 header flags (little-endian on the wire) */
+#define RDPUDP2_FLAG_ACK 0x001
+#define RDPUDP2_FLAG_DATA 0x004
+#define RDPUDP2_FLAG_ACKVEC 0x008
+#define RDPUDP2_FLAG_AOA 0x010
+#define RDPUDP2_FLAG_OVERHEAD 0x040
+#define RDPUDP2_FLAG_DELAYACK 0x100
+#define RDPUDP2_FLAGS_MASK 0xFFF
+
+#define RDPUDP2_DEFAULT_LOGWINDOW 5 /* 32 * MTU window */
+#define RDPUDP2_MAX_LOGWINDOW 10
+#define RDPUDP2_MTU 1232
+#define RDPUDP2_MAX_PAYLOAD 1150 /* MTU minus worst-case headers */
+
+/* [MS-RDPEMT] 2.2.1.1 tunnel actions */
+#define RDPTUNNEL_ACTION_CREATEREQUEST 0x00
+#define RDPTUNNEL_ACTION_CREATERESPONSE 0x01
+#define RDPTUNNEL_ACTION_DATA 0x02
+
+#define RDPEUDP_COOKIE_LEN 16
+#define RDPEUDP_COOKIE_HASHLEN 32
+#define RDPEUDP_CORRELATION_LEN 16
+
+/* Handshake / transport timeouts (ms) */
+#define RDPEUDP_SYN_TIMEOUT_MS 1000
+#define RDPEUDP_SYN_MAX_RETRIES 5
+#define RDPEUDP_ACK_TIMEOUT_MS 200
+#define RDPEUDP_MAX_RETRIES 5
+#define RDPEUDP_KEEPALIVE_MS 30000
+
+typedef struct rdp_udp_transport rdpUdpTransport;
+
+/* ---- v1 SYN codec (network byte order / big-endian) ---- */
+
+typedef struct
+{
+	UINT32 snSourceAck;
+	UINT16 receiveWindow;
+	UINT16 flags;
+} RdpUdpFecHeader;
+
+typedef struct
+{
+	UINT32 initialSeq;
+	UINT16 upstreamMtu;
+	UINT16 downstreamMtu;
+} RdpUdpSynPayload;
+
+typedef struct
+{
+	UINT16 synexFlags;
+	UINT16 version;
+	BYTE cookieHash[RDPEUDP_COOKIE_HASHLEN];
+	BOOL haveCookieHash;
+} RdpUdpSynExPayload;
+
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_write_fec_header(wStream* s, const RdpUdpFecHeader* h);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_read_fec_header(wStream* s, RdpUdpFecHeader* h);
+
+WINPR_ATTR_NODISCARD
+FREERDP_API wStream* rdpeudp_build_syn(UINT32 initialSeq, UINT16 upstreamMtu,
+                                       UINT16 downstreamMtu, UINT32 ackSeq, BOOL withAck,
+                                       const BYTE* correlationId, UINT16 udpVer,
+                                       const BYTE* cookieHash);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_parse_syn(const BYTE* data, size_t len, RdpUdpFecHeader* header,
+                                   RdpUdpSynPayload* syn, BYTE* correlationId,
+                                   RdpUdpSynExPayload* synex);
+
+/* ---- v2 packet codec (little-endian, with prefix-byte transform) ---- */
+
+typedef struct
+{
+	UINT16 flags; /* 12 bits */
+	UINT8 logWindow; /* 4 bits */
+} RdpUdp2Header;
+
+typedef struct
+{
+	UINT16 seqNum;
+	BYTE receivedTs[3];
+	BYTE sendGap;
+	BYTE numDelayed; /* low 4 bits */
+	BYTE timeScale;  /* high 4 bits */
+	/* delayed acks omitted for cumulative-ACK mode */
+} RdpUdp2AckPayload;
+
+typedef struct
+{
+	UINT16 baseSeq;
+	BYTE codedSize; /* 7 bits */
+	BOOL haveTs;
+	BYTE timestamp[4]; /* 3-byte ts + 1-byte gap if haveTs */
+	BYTE* vector;      /* codedSize bytes, caller-owned */
+	size_t vectorLen;
+} RdpUdp2AckVecPayload;
+
+/** Apply the [MS-RDPEUDP2] 3.1.1.1.5 prefix transform for sending.
+ * Takes a complete RDP-UDP2 packet layout in @p s (position = length),
+ * prepends PacketPrefixByte and swaps bytes 0 and 7. */
+FREERDP_API BOOL rdpeudp2_protect(wStream* s, BOOL dummy);
+/** Reverse the prefix transform in place.
+ * @p data/@p len is the received UDP payload. Returns FALSE if too short. */
+FREERDP_API BOOL rdpeudp2_unprotect(BYTE* data, size_t len, BOOL* dummy, size_t* payloadOffset);
+
+/* ---- MTU negotiation ([MS-RDPEUDP] 3.1.1.3, conservative without bonus) ---- */
+FREERDP_API void rdpeudp_compute_mtu(UINT16 ourUp, UINT16 ourDown, UINT16 peerUp,
+                                     UINT16 peerDown, UINT16* negUp, UINT16* negDown);
+WINPR_ATTR_NODISCARD
+FREERDP_API UINT16 rdpeudp_payload_for_mtu(UINT16 mtu);
+
+/* ---- ACK vector codec ([MS-RDPEUDP2] 2.2.1.2.6, little-endian) ----
+ * Bitmap mode (MSB 0): 7 seqs per byte, bit=1 received.
+ * RLE mode (MSB 1): bit6 = state, low 6 bits = run length. */
+WINPR_ATTR_NODISCARD
+FREERDP_API wStream* rdpeudp_build_ackvec(UINT16 baseSeq, const BOOL* received, size_t count,
+                                          BOOL withTs, UINT32 ts, BYTE sendGap);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_parse_ackvec(const BYTE* data, size_t len, UINT16* baseSeq,
+                                      BOOL** received, size_t* count);
+
+/* ---- channel framing over RDP_TUNNEL_DATA ----
+ * First byte payload type: 0x00=channel, 0x01=autodetect_req, 0x02=autodetect_rsp.
+ * Channel: type(1)+channelId(2)+totalSize(4)+flags(4)+chunkLen(2)+chunk.
+ * Autodetect: type(1)+secFlags(2)+autodetect PDU. Plaintext (TLS encrypts). */
+WINPR_ATTR_NODISCARD
+FREERDP_API wStream* rdpeudp_build_channel_packet(UINT16 channelId, UINT32 totalSize,
+                                                  UINT32 flags, const BYTE* chunk,
+                                                  size_t chunkLen);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_parse_channel_packet(const BYTE* data, size_t len, UINT16* channelId,
+                                              UINT32* totalSize, UINT32* flags,
+                                              const BYTE** chunk, size_t* chunkLen);
+WINPR_ATTR_NODISCARD
+FREERDP_API wStream* rdpeudp_build_autodetect_packet(BOOL isRequest, UINT16 secFlags,
+                                                     const BYTE* pdu, size_t pduLen);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_parse_autodetect_packet(const BYTE* data, size_t len, BOOL* isRequest,
+                                                 UINT16* secFlags, const BYTE** pdu,
+                                                 size_t* pduLen);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_parse_tunnel_ptype(const BYTE* data, size_t len, BYTE* ptype);
+
+/* ---- tunnel codec ([MS-RDPEMT] 2.2, little-endian) ---- */
+
+WINPR_ATTR_NODISCARD
+FREERDP_API wStream* rdpemt_build_create_request(UINT32 requestId, const BYTE* cookie);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpemt_parse_create_response(const BYTE* data, size_t len, UINT32* hr);
+WINPR_ATTR_NODISCARD
+FREERDP_API wStream* rdpemt_build_data(const BYTE* data, size_t len);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpemt_parse_header(const BYTE* data, size_t len, BYTE* action,
+                                     UINT16* payloadLen, UINT8* headerLen);
+
+/* ---- transport ---- */
+
+WINPR_ATTR_MALLOC(rdpeudp_free, 1)
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port,
+                                           UINT32 requestId, UINT16 requestedProto,
+                                           const BYTE* securityCookie);
+
+FREERDP_LOCAL void rdpeudp_free(rdpUdpTransport* udp);
+
+/** Establish UDP socket + RDPEUDP handshake + version negotiation.
+ * On success the reliable RDPEUDP2 data path is ready (but not yet TLS).
+ * @return TRUE if UDP transport is usable (negotiated v3 / RDPEUDP2). */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL rdpeudp_connect(rdpUdpTransport* udp, DWORD timeoutMs);
+
+/** Perform TLS handshake over the reliable UDP transport.
+ * Must be called after rdpeudp_connect(). */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL rdpeudp_tls_connect(rdpUdpTransport* udp);
+
+/** Send Tunnel Create Request and wait for Tunnel Create Response.
+ * Must be called after rdpeudp_tls_connect(). */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL rdpeudp_tunnel_create(rdpUdpTransport* udp, DWORD timeoutMs);
+
+/** Reliable stream send/recv over the established tunnel (TLS).
+ * These carry RDP_TUNNEL_DATA payloads (used for future DVC migration). */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL SSIZE_T rdpeudp_tunnel_send(rdpUdpTransport* udp, const BYTE* data, size_t len);
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL SSIZE_T rdpeudp_tunnel_recv(rdpUdpTransport* udp, BYTE* buffer, size_t len,
+                                           DWORD timeoutMs);
+
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL rdpeudp_is_connected(const rdpUdpTransport* udp);
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL UINT16 rdpeudp_negotiated_version(const rdpUdpTransport* udp);
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL UINT32 rdpeudp_get_request_id(const rdpUdpTransport* udp);
+
+/* Reliability / keepalive / stats ([MS-RDPEUDP2] 3.1.1, 3.1.5) */
+typedef struct
+{
+	UINT64 sentPackets;
+	UINT64 recvPackets;
+	UINT64 retransmits;
+	UINT64 lostDetected;
+	UINT64 ackSent;
+	UINT64 ackvecSent;
+} RdpUdpStats;
+
+FREERDP_LOCAL BOOL rdpeudp_send_keepalive(rdpUdpTransport* udp);
+FREERDP_LOCAL BOOL rdpeudp_check_keepalive(rdpUdpTransport* udp, DWORD idleMs);
+FREERDP_LOCAL BOOL rdpeudp_get_stats(const rdpUdpTransport* udp, RdpUdpStats* stats);
+FREERDP_LOCAL int rdpeudp_get_sockfd(const rdpUdpTransport* udp);
+FREERDP_LOCAL HANDLE rdpeudp_get_event(rdpUdpTransport* udp);
+
+/** BIO wrapping the reliable RDPEUDP2 stream (for TLS). */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BIO_METHOD* BIO_s_rdpeudp(void);
+
+/* Server-side accept ([MS-RDPEUDP] 3.2, [MS-RDPEMT] 3.2.5.1).
+ * Binds a UDP socket on @p port, performs SYN handshake as server,
+ * TLS accept with @p settings, validates Tunnel Create against
+ * @p expectedReqId/@p expectedCookie, sends Tunnel Create Response.
+ * Returns a connected transport or NULL. */
+WINPR_ATTR_MALLOC(rdpeudp_free, 1)
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL rdpUdpTransport* rdpeudp_accept(rdpContext* context, int port,
+                                              UINT32 expectedReqId,
+                                              const BYTE* expectedCookie, DWORD timeoutMs);
+
+#endif /* FREERDP_LIB_CORE_RDPEUDP_H */
