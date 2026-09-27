@@ -67,6 +67,36 @@ FREERDP_LOCAL BOOL multitransport_is_udp_connected(const rdpMultitransport* mult
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL rdpUdpTransport* multitransport_get_udp(rdpMultitransport* multi);
 
+/* Migration gating (MS-RDPEDYC 3.1.5.3 Soft-Sync, MS-RDPEMT 1.3).
+ * Tunnel establishment alone does NOT authorize DVC migration when Soft-Sync
+ * was negotiated. Send/recv each require their direction to be migrated. */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL multitransport_is_udp_send_migrated(const rdpMultitransport* multi);
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL multitransport_is_udp_recv_migrated(const rdpMultitransport* multi);
+/* Soft-Sync event hooks (called from DRDYNVC layer on TCP when PDUs observed):
+ * - request sent (server, whole PDU): installs the mapping, enables send.
+ * - request chunks received (client, per static-channel chunk): feeds the
+ *   reassembly buffer; on the LAST chunk the validated mapping is installed
+ *   and recv is enabled. Handles fragmented requests the single-chunk fast
+ *   path cannot see.
+ * - response sent (client) / received (server): complete the handshake, but
+ *   only when a validated mapping was installed first (never migrate-all on
+ *   failure). Request hooks take the whole DVC PDU (header byte included) and
+ *   strict-parse it; malformed or non-UDPFECR requests change nothing (TCP-safe).
+ * Without Soft-Sync negotiation these are no-ops (migration immediate). */
+FREERDP_LOCAL void multitransport_on_soft_sync_request_sent(rdpMultitransport* multi,
+                                                             const BYTE* pdu, size_t len);
+FREERDP_LOCAL void multitransport_soft_sync_recv_feed(rdpMultitransport* multi, const BYTE* chunk,
+                                                      size_t chunkLen, UINT32 flags);
+FREERDP_LOCAL void multitransport_on_soft_sync_response_sent(rdpMultitransport* multi);
+FREERDP_LOCAL void multitransport_on_soft_sync_response_received(rdpMultitransport* multi);
+/* Per-DVC send migration (S2): TRUE iff the direction is migrated AND (no active
+ * mapping OR dvcId was listed under UDPFECR). Unlisted DVCs stay on TCP. */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL BOOL multitransport_is_dvc_migrated(const rdpMultitransport* multi,
+                                                   UINT32 dvcId);
+
 /* Channel data over UDP ([MS-RDPEMT] RDP_TUNNEL_DATA + plaintext channel PDU).
  * Tries UDP tunnel first if connected and channel is UDP-capable (drdynvc);
  * returns TRUE if sent over UDP, FALSE to fall back to TCP. */

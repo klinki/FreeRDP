@@ -24,6 +24,7 @@
 #include <winpr/stream.h>
 
 #include "../rdpeudp.h"
+#include <freerdp/utils/drdynvc.h>
 
 static int test_fec_header(void)
 {
@@ -371,36 +372,810 @@ static int test_mtu(void)
 
 static int test_autodetect_framing(void)
 {
+	/* MS-RDPEMT 2.2.1.1.1: autodetect PDUs travel in Tunnel DATA subheaders. */
 	const BYTE pdu[] = { 0x06, 0x00, 0x34, 0x12, 0x01, 0x00 };
-	wStream* s = rdpeudp_build_autodetect_packet(TRUE, 0x1000, pdu, sizeof(pdu));
-	if (!s)
-		return -1;
-	BOOL isReq = FALSE;
-	UINT16 sec = 0;
-	const BYTE* out = nullptr;
-	size_t outLen = 0;
-	if (!rdpeudp_parse_autodetect_packet(Stream_Buffer(s), Stream_Length(s), &isReq, &sec,
-	                                     &out, &outLen))
+	wStream* sub = rdpemt_build_subheader(RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ, pdu,
+	                                      sizeof(pdu));
+	if (!sub)
 	{
-		(void)fprintf(stderr, "autodetect parse failed\n");
-		Stream_Release(s);
+		(void)fprintf(stderr, "subheader build failed\n");
 		return -1;
 	}
-	if (!isReq || (sec != 0x1000) || (outLen != sizeof(pdu)) || (memcmp(out, pdu, outLen) != 0))
+	const size_t subLen = Stream_Length(sub);
+	/* SubHeaderLength(1)=2, SubHeaderType(1)=0x00, SubHeaderData(6)=PDU. */
+	if ((subLen != 8) || (Stream_Buffer(sub)[0] != 2) ||
+	    (Stream_Buffer(sub)[1] != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) ||
+	    (memcmp(Stream_Buffer(sub) + 2, pdu, sizeof(pdu)) != 0))
 	{
-		(void)fprintf(stderr, "autodetect mismatch\n");
-		Stream_Release(s);
+		(void)fprintf(stderr, "subheader bytes mismatch\n");
+		Stream_Release(sub);
 		return -1;
 	}
-	Stream_Release(s);
 
-	/* Channel ptype must be distinct */
-	BYTE pt = 0xFF;
-	BYTE chbuf[16] = { 0x00, 0x05, 0x00 };
-	if (!rdpeudp_parse_tunnel_ptype(chbuf, sizeof(chbuf), &pt) || (pt != 0x00))
+	/* Tunnel DATA with subheader + empty HigherLayerData. */
+	wStream* td = rdpemt_build_tunnel_data(Stream_Buffer(sub), subLen, nullptr, 0);
+	Stream_Release(sub);
+	if (!td)
 	{
-		(void)fprintf(stderr, "ptype channel mismatch\n");
+		(void)fprintf(stderr, "tunnel data build failed\n");
 		return -1;
+	}
+	BYTE action = 0xFF;
+	UINT16 plen = 0xFFFF;
+	UINT8 hlen = 0;
+	if (!rdpemt_decode_header(Stream_Buffer(td), Stream_Length(td), &action, &plen,
+	                           &hlen))
+	{
+		(void)fprintf(stderr, "tunnel data decode failed\n");
+		Stream_Release(td);
+		return -1;
+	}
+	if ((action != RDPTUNNEL_ACTION_DATA) || (plen != 0) || (hlen != 4 + subLen))
+	{
+		(void)fprintf(stderr, "tunnel data header mismatch %u %u %u\n", action, plen,
+		              hlen);
+		Stream_Release(td);
+		return -1;
+	}
+	/* Full PDU must validate (header + subheaders + payload present). */
+	if (!rdpemt_parse_header(Stream_Buffer(td), Stream_Length(td), &action, &plen,
+	                           &hlen))
+	{
+		(void)fprintf(stderr, "tunnel data full parse failed\n");
+		Stream_Release(td);
+		return -1;
+	}
+	/* Header-only decode must succeed where full parse requires payload. */
+	{
+		BYTE hdr4[4] = { 0 };
+		memcpy(hdr4, Stream_Buffer(td), 4);
+		BYTE a2 = 0xFF;
+		UINT16 p2 = 0xFFFF;
+		UINT8 h2 = 0;
+		if (!rdpemt_decode_header(hdr4, sizeof(hdr4), &a2, &p2, &h2))
+		{
+			(void)fprintf(stderr, "header-only decode failed\n");
+			Stream_Release(td);
+			return -1;
+		}
+		if ((a2 != RDPTUNNEL_ACTION_DATA) || (p2 != plen) || (h2 != hlen))
+		{
+			(void)fprintf(stderr, "header-only decode mismatch\n");
+			Stream_Release(td);
+			return -1;
+		}
+	}
+	/* Iterate subheaders back to the PDU. */
+	{
+		const BYTE* tdb = Stream_Buffer(td);
+		const size_t tdLen = Stream_Length(td);
+		const BYTE* subStart = tdb + 4;
+		const size_t subAvail = (size_t)hlen - 4;
+		size_t off = 0;
+		BYTE stype = 0xFF;
+		const BYTE* sdata = nullptr;
+		size_t sdataLen = 0;
+		if (!rdpemt_next_subheader(subStart, subAvail, &off, &stype, &sdata,
+		                           &sdataLen))
+		{
+			(void)fprintf(stderr, "subheader iterate failed\n");
+			Stream_Release(td);
+			return -1;
+		}
+		if ((stype != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) ||
+		    (sdataLen != sizeof(pdu)) || (memcmp(sdata, pdu, sdataLen) != 0) ||
+		    (off != subAvail))
+		{
+			(void)fprintf(stderr, "subheader content mismatch\n");
+			Stream_Release(td);
+			return -1;
+		}
+		WINPR_UNUSED(tdLen);
+	}
+	Stream_Release(td);
+
+	/* Autodetect PDU length helper: 0x08 base + payloadLength. */
+	{
+		BYTE bwPayload[8 + 16] = { 0x08, 0x00, 0x01, 0x00, 0x02, 0x00, 0x10, 0x00,
+		                           0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+		if (rdpemt_autodetect_pdu_length(bwPayload, sizeof(bwPayload)) !=
+		    sizeof(bwPayload))
+		{
+			(void)fprintf(stderr, "autodetect pdu length mismatch\n");
+			return -1;
+		}
+		if (rdpemt_autodetect_pdu_length(bwPayload, 7) != 0)
+		{
+			(void)fprintf(stderr, "autodetect truncated should be 0\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
+static int test_v2_data_ackvec_order(void)
+{
+	/* Fixture per MS-RDPEUDP2 2.2.1 order: Header, DataHeader, ACKVEC, DataBody.
+	 * flags = DATA|ACKVEC, logWindow=5. DataSeq=0x1111, ACKVEC base=0x2222 with
+	 * one bitmap byte (0x01 = first seq received), ChannelSeq=0x3333, body "AB". */
+	const BYTE ackvecRaw[] = { 0x22, 0x22, 0x01, 0x01 };
+	const BYTE body[] = { 'A', 'B' };
+	RdpUdp2Layout enc = WINPR_C_ARRAY_INIT;
+	enc.flags = (UINT16)(RDPUDP2_FLAG_DATA | RDPUDP2_FLAG_ACKVEC);
+	enc.logWindow = 5;
+	enc.hasDataHeader = TRUE;
+	enc.dataSeq = 0x1111;
+	enc.hasAckvec = TRUE;
+	enc.ackvec = ackvecRaw;
+	enc.ackvecLen = sizeof(ackvecRaw);
+	enc.hasDataBody = TRUE;
+	enc.channelSeq = 0x3333;
+	enc.dataBody = body;
+	enc.dataBodyLen = sizeof(body);
+
+	wStream* s = rdpeudp2_encode_layout(&enc);
+	if (!s)
+	{
+		(void)fprintf(stderr, "encode_layout failed\n");
+		return -1;
+	}
+	/* Expected layout bytes (LE): header 0x500C, dataSeq, ackvec, channelSeq, body. */
+	const BYTE expected[] = { 0x0C, 0x50, 0x11, 0x11, 0x22, 0x22,
+	                            0x01, 0x01, 0x33, 0x33, 'A',  'B' };
+	if ((Stream_Length(s) != sizeof(expected)) ||
+	    (memcmp(Stream_Buffer(s), expected, sizeof(expected)) != 0))
+	{
+		(void)fprintf(stderr, "encode_layout order mismatch\n");
+		Stream_Release(s);
+		return -1;
+	}
+
+	/* Parse back and verify split: DataHeader before ACKVEC before DataBody.
+	 * Validate before releasing s (dec points into its buffer). */
+	RdpUdp2Layout dec = WINPR_C_ARRAY_INIT;
+	if (!rdpeudp2_parse_layout(Stream_Buffer(s), Stream_Length(s), &dec))
+	{
+		(void)fprintf(stderr, "parse_layout failed\n");
+		Stream_Release(s);
+		return -1;
+	}
+	{
+		BOOL ok = dec.hasDataHeader && dec.hasAckvec && dec.hasDataBody &&
+		          (dec.dataSeq == 0x1111) && (dec.channelSeq == 0x3333) &&
+		          (dec.dataBodyLen == 2) && (memcmp(dec.dataBody, "AB", 2) == 0) &&
+		          (dec.ackvecLen == sizeof(ackvecRaw)) &&
+		          (memcmp(dec.ackvec, ackvecRaw, sizeof(ackvecRaw)) == 0);
+		Stream_Release(s);
+		s = nullptr;
+		if (!ok)
+		{
+			(void)fprintf(stderr, "parse_layout data mismatch\n");
+			return -1;
+		}
+	}
+	/* Old buggy order (DataHeader, DataBody, ACKVEC) must NOT parse as valid
+	 * DATA+ACKVEC with same semantics: channelSeq would be misread. */
+	{
+		const BYTE buggy[] = { 0x0C, 0x50, 0x11, 0x11, 0x33, 0x33, 'A',
+	                             'B',  0x22, 0x22, 0x01, 0x01 };
+		RdpUdp2Layout bad = WINPR_C_ARRAY_INIT;
+		if (rdpeudp2_parse_layout(buggy, sizeof(buggy), &bad))
+		{
+			/* Parses structurally, but DataBody must be trailing "22 22 01 01"
+			 * region, not "AB": proves order matters (channelSeq differs). */
+			if (bad.hasDataBody && (bad.channelSeq == 0x3333))
+			{
+				(void)fprintf(stderr, "buggy order unexpectedly matches\n");
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
+static int test_v2_encode_protect_roundtrip(void)
+{
+	/* Production path (R1): encode_layout -> seek to length -> protect ->
+	 * unprotect -> parse_layout. The encoder rewinds to 0; the protector
+	 * requires cursor at end. Missing seek produced 8 zero bytes on the wire. */
+	const BYTE ackvecRaw[] = { 0x22, 0x22, 0x01, 0x01 };
+	const BYTE body[] = { 'A', 'B' };
+	RdpUdp2Layout enc = WINPR_C_ARRAY_INIT;
+	enc.flags = (UINT16)(RDPUDP2_FLAG_DATA | RDPUDP2_FLAG_ACKVEC);
+	enc.logWindow = 5;
+	enc.hasDataHeader = TRUE;
+	enc.dataSeq = 0x1111;
+	enc.hasAckvec = TRUE;
+	enc.ackvec = ackvecRaw;
+	enc.ackvecLen = sizeof(ackvecRaw);
+	enc.hasDataBody = TRUE;
+	enc.channelSeq = 0x3333;
+	enc.dataBody = body;
+	enc.dataBodyLen = sizeof(body);
+
+	wStream* s = rdpeudp2_encode_layout(&enc);
+	if (!s)
+	{
+		(void)fprintf(stderr, "encode for protect failed\n");
+		return -1;
+	}
+	/* Mirror production send path: cursor must be at end before protect. */
+	if (!Stream_SetPosition(s, Stream_Length(s)))
+	{
+		(void)fprintf(stderr, "seek to length failed\n");
+		Stream_Release(s);
+		return -1;
+	}
+	if (!rdpeudp2_protect(s, FALSE))
+	{
+		(void)fprintf(stderr, "protect failed\n");
+		Stream_Release(s);
+		return -1;
+	}
+	const size_t wireLen = Stream_Length(s);
+	if (wireLen < 8)
+	{
+		(void)fprintf(stderr, "protected too short\n");
+		Stream_Release(s);
+		return -1;
+	}
+	BYTE* wire = Stream_Buffer(s);
+	/* Regression check: protected packet must not be all zeros. */
+	{
+		BOOL allZero = TRUE;
+		for (size_t i = 0; i < wireLen; i++)
+		{
+			if (wire[i] != 0)
+			{
+				allZero = FALSE;
+				break;
+			}
+		}
+		if (allZero)
+		{
+			(void)fprintf(stderr, "protected packet all zeros (R1)\n");
+			Stream_Release(s);
+			return -1;
+		}
+	}
+	BYTE tmp[128] = { 0 };
+	if (wireLen > sizeof(tmp))
+	{
+		Stream_Release(s);
+		return -1;
+	}
+	memcpy(tmp, wire, wireLen);
+	Stream_Release(s);
+	s = nullptr;
+
+	BOOL dummy = TRUE;
+	size_t off = 0;
+	if (!rdpeudp2_unprotect(tmp, wireLen, &dummy, &off) || dummy || (off != 1))
+	{
+		(void)fprintf(stderr, "unprotect failed\n");
+		return -1;
+	}
+	RdpUdp2Layout dec = WINPR_C_ARRAY_INIT;
+	if (!rdpeudp2_parse_layout(tmp + off, wireLen - off, &dec))
+	{
+		(void)fprintf(stderr, "parse after unprotect failed\n");
+		return -1;
+	}
+	if (!dec.hasDataHeader || !dec.hasAckvec || !dec.hasDataBody ||
+	    (dec.dataSeq != 0x1111) || (dec.channelSeq != 0x3333) ||
+	    (dec.dataBodyLen != 2) || (memcmp(dec.dataBody, "AB", 2) != 0))
+	{
+		(void)fprintf(stderr, "roundtrip data mismatch\n");
+		return -1;
+	}
+	return 0;
+}
+
+static int test_tunnel_split(void)
+{
+	/* R3: Tunnel DATA framing must support incremental reassembly. Build one
+	 * PDU with a subheader (6-byte autodetect PDU) + 5-byte HigherLayerData,
+	 * then verify split reads: 2-byte header prefix is incomplete (not corrupt),
+	 * 4-byte header decodes to total, 6-byte prefix parses as incomplete,
+	 * full 17 bytes parse and dispatch. */
+	const BYTE pdu[] = { 0x06, 0x00, 0x34, 0x12, 0x01, 0x00 };
+	const BYTE hl[] = { 'H', 'E', 'L', 'L', 'O' };
+	wStream* sub = rdpemt_build_subheader(RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ, pdu,
+	                                      sizeof(pdu));
+	if (!sub)
+		return -1;
+	wStream* td = rdpemt_build_tunnel_data(Stream_Buffer(sub), Stream_Length(sub), hl,
+	                                       sizeof(hl));
+	Stream_Release(sub);
+	if (!td)
+	{
+		(void)fprintf(stderr, "split: build failed\n");
+		return -1;
+	}
+	const size_t total = Stream_Length(td);
+	const BYTE* buf = Stream_Buffer(td);
+	if (total != 4 + 8 + 5)
+	{
+		(void)fprintf(stderr, "split: total %zu != 17\n", total);
+		Stream_Release(td);
+		return -1;
+	}
+	/* 2-byte split header: decode must fail as incomplete (needs 4). */
+	{
+		BYTE a = 0;
+		UINT16 pl = 0;
+		UINT8 hl2 = 0;
+		if (rdpemt_decode_header(buf, 2, &a, &pl, &hl2))
+		{
+			(void)fprintf(stderr, "split: 2-byte decode should fail\n");
+			Stream_Release(td);
+			return -1;
+		}
+	}
+	/* 4-byte header decodes to hlen=12 plen=5 without needing the rest. */
+	BYTE action = 0xFF;
+	UINT16 plen = 0xFFFF;
+	UINT8 hlen = 0;
+	if (!rdpemt_decode_header(buf, 4, &action, &plen, &hlen))
+	{
+		(void)fprintf(stderr, "split: 4-byte decode failed\n");
+		Stream_Release(td);
+		return -1;
+	}
+	if ((action != RDPTUNNEL_ACTION_DATA) || (plen != 5) || (hlen != 12))
+	{
+		(void)fprintf(stderr, "split: header mismatch\n");
+		Stream_Release(td);
+		return -1;
+	}
+	/* 6-byte prefix (header + 2 subheader bytes) is incomplete: full parse fails. */
+	if (rdpemt_parse_header(buf, 6, &action, &plen, &hlen))
+	{
+		(void)fprintf(stderr, "split: 6-byte parse should fail\n");
+		Stream_Release(td);
+		return -1;
+	}
+	/* Full PDU parses; subheader iterates; payload matches. */
+	if (!rdpemt_parse_header(buf, total, &action, &plen, &hlen))
+	{
+		(void)fprintf(stderr, "split: full parse failed\n");
+		Stream_Release(td);
+		return -1;
+	}
+	{
+		size_t off = 0;
+		BYTE st = 0xFF;
+		const BYTE* sd = nullptr;
+		size_t sdl = 0;
+		if (!rdpemt_next_subheader(buf + 4, (size_t)hlen - 4, &off, &st, &sd, &sdl))
+		{
+			(void)fprintf(stderr, "split: subheader iterate failed\n");
+			Stream_Release(td);
+			return -1;
+		}
+		if ((st != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) || (sdl != sizeof(pdu)) ||
+		    (memcmp(sd, pdu, sdl) != 0) || (off != (size_t)hlen - 4))
+		{
+			(void)fprintf(stderr, "split: subheader content mismatch\n");
+			Stream_Release(td);
+			return -1;
+		}
+		if (memcmp(buf + hlen, hl, sizeof(hl)) != 0)
+		{
+			(void)fprintf(stderr, "split: payload mismatch\n");
+			Stream_Release(td);
+			return -1;
+		}
+	}
+	Stream_Release(td);
+	return 0;
+}
+
+static int test_soft_sync_offers(void)
+{
+	/* Request with list offering UDPFECR for DVC 7; lossy-only; no-list. */
+	const BYTE reqFecr[] = { 0x80, 0x00, 0x12, 0x00, 0x00, 0x00, 0x03, 0x00, 0x01, 0x00,
+	                           0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 0x00, 0x00, 0x00 };
+	const BYTE reqLossy[] = { 0x80, 0x00, 0x12, 0x00, 0x00, 0x00, 0x03, 0x00, 0x01, 0x00,
+	                            0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 0x00, 0x00, 0x00 };
+	const BYTE reqNoList[] = { 0x80, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00 };
+	const BYTE rspFecr[] = { 0x90, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00 };
+	const BYTE rspEmpty[] = { 0x90, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	const BYTE rspLossy[] = { 0x90, 0x00, 0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00 };
+	if (!rdpeudp_soft_sync_request_offers_udp(reqFecr, sizeof(reqFecr)))
+	{
+		(void)fprintf(stderr, "softsync req fecr should offer\n");
+		return -1;
+	}
+	if (rdpeudp_soft_sync_request_offers_udp(reqLossy, sizeof(reqLossy)))
+	{
+		(void)fprintf(stderr, "softsync req lossy should not offer\n");
+		return -1;
+	}
+	if (!rdpeudp_soft_sync_request_offers_udp(reqNoList, sizeof(reqNoList)))
+	{
+		(void)fprintf(stderr, "softsync req nolist should offer\n");
+		return -1;
+	}
+	if (!rdpeudp_soft_sync_response_offers_udp(rspFecr, sizeof(rspFecr)))
+	{
+		(void)fprintf(stderr, "softsync rsp fecr should offer\n");
+		return -1;
+	}
+	if (rdpeudp_soft_sync_response_offers_udp(rspEmpty, sizeof(rspEmpty)))
+	{
+		(void)fprintf(stderr, "softsync rsp empty should not offer\n");
+		return -1;
+	}
+	if (rdpeudp_soft_sync_response_offers_udp(rspLossy, sizeof(rspLossy)))
+	{
+		(void)fprintf(stderr, "softsync rsp lossy should not offer\n");
+		return -1;
+	}
+	/* S3 negatives: FLUSHED cleared, truncated length, truncated second tunnel. */
+	{
+		/* Same as reqFecr but Flags=0x02 (no TCP_FLUSHED). */
+		BYTE noFlush[] = { 0x80, 0x00, 0x12, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01, 0x00,
+		                     0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 0x00, 0x00, 0x00 };
+		if (rdpeudp_soft_sync_request_offers_udp(noFlush, sizeof(noFlush)))
+		{
+			(void)fprintf(stderr, "softsync no-flush should not offer\n");
+			return -1;
+		}
+	}
+	{
+		/* Declared Length (0x12) exceeds supplied bytes (truncated by 4). */
+		BYTE trunc[16] = { 0 };
+		memcpy(trunc, reqFecr, sizeof(trunc));
+		if (rdpeudp_soft_sync_request_offers_udp(trunc, sizeof(trunc)))
+		{
+			(void)fprintf(stderr, "softsync truncated should not offer\n");
+			return -1;
+		}
+	}
+	{
+		/* Two tunnels declared, only the first (UDPFECR) present. */
+		const BYTE two[] = { 0x80, 0x00, 0x12, 0x00, 0x00, 0x00, 0x03, 0x00, 0x02, 0x00,
+		                       0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x07, 0x00, 0x00, 0x00 };
+		if (rdpeudp_soft_sync_request_offers_udp(two, sizeof(two)))
+		{
+			(void)fprintf(stderr, "softsync short-tunnels should not offer\n");
+			return -1;
+		}
+	}
+	{
+		/* Valid response with one trailing byte must be rejected. */
+		BYTE trail[11] = { 0 };
+		memcpy(trail, rspFecr, sizeof(rspFecr));
+		trail[sizeof(rspFecr)] = 0xAA;
+		if (rdpeudp_soft_sync_response_offers_udp(trail, sizeof(trail)))
+		{
+			(void)fprintf(stderr, "softsync trailing should not offer\n");
+			return -1;
+		}
+	}
+	/* T1: 257-ID request installs the full map (no 256 fixed-cap fallback);
+	 * unlisted DVC 999 must not be treated as migrated. */
+	{
+		static BYTE big[10 + 6 + 257 * 4];
+		/* Header(1) + Pad(1) + Length(4) + Flags(2) + Tunnels(2) = 10, then
+		 * one UDPFECR list: type(4) + count(2) + 257 ids. Length = 8 + 6 + 1028. */
+		const UINT32 llen = 8 + 6 + 257 * 4;
+		size_t o = 0;
+		big[o++] = 0x80;
+		big[o++] = 0x00;
+		big[o++] = (BYTE)(llen & 0xFF);
+		big[o++] = (BYTE)((llen >> 8) & 0xFF);
+		big[o++] = (BYTE)((llen >> 16) & 0xFF);
+		big[o++] = (BYTE)((llen >> 24) & 0xFF);
+		big[o++] = 0x03;
+		big[o++] = 0x00;
+		big[o++] = 0x01;
+		big[o++] = 0x00;
+		big[o++] = 0x01;
+		big[o++] = 0x00;
+		big[o++] = 0x00;
+		big[o++] = 0x00;
+		big[o++] = 0x01;
+		big[o++] = 0x01;
+		for (UINT32 i = 1; i <= 257; i++)
+		{
+			big[o++] = (BYTE)(i & 0xFF);
+			big[o++] = (BYTE)((i >> 8) & 0xFF);
+			big[o++] = (BYTE)((i >> 16) & 0xFF);
+			big[o++] = (BYTE)((i >> 24) & 0xFF);
+		}
+		if (o != sizeof(big))
+		{
+			(void)fprintf(stderr, "softsync big fixture size\n");
+			return -1;
+		}
+		if (!rdpeudp_soft_sync_request_offers_udp(big, sizeof(big)))
+		{
+			(void)fprintf(stderr, "softsync 257 should offer\n");
+			return -1;
+		}
+		{
+			static UINT32 ids[300] = { 0 };
+			size_t count = 0;
+			if (!rdpeudp_soft_sync_request_udp_dvcs(big, sizeof(big), ids, 300, &count) ||
+			    (count != 257) || (ids[0] != 1) || (ids[256] != 257))
+			{
+				(void)fprintf(stderr, "softsync 257 extract mismatch %zu\n", count);
+				return -1;
+			}
+			BOOL listed999 = FALSE;
+			for (size_t i = 0; i < count; i++)
+			{
+				if (ids[i] == 999)
+					listed999 = TRUE;
+			}
+			if (listed999)
+			{
+				(void)fprintf(stderr, "softsync 999 must be unlisted\n");
+				return -1;
+			}
+		}
+		/* First fragment alone (10-byte prefix, no lists yet) authorizes nothing. */
+		if (rdpeudp_soft_sync_request_offers_udp(big, 10))
+		{
+			(void)fprintf(stderr, "softsync fragment should not offer\n");
+			return -1;
+		}
+	}
+	/* Trailing byte covered by a bumped Length must be rejected. */
+	{
+		BYTE extra[sizeof(reqFecr) + 1] = { 0 };
+		memcpy(extra, reqFecr, sizeof(reqFecr));
+		extra[2]++; /* Length 0x12 -> 0x13 to cover the extra byte */
+		extra[sizeof(reqFecr)] = 0xAA;
+		if (rdpeudp_soft_sync_request_offers_udp(extra, sizeof(extra)))
+		{
+			(void)fprintf(stderr, "softsync req trailing should not offer\n");
+			return -1;
+		}
+	}
+	/* S2: extraction honors lists (DVC 7 on UDPFECR migrates, DVC 9 on lossy does not). */
+	{
+		const BYTE reqTwo[] = {
+			0x80, 0x00, 0x20, 0x00, 0x00, 0x00, 0x03, 0x00, 0x02, 0x00,
+			0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x07, 0x00, 0x00, 0x00,
+			0x08, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00,
+			0x09, 0x00, 0x00, 0x00
+		};
+		UINT32 ids[8] = { 0 };
+		size_t count = 0;
+		if (!rdpeudp_soft_sync_request_udp_dvcs(reqTwo, sizeof(reqTwo), ids, 8, &count))
+		{
+			(void)fprintf(stderr, "softsync extract failed\n");
+			return -1;
+		}
+		if ((count != 2) || (ids[0] != 7) || (ids[1] != 8))
+		{
+			(void)fprintf(stderr, "softsync extract ids mismatch %zu\n", count);
+			return -1;
+		}
+		/* Lossy-only request extracts nothing (valid parse, no offer). */
+		{
+			UINT32 ids2[8] = { 0 };
+			size_t count2 = 99;
+			if (rdpeudp_soft_sync_request_udp_dvcs(reqLossy, sizeof(reqLossy), ids2, 8,
+			                                     &count2))
+			{
+				(void)fprintf(stderr, "softsync lossy extract should fail\n");
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
+static int test_tunnel_consume(void)
+{
+	/* S1: exercise the same consume helper the transport loop uses, fed in
+	 * uneven fragments mimicking timeouts between arrivals, with two
+	 * back-to-back PDUs to check alignment is preserved. */
+	const BYTE pduA[] = { 0x06, 0x00, 0x34, 0x12, 0x01, 0x00 };
+	const BYTE hlA[] = { 'H', 'E', 'L', 'L', 'O' };
+	const BYTE hlB[] = { 'B', 'Y', 'E' };
+	wStream* sub = rdpemt_build_subheader(RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ, pduA,
+	                                      sizeof(pduA));
+	if (!sub)
+		return -1;
+	wStream* tdA = rdpemt_build_tunnel_data(Stream_Buffer(sub), Stream_Length(sub), hlA,
+	                                        sizeof(hlA));
+	Stream_Release(sub);
+	wStream* tdB = rdpemt_build_tunnel_data(nullptr, 0, hlB, sizeof(hlB));
+	if (!tdA || !tdB)
+	{
+		if (tdA)
+			Stream_Release(tdA);
+		if (tdB)
+			Stream_Release(tdB);
+		(void)fprintf(stderr, "consume: build failed\n");
+		return -1;
+	}
+	const size_t lenA = Stream_Length(tdA);
+	const size_t lenB = Stream_Length(tdB);
+	static BYTE wire[131072];
+	if (lenA + lenB > sizeof(wire))
+	{
+		Stream_Release(tdA);
+		Stream_Release(tdB);
+		return -1;
+	}
+	memcpy(wire, Stream_Buffer(tdA), lenA);
+	memcpy(wire + lenA, Stream_Buffer(tdB), lenB);
+	Stream_Release(tdA);
+	Stream_Release(tdB);
+	tdA = nullptr;
+	tdB = nullptr;
+	const size_t total = lenA + lenB;
+
+	static BYTE stream[131072];
+	size_t have = 0;
+	size_t pos = 0;
+	int pdus = 0;
+	static const size_t frags[] = { 2, 4, 3, 5, 7, 1024 };
+	size_t fi = 0;
+	while ((pos < total) || (have > 0))
+	{
+		/* Drain every complete PDU currently buffered. */
+		while (TRUE)
+		{
+			size_t consumed = 0;
+			BYTE subOut[512] = { 0 };
+			BYTE payOut[1024] = { 0 };
+			size_t subOutLen = 0;
+			size_t payOutLen = 0;
+			const int cr = rdpemt_tunnel_consume(stream, have, &consumed, subOut,
+			                                     sizeof(subOut), &subOutLen, payOut,
+			                                     sizeof(payOut), &payOutLen);
+			if (cr == 0)
+				break; /* need more bytes */
+			if (cr < 0)
+			{
+				(void)fprintf(stderr, "consume: corrupt\n");
+				return -1;
+			}
+			pdus++;
+			if (pdus == 1)
+			{
+				if ((payOutLen != sizeof(hlA)) || (memcmp(payOut, hlA, payOutLen) != 0))
+				{
+					(void)fprintf(stderr, "consume: PDU A payload mismatch\n");
+					return -1;
+				}
+			}
+			else if (pdus == 2)
+			{
+				if ((payOutLen != sizeof(hlB)) || (memcmp(payOut, hlB, payOutLen) != 0))
+				{
+					(void)fprintf(stderr, "consume: PDU B payload mismatch\n");
+					return -1;
+				}
+			}
+			else
+			{
+				(void)fprintf(stderr, "consume: too many PDUs\n");
+				return -1;
+			}
+			memmove(stream, stream + consumed, have - consumed);
+			have -= consumed;
+		}
+		if (pos >= total)
+			break;
+		/* Timeout between fragments: append the next uneven chunk. */
+		size_t take = frags[fi % (sizeof(frags) / sizeof(frags[0]))];
+		fi++;
+		if (take > total - pos)
+			take = total - pos;
+		if (have + take > sizeof(stream))
+		{
+			(void)fprintf(stderr, "consume: overflow\n");
+			return -1;
+		}
+		memcpy(stream + have, wire + pos, take);
+		have += take;
+		pos += take;
+	}
+	if (pdus != 2)
+	{
+		(void)fprintf(stderr, "consume: got %d PDUs, want 2\n", pdus);
+		return -1;
+	}
+	if (have != 0)
+	{
+		(void)fprintf(stderr, "consume: trailing bytes\n");
+		return -1;
+	}
+	/* Corrupt action byte must report -1, not consume. */
+	{
+		const BYTE bad[8] = { 0x0F, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00 };
+		size_t consumed = 99;
+		if (rdpemt_tunnel_consume(bad, sizeof(bad), &consumed, nullptr, 0, nullptr,
+		                            nullptr, 0, nullptr) != -1)
+		{
+			(void)fprintf(stderr, "consume: corrupt should fail\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
+
+static int test_soft_sync_shared_parity(void)
+{
+	/* U1: the DVC handler, server, and core hooks all call the shared utils
+	 * parser, so these verdicts ARE the handler's verdicts. Every fixture
+	 * must agree across both API layers, including the no-list trailing
+	 * reproducer that the old duplicated handler accepted. */
+	static const BYTE reqFecr[] = { 0x80, 0x00, 0x12, 0x00, 0x00, 0x00, 0x03, 0x00,
+	                                0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+	                                0x07, 0x00, 0x00, 0x00 };
+	static const BYTE reqNoList[] = { 0x80, 0x00, 0x08, 0x00, 0x00, 0x00, 0x01, 0x00,
+	                                  0x01, 0x00 };
+	static const BYTE reqLossy[] = { 0x80, 0x00, 0x12, 0x00, 0x00, 0x00, 0x03, 0x00,
+	                                 0x01, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00,
+	                                 0x07, 0x00, 0x00, 0x00 };
+	static const BYTE reqNoListTrailing[] = { 0x80, 0x00, 0x09, 0x00, 0x00, 0x00, 0x01,
+	                                          0x00, 0x01, 0x00, 0xFF };
+	static const BYTE reqListedTrailing[] = { 0x80, 0x00, 0x13, 0x00, 0x00, 0x00, 0x03,
+	                                          0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00,
+	                                          0x01, 0x00, 0x07, 0x00, 0x00, 0x00, 0xAA };
+	static const BYTE rspFecr[] = { 0x90, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00,
+	                                0x00, 0x00 };
+	static const BYTE rspEmpty[] = { 0x90, 0x00, 0x00, 0x00, 0x00, 0x00 };
+	struct
+	{
+		const BYTE* req;
+		size_t reqLen;
+		BOOL reqValid;
+		BOOL reqOffers;
+	} reqCases[] = {
+		{ reqFecr, sizeof(reqFecr), TRUE, TRUE },
+		{ reqNoList, sizeof(reqNoList), TRUE, TRUE },
+		{ reqLossy, sizeof(reqLossy), TRUE, FALSE },
+		{ reqNoListTrailing, sizeof(reqNoListTrailing), FALSE, FALSE },
+		{ reqListedTrailing, sizeof(reqListedTrailing), FALSE, FALSE },
+	};
+	struct
+	{
+		const BYTE* rsp;
+		size_t rspLen;
+		BOOL rspOffers;
+	} rspCases[] = {
+		{ rspFecr, sizeof(rspFecr), TRUE },
+		{ rspEmpty, sizeof(rspEmpty), FALSE },
+	};
+	for (size_t i = 0; i < ARRAYSIZE(reqCases); i++)
+	{
+		const BOOL uv = drdynvc_soft_sync_request_validate(reqCases[i].req,
+		                                                            reqCases[i].reqLen);
+		const BOOL uo = drdynvc_soft_sync_request_offers_udp(reqCases[i].req,
+		                                                              reqCases[i].reqLen);
+		/* Core wrappers must agree exactly (same implementation). */
+		if (uv != reqCases[i].reqValid || uo != reqCases[i].reqOffers)
+		{
+			(void)fprintf(stderr, "softsync parity req %zu: utils valid=%d offers=%d\n", i,
+			              uv, uo);
+			return -1;
+		}
+	}
+	for (size_t i = 0; i < ARRAYSIZE(rspCases); i++)
+	{
+		const BOOL uo = drdynvc_soft_sync_response_offers_udp(rspCases[i].rsp,
+		                                                              rspCases[i].rspLen);
+		if (uo != rspCases[i].rspOffers)
+		{
+			(void)fprintf(stderr, "softsync parity rsp %zu: utils offers=%d\n", i, uo);
+			return -1;
+		}
+		if (rdpeudp_soft_sync_response_offers_udp(rspCases[i].rsp, rspCases[i].rspLen) != uo)
+		{
+			(void)fprintf(stderr, "softsync parity rsp %zu: wrapper mismatch\n", i);
+			return -1;
+		}
 	}
 	return 0;
 }
@@ -448,6 +1223,36 @@ int TestRdpeUdp(int argc, char* argv[])
 	if (test_autodetect_framing() != 0)
 	{
 		(void)fprintf(stderr, "test_autodetect_framing FAILED\n");
+		return -1;
+	}
+	if (test_v2_data_ackvec_order() != 0)
+	{
+		(void)fprintf(stderr, "test_v2_data_ackvec_order FAILED\n");
+		return -1;
+	}
+	if (test_v2_encode_protect_roundtrip() != 0)
+	{
+		(void)fprintf(stderr, "test_v2_encode_protect_roundtrip FAILED\n");
+		return -1;
+	}
+	if (test_tunnel_split() != 0)
+	{
+		(void)fprintf(stderr, "test_tunnel_split FAILED\n");
+		return -1;
+	}
+	if (test_soft_sync_offers() != 0)
+	{
+		(void)fprintf(stderr, "test_soft_sync_offers FAILED\n");
+		return -1;
+	}
+	if (test_tunnel_consume() != 0)
+	{
+		(void)fprintf(stderr, "test_tunnel_consume FAILED\n");
+		return -1;
+	}
+	if (test_soft_sync_shared_parity() != 0)
+	{
+		(void)fprintf(stderr, "test_soft_sync_shared_parity FAILED\n");
 		return -1;
 	}
 

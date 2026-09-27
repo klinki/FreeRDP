@@ -53,6 +53,12 @@ FREERDP_LOCAL void autodetect_register_server_callbacks(rdpAutoDetect* autodetec
 FREERDP_LOCAL void autodetect_on_connect_time_auto_detect_begin(rdpAutoDetect* autodetect);
 FREERDP_LOCAL void autodetect_on_connect_time_auto_detect_progress(rdpAutoDetect* autodetect);
 
+/* Account raw Tunnel DATA bytes (subheaders + HigherLayerData, i.e. everything
+ * following the 4-byte Tunnel PDU base header) toward the UDP_R bandwidth
+ * measurement (MS-RDPBCGR 2.2.14, MS-RDPEMT 2.2.1.1). Safe to call for every
+ * Tunnel DATA PDU: the count is reset on Bandwidth Measure Start. */
+FREERDP_LOCAL void autodetect_account_udp_bytes(rdpAutoDetect* autodetect, size_t bytes);
+
 #define AUTODETECT_TAG FREERDP_TAG("core.autodetect")
 
 #endif /* FREERDP_LIB_CORE_AUTODETECT_H */
