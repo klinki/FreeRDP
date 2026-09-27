@@ -20,8 +20,10 @@ def counters(path, result):
     monitors = defaultdict(lambda: defaultdict(int))
     for line in path.read_text().splitlines():
         row = json.loads(line)
-        if row['schema'] != 'freerdp.sdl_render_metrics':
-            raise ValueError('Unexpected metrics schema')
+        if row.get("schema") != "freerdp.sdl_render_metrics":
+            # Process-global records (e.g. freerdp.sdl_queue_metrics) share
+            # the file; only render records carry upload counters.
+            continue
         # The runner flushes at both boundaries, so no interval straddles them.
         if row['interval_start_ns'] < result['measurement_start_ns']:
             continue
