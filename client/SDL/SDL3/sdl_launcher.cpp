@@ -491,6 +491,7 @@ bool SdlLauncher::requestClose()
 		id = _sessionId + ":close:" + std::to_string(++_nextRequest);
 		_closeRequest = id;
 	}
+	yieldActivationToLauncher();
 	auto event = message("close_request");
 	text(event.get(), "requestId", id.c_str());
 	if (!send(std::move(event))) cancel();

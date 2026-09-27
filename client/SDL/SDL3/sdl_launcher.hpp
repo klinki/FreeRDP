@@ -52,6 +52,7 @@ class SdlLauncher
 	void readLoop();
 	void writeLoop();
 	void thumbnailLoop();
+	void yieldActivationToLauncher(); // SDL main thread, before a close request.
 	bool receive(Json event);
 	std::vector<std::pair<std::string, UINT32>> displays(WINPR_JSON* array);
 	void terminal(const char* outcome, int code, const std::string& detail);
