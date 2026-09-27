@@ -5,11 +5,16 @@
 # for Wireshark dissection. Logs go to /tmp/rdp-udp-test.log.
 #
 # Env overrides: SERVER (default davidpc), RDP_USER (default david),
-# FREERDP_BIN (default: our /tmp build).
+# FREERDP_BIN (default: this repository's build/video-responsive build).
 
 set -euo pipefail
 
-FREERDP_BIN="${FREERDP_BIN:-/tmp/freerdp-build/client/SDL/SDL3/sdl-freerdp}"
+repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+FREERDP_BIN="${FREERDP_BIN:-$repo/build/video-responsive/client/SDL/SDL3/sdl-freerdp}"
+if [[ ! -x "$FREERDP_BIN" ]]; then
+  printf 'FreeRDP executable not found: %s\n' "$FREERDP_BIN" >&2
+  exit 1
+fi
 SERVER="${SERVER:-davidpc}"
 RDP_USER="${RDP_USER:-david}"
 SECRETS_FILE="${SECRETS_FILE:-/tmp/rdp-secrets.txt}"
@@ -23,6 +28,8 @@ SECONDARY_MONITOR_ID="${SECONDARY_MONITOR_ID:-2}"   # DELL U2419HC
 
 # Fresh secrets each run so Wireshark never uses a stale session.
 rm -f "${SECRETS_FILE}"
+# Start a fresh log, then use append mode so copytruncate rotation resets writes.
+: > "${LOG_FILE}"
 
 # Use M27UP as the RDP primary and DELL U2419HC as the secondary.
 "${FREERDP_BIN}" \
@@ -40,8 +47,9 @@ rm -f "${SECRETS_FILE}"
   /monitors:"${PRIMARY_MONITOR_ID},${SECONDARY_MONITOR_ID}" \
   /sdl-monitor-scale:"${PRIMARY_MONITOR_ID}=175/100,${SECONDARY_MONITOR_ID}=100/100" \
   +multitransport \
+  +async-update \
   /auto-reconnect \
   /auto-reconnect-max-retries:5 \
   /tls:secrets-file:"${SECRETS_FILE}" \
   /log-filters:com.freerdp.core.rdpeudp:DEBUG,com.freerdp.core.multitransport:DEBUG,com.freerdp.core.autodetect:DEBUG,com.freerdp.core:DEBUG \
-  2>&1 | tee "${LOG_FILE}"
+  2>&1 | tee -a "${LOG_FILE}"
