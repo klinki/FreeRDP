@@ -30,6 +30,36 @@
 
 #include <openssl/bio.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+
+/* Temporary live-debug tracing (remove once wlog-filter delivery is fixed:
+ * correct `com.freerdp.*:DEBUG` filter strings are silently ignored by
+ * sdl-freerdp even though an isolated wlog test honors them, so WLog_DBG
+ * lines are invisible in live runs). Toggle at RUNTIME, no rebuild and no
+ * add/remove churn around the call sites:
+ *     RDPEUDP_TRACE=1 ./sdl-freerdp ...
+ * Completely silent unless the variable is set to a non-"0" value. Call
+ * sites stay in the tree; each expansion caches the lookup once. */
+#define UDP_TRACE(...) \
+	do \
+	{ \
+		static int udp_trace_on = -1; \
+		if (udp_trace_on < 0) \
+		{ \
+			const char* udp_trace_env = getenv("RDPEUDP_TRACE"); \
+			udp_trace_on = (udp_trace_env && (udp_trace_env[0] != '\0') && \
+			                (udp_trace_env[0] != '0')) \
+			                   ? 1 \
+			                   : 0; \
+		} \
+		if (udp_trace_on) \
+		{ \
+			fprintf(stderr, __VA_ARGS__); \
+			fflush(stderr); \
+		} \
+	} while (0)
+
 /* [MS-RDPEUDP] 2.2.2.1 RDPUDP_FEC_HEADER flags (big-endian on the wire) */
 #define RDPUDP_FLAG_SYN 0x0001
 #define RDPUDP_FLAG_FIN 0x0002
@@ -80,6 +110,13 @@
 #define RDPEUDP_ACK_TIMEOUT_MS 200
 #define RDPEUDP_MAX_RETRIES 5
 #define RDPEUDP_KEEPALIVE_MS 30000
+/* Per-chunk reliable-send deadline. Generous on purpose: loaded peers have
+ * been observed to take ~2 s before their first ACK while blasting probe
+ * trains, and a 2 s deadline lost that race by milliseconds (the ACKs kept
+ * arriving right after). The establishment worker is async (main session on
+ * TCP is unaffected), and MS's own reference waits an order of magnitude
+ * longer, so patience here is safe. */
+#define RDPEUDP_SEND_TIMEOUT_MS 10000
 
 typedef struct rdp_udp_transport rdpUdpTransport;
 
@@ -226,6 +263,18 @@ WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_parse_channel_packet(const BYTE* data, size_t len, UINT16* channelId,
                                               UINT32* totalSize, UINT32* flags,
                                               const BYTE** chunk, size_t* chunkLen);
+/* Length of one DYNVC PDU at data (MS-RDPEDYC 2.2, header byte
+ * [cbId(2)|Sp/Pri(2)|Cmd(4)] + ChannelId of cbChId width). Live servers put
+ * RAW DVC PDUs in Tunnel DATA HigherLayerData with no outer envelope
+ * (observed: CREATEs `18 02/07/08 <name>\0`, one PDU per Tunnel DATA).
+ * Supported: CREATE (NUL scan client-side, fixed status server-side),
+ * CLOSE (fixed), DATA_FIRST (exact-fit only; fragmented across Tunnel DATAs
+ * is rejected visibly), DATA (to end). isServer selects the CREATE direction
+ * (N4: same command nibble both ways; server receives responses).
+ * FALSE when the bytes do not hold one complete supported PDU. */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer,
+                                        size_t* pduLenOut);
 
 /* ---- tunnel codec ([MS-RDPEMT] 2.2, little-endian) ---- */
 
@@ -244,15 +293,18 @@ FREERDP_API wStream* rdpemt_build_data(const BYTE* data, size_t len);
 WINPR_ATTR_NODISCARD
 FREERDP_API wStream* rdpemt_build_tunnel_data(const BYTE* subheaders, size_t subheadersLen,
                                               const BYTE* higherLayer, size_t higherLayerLen);
-/* Single subheader: SubHeaderLength(1)=2, SubHeaderType(1), SubHeaderData. */
+/* Single subheader in overlaid form: data must be a complete RDPBCGR PDU
+ * whose [0]=total length and [1]=REQ/RSP typeId; the subheader IS those
+ * framing bytes (emitted verbatim after validation). */
 WINPR_ATTR_NODISCARD
 FREERDP_API wStream* rdpemt_build_subheader(BYTE subHeaderType, const BYTE* data, size_t dataLen);
 /* Length of an autodetect PDU starting at data (0 if incomplete). Uses
  * headerLength + payloadLength fields per MS-RDPBCGR 2.2.14. */
 WINPR_ATTR_NODISCARD
 FREERDP_API size_t rdpemt_autodetect_pdu_length(const BYTE* data, size_t len);
-/* Iterate subheaders: at *offset, returns type + data + dataLen, advances
- * offset past this subheader (2 + autodetect len). FALSE when done/invalid. */
+/* Iterate subheaders: at *offset, returns type + FULL PDU bytes + total
+ * length, advances offset past this subheader (== PDU length). FALSE when
+ * done/invalid. */
 WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpemt_next_subheader(const BYTE* subheaders, size_t subheadersLen,
                                        size_t* offset, BYTE* subHeaderType,
@@ -344,6 +396,39 @@ FREERDP_LOCAL int rdpeudp_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf, s
                                            size_t* subLenOut, BYTE* payloadBuf,
                                            size_t payloadBufLen, size_t* payloadLenOut,
                                            DWORD timeoutMs);
+
+/* ---- unit-test driver (Q2 transport integration, no sockets) ----
+ * Feeds one wire datagram through the production v2 receive path (the same
+ * block rdpeudp_recv_one runs for socket input): prefix/layout parse, AOA
+ * epoch rule, DataSeq window, ACK accounting, channel delivery. The sender
+ * side is modeled with the production builders (rdpeudp2_encode_layout +
+ * rdpeudp2_protect), so wire bytes are real in both directions. */
+typedef struct
+{
+	UINT16 recvDataBase;
+	UINT16 lastAckSent;
+	UINT16 expectedChannelSeq;
+	BOOL haveRecvData;
+	BOOL haveSeenAoa;
+	BOOL haveRealData;
+	size_t recvStreamLen; /* delivered in-order channel bytes */
+} RdpUdpTestRecvState;
+
+WINPR_ATTR_MALLOC(rdpeudp_test_free, 1)
+WINPR_ATTR_NODISCARD
+FREERDP_API rdpUdpTransport* rdpeudp_test_new(void);
+FREERDP_API void rdpeudp_test_free(rdpUdpTransport* udp);
+/** Feed one datagram; TRUE if received (even if ignored, same as recv_one). */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* datagram, size_t len);
+/** Snapshot scalar receive state (bitmap via rdpeudp_test_seen below). */
+FREERDP_API BOOL rdpeudp_test_recv_state(const rdpUdpTransport* udp, RdpUdpTestRecvState* out);
+/** TRUE if DataSeq (base+i) is recorded received; FALSE if out of range. */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL rdpeudp_test_seen(const rdpUdpTransport* udp, size_t i);
+/** Force the connected flag (lets the multitransport test fixture skip the
+ * socket handshake; no I/O is performed). */
+FREERDP_API void rdpeudp_test_set_connected(rdpUdpTransport* udp, BOOL connected);
 
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL rdpeudp_is_connected(const rdpUdpTransport* udp);

@@ -22,8 +22,10 @@
 
 #include <winpr/crt.h>
 #include <winpr/stream.h>
+#include <winpr/wtsapi.h>
 
 #include "../rdpeudp.h"
+#include "../multitransport.h"
 #include <freerdp/utils/drdynvc.h>
 
 static int test_fec_header(void)
@@ -147,6 +149,16 @@ static int test_v2_protect(void)
 	}
 	const size_t wireLen = Stream_Length(s);
 	BYTE* wire = Stream_Buffer(s);
+	/* Absolute prefix check (not just roundtrip): normal DATA must be 0xE0
+	 * (shortLen=7 | type=0). The mirrored 0x07 decodes as reserved packet
+	 * type 3 and is silently dropped by Windows although v1 still works. */
+	if (wireLen < 8 || (wire[7] != 0xE0))
+	{
+		(void)fprintf(stderr, "DATA prefix must be 0xE0, got 0x%02x\n",
+		              (wireLen >= 8) ? wire[7] : 0);
+		Stream_Release(s);
+		return -1;
+	}
 	BYTE tmp[64] = { 0 };
 	if (wireLen > sizeof(tmp))
 	{
@@ -200,8 +212,51 @@ static int test_v2_protect(void)
 			Stream_Release(s);
 			return -1;
 		}
+		if ((wl < 8) || (Stream_Buffer(s)[7] != 0xF0))
+		{
+			(void)fprintf(stderr, "dummy prefix must be 0xF0\n");
+			Stream_Release(s);
+			return -1;
+		}
 	}
 	Stream_Release(s);
+
+	/* Interop fixture: first DATA of a healthy MS-client session on the
+	 * wire (prefix + layout for flags DATA|AOA|DELAYACK, dseq=100, cseq=1).
+	 * Our parser must accept it exactly; our encoder must emit the same
+	 * prefix byte for normal DATA. */
+	{
+		static const BYTE msWire[] = {
+			0x00, 0x14, 0xF3, 0x01, 0x14, 0x00, 0x64, 0xE0, 0x64, 0x00, 0x01, 0x00,
+			0xAA, 0xBB
+		};
+		BYTE ms[sizeof(msWire)] = { 0 };
+		memcpy(ms, msWire, sizeof(msWire));
+		BOOL msDummy = TRUE;
+		size_t msOff = 0;
+		if (!rdpeudp2_unprotect(ms, sizeof(ms), &msDummy, &msOff) || msDummy ||
+		    (msOff != 1))
+		{
+			(void)fprintf(stderr, "MS DATA prefix rejected\n");
+			return -1;
+		}
+		RdpUdp2Layout msLayout = { 0 };
+		if (!rdpeudp2_parse_layout(ms + msOff, sizeof(ms) - msOff, &msLayout))
+		{
+			(void)fprintf(stderr, "MS DATA layout rejected\n");
+			return -1;
+		}
+		/* Bit 0x200 is set by the MS client but unnamed in the spec;
+		 * assert the meaningful fields, not exact flag equality. */
+		if (!msLayout.hasDataHeader || !msLayout.hasDelayAck || !msLayout.hasAoa ||
+		    msLayout.hasAck || msLayout.hasOverhead || msLayout.hasAckvec ||
+		    (msLayout.logWindow != 15) || (msLayout.dataSeq != 100) ||
+		    !msLayout.hasDataBody || (msLayout.channelSeq != 1))
+		{
+			(void)fprintf(stderr, "MS DATA fields mismatch\n");
+			return -1;
+		}
+	}
 	return 0;
 }
 
@@ -372,7 +427,9 @@ static int test_mtu(void)
 
 static int test_autodetect_framing(void)
 {
-	/* MS-RDPEMT 2.2.1.1.1: autodetect PDUs travel in Tunnel DATA subheaders. */
+	/* MS-RDPEMT 2.2.1.1.1: autodetect PDUs travel in Tunnel DATA subheaders,
+	 * overlaid: the subheader IS the PDU's own header start ([totalLen][type]
+	 * + remainder), not a separate Length=2 prefix. */
 	const BYTE pdu[] = { 0x06, 0x00, 0x34, 0x12, 0x01, 0x00 };
 	wStream* sub = rdpemt_build_subheader(RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ, pdu,
 	                                      sizeof(pdu));
@@ -382,10 +439,8 @@ static int test_autodetect_framing(void)
 		return -1;
 	}
 	const size_t subLen = Stream_Length(sub);
-	/* SubHeaderLength(1)=2, SubHeaderType(1)=0x00, SubHeaderData(6)=PDU. */
-	if ((subLen != 8) || (Stream_Buffer(sub)[0] != 2) ||
-	    (Stream_Buffer(sub)[1] != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) ||
-	    (memcmp(Stream_Buffer(sub) + 2, pdu, sizeof(pdu)) != 0))
+	/* Overlaid emit: identical to the complete 6-byte PDU. */
+	if ((subLen != sizeof(pdu)) || (memcmp(Stream_Buffer(sub), pdu, sizeof(pdu)) != 0))
 	{
 		(void)fprintf(stderr, "subheader bytes mismatch\n");
 		Stream_Release(sub);
@@ -487,6 +542,38 @@ static int test_autodetect_framing(void)
 		if (rdpemt_autodetect_pdu_length(bwPayload, 7) != 0)
 		{
 			(void)fprintf(stderr, "autodetect truncated should be 0\n");
+			return -1;
+		}
+	}
+
+	/* Live-VM fixture: 18-byte subheader region exactly as received
+	 * (subLen == PDU total; REQ network-characteristics result,
+	 * requestType 0x08C0, baseRTT=1, bandwidth=512, averageRTT=360).
+	 * The old separate-framing parser rejected this (headerLength 0x00
+	 * at data offset); the overlaid model consumes it exactly. */
+	{
+		static const BYTE live[] = { 0x12, 0x00, 0x00, 0x00, 0xC0, 0x08, 0x01, 0x00,
+			                           0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x68, 0x01,
+			                           0x00, 0x00 };
+		size_t off = 0;
+		BYTE stype = 0xFF;
+		const BYTE* sdata = nullptr;
+		size_t sdataLen = 0;
+		if (!rdpemt_next_subheader(live, sizeof(live), &off, &stype, &sdata, &sdataLen))
+		{
+			(void)fprintf(stderr, "live subheader rejected\n");
+			return -1;
+		}
+		if ((stype != RDP_TUNNEL_SUBHEADER_AUTODETECT_REQ) || (sdataLen != 18) ||
+		    (sdata != live) || (off != sizeof(live)))
+		{
+			(void)fprintf(stderr, "live subheader content mismatch\n");
+			return -1;
+		}
+		/* Trailing garbage must not parse as a second subheader. */
+		if (rdpemt_next_subheader(live, sizeof(live), &off, &stype, &sdata, &sdataLen))
+		{
+			(void)fprintf(stderr, "live trailing subheader should fail\n");
 			return -1;
 		}
 	}
@@ -694,9 +781,9 @@ static int test_tunnel_split(void)
 	}
 	const size_t total = Stream_Length(td);
 	const BYTE* buf = Stream_Buffer(td);
-	if (total != 4 + 8 + 5)
+	if (total != 4 + 6 + 5)
 	{
-		(void)fprintf(stderr, "split: total %zu != 17\n", total);
+		(void)fprintf(stderr, "split: total %zu != 15\n", total);
 		Stream_Release(td);
 		return -1;
 	}
@@ -712,7 +799,7 @@ static int test_tunnel_split(void)
 			return -1;
 		}
 	}
-	/* 4-byte header decodes to hlen=12 plen=5 without needing the rest. */
+	/* 4-byte header decodes to hlen=10 plen=5 without needing the rest. */
 	BYTE action = 0xFF;
 	UINT16 plen = 0xFFFF;
 	UINT8 hlen = 0;
@@ -722,7 +809,7 @@ static int test_tunnel_split(void)
 		Stream_Release(td);
 		return -1;
 	}
-	if ((action != RDPTUNNEL_ACTION_DATA) || (plen != 5) || (hlen != 12))
+	if ((action != RDPTUNNEL_ACTION_DATA) || (plen != 5) || (hlen != 10))
 	{
 		(void)fprintf(stderr, "split: header mismatch\n");
 		Stream_Release(td);
@@ -1180,6 +1267,609 @@ static int test_soft_sync_shared_parity(void)
 	return 0;
 }
 
+static int test_dvc_pdu_length(void)
+{
+	/* Live CREATEs: `18 02/07/08 <name>\0`, one PDU each (VM + DavidPC). */
+	static const BYTE createCoreIn[] = {
+		0x18, 0x02, 'M', 'i', 'c', 'r', 'o', 's', 'o', 'f', 't', ':',
+		':', 'W', 'i', 'n', 'd', 'o', 'w', 's', ':', ':', 'R', 'D', 'S', ':', ':',
+		'C', 'o', 'r', 'e', 'I', 'n', 'p', 'u', 't', 0x00
+	};
+	static const BYTE createGfx[] = {
+		0x18, 0x07, 'M', 'i', 'c', 'r', 'o', 's', 'o', 'f', 't', ':',
+		':', 'W', 'i', 'n', 'd', 'o', 'w', 's', ':', ':', 'R', 'D', 'S', ':', ':',
+		'G', 'r', 'a', 'p', 'h', 'i', 'c', 's', 0x00
+	};
+	size_t len = 0;
+	if (!rdpeudp_dvc_pdu_length(createCoreIn, sizeof(createCoreIn), FALSE, &len) ||
+	    (len != sizeof(createCoreIn)))
+	{
+		(void)fprintf(stderr, "live CREATE CoreInput rejected\n");
+		return -1;
+	}
+	if (!rdpeudp_dvc_pdu_length(createGfx, sizeof(createGfx), FALSE, &len) ||
+	    (len != sizeof(createGfx)))
+	{
+		(void)fprintf(stderr, "live CREATE Graphics rejected\n");
+		return -1;
+	}
+	/* Synthetic CLOSE (header Cmd=4 + 1-byte id) and DATA_FIRST exact-fit. */
+	{
+		static const BYTE closePdu[] = { 0x44, 0x09 };
+		if (!rdpeudp_dvc_pdu_length(closePdu, sizeof(closePdu), FALSE, &len) || (len != 2))
+		{
+			(void)fprintf(stderr, "CLOSE rejected\n");
+			return -1;
+		}
+		/* DATA_FIRST total == present (exact fit): header + id + len(9) + 3 data. */
+		static const BYTE firstPdu[] = { 0x20, 0x05, 0x09, 0x00, 0x00, 0x00,
+			                               'A', 'B', 'C' };
+		if (!rdpeudp_dvc_pdu_length(firstPdu, sizeof(firstPdu), FALSE, &len) || (len != 9))
+		{
+			(void)fprintf(stderr, "exact DATA_FIRST rejected\n");
+			return -1;
+		}
+		/* Plain DATA runs to end of buffer. */
+		static const BYTE dataPdu[] = { 0x30, 0x0A, 'x', 'y' };
+		if (!rdpeudp_dvc_pdu_length(dataPdu, sizeof(dataPdu), FALSE, &len) || (len != 4))
+		{
+			(void)fprintf(stderr, "DATA rejected\n");
+			return -1;
+		}
+	}
+	/* Negatives: truncated header/id, unterminated CREATE, zero-length
+	 * DATA_FIRST, unknown command. A fragmented DATA_FIRST (total beyond
+	 * present) is ACCEPTED consuming all (see below), so it is not here. */
+	{
+		static const BYTE trunc[] = { 0x18 };
+		static const BYTE noNul[] = { 0x18, 0x02, 'A', 'B' };
+		static const BYTE zeroTotal[] = { 0x20, 0x05, 0x00 };
+		static const BYTE unknown[] = { 0xF8, 0x01 };
+		if (rdpeudp_dvc_pdu_length(trunc, sizeof(trunc), FALSE, &len) ||
+		    rdpeudp_dvc_pdu_length(noNul, sizeof(noNul), FALSE, &len) ||
+		    rdpeudp_dvc_pdu_length(zeroTotal, sizeof(zeroTotal), FALSE, &len) ||
+		    rdpeudp_dvc_pdu_length(unknown, sizeof(unknown), FALSE, &len))
+		{
+			(void)fprintf(stderr, "negative DVC fixture accepted\n");
+			return -1;
+		}
+	}
+	/* Fragmented DATA_FIRST (total 0x20=32 > 4 present bytes): accepted,
+	 * consuming all present bytes; completion tracked by the caller. */
+	{
+		static const BYTE fragFirst[] = { 0x20, 0x05, 0x20, 0x00, 0x00, 0x00, 'A' };
+		if (!rdpeudp_dvc_pdu_length(fragFirst, sizeof(fragFirst), FALSE, &len) ||
+		    (len != sizeof(fragFirst)))
+		{
+			(void)fprintf(stderr, "fragmented DATA_FIRST rejected\n");
+			return -1;
+		}
+	}
+	/* CREATE responses (server-side direction, N4): same command nibble as
+	 * requests but header + ChannelId + 4-byte status. Success and failure
+	 * statuses both take 6 bytes here (1-byte id); truncation fails. */
+	{
+		static const BYTE rspOk[] = { 0x10, 0x07, 0x00, 0x00, 0x00, 0x00 };
+		static const BYTE rspFail[] = { 0x10, 0x07, 0x01, 0x00, 0x00, 0x80 };
+		static const BYTE rspTrunc[] = { 0x10, 0x07, 0x00, 0x00, 0x00 };
+		if (!rdpeudp_dvc_pdu_length(rspOk, sizeof(rspOk), TRUE, &len) || (len != 6))
+		{
+			(void)fprintf(stderr, "CREATE success response rejected\n");
+			return -1;
+		}
+		if (!rdpeudp_dvc_pdu_length(rspFail, sizeof(rspFail), TRUE, &len) || (len != 6))
+		{
+			(void)fprintf(stderr, "CREATE failure response rejected\n");
+			return -1;
+		}
+		if (rdpeudp_dvc_pdu_length(rspTrunc, sizeof(rspTrunc), TRUE, &len))
+		{
+			(void)fprintf(stderr, "truncated CREATE response accepted\n");
+			return -1;
+		}
+	}
+	return 0;
+}
+
+/* Q2 transport integration: real receiver (rdpeudp_test_feed runs the
+ * production v2 receive block) + sender model (production
+ * rdpeudp2_encode_layout + rdpeudp2_protect) + retransmit-as-new-dseq model.
+ * Covers the MS probe epoch, the adversarial far-ahead AOA case and its
+ * recovery, and gap preservation — all against real receive state. */
+typedef struct
+{
+	UINT16 dseq;
+	UINT16 cseq;
+	const BYTE* body;
+	size_t bodyLen;
+	BOOL hasAoa;
+	UINT16 aoa;
+	BOOL dummy;
+	BOOL withBody;
+} RxScriptPkt;
+
+static wStream* rx_emit(const RxScriptPkt* pkt)
+{
+	RdpUdp2Layout in = { 0 };
+	in.logWindow = 5;
+	if (pkt->hasAoa)
+	{
+		in.flags |= RDPUDP2_FLAG_AOA;
+		in.hasAoa = TRUE;
+		in.aoa = pkt->aoa;
+	}
+	if (pkt->withBody)
+	{
+		in.flags |= RDPUDP2_FLAG_DATA;
+		in.hasDataHeader = TRUE;
+		in.dataSeq = pkt->dseq;
+		in.hasDataBody = TRUE;
+		in.channelSeq = pkt->cseq;
+		in.dataBody = pkt->body;
+		in.dataBodyLen = pkt->bodyLen;
+	}
+	wStream* s = rdpeudp2_encode_layout(&in);
+	if (!s)
+		return nullptr;
+	if (!Stream_SetPosition(s, Stream_Length(s)) || !rdpeudp2_protect(s, pkt->dummy))
+	{
+		Stream_Release(s);
+		return nullptr;
+	}
+	return s;
+}
+
+static int rx_feed(rdpUdpTransport* udp, const RxScriptPkt* pkt)
+{
+	wStream* s = rx_emit(pkt);
+	if (!s)
+		return -1;
+	const BOOL ok = rdpeudp_test_feed(udp, Stream_Buffer(s), Stream_Length(s));
+	Stream_Release(s);
+	return ok ? 0 : -1;
+}
+
+static int rx_state(rdpUdpTransport* udp, RdpUdpTestRecvState* out)
+{
+	return rdpeudp_test_recv_state(udp, out) ? 0 : -1;
+}
+
+#define RX_CHECK(cond) \
+	do \
+	{ \
+		if (!(cond)) \
+		{ \
+			(void)fprintf(stderr, "rx_integration FAILED line %d: %s\n", __LINE__, #cond); \
+			rdpeudp_test_free(udp); \
+			return -1; \
+		} \
+	} while (0)
+
+static int test_rx_integration(void)
+{
+	rdpUdpTransport* udp = nullptr;
+	RdpUdpTestRecvState st = { 0 };
+	static const BYTE b1[] = { 'A', 'B' };
+	static const BYTE b2[] = { 'C', 'D' };
+
+	/* S1: MS-like probe epoch (100..145, AOA=100) then DATA 146. */
+	udp = rdpeudp_test_new();
+	if (!udp)
+		return -1;
+	for (UINT16 d = 100; d <= 145; d++)
+	{
+		/* Dummy prefix + DATA header/AOA + empty body: the state path
+		 * under test only sees (dataSeq, aoa, dummy); the empty body is
+		 * never delivered. A headerless probe could not move the DataSeq
+		 * window at all. */
+		const RxScriptPkt probe = { d, 0, nullptr, 0, TRUE, 100, TRUE, TRUE };
+		if (rx_feed(udp, &probe) != 0)
+		{
+			rdpeudp_test_free(udp);
+			return -1;
+		}
+	}
+	{
+		const RxScriptPkt data = { 146, 1, b1, sizeof(b1), TRUE, 100, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &data) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.haveSeenAoa && (st.recvDataBase == 147));
+		RX_CHECK((st.expectedChannelSeq == 2) && (st.recvStreamLen == sizeof(b1)));
+		RX_CHECK(st.haveRealData);
+	}
+	rdpeudp_test_free(udp);
+
+	/* S2: adversarial DATA=300/AOA=1, then retransmit-as-new recovery. */
+	udp = rdpeudp_test_new();
+	if (!udp)
+		return -1;
+	{
+		const RxScriptPkt adv = { 300, 1, b2, sizeof(b2), TRUE, 1, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &adv) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		/* Slide, not snap: base advances past nothing electively. */
+		RX_CHECK(st.recvDataBase == 173);
+		RX_CHECK(rdpeudp_test_seen(udp, 127) && !rdpeudp_test_seen(udp, 0));
+		/* ChannelSeq delivery is independent of the DataSeq gap. */
+		RX_CHECK((st.expectedChannelSeq == 2) && (st.recvStreamLen == sizeof(b2)));
+		/* Real ACK codec on real state: gaps from 173, 300 marked,
+		 * 1..172 unrepresentable (reviewer-corrected facts). */
+		BOOL rec[128] = { 0 };
+		for (size_t i = 0; i < 128; i++)
+			rec[i] = rdpeudp_test_seen(udp, i);
+		wStream* av = rdpeudp_build_ackvec(st.recvDataBase, rec, 128, FALSE, 0, 0);
+		RX_CHECK(av != nullptr);
+		{
+			UINT16 pbase = 0;
+			BOOL* pvec = nullptr;
+			size_t pcount = 0;
+			const BOOL pok = rdpeudp_parse_ackvec(Stream_Buffer(av), Stream_Length(av),
+			                                      &pbase, &pvec, &pcount);
+			RX_CHECK(pok && (pbase == 173) && (pcount > 127) && pvec && pvec[127]);
+			for (size_t i = 0; i < 127; i++)
+				RX_CHECK(!pvec[i]);
+			free(pvec);
+		}
+		Stream_Release(av);
+	}
+	/* Sender retransmits onward under fresh DataSeqs; base must creep
+	 * monotonically (no stall) and every body must deliver in order. */
+	{
+		UINT16 cseq = 2;
+		size_t wantLen = sizeof(b2);
+		static BYTE rb[1] = { 'x' };
+		for (UINT16 d = 301; d <= 309; d++)
+		{
+			const RxScriptPkt rtx = { d, cseq, rb, sizeof(rb), TRUE, 1, FALSE, TRUE };
+			RX_CHECK(rx_feed(udp, &rtx) == 0);
+			cseq++;
+			wantLen += sizeof(rb);
+		}
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 182);
+		RX_CHECK((st.expectedChannelSeq == cseq) && (st.recvStreamLen == wantLen));
+	}
+	rdpeudp_test_free(udp);
+
+	/* S3: N3 synthetic on real code — DATA 2/AOA=1 first keeps the gap. */
+	udp = rdpeudp_test_new();
+	if (!udp)
+		return -1;
+	{
+		static const BYTE g1[] = { 'G', 'H' };
+		static const BYTE g2[] = { 'I', 'J' };
+		const RxScriptPkt first = { 2, 1, g1, sizeof(g1), TRUE, 1, FALSE, TRUE };
+		const RxScriptPkt second = { 1, 2, g2, sizeof(g2), TRUE, 1, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &first) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 1);
+		RX_CHECK(st.recvStreamLen == sizeof(g1));
+		RX_CHECK(rx_feed(udp, &second) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 3);
+		RX_CHECK((st.expectedChannelSeq == 3) &&
+		         (st.recvStreamLen == sizeof(g1) + sizeof(g2)));
+	}
+	rdpeudp_test_free(udp);
+
+	/* S4: mild reorder with AOA advance, then fill. */
+	udp = rdpeudp_test_new();
+	if (!udp)
+		return -1;
+	{
+		static const BYTE h1[] = { 'K', 'L' };
+		static const BYTE h2[] = { 'M', 'N' };
+		const RxScriptPkt ahead = { 6, 1, h1, sizeof(h1), TRUE, 5, FALSE, TRUE };
+		const RxScriptPkt fill = { 5, 2, h2, sizeof(h2), TRUE, 5, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &ahead) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 5);
+		RX_CHECK(rx_feed(udp, &fill) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK(st.recvDataBase == 7);
+		RX_CHECK(st.recvStreamLen == sizeof(h1) + sizeof(h2));
+	}
+	rdpeudp_test_free(udp);
+
+	/* S5: probeless far jump without AOA keeps the initial epoch snap. */
+	udp = rdpeudp_test_new();
+	if (!udp)
+		return -1;
+	{
+		static const BYTE k1[] = { 'O', 'P' };
+		const RxScriptPkt far = { 150, 1, k1, sizeof(k1), FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed(udp, &far) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0);
+		RX_CHECK((st.recvDataBase == 151) && !st.haveSeenAoa);
+		RX_CHECK(st.recvStreamLen == sizeof(k1));
+	}
+	rdpeudp_test_free(udp);
+	return 0;
+}
+
+/* Soft-Sync allocation-failure injection + complete mapping processing.
+ * Real mapping paths (multitransport feed/send hooks) on a socketless
+ * negotiated fixture; OOM is injected via multitransport_test_fail_alloc_after
+ * (0 = fail next wrapped allocation). Every failure must stay TCP-safe:
+ * nothing migrated, nothing routed, and the transport must recover fully. */
+static BYTE* ss_build_req(const UINT32* ids, size_t n, size_t* lenOut)
+{
+	/* Header(2) + Length(4) + Flags(2) + Tunnels(2) + list(type 4 + count 2). */
+	const size_t len = 10 + 6 + n * 4;
+	BYTE* b = malloc(len ? len : 1);
+	size_t o = 0;
+	if (!b)
+		return nullptr;
+	b[o++] = 0x80; /* CREATE... Soft-Sync Request */
+	b[o++] = 0x00; /* Pad */
+	const UINT32 llen = (UINT32)(8 + 6 + n * 4);
+	b[o++] = (BYTE)(llen & 0xFF);
+	b[o++] = (BYTE)((llen >> 8) & 0xFF);
+	b[o++] = (BYTE)((llen >> 16) & 0xFF);
+	b[o++] = (BYTE)((llen >> 24) & 0xFF);
+	b[o++] = 0x01 | 0x02; /* TCP_FLUSHED | CHANNELLIST */
+	b[o++] = 0x00;
+	b[o++] = 0x01; /* one tunnel */
+	b[o++] = 0x00;
+	b[o++] = 0x01; /* UDPFECR */
+	b[o++] = 0x00;
+	b[o++] = 0x00;
+	b[o++] = 0x00;
+	b[o++] = (BYTE)(n & 0xFF);
+	b[o++] = (BYTE)((n >> 8) & 0xFF);
+	for (size_t i = 0; i < n; i++)
+	{
+		b[o++] = (BYTE)(ids[i] & 0xFF);
+		b[o++] = (BYTE)((ids[i] >> 8) & 0xFF);
+		b[o++] = (BYTE)((ids[i] >> 16) & 0xFF);
+		b[o++] = (BYTE)((ids[i] >> 24) & 0xFF);
+	}
+	if (lenOut)
+		*lenOut = len;
+	return b;
+}
+
+#define SS_CHECK(cond) \
+	do \
+	{ \
+		if (!(cond)) \
+		{ \
+			(void)fprintf(stderr, "soft_sync_alloc FAILED line %d: %s\n", __LINE__, \
+			              #cond); \
+			multitransport_test_free(mt); \
+			free(big); \
+			return -1; \
+		} \
+	} while (0)
+
+static int test_soft_sync_alloc(void)
+{
+	rdpMultitransport* mt = nullptr;
+	BYTE* big = nullptr;
+	size_t bigLen = 0;
+	{
+		/* 257-ID request: the fragmented-installation case from T1. */
+		static UINT32 ids257[257];
+		for (UINT32 i = 0; i < 257; i++)
+			ids257[i] = i + 1;
+		big = ss_build_req(ids257, 257, &bigLen);
+		if (!big)
+			return -1;
+	}
+
+	/* A. Fragmented install happy path: 3 chunks -> migrated + routed. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	multitransport_test_recv_feed(mt, big, 400, CHANNEL_FLAG_FIRST);
+	multitransport_test_recv_feed(mt, big + 400, 400, 0);
+	multitransport_test_recv_feed(mt, big + 800, bigLen - 800, CHANNEL_FLAG_LAST);
+	SS_CHECK(multitransport_test_recvmigrated(mt));
+	SS_CHECK(multitransport_test_dvc_routed(mt, 1));
+	SS_CHECK(multitransport_test_dvc_routed(mt, 257));
+	SS_CHECK(!multitransport_test_dvc_routed(mt, 999));
+	multitransport_test_free(mt);
+
+	/* B1. Reassembly malloc OOM: FIRST chunk fails -> TCP-safe + recoverable. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	{
+		static const UINT32 one[] = { 7 };
+		size_t rl = 0;
+		BYTE* req = ss_build_req(one, 1, &rl);
+		if (!req)
+		{
+			multitransport_test_free(mt);
+			free(big);
+			return -1;
+		}
+		multitransport_test_fail_alloc_after(0);
+		multitransport_test_recv_feed(mt, req, rl,
+		                              CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+		SS_CHECK(!multitransport_test_recvmigrated(mt));
+		SS_CHECK(!multitransport_test_dvc_routed(mt, 7));
+		multitransport_test_fail_alloc_after(-1);
+		multitransport_test_recv_feed(mt, req, rl,
+		                              CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+		SS_CHECK(multitransport_test_recvmigrated(mt));
+		SS_CHECK(multitransport_test_dvc_routed(mt, 7));
+		free(req);
+	}
+	multitransport_test_free(mt);
+
+	/* B2. Install malloc OOM: reassembly ok, mapping alloc fails. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	{
+		static const UINT32 one[] = { 7 };
+		size_t rl = 0;
+		BYTE* req = ss_build_req(one, 1, &rl);
+		if (!req)
+		{
+			multitransport_test_free(mt);
+			free(big);
+			return -1;
+		}
+		multitransport_test_fail_alloc_after(1);
+		multitransport_test_recv_feed(mt, req, rl,
+		                              CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+		SS_CHECK(!multitransport_test_recvmigrated(mt));
+		SS_CHECK(!multitransport_test_dvc_routed(mt, 7));
+		multitransport_test_fail_alloc_after(-1);
+		multitransport_test_recv_feed(mt, req, rl,
+		                              CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+		SS_CHECK(multitransport_test_recvmigrated(mt));
+		SS_CHECK(multitransport_test_dvc_routed(mt, 7));
+		free(req);
+	}
+	multitransport_test_free(mt);
+
+	/* C. Realloc OOM on continuation: accumulation dropped, TCP-safe. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	multitransport_test_fail_alloc_after(1);
+	multitransport_test_recv_feed(mt, big, 400, CHANNEL_FLAG_FIRST);
+	multitransport_test_recv_feed(mt, big + 400, 400, 0);
+	SS_CHECK(!multitransport_test_recvmigrated(mt));
+	multitransport_test_fail_alloc_after(-1);
+	multitransport_test_recv_feed(mt, big, 400, CHANNEL_FLAG_FIRST);
+	multitransport_test_recv_feed(mt, big + 400, 400, 0);
+	multitransport_test_recv_feed(mt, big + 800, bigLen - 800, CHANNEL_FLAG_LAST);
+	SS_CHECK(multitransport_test_recvmigrated(mt));
+	SS_CHECK(multitransport_test_dvc_routed(mt, 257));
+	multitransport_test_free(mt);
+
+	/* D. Runaway accumulation guard (>65536): dropped without install. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	{
+		static BYTE first[40000];
+		static BYTE cont[30000];
+		first[0] = 0x80; /* opens a Soft-Sync reassembly, never completes */
+		multitransport_test_recv_feed(mt, first, sizeof(first), CHANNEL_FLAG_FIRST);
+		multitransport_test_recv_feed(mt, cont, sizeof(cont), 0);
+		SS_CHECK(!multitransport_test_recvmigrated(mt));
+		/* State reset: a later valid request still installs. */
+		multitransport_test_recv_feed(mt, big, 400, CHANNEL_FLAG_FIRST);
+		multitransport_test_recv_feed(mt, big + 400, bigLen - 400, CHANNEL_FLAG_LAST);
+		SS_CHECK(multitransport_test_recvmigrated(mt));
+		SS_CHECK(multitransport_test_dvc_routed(mt, 1));
+	}
+	multitransport_test_free(mt);
+
+	/* E. Malformed request through the feed path installs nothing. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	multitransport_test_recv_feed(mt, big, 10, CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+	SS_CHECK(!multitransport_test_recvmigrated(mt));
+	SS_CHECK(!multitransport_test_dvc_routed(mt, 1));
+	multitransport_test_free(mt);
+
+	/* F. Zero-list request authorizes migrate-all routing. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	{
+		static const BYTE noList[] = { 0x80, 0x00, 0x08, 0x00, 0x00, 0x00,
+			                       0x01, 0x00, 0x01, 0x00 };
+		multitransport_test_recv_feed(mt, noList, sizeof(noList),
+		                              CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+		SS_CHECK(multitransport_test_recvmigrated(mt));
+		SS_CHECK(multitransport_test_dvc_routed(mt, 424242));
+	}
+	multitransport_test_free(mt);
+
+	/* G. Send-side install hook migrates; OOM keeps it on TCP. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	{
+		static const UINT32 one[] = { 7 };
+		size_t rl = 0;
+		BYTE* req = ss_build_req(one, 1, &rl);
+		if (!req)
+		{
+			multitransport_test_free(mt);
+			free(big);
+			return -1;
+		}
+		multitransport_test_fail_alloc_after(0);
+		multitransport_test_request_sent(mt, req, rl);
+		SS_CHECK(!multitransport_test_sendmigrated(mt));
+		SS_CHECK(!multitransport_test_dvc_routed(mt, 7));
+		multitransport_test_fail_alloc_after(-1);
+		multitransport_test_request_sent(mt, req, rl);
+		SS_CHECK(multitransport_test_sendmigrated(mt));
+		SS_CHECK(multitransport_test_dvc_routed(mt, 7));
+		SS_CHECK(!multitransport_test_dvc_routed(mt, 8));
+		free(req);
+	}
+	multitransport_test_free(mt);
+
+	/* H. T1 response gates: stray hooks migrate nothing. */
+	mt = multitransport_test_new();
+	if (!mt)
+	{
+		free(big);
+		return -1;
+	}
+	multitransport_test_response_sent(mt);
+	SS_CHECK(!multitransport_test_sendmigrated(mt));
+	multitransport_test_response_received(mt);
+	SS_CHECK(!multitransport_test_recvmigrated(mt));
+	/* After a real install both hooks take effect. */
+	multitransport_test_recv_feed(mt, big, bigLen, CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST);
+	SS_CHECK(multitransport_test_recvmigrated(mt));
+	multitransport_test_response_sent(mt);
+	SS_CHECK(multitransport_test_sendmigrated(mt));
+	multitransport_test_free(mt);
+
+	/* I. NULL robustness. */
+	mt = nullptr;
+	multitransport_test_free(nullptr);
+	multitransport_test_recv_feed(nullptr, big, bigLen, CHANNEL_FLAG_LAST);
+	multitransport_test_request_sent(nullptr, big, bigLen);
+	multitransport_test_response_sent(nullptr);
+	multitransport_test_response_received(nullptr);
+	multitransport_test_fail_alloc_after(-1);
+	SS_CHECK(!multitransport_test_recvmigrated(nullptr));
+	SS_CHECK(!multitransport_test_sendmigrated(nullptr));
+	SS_CHECK(!multitransport_test_dvc_routed(nullptr, 1));
+	/* SS_CHECK frees mt (nullptr here) and big; big still live. */
+	free(big);
+	big = nullptr;
+	return 0;
+}
+
 int TestRdpeUdp(int argc, char* argv[])
 {
 	WINPR_UNUSED(argc);
@@ -1255,7 +1945,23 @@ int TestRdpeUdp(int argc, char* argv[])
 		(void)fprintf(stderr, "test_soft_sync_shared_parity FAILED\n");
 		return -1;
 	}
+	if (test_dvc_pdu_length() != 0)
+	{
+		(void)fprintf(stderr, "test_dvc_pdu_length FAILED\n");
+		return -1;
+	}
+	if (test_rx_integration() != 0)
+	{
+		(void)fprintf(stderr, "test_rx_integration FAILED\n");
+		return -1;
+	}
+	if (test_soft_sync_alloc() != 0)
+	{
+		(void)fprintf(stderr, "test_soft_sync_alloc FAILED\n");
+		return -1;
+	}
 
 	(void)printf("TestRdpeUdp passed\n");
 	return 0;
 }
+

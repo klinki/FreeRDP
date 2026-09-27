@@ -163,9 +163,9 @@ BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_
 	 * tunnel connectivity: with Soft-Sync, migration requires the handshake;
 	 * without it, migration is allowed only pre-ACTIVE to avoid reordering
 	 * TCP in-flight vs new UDP traffic.
-	 * If UDP fails before any chunk was sent, fall back to TCP for the whole
-	 * PDU. If it fails mid-PDU, fail without TCP duplicate (caller retries
-	 * or disconnects; UDP failure usually means network down anyway). */
+	 * The UDP send is atomic per PDU (Q1: no SVC split, one Tunnel DATA),
+	 * so on failure nothing went out and TCP fallback below cannot
+	 * duplicate. */
 	if (!isSoftSyncPdu && rdp->multitransport &&
 	    multitransport_is_udp_send_migrated(rdp->multitransport) &&
 	    channel_is_drdynvc(rdp, channelId))
@@ -177,47 +177,24 @@ BOOL freerdp_channel_send(rdpRdp* rdp, UINT16 channelId, const BYTE* data, size_
 		if (dvc_get_id(data, size, &sendDvcId) &&
 		    multitransport_is_dvc_migrated(rdp->multitransport, sendDvcId))
 		{
-			size_t udpLeft = size;
-			const BYTE* udpData = data;
-			UINT32 udpFlags = CHANNEL_FLAG_FIRST;
-			const UINT32 VCChunkSize =
-			    freerdp_settings_get_uint32(rdp->settings, FreeRDP_VCChunkSize);
+			/* Q1: one whole DVC PDU per Tunnel DATA payload. The UDP tunnel
+			 * carries raw DVC PDUs (no SVC envelope), so the SVC chunk split
+			 * must not apply here: only the first SVC chunk holds the DVC
+			 * command/ChannelId, and the receiver accepts a truncated DATA
+			 * piece as a complete PDU (DATA = "to end") and misparses the
+			 * rest as a fresh command. Transport/TLS packet fragmentation
+			 * stays below this boundary (RDP-UDP2 FEC fragments large
+			 * datagrams). The send is atomic: on failure nothing went out on
+			 * UDP, so TCP fallback below cannot duplicate. */
 			const BOOL ServerMode =
 			    freerdp_settings_get_bool(rdp->settings, FreeRDP_ServerMode);
-			size_t sentChunks = 0;
-			BOOL udpFailed = FALSE;
-			while (udpLeft > 0)
-			{
-				size_t cSize = (udpLeft > VCChunkSize) ? VCChunkSize : udpLeft;
-				UINT32 cFlags = udpFlags;
-				if (cSize == udpLeft)
-					cFlags |= CHANNEL_FLAG_LAST;
-				if (!ServerMode && (channel->options & CHANNEL_OPTION_SHOW_PROTOCOL))
-					cFlags |= CHANNEL_FLAG_SHOW_PROTOCOL;
-				if (!multitransport_send_channel_packet(rdp->multitransport, channelId,
-				                                        size, cFlags, udpData, cSize))
-				{
-					udpFailed = TRUE;
-					break;
-				}
-				udpData += cSize;
-				udpLeft -= cSize;
-				udpFlags = 0;
-				sentChunks++;
-			}
-			if (!udpFailed)
+			UINT32 pduFlags = CHANNEL_FLAG_FIRST | CHANNEL_FLAG_LAST;
+			if (!ServerMode && (channel->options & CHANNEL_OPTION_SHOW_PROTOCOL))
+				pduFlags |= CHANNEL_FLAG_SHOW_PROTOCOL;
+			if (multitransport_send_channel_packet(rdp->multitransport, channelId,
+			                                        size, pduFlags, data, size))
 				return TRUE;
-			/* Fall back to TCP only if nothing went out on UDP (no duplicates) */
-			if (sentChunks == 0)
-			{
-				WLog_DBG(TAG, "UDP PDU send failed on first chunk, TCP fallback");
-			}
-			else
-			{
-				WLog_WARN(TAG, "UDP PDU failed mid-PDU after %zu chunks, no TCP duplicate",
-				          sentChunks);
-				return FALSE;
-			}
+			WLog_DBG(TAG, "UDP PDU send failed, TCP fallback");
 		}
 	}
 

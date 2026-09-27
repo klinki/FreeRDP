@@ -1,0 +1,5 @@
+case=0 core offers=0 handler=13 (123=accept UDP,456=decline)
+case=1 core offers=0 handler=13 (123=accept UDP,456=decline)
+case=2 core offers=1 handler=123 (123=accept UDP,456=decline)
+case=3 core offers=1 handler=123 (123=accept UDP,456=decline)
+case=4 core offers=0 handler=456 (123=accept UDP,456=decline)

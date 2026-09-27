@@ -125,4 +125,29 @@ WINPR_ATTR_MALLOC(multitransport_free, 1)
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL rdpMultitransport* multitransport_new(rdpRdp* rdp, UINT16 protocol);
 
+/* ---- unit-test driver (no sockets; soft-sync mapping paths only) ----
+ * Fixture transport comes up negotiated with a connected (socketless) UDP
+ * transport, so the mapping install/feed hooks run exactly as in production.
+ * multitransport_test_fail_alloc_after arms OOM injection for the mapping and
+ * reassembly allocations: n >= 0 fails the (n+1)-th wrapped allocation (0 =
+ * fail next), negative disables. Single-threaded test use only. */
+WINPR_ATTR_MALLOC(multitransport_test_free, 1)
+WINPR_ATTR_NODISCARD
+FREERDP_API rdpMultitransport* multitransport_test_new(void);
+FREERDP_API void multitransport_test_free(rdpMultitransport* multi);
+FREERDP_API void multitransport_test_fail_alloc_after(int n);
+FREERDP_API void multitransport_test_recv_feed(rdpMultitransport* multi, const BYTE* chunk,
+                                               size_t chunkLen, UINT32 flags);
+FREERDP_API void multitransport_test_request_sent(rdpMultitransport* multi, const BYTE* pdu,
+                                                  size_t len);
+FREERDP_API void multitransport_test_response_sent(rdpMultitransport* multi);
+FREERDP_API void multitransport_test_response_received(rdpMultitransport* multi);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL multitransport_test_recvmigrated(const rdpMultitransport* multi);
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL multitransport_test_sendmigrated(const rdpMultitransport* multi);
+/** Routing decision independent of connection: installed && (migrate-all or listed). */
+WINPR_ATTR_NODISCARD
+FREERDP_API BOOL multitransport_test_dvc_routed(const rdpMultitransport* multi, UINT32 dvcId);
+
 #endif /* FREERDP_LIB_CORE_MULTITRANSPORT_H */
