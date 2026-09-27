@@ -5,47 +5,37 @@
 # for Wireshark dissection. Logs go to /tmp/rdp-udp-test.log.
 #
 # Env overrides: SERVER (default davidpc), RDP_USER (default david),
-# FREERDP_BIN (default: this repository's build/video-responsive build).
+# FREERDP_BIN (default: our /tmp build).
 
 set -euo pipefail
 
-repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-FREERDP_BIN="${FREERDP_BIN:-$repo/build/video-responsive/client/SDL/SDL3/sdl-freerdp}"
-if [[ ! -x "$FREERDP_BIN" ]]; then
-  printf 'FreeRDP executable not found: %s\n' "$FREERDP_BIN" >&2
-  exit 1
-fi
+FREERDP_BIN="${FREERDP_BIN:-/tmp/freerdp-build/client/SDL/SDL3/sdl-freerdp}"
 SERVER="${SERVER:-davidpc}"
 RDP_USER="${RDP_USER:-david}"
 SECRETS_FILE="${SECRETS_FILE:-/tmp/rdp-secrets.txt}"
 LOG_FILE="${LOG_FILE:-/tmp/rdp-udp-test.log}"
-
-# SDL monitor IDs from `sdl-freerdp /list:monitor`.
-# The first selected monitor becomes the RDP primary when the MacBook display
-# (ID 1) is excluded.
-PRIMARY_MONITOR_ID="${PRIMARY_MONITOR_ID:-3}"       # M27UP
-SECONDARY_MONITOR_ID="${SECONDARY_MONITOR_ID:-2}"   # DELL U2419HC
 
 # Fresh secrets each run so Wireshark never uses a stale session.
 rm -f "${SECRETS_FILE}"
 # Start a fresh log, then use append mode so copytruncate rotation resets writes.
 : > "${LOG_FILE}"
 
-# Use M27UP as the RDP primary and DELL U2419HC as the secondary.
+# SDL monitor 2 is the external 4K display (PHL 288P6L).
 "${FREERDP_BIN}" \
   /v:"${SERVER}" \
   /port:3389 \
   /u:"${RDP_USER}" \
   /d:davidpc \
+  /size:3840x2160 \
+  /scale-desktop:175 \
+  /scale-device:100 \
   /gfx:AVC444:on \
   /network:lan \
   /cert:tofu \
   /clipboard \
   /from-stdin:force \
-  /multimon \
   +f \
-  /monitors:"${PRIMARY_MONITOR_ID},${SECONDARY_MONITOR_ID}" \
-  /sdl-monitor-scale:"${PRIMARY_MONITOR_ID}=175/100,${SECONDARY_MONITOR_ID}=100/100" \
+  /monitors:1 \
   +multitransport \
   +async-update \
   /auto-reconnect \
