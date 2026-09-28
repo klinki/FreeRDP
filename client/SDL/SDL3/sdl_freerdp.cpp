@@ -192,6 +192,49 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 				if (sdl->shallAbort(true))
 					continue;
 
+				/* Motion coalescing: while the main thread stalls (render bursts,
+				 * window sync), motion events backlog; replaying every stale
+				 * position makes remote windows jump. Collapse consecutive
+				 * motion to the latest position, even across windows (a drag
+				 * crossing displays is one gesture): same button state and
+				 * device only. The run ends at the first queued non-motion
+				 * event — button, focus, display, dialog — so intervening
+				 * press/release or topology changes are never reordered past
+				 * a merged position. Relative deltas are summed so nothing
+				 * is lost. */
+				if (windowEvent.type == SDL_EVENT_MOUSE_MOTION)
+				{
+					SDL_Event next{};
+					for (;;)
+					{
+						/* Peek the queue head in order (no type filter):
+						 * anything but motion ends the run. Filtering by
+						 * motion type here would reach past queued button /
+						 * focus / display events and merge positions across
+						 * them, processing a later position before an
+						 * intervening release/press. */
+						const int nrc = SDL_PeepEvents(&next, 1, SDL_PEEKEVENT,
+						                               SDL_EVENT_FIRST, SDL_EVENT_LAST);
+						if (nrc <= 0)
+							break;
+						if (next.type != SDL_EVENT_MOUSE_MOTION)
+							break;
+						if ((next.motion.state != windowEvent.motion.state) ||
+						    (next.motion.which != windowEvent.motion.which))
+							break;
+						const int drc = SDL_PeepEvents(&next, 1, SDL_GETEVENT,
+						                               SDL_EVENT_FIRST, SDL_EVENT_LAST);
+						if (drc <= 0)
+							break;
+						windowEvent.motion.windowID = next.motion.windowID;
+						windowEvent.motion.x = next.motion.x;
+						windowEvent.motion.y = next.motion.y;
+						windowEvent.motion.xrel += next.motion.xrel;
+						windowEvent.motion.yrel += next.motion.yrel;
+						windowEvent.motion.timestamp = next.motion.timestamp;
+					}
+				}
+
 				if (sdl->getDialog().handleEvent(windowEvent))
 					continue;
 
