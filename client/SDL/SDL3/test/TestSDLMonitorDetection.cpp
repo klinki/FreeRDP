@@ -1,7 +1,8 @@
 /**
- * Regression coverage for monitor detection retries and physical display removal.
+ * Regression coverage for monitor selection, detection retries and physical display removal.
  * Copyright 2026 FreeRDP contributors. Licensed under Apache-2.0.
  */
+#include <algorithm>
 #include <cstdio>
 #include <memory>
 
@@ -79,6 +80,16 @@ static bool hotplug(SdlContext& sdl, SDL_DisplayID display)
 		if (!expect(window->displayIndex() == display, "removed window migrated to live display"))
 			return false;
 	}
+	// SDL window IDs are independent of display IDs. Rediscovery must look up
+	// the cached physical owner and tolerate an owner that has disappeared.
+	if (!expect(sdl.detectDisplays(), "rediscovery with independent window/display IDs"))
+		return false;
+	for (const auto id : oldWindows)
+	{
+		if (!expect(sdl.getWindowForId(id)->monitor(false).orig_screen == removed,
+		            "rediscovery preserves removed-window ownership"))
+			return false;
+	}
 	SDL_Event removal{};
 	removal.display.type = SDL_EVENT_DISPLAY_REMOVED;
 	removal.display.displayID = removed;
@@ -100,6 +111,77 @@ static bool hotplug(SdlContext& sdl, SDL_DisplayID display)
 	return expect(freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount) == 1 &&
 	              monitor && monitor->is_primary && monitor->x == 0 && monitor->y == 0,
 	              "fallback layout has one primary monitor at the origin");
+}
+
+static bool primarySelection(SdlContext& sdl)
+{
+	auto settings = sdl.context()->settings;
+	const auto originalIds = sdl.monitorIds();
+	const UINT32 selected[] = { 33, 22, 11 };
+	if (!freerdp_settings_set_pointer_len(settings, FreeRDP_MonitorIds, selected, 3))
+		return false;
+	sdl.setMonitorIds({ 33, 22, 11 });
+	std::vector<rdpMonitor> monitors(3);
+	for (size_t x = 0; x < monitors.size(); x++)
+	{
+		auto& monitor = monitors[x];
+		monitor.orig_screen = static_cast<SDL_DisplayID>((x + 1) * 11);
+		monitor.x = static_cast<INT32>(x * 1600);
+		monitor.width = 1600;
+		monitor.height = 900;
+		monitor.is_primary = (x == 0); // The Mac's primary remains the left display.
+		monitor.attributes.desktopScaleFactor = static_cast<UINT32>(100 + x * 50);
+		monitor.attributes.deviceScaleFactor = 100;
+	}
+	const auto original = monitors;
+	sdl.applyPrimaryMonitor(monitors);
+	if (!expect(!monitors[0].is_primary && !monitors[1].is_primary && monitors[2].is_primary,
+	            "first explicit selection overrides the Mac primary"))
+		return false;
+	if (!expect(monitors[2].x == original[2].x &&
+	            monitors[2].attributes.desktopScaleFactor == 200,
+	            "primary selection preserves monitor geometry and scale"))
+		return false;
+	if (!expect(freerdp_settings_set_monitor_def_array_sorted(settings, monitors.data(),
+	                                                       monitors.size()),
+	            "explicit primary layout is accepted by FreeRDP"))
+		return false;
+	auto sorted = static_cast<const rdpMonitor*>(
+	    freerdp_settings_get_pointer(settings, FreeRDP_MonitorDefArray));
+	if (!expect(sorted && sorted[0].orig_screen == 33 && sorted[0].is_primary &&
+	            sorted[0].x == 0 && sorted[0].y == 0 && sorted[1].orig_screen == 11 &&
+	            sorted[1].x == -3200 && sorted[2].orig_screen == 22 && sorted[2].x == -1600,
+	            "negotiated definitions retain physical identity after primary/position sorting"))
+		return false;
+
+	monitors.pop_back();
+	sdl.applyPrimaryMonitor(monitors);
+	if (!expect(!monitors[0].is_primary && monitors[1].is_primary,
+	            "primary removal promotes the next surviving explicit selection"))
+		return false;
+	if (!freerdp_settings_set_pointer_len(settings, FreeRDP_MonitorIds, nullptr, 0))
+		return false;
+	monitors = original;
+	sdl.applyPrimaryMonitor(monitors);
+	if (!expect(monitors[0].is_primary && !monitors[1].is_primary && !monitors[2].is_primary,
+	            "automatic selection retains the Mac primary"))
+		return false;
+	for (auto& monitor : monitors)
+		monitor.is_primary = false;
+	sdl.applyPrimaryMonitor(monitors);
+	if (!expect(monitors[0].is_primary, "missing primary falls back to one available display"))
+		return false;
+	for (auto& monitor : monitors)
+		monitor.is_primary = true;
+	sdl.applyPrimaryMonitor(monitors);
+	if (!expect(std::count_if(monitors.cbegin(), monitors.cend(),
+	                         [](const rdpMonitor& m) { return m.is_primary; }) == 1,
+	            "layout always contains exactly one primary"))
+		return false;
+	monitors.clear();
+	sdl.applyPrimaryMonitor(monitors);
+	sdl.setMonitorIds(originalIds);
+	return true;
 }
 
 static bool run()
@@ -140,7 +222,7 @@ static bool run()
 			return false;
 	}
 
-	if (!hotplug(sdl, displays.front()))
+	if (!hotplug(sdl, displays.front()) || !primarySelection(sdl))
 		return false;
 
 	const UINT32 selected = displays.front();
@@ -172,6 +254,6 @@ int main()
 	sdl_dialogs_uninit();
 	SDL_Quit();
 	if (success)
-		puts("PASS monitor detection retries, stale events, migrated-window removal, and fallback layout");
+		puts("PASS primary selection, monitor detection retries, stale events, migrated-window removal, and fallback layout");
 	return success ? 0 : 1;
 }

@@ -525,10 +525,19 @@ bool SdlContext::createWindows()
 		if (!freerdp_settings_get_bool(settings, FreeRDP_Decorations))
 			flags |= SDL_WINDOW_BORDERLESS;
 
-		auto did = WINPR_ASSERTING_INT_CAST(SDL_DisplayID, id);
+		// FreeRDP sorts definitions by primary and position. Keep each window
+		// attached to its definition's display, not the unsorted selection index.
+		const auto did = (freerdp_settings_get_bool(settings, FreeRDP_UseMultimon) ||
+		                  freerdp_settings_get_bool(settings, FreeRDP_Fullscreen))
+		                     ? monitor->orig_screen
+		                     : WINPR_ASSERTING_INT_CAST(SDL_DisplayID, id);
 		auto window = SdlWindow::create(did, title, flags, w, h);
 		if (freerdp_settings_get_bool(settings, FreeRDP_UseMultimon))
-			window.setMonitor(*monitor);
+		{
+			// Cache local coordinates; negotiated coordinates are relative to the
+			// selected primary and must not be mixed with newly added displays.
+			window.setMonitor(getDisplay(did));
+		}
 
 		if (freerdp_settings_get_bool(settings, FreeRDP_UseMultimon))
 		{
@@ -568,7 +577,8 @@ bool SdlContext::updateWindowList()
 		list.front().is_primary = true;
 	}
 
-	Sint32 originX = 0, originY = 0;
+	applyPrimaryMonitor(list);
+	Sint32 originX = list.front().x, originY = list.front().y;
 	for (const auto& monitor : list)
 	{
 		originX = std::min(originX, monitor.x);
@@ -585,13 +595,6 @@ bool SdlContext::updateWindowList()
 			win.second.setOffsetY(originY - monitor->y);
 		}
 	}
-
-	// /monitors: subset may exclude the SDL primary. The library requires
-	// the array to mark one monitor as primary, so promote the first when
-	// none of the kept windows cover the original primary.
-	if (!list.empty() &&
-	    std::none_of(list.cbegin(), list.cend(), [](const rdpMonitor& m) { return m.is_primary; }))
-		list.at(0).is_primary = true;
 
 	return freerdp_settings_set_monitor_def_array_sorted(context()->settings, list.data(),
 	                                                     list.size());
@@ -1096,8 +1099,10 @@ void SdlContext::updateMonitorDataFromOffsets()
 
 	for (auto& entry : _windows)
 	{
-		const auto& monitor = _displays.at(entry.first);
-		entry.second.setMonitor(monitor);
+		const auto id = entry.second.monitor(false).orig_screen;
+		const auto monitor = _displays.find(id);
+		if (monitor != _displays.end())
+			entry.second.setMonitor(monitor->second);
 	}
 }
 
@@ -2474,6 +2479,32 @@ bool SdlContext::restoreCursor()
 			           sdl::utils::toString(_cursorType).c_str());
 			return false;
 	}
+}
+
+void SdlContext::applyPrimaryMonitor(std::vector<rdpMonitor>& monitors) const
+{
+	if (monitors.empty())
+		return;
+	auto primary = monitors.end();
+	// Explicit /monitors: order comes from the launcher's saved UUID list.
+	// If its primary disappears, choose the first remaining selected display.
+	if (freerdp_settings_get_uint32(context()->settings, FreeRDP_NumMonitorIds) > 0)
+	{
+		for (const auto id : _monitorIds)
+		{
+			primary = std::find_if(monitors.begin(), monitors.end(),
+			                       [id](const rdpMonitor& m) { return m.orig_screen == id; });
+			if (primary != monitors.end())
+				break;
+		}
+	}
+	if (primary == monitors.end())
+		primary = std::find_if(monitors.begin(), monitors.end(),
+		                       [](const rdpMonitor& m) { return m.is_primary != 0; });
+	if (primary == monitors.end())
+		primary = monitors.begin();
+	for (auto& monitor : monitors)
+		monitor.is_primary = (&monitor == &*primary);
 }
 
 void SdlContext::setMonitorIds(const std::vector<SDL_DisplayID>& ids)

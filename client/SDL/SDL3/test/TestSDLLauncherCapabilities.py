@@ -50,7 +50,7 @@ def main():
                     result["bridgeProtocolVersion"] == 1, "Wrong bridge version")
             require(result["capabilities"] == ["auth", "certificate", "focus", "retry",
                     "display_uuid", "per_monitor_scaling", "dynamic_resolution", "multimon",
-                    "close_confirmation", "session_thumbnail", "dock_accessory"],
+                    "close_confirmation", "session_thumbnail", "dock_accessory", "primary_monitor"],
                     "Wrong compiled capabilities")
         else:
             require(response.returncode != 0 and response.stdout == "" and
