@@ -1,0 +1,2 @@
+CREATE success response: accepted=1 consumed=3 expected=6
+Production send envelope -> new receive parser: accepted=0 firstByte=00
