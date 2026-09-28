@@ -71,6 +71,17 @@ extern "C"
 	WINPR_ATTR_NODISCARD
 	FREERDP_API YUV_CONTEXT* yuv_context_new(BOOL encoder, UINT32 ThreadingFlags);
 
+	/** @brief Poll process-wide YUV threadpool diagnostics.
+	 *
+	 *  Reports monotonic counters for tiles submitted to the threadpool and
+	 *  for work objects created vs reused. UI layers poll these and report
+	 *  deltas per metrics interval. Counters are 32 bit and wrap after 4G
+	 *  events, which unsigned delta arithmetic absorbs. Any argument may be
+	 *  NULL to skip it.
+	 */
+	FREERDP_API void yuv_pool_stats(UINT32* WINPR_RESTRICT tiles, UINT32* WINPR_RESTRICT created,
+	                                UINT32* WINPR_RESTRICT reused);
+
 #ifdef __cplusplus
 }
 #endif
