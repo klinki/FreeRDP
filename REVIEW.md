@@ -1407,3 +1407,164 @@ The build log is preserved in `tools/udp-review-tests/logs/review-026e5a022/buil
 At completion, multitransport.c/.h and rdpeudp.c/.h had new uncommitted changes;
 they were left untouched and are outside this commit-focused review. No new
 harness was needed for the two static code/test-contract findings above.
+
+
+## SDL connection topbar review — working directory (2026-09-08)
+
+Scope: the seven requested SDL3 topbar/window/context files, including the two
+new untracked sdl_topbar files. No implementation files were changed by this
+review. The findings below concern the proposed bar, not the UDP transport.
+
+### TB1. [P1] Disable button hit-testing when the bar is hidden
+
+Location: `client/SDL/SDL3/sdl_context.cpp:1277–1295`.
+
+`handleTopBarButton` checks fullscreen/multimon state and geometry but never
+checks `_topBarVisible`. After unpinning and hiding the bar, moving into its
+button row below the narrow reveal strip does not show it: `nearTop` is false
+and the hidden state remains. A click on the visible remote application's
+content there is nevertheless consumed, and releasing over the invisible Close
+button disconnects the session; Minimize/Restore similarly invoke hidden actions.
+This also affects multimon windows after leaving fullscreen, where visibility is
+false but UseMultimon keeps the handler enabled.
+
+Gate new presses/actions on actual visibility. If a pointer gesture has already
+been captured by the bar, handle its release through explicit gesture state
+rather than invisible geometric hit-testing. Test hidden bar clicks below the
+reveal strip, including each former button position.
+
+### TB2. [P1] Keep press and release ownership consistent across the overlay
+
+Location: `client/SDL/SDL3/sdl_context.cpp:1288–1311` and mouse-event interception
+at `1263–1264`.
+
+The action is selected solely from release position, with no record of where a
+press began. Press on the remote desktop, drag onto the bar, then release:
+Windows receives button-down but its button-up is swallowed by the bar. Releasing
+over Close can disconnect even though no close-button press occurred. Conversely,
+pressing the bar and releasing outside it forwards an unmatched release remotely.
+Right-button drags have the same swallowed-release problem because non-left events
+inside the bar return true immediately.
+
+Track whether each press belongs to the remote desktop or a specific local button.
+Deliver the corresponding release to the same owner, and activate a local button
+only for an appropriate press/release pair. Include drags across the bar boundary
+and out of the window, plus releases after minimize/fullscreen changes.
+
+### TB3. [P2] Destroy the topbar's texture before destroying its renderer
+
+Location: `client/SDL/SDL3/sdl_window.cpp:82–92`; new ownership in
+`sdl_window.hpp` and `sdl_topbar.cpp`.
+
+`SdlTopBar::Impl::titleTexture` owns an SDL texture through a unique_ptr deleter.
+`SdlWindow` destroys `_renderer` in its destructor body, while `_topBar` is only
+destroyed afterward during automatic member destruction. SDL_DestroyRenderer
+already frees associated textures, so the later topbar deleter calls
+SDL_DestroyTexture on a stale pointer. This invalid lifetime sequence happens
+on normal window cleanup/reconnect after successful title texture creation;
+SDL may reject the stale handle, but it is not valid ownership and should not
+rely on such checks.
+
+Reset `_topBar` before SDL_DestroyRenderer (and keep the same ordering on any
+future renderer replacement). Reference:
+[SDL_DestroyRenderer frees associated textures](https://wiki.libsdl.org/SDL3/SDL_DestroyRenderer).
+No runtime crash is claimed from this static lifetime finding.
+
+### Validation
+
+The `sdl3-freerdp` target built successfully in `/tmp/freerdp-build` with these
+changes. Static review covered drawing, coordinate conversion, event routing,
+move/destructor ownership, and the new CMake entries. No live click test or
+sanitizer run was performed; these findings follow directly from event/state
+branches and ownership order. The build log is preserved at
+`tools/udp-review-tests/logs/topbar-review/build.log`.
+
+## SDL topbar fixes follow-up — working directory (2026-09-08)
+
+Scope: current `sdl_context.hpp`, `sdl_context.cpp`, and `sdl_window.cpp`,
+with the topbar drawing and downstream input handlers inspected for context.
+TB1 and TB3 are fixed. TB2's original single-button crossing cases are fixed:
+releases follow the recorded owner, and local activation requires a matching
+press and release on the same button. The following issues remain.
+
+### TB4. [P2] Keep ownership consistent when another mouse button is pressed
+
+Location: `client/SDL/SDL3/sdl_context.cpp:1357–1368` and `1125–1128`.
+
+Each new press is assigned by its own position, so local and remote captures can
+coexist. Hold the left button on the remote desktop, move onto the bar, then
+press and hold the right button: the second press becomes local. The local-first
+check in `handleTopBarMotion` now swallows all movement even when moving back
+onto the desktop, although Windows still holds the left button. The drag stops
+updating until the local button is released. With a remote right-button drag,
+a second left-button click can even activate Close while that drag is active.
+
+Use a consistent owner for the multi-button gesture until all buttons are up,
+or explicitly preserve remote motion and suppress local actions while a remote
+gesture is active. Validate both press orders and both release orders across
+the overlay boundary. This is a static event-sequence finding, not a live repro.
+
+### TB5. [P3] Repaint when the hovered button changes
+
+Location: `client/SDL/SDL3/sdl_context.cpp:1139–1153`.
+
+Pointer motion changes `_topBarPointer`, but requests a redraw only when bar
+visibility changes. On a static remote desktop with the bar pinned, moving over
+Close/Restore/etc. therefore does not update their hover colors until another
+render occurs. Leaving a highlighted button can likewise leave its old highlight
+visible. The renderer uses the pointer for these colors, so this feedback is
+unintentionally tied to incoming desktop updates.
+
+Invalidate/redraw when the hovered button changes, including leaving the bar;
+avoid repainting every window for every unchanged pointer position.
+
+### Validation
+
+`cmake --build /tmp/freerdp-build --target sdl3-freerdp` passed. Build output is
+retained in `tools/udp-review-tests/logs/topbar-review/build-fixes.log`.
+No live GUI gesture test or sanitizer run was performed. Implementation files
+were left untouched.
+
+## SDL topbar gesture/hover fixes — working directory (2026-09-08)
+
+Reviewed the latest `sdl_context.cpp` / `sdl_context.hpp` changes. TB4 is fixed
+for the five tracked mouse buttons: subsequent presses inherit the gesture
+owner, and it remains assigned until the last tracked release. TB5's ordinary
+hover/leave cases are fixed by invalidating on hover changes and clearing hover
+on window leave. One new input-state edge case remains.
+
+### TB6. [P2] Validate the button before assigning gesture ownership
+
+Location: `client/SDL/SDL3/sdl_context.cpp:1393–1399` and `1430–1432`.
+
+The new global owner is assigned even when `topBarCapture(ev.button)` returns
+null. The array only covers button IDs through SDL_BUTTON_X2 (5). If a device
+emits button 6 or above, pressing it over the bar sets Local without recording
+an active capture. Its release cannot enter the active-capture release branch,
+so the owner remains Local after all buttons are released. Every subsequent
+mouse motion is swallowed. A normal tracked click/release can clear this state,
+but until then the remote pointer appears frozen. Starting the same unsupported
+button on the desktop instead leaves Remote ownership latched and disables bar
+interaction until a tracked gesture completes.
+
+Reject/ignore untracked button IDs before assigning the owner, or track the full
+supported event button range. Test an out-of-range down/up followed by motion
+with no buttons held, both over the bar and over remote content. This is a
+conditional static finding for devices emitting these IDs; no such physical
+mouse was tested.
+
+Validation: `sdl3-freerdp` built successfully; output retained at
+`tools/udp-review-tests/logs/topbar-review/build-gesture-fixes.log`.
+No live GUI test was run and no implementation files were changed.
+
+## TB6 fix verification — working directory (2026-09-08)
+
+TB6 is fixed. `handleTopBarButton` now checks for a capture slot before assigning
+`_topBarGestureOwner`. Unsupported down events return false before any ownership
+mutation; their up events also bypass the active-capture branch. This preserves
+any existing supported-button gesture and avoids latching a new owner.
+
+These events reach the normal input handler; `SdlTouch` currently ignores button
+IDs outside 1–5, so this does not add remote support for extra mouse buttons.
+No new issues found in this focused fix. Validation was static inspection; the
+build and live GUI tests were not rerun for this small guard change.
