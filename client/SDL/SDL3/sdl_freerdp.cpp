@@ -285,7 +285,14 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 						const bool enter = windowEvent.user.code != 0;
 						const bool forceOriginalDisplay = windowEvent.user.data2 != nullptr;
 						if (window)
+						{
 							window->fullscreen(enter, forceOriginalDisplay);
+							/* Windows are born hidden so startup never flashes
+							 * them on the wrong display; reveal here, after
+							 * placement and fullscreen state are final. */
+							if (window->window())
+								SDL_ShowWindow(window->window());
+						}
 					}
 					break;
 					case SDL_EVENT_USER_WINDOW_MINIMIZE:
