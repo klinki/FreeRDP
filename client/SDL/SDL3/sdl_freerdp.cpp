@@ -758,6 +758,7 @@ int main(int argc, char* argv[])
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 	int launcherFd = -1;
 	std::string launcherSession;
+	bool launcherDockSingle = false;
 	for (int x = 1; x < argc; x++)
 	{
 		const std::string arg = argv[x];
@@ -771,7 +772,11 @@ int main(int argc, char* argv[])
 		}
 		else if (arg.rfind("/launcher-session:", 0) == 0)
 			launcherSession = arg.substr(18);
+		else if (arg == "/launcher-dock:single")
+			launcherDockSingle = true;
 	}
+	if (launcherDockSingle && launcherFd < 0)
+		return -1;
 	std::unique_ptr<SdlLauncher> bridge;
 	std::vector<std::string> launcherArguments;
 	if (launcherFd >= 0)
@@ -789,8 +794,13 @@ int main(int argc, char* argv[])
 		    socketType != SOCK_STREAM)
 			return -1;
 		std::ignore = fcntl(launcherFd, F_SETFD, FD_CLOEXEC);
+		if (launcherDockSingle && !SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP, "1"))
+			return -1;
 		if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
 			return -1;
+		if (launcherDockSingle && !SdlLauncher::useAccessoryActivationPolicy())
+			SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+			            "Could not hide the FreeRDP Dock icon; using regular app mode");
 		bridge = std::make_unique<SdlLauncher>(launcherFd, launcherSession, sdl->context());
 		sdl->getDialog().setSuppressed(true);
 		std::string error;
