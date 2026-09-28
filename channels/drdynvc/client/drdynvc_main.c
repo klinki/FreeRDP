@@ -1630,6 +1630,80 @@ static UINT drdynvc_process_close_request(drdynvcPlugin* drdynvc, int Sp, int cb
 }
 
 /**
+ * Handle Soft-Sync Request (MS-RDPEDYC 2.2.5.1) as a client: validate, honor
+ * channel/tunnel lists, and answer with Soft-Sync Response (2.2.5.2) over TCP.
+ * Migration itself is driven by core snooping of these TCP control PDUs.
+ *
+ * @return 0 on success, otherwise a Win32 error code
+ */
+static UINT drdynvc_send_soft_sync_response(drdynvcPlugin* drdynvc, BOOL migrate)
+{
+	UINT status = 0;
+	wStream* s = nullptr;
+	DVCMAN* dvcman = nullptr;
+
+	WINPR_ASSERT(drdynvc);
+	dvcman = (DVCMAN*)drdynvc->channel_mgr;
+	WINPR_ASSERT(dvcman);
+
+	s = StreamPool_Take(dvcman->pool, 16);
+	if (!s)
+	{
+		WLog_Print(drdynvc->log, WLOG_ERROR, "StreamPool_Take failed!");
+		return CHANNEL_RC_NO_MEMORY;
+	}
+
+	/* Header byte: CbId=0, Sp=0, Cmd=SOFT_SYNC_RESPONSE (0x09). */
+	Stream_Write_UINT8(s, 0x90);
+	Stream_Write_UINT8(s, 0x00); /* Pad */
+	if (migrate)
+	{
+		Stream_Write_UINT32(s, 1);               /* NumberOfTunnels */
+		Stream_Write_UINT32(s, TUNNELTYPE_UDPFECR); /* reliable UDP */
+	}
+	else
+	{
+		Stream_Write_UINT32(s, 0); /* decline migration */
+	}
+	status = drdynvc_send(drdynvc, s, nullptr);
+	if (status != CHANNEL_RC_OK)
+	{
+		WLog_Print(drdynvc->log, WLOG_ERROR,
+		           "soft_sync_response send failed with %s [%08" PRIX32 "]",
+		           WTSErrorToString(status), status);
+	}
+	return status;
+}
+
+static UINT drdynvc_process_soft_sync_request(drdynvcPlugin* drdynvc, int Sp, int cbChId,
+                                              wStream* s)
+{
+	BOOL offersUdpFecr = FALSE;
+
+	WINPR_ASSERT(drdynvc);
+	WINPR_UNUSED(Sp);
+	WINPR_UNUSED(cbChId);
+	/* Header byte already consumed; rewind so the shared strict validator sees
+	 * the whole PDU (U1: identical bytes as core snooping, so both sides always
+	 * agree). The stream holds exactly one sealed PDU here. */
+	Stream_Rewind(s, 1);
+	{
+		const BYTE* pdu = Stream_Pointer(s);
+		const size_t len = Stream_GetRemainingLength(s);
+		if (!drdynvc_soft_sync_request_validate(pdu, len))
+		{
+			WLog_Print(drdynvc->log, WLOG_ERROR, "soft_sync_request: rejected");
+			return ERROR_INVALID_DATA;
+		}
+		offersUdpFecr = drdynvc_soft_sync_request_offers_udp(pdu, len);
+	}
+
+	WLog_Print(drdynvc->log, WLOG_INFO, "soft_sync_request: offersUdpFecr=%d, responding",
+	           offersUdpFecr);
+	return drdynvc_send_soft_sync_response(drdynvc, offersUdpFecr);
+}
+
+/**
  * Function description
  *
  * @return 0 on success, otherwise a Win32 error code
@@ -1667,6 +1741,9 @@ static UINT drdynvc_order_recv(drdynvcPlugin* drdynvc, wStream* s, UINT32 Thread
 
 		case CLOSE_REQUEST_PDU:
 			return drdynvc_process_close_request(drdynvc, Sp, cbChId, s);
+
+		case SOFT_SYNC_REQUEST_PDU:
+			return drdynvc_process_soft_sync_request(drdynvc, Sp, cbChId, s);
 
 		case SOFT_SYNC_RESPONSE_PDU:
 			WLog_Print(drdynvc->log, WLOG_ERROR,

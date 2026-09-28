@@ -1,0 +1,1 @@
+First DATA seq=300 AOA=1: cumulativeACK=44 missingSeq1WasReceived=0
