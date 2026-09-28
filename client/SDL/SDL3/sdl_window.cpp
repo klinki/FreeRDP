@@ -1066,9 +1066,6 @@ static float probeDisplayScale(SDL_DisplayID id, float& pixelDensity)
 	{
 		scale = SDL_GetWindowDisplayScale(window.get());
 		pixelDensity = SDL_GetWindowPixelDensity(window.get());
-		SDL_Event event{};
-		while (SDL_PollEvent(&event))
-			;
 	}
 	if (pixelDensity <= 0.0f)
 	{

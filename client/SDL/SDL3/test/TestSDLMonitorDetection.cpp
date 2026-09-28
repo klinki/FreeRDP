@@ -1,5 +1,5 @@
 /**
- * Regression coverage for repeated SDL monitor detection during sign-in retries.
+ * Regression coverage for monitor detection retries and physical display removal.
  * Copyright 2026 FreeRDP contributors. Licensed under Apache-2.0.
  */
 #include <cstdio>
@@ -8,6 +8,7 @@
 #include "sdl_context.hpp"
 #include "sdl_monitor.hpp"
 #include "sdl_types.hpp"
+#include "dialogs/sdl_dialogs.hpp"
 
 static bool expect(bool condition, const char* message)
 {
@@ -20,6 +21,85 @@ static bool detect(SdlContext& sdl)
 {
 	UINT32 width = 0, height = 0;
 	return sdl_detect_monitors(&sdl, &width, &height);
+}
+
+static bool hotplug(SdlContext& sdl, SDL_DisplayID display)
+{
+	auto settings = sdl.context()->settings;
+	if (!freerdp_settings_set_string(settings, FreeRDP_ServerHostname,
+	                                "monitor-regression.invalid") ||
+	    !freerdp_settings_set_bool(settings, FreeRDP_DynamicResolutionUpdate, TRUE))
+		return false;
+	// These changes can already be queued when SDL removes the display.
+	constexpr SDL_DisplayID removed = 0xfffffff0;
+	for (Uint32 type = SDL_EVENT_DISPLAY_FIRST; type <= SDL_EVENT_DISPLAY_LAST; type++)
+	{
+		if (type == SDL_EVENT_DISPLAY_REMOVED)
+			continue;
+		SDL_Event event{};
+		event.display.type = static_cast<SDL_EventType>(type);
+		event.display.displayID = removed;
+		if (!expect(sdl.handleEvent(event), "queued event for a removed display is harmless"))
+			return false;
+	}
+
+	// A display probe must not consume pending topology or input events.
+	SDL_Event marker{};
+	marker.type = SDL_EVENT_USER;
+	marker.user.code = 42;
+	if (!SDL_PushEvent(&marker))
+		return false;
+	std::ignore = SdlWindow::query(display);
+	SDL_Event pending{};
+	if (!expect(SDL_PeepEvents(&pending, 1, SDL_GETEVENT, SDL_EVENT_USER, SDL_EVENT_USER) == 1 &&
+	            pending.user.code == 42, "display probe preserves the event queue"))
+		return false;
+
+	// The OS has moved both removed-monitor windows onto a live display.
+	SDL_WindowID oldWindows[2]{};
+	for (auto& id : oldWindows)
+	{
+		if (!expect(sdl.addDisplayWindow(display), "hotplug fixture window"))
+			return false;
+		auto window = sdl.getFirstWindow();
+		// Find the newly created SDL window, not the previous fixture window.
+		int count = 0;
+		auto windows = SDL_GetWindows(&count);
+		for (int x = 0; x < count; x++)
+		{
+			auto candidate = sdl.getWindowForId(SDL_GetWindowID(windows[x]));
+			if (candidate && candidate->monitor(false).orig_screen == display)
+				window = candidate;
+		}
+		SDL_free(windows);
+		id = window->id();
+		auto monitor = window->monitor(false);
+		monitor.orig_screen = removed;
+		window->setMonitor(monitor);
+		if (!expect(window->displayIndex() == display, "removed window migrated to live display"))
+			return false;
+	}
+	SDL_Event removal{};
+	removal.display.type = SDL_EVENT_DISPLAY_REMOVED;
+	removal.display.displayID = removed;
+	if (!expect(sdl.handleEvent(removal), "remove migrated windows through display channel"))
+		return false;
+	for (const auto id : oldWindows)
+	{
+		if (!expect(sdl.getWindowForId(id) == nullptr, "all windows owned by removed monitor released"))
+			return false;
+	}
+	if (!expect(sdl.getFirstWindow() != nullptr &&
+	            sdl.getFirstWindow()->monitor(false).orig_screen == display,
+	            "last selected display removal falls back to remaining display"))
+		return false;
+	if (!expect(sdl.updateWindowList(), "fallback monitor layout"))
+		return false;
+	auto monitor = static_cast<const rdpMonitor*>(
+	    freerdp_settings_get_pointer(settings, FreeRDP_MonitorDefArray));
+	return expect(freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount) == 1 &&
+	              monitor && monitor->is_primary && monitor->x == 0 && monitor->y == 0,
+	              "fallback layout has one primary monitor at the origin");
 }
 
 static bool run()
@@ -60,6 +140,9 @@ static bool run()
 			return false;
 	}
 
+	if (!hotplug(sdl, displays.front()))
+		return false;
+
 	const UINT32 selected = displays.front();
 	if (!freerdp_settings_set_pointer_len(settings, FreeRDP_MonitorIds, &selected, 1))
 		return false;
@@ -84,9 +167,11 @@ int main()
 		fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
 		return 1;
 	}
+	sdl_dialogs_init();
 	const bool success = run();
+	sdl_dialogs_uninit();
 	SDL_Quit();
 	if (success)
-		puts("PASS repeated automatic/explicit monitor detection and malformed selection");
+		puts("PASS monitor detection retries, stale events, migrated-window removal, and fallback layout");
 	return success ? 0 : 1;
 }

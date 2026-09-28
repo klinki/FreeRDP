@@ -69,7 +69,17 @@ SdlContext::SdlContext(rdpContext* context)
 	instance->LogonErrorInfo = sdl_logon_error_info;
 	instance->PresentGatewayMessage = sdl_present_gateway_message;
 	instance->ChooseSmartcard = sdl_choose_smartcard;
-	instance->RetryDialog = sdl_retry_dialog;
+	instance->RetryDialog = [](freerdp* i, const char* what, size_t current, void* user) -> SSIZE_T
+	{
+		auto sdl = get_context(i->context);
+		if (sdl->_stopRequested)
+			return -1;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+		if (auto bridge = SdlLauncher::active())
+			return bridge->retry(current, what);
+#endif
+		return sdl_retry_dialog(i, what, current, user);
+	};
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 	instance->AuthenticateEx = [](freerdp* i, char** u, char** p, char** d,
 	                              rdp_auth_reason reason) -> BOOL
@@ -97,12 +107,6 @@ SdlContext::SdlContext(rdpContext* context)
 			                           oldFp, flags);
 		return sdl_verify_changed_certificate_ex(i, host, port, cn, subject, issuer, fp, oldSubject,
 		                                         oldIssuer, oldFp, flags);
-	};
-	instance->RetryDialog = [](freerdp* i, const char* what, size_t current, void* user) -> SSIZE_T
-	{
-		if (auto bridge = SdlLauncher::active())
-			return bridge->retry(current, what);
-		return sdl_retry_dialog(i, what, current, user);
 	};
 	instance->LogonErrorInfo = [](freerdp* i, UINT32 data, UINT32 type) -> int
 	{
@@ -161,15 +165,21 @@ int SdlContext::start()
 	return 0;
 }
 
+bool SdlContext::requestStop()
+{
+	/* A UI failure is not a network disconnect. Reconnect clears the core
+	 * abort event, so keep a separate, permanent stop request. Preserve the
+	 * original error rather than replacing it with CONNECT_CANCELLED. */
+	_stopRequested = true;
+	return SetEvent(freerdp_abort_event(context())) != FALSE;
+}
+
 int SdlContext::join()
 {
-	/* We do not want to use freerdp_abort_connect_context here.
-	 * It would change the exit code and we do not want that. */
-	HANDLE event = freerdp_abort_event(context());
-	if (!SetEvent(event))
+	if (!requestStop())
 		return -1;
-
-	_thread.join();
+	if (_thread.joinable())
+		_thread.join();
 	return 0;
 }
 
@@ -192,6 +202,8 @@ void SdlContext::cleanup()
 
 bool SdlContext::shallAbort(bool ignoreDialogs)
 {
+	if (_stopRequested)
+		return true;
 	std::unique_lock lock(_critical);
 	if (freerdp_shall_disconnect_context(context()))
 	{
@@ -212,6 +224,8 @@ BOOL SdlContext::preConnect(freerdp* instance)
 	WINPR_ASSERT(instance->context);
 
 	auto sdl = get_context(instance->context);
+	if (sdl->_stopRequested)
+		return FALSE;
 
 	auto settings = instance->context->settings;
 	WINPR_ASSERT(settings);
@@ -513,6 +527,8 @@ bool SdlContext::createWindows()
 
 		auto did = WINPR_ASSERTING_INT_CAST(SDL_DisplayID, id);
 		auto window = SdlWindow::create(did, title, flags, w, h);
+		if (freerdp_settings_get_bool(settings, FreeRDP_UseMultimon))
+			window.setMonitor(*monitor);
 
 		if (freerdp_settings_get_bool(settings, FreeRDP_UseMultimon))
 		{
@@ -534,9 +550,40 @@ bool SdlContext::updateWindowList()
 	list.reserve(_windows.size());
 	for (const auto& win : _windows)
 	{
-		auto monitor = win.second.monitor(_windows.size() == 1);
+		auto monitor = win.second.monitor(false);
+		// Several removals can be queued after SDL has removed all of them.
+		if (!SDL_GetDisplayName(monitor.orig_screen))
+			continue;
 		applyMonitorScaleOverride(monitor);
 		list.push_back(monitor);
+	}
+
+	// Keep the previous valid layout until the remaining removal events arrive.
+	if (list.empty())
+		return true;
+	if (list.size() == 1)
+	{
+		list.front().x = 0;
+		list.front().y = 0;
+		list.front().is_primary = true;
+	}
+
+	Sint32 originX = 0, originY = 0;
+	for (const auto& monitor : list)
+	{
+		originX = std::min(originX, monitor.x);
+		originY = std::min(originY, monitor.y);
+	}
+	for (auto& win : _windows)
+	{
+		const auto id = win.second.monitor(false).orig_screen;
+		const auto monitor = std::find_if(list.cbegin(), list.cend(),
+		                                 [id](const rdpMonitor& m) { return m.orig_screen == id; });
+		if (monitor != list.cend())
+		{
+			win.second.setOffsetX(originX - monitor->x);
+			win.second.setOffsetY(originY - monitor->y);
+		}
 	}
 
 	// /monitors: subset may exclude the SDL primary. The library requires
@@ -593,6 +640,8 @@ bool SdlContext::waitForWindowsCreated()
 {
 	{
 		std::unique_lock<CriticalSection> lock(_critical);
+		if (_stopRequested)
+			return false;
 		_windowsCreatedEvent.clear();
 		if (!sdl_push_user_event(SDL_EVENT_USER_CREATE_WINDOWS, this))
 			return false;
@@ -718,7 +767,7 @@ int SdlContext::sdl_client_thread_connect(std::string& error_msg)
 	// A rejected credential is offered back for editing; never silently reuse it.
 	if (auto bridge = SdlLauncher::active())
 	{
-		while (!rc && !bridge->cancelled() &&
+		while (!rc && !_stopRequested && !bridge->cancelled() &&
 		       SdlLauncher::isAuthenticationError(freerdp_get_last_error(context())))
 		{
 			auto settings = context()->settings;
@@ -740,7 +789,7 @@ int SdlContext::sdl_client_thread_connect(std::string& error_msg)
 			free(u);
 			free(d);
 			free(p);
-			if (!accepted)
+			if (!accepted || _stopRequested)
 				break;
 			bridge->state("connecting");
 			rc = freerdp_connect(instance);
@@ -813,7 +862,7 @@ int SdlContext::sdl_client_thread_run(std::string& error_msg)
 	WINPR_ASSERT(instance);
 
 	int exit_code = sdl::error::SUCCESS;
-	while (!freerdp_shall_disconnect_context(context()))
+	while (!_stopRequested && !freerdp_shall_disconnect_context(context()))
 	{
 		HANDLE handles[MAXIMUM_WAIT_OBJECTS] = {};
 		/*
@@ -849,26 +898,31 @@ int SdlContext::sdl_client_thread_run(std::string& error_msg)
 			break;
 		}
 
+		if (_stopRequested)
+			break;
 		if (!freerdp_check_event_handles(context()))
 		{
+			if (_stopRequested)
+				break;
 			/* Transport reported dead, outcome unknown: dim the session
 			 * with a "Reconnecting..." overlay instead of a silent frozen
 			 * frame while auto-reconnect runs. Cleared on success below;
 			 * on final failure the error dialog / quit takes over. */
 			setReconnecting(true);
+			const auto reconnect = client_auto_reconnect_ex(
+			    instance, [](freerdp* i) -> BOOL
+			    {
+				    if (get_context(i->context)->_stopRequested)
+					    return FALSE;
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
-			const auto reconnect =
-			    SdlLauncher::active()
-			        ? client_auto_reconnect_ex(instance,
-			                                   [](freerdp*) -> BOOL
-			                                   {
-				                                   auto bridge = SdlLauncher::active();
-				                                   return !bridge || !bridge->cancelled();
-			                                   })
-			        : client_auto_reconnect(instance);
-#else
-			const auto reconnect = client_auto_reconnect(instance);
+				    auto bridge = SdlLauncher::active();
+				    if (bridge && bridge->cancelled())
+					    return FALSE;
 #endif
+				    return TRUE;
+			    });
+			if (_stopRequested)
+				break;
 			if (reconnect)
 			{
 				// Retry was successful, discard dialog
@@ -939,8 +993,9 @@ DWORD SdlContext::rdpThreadRun(SdlContext* sdl)
 	WINPR_ASSERT(sdl);
 
 	std::string error_msg;
-	int exit_code = sdl->sdl_client_thread_connect(error_msg);
-	if (exit_code == sdl::error::SUCCESS)
+	int exit_code = sdl->_stopRequested ? sdl::error::SUCCESS
+	                                  : sdl->sdl_client_thread_connect(error_msg);
+	if (exit_code == sdl::error::SUCCESS && !sdl->_stopRequested)
 		exit_code = sdl->sdl_client_thread_run(error_msg);
 	sdl->sdl_client_cleanup(exit_code, error_msg);
 
@@ -1148,23 +1203,56 @@ SDL_PixelFormat SdlContext::pixelFormat() const
 
 bool SdlContext::addDisplayWindow(SDL_DisplayID id)
 {
+	if (!SDL_GetDisplayName(id))
+		return true; // The added display may already have been removed.
+	for (const auto& entry : _windows)
+	{
+		if (entry.second.monitor(false).orig_screen == id)
+			return true;
+	}
+	const auto monitor = SdlWindow::query(id);
+	if (monitor.width <= 0 || monitor.height <= 0)
+		return false;
 	const auto flags =
 	    SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS;
 	auto title = sdl::utils::windowTitle(context()->settings);
 	auto w = SdlWindow::create(id, title, flags);
-	if (w.window())
-		SDL_ShowWindow(w.window());
+	if (!w.window() || !w.renderer())
+		return false;
+	w.setMonitor(monitor);
+	SDL_ShowWindow(w.window());
+	if (_topBarWindowId == 0)
+		_topBarWindowId = w.id();
 	_windows.emplace(w.id(), std::move(w));
 	return true;
 }
 
 bool SdlContext::removeDisplayWindow(SDL_DisplayID id)
 {
-	for (auto& w : _windows)
+	const bool hadWindows = !_windows.empty();
+	for (auto it = _windows.begin(); it != _windows.end();)
 	{
-		if (w.second.displayIndex() == id)
-			_windows.erase(w.first);
+		// macOS may already have moved the window to another display. Its
+		// negotiated monitor still identifies the display that owned it.
+		if (it->second.monitor(false).orig_screen == id)
+		{
+			if (it->first == _topBarWindowId)
+				_topBarWindowId = 0;
+			it = _windows.erase(it);
+		}
+		else
+			++it;
 	}
+	if (hadWindows && _windows.empty())
+	{
+		// Keep the session reachable when all explicitly selected screens
+		// disappear, using the remaining primary display (e.g. the laptop).
+		const auto primary = SDL_GetPrimaryDisplay();
+		if (primary != 0 && !addDisplayWindow(primary))
+			return false;
+	}
+	if (_topBarWindowId == 0 && !_windows.empty())
+		_topBarWindowId = _windows.begin()->first;
 	return true;
 }
 
@@ -1472,6 +1560,14 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 
 bool SdlContext::handleEvent(const SDL_DisplayEvent& ev)
 {
+	// SDL's inventory is updated before queued events are consumed. Bounds,
+	// scale and mode events for a removed display are therefore expected.
+	if (ev.type != SDL_EVENT_DISPLAY_REMOVED && !SDL_GetDisplayName(ev.displayID))
+	{
+		SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Ignoring stale display event 0x%x for %u",
+		             ev.type, ev.displayID);
+		return true;
+	}
 	if (!getDisplayChannelContext().handleEvent(ev))
 		return false;
 
@@ -1481,17 +1577,18 @@ bool SdlContext::handleEvent(const SDL_DisplayEvent& ev)
 			break;
 		default:
 		{
+			// Details are diagnostic only; hotplug can invalidate them mid-query.
 			SDL_Rect r = {};
 			if (!SDL_GetDisplayBounds(ev.displayID, &r))
-				return false;
+				return true;
 			const auto name = SDL_GetDisplayName(ev.displayID);
 			if (!name)
-				return false;
+				return true;
 			const auto orientation = SDL_GetCurrentDisplayOrientation(ev.displayID);
 			const auto scale = SDL_GetDisplayContentScale(ev.displayID);
 			const auto mode = SDL_GetCurrentDisplayMode(ev.displayID);
 			if (!mode)
-				return false;
+				return true;
 
 			SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
 			             "%s: [%u, %s] %dx%d-%dx%d {orientation=%s, scale=%f}%s",

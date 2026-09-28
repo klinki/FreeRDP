@@ -125,6 +125,7 @@ class SdlContext
 
 	[[nodiscard]] int start();
 	[[nodiscard]] int join();
+	[[nodiscard]] bool requestStop();
 	[[nodiscard]] bool shallAbort(bool ignoreDialogs = false);
 
 	[[nodiscard]] bool createWindows();
@@ -303,6 +304,8 @@ class SdlContext
 	int _exitCode = -1;
 	std::string _exitDetail;
 	std::atomic<bool> _rdpThreadRunning = false;
+	/* Unlike the core abort event, this cannot be cleared by reconnect. */
+	std::atomic<bool> _stopRequested = false;
 	SDL_PixelFormat _sdlPixelFormat = SDL_PIXELFORMAT_UNKNOWN;
 
 	CriticalSection _critical;
