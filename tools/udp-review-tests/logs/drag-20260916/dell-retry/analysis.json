@@ -1,0 +1,109 @@
+{
+  "m27": {
+    "helper": "1789541140.852956 down cursor=2552.0,-811.0 down=false\n1789541150.0809689 pause-start cursor=1100.0,-811.0 down=true\n1789541162.0861511 pause-end cursor=1100.0,-811.0 down=true\n1789541171.354535 released cursor=2552.0,-811.0 down=true\n",
+    "events": 948,
+    "window_ids": [
+      7.0
+    ],
+    "age_median_ms": 0.6685000000000001,
+    "age_p95_ms": 1.474,
+    "age_max_ms": 15.814,
+    "last_outward": {
+      "t": 1789541150.064212,
+      "age": 0.708,
+      "wid": 7.0,
+      "state": 1.0,
+      "relative": 0.0,
+      "x": 280.0,
+      "y": 538.0,
+      "gx": 1100.0,
+      "gy": -811.0
+    },
+    "last_return": {
+      "t": 1789541171.337795,
+      "age": 1.06,
+      "wid": 7.0,
+      "state": 1.0,
+      "relative": 0.0,
+      "x": 3184.0,
+      "y": 538.0,
+      "gx": 2552.0,
+      "gy": -811.0
+    },
+    "x_mapping_residual_max_px": 0.9600000000000364,
+    "y_values": [
+      538.0
+    ]
+  },
+  "dell": {
+    "helper": "1789541232.2850652 down cursor=632.0,-811.0 down=false\n1789541243.840774 pause-start cursor=2552.0,-811.0 down=true\n1789541255.841433 pause-end cursor=2552.0,-811.0 down=true\n1789541267.3586512 released cursor=632.0,-811.0 down=true\n",
+    "events": 1181,
+    "window_ids": [
+      8.0
+    ],
+    "age_median_ms": 0.356,
+    "age_p95_ms": 2.69,
+    "age_max_ms": 18.184,
+    "last_outward": {
+      "t": 1789541243.820273,
+      "age": 0.161,
+      "wid": 8.0,
+      "state": 1.0,
+      "relative": 0.0,
+      "x": 2552.0,
+      "y": 1349.0,
+      "gx": 2552.0,
+      "gy": -811.0
+    },
+    "last_return": {
+      "t": 1789541267.342531,
+      "age": 0.581,
+      "wid": 8.0,
+      "state": 1.0,
+      "relative": 0.0,
+      "x": 632.0,
+      "y": 1349.0,
+      "gx": 632.0,
+      "gy": -811.0
+    },
+    "x_mapping_residual_max_px": 0.8000000000001819,
+    "y_values": [
+      1349.0
+    ]
+  },
+  "reference_anchors": [
+    {
+      "t": 1789541124.288646,
+      "age": 7.156,
+      "wid": 8.0,
+      "state": 0.0,
+      "relative": 0.0,
+      "x": 1100.0,
+      "y": 1349.0,
+      "gx": 1100.0,
+      "gy": -811.0
+    },
+    {
+      "t": 1789541140.66252,
+      "age": 2.87,
+      "wid": 7.0,
+      "state": 0.0,
+      "relative": 0.0,
+      "x": 3184.0,
+      "y": 538.0,
+      "gx": 2552.0,
+      "gy": -811.0
+    },
+    {
+      "t": 1789541228.308308,
+      "age": 1.123,
+      "wid": 7.0,
+      "state": 0.0,
+      "relative": 0.0,
+      "x": 3184.0,
+      "y": 538.0,
+      "gx": 2552.0,
+      "gy": -811.0
+    }
+  ]
+}

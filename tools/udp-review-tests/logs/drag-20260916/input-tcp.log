@@ -1,0 +1,1079 @@
+[08:21:31:605] [52262:ee9add81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[08:21:31:606] [52262:ee9add81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]: Using /p is insecure
+[08:21:31:606] [52262:ee9add81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]: Passing credentials or secrets via command line might expose these in the process list
+[08:21:31:606] [52262:ee9add81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]: Consider using one of the following (more secure) alternatives:
+[08:21:31:606] [52262:ee9add81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]:   - /args-from: pipe in arguments from stdin, file, file descriptor or environment variable
+[08:21:31:606] [52262:ee9add81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]:   - /from-stdin pass the credential via stdin
+[08:21:31:606] [52262:ee9add81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]:   - set environment variable FREERDP_ASKPASS to have a gui tool query for credentials
+[08:21:31:948] [52262:6dd5b001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: *************************************************
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: This build is using [experimental] build options:
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: * 'WITH_VAAPI_H264_ENCODING=ON'
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: * 'WITH_VIDEOTOOLBOX=ON'
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: *
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: [experimental] build options might crash the application
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: *************************************************
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: *************************************************
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: This build is using [runtime-check] build options:
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: * 'WITH_VERBOSE_WINPR_ASSERT=ON'
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: *
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: [runtime-check] build options might slow down the application
+[08:21:32:051] [52262:6dd5b001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106d19580]: *************************************************
+[08:21:32:094] [52262:6dd5b001] [WARN][com.freerdp.crypto] - [verify_cb]: Certificate verification failure 'self-signed certificate (18)' at stack position 0
+[08:21:32:094] [52262:6dd5b001] [WARN][com.freerdp.crypto] - [verify_cb]: CN = WIN-RL37D50MR0J
+[08:21:31:785] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [main]: client is using backend 'cocoa'
+[08:21:31:884] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.orig_screen                   1
+[08:21:31:884] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.x                             0
+[08:21:31:884] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.y                             0
+[08:21:31:884] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.width                         3840
+[08:21:31:884] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.height                        2160
+[08:21:31:884] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.is_primary                    1
+[08:21:31:945] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.orig_screen                   2
+[08:21:31:945] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.x                             -1470
+[08:21:31:945] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.y                             0
+[08:21:31:945] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.width                         2940
+[08:21:31:945] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.height                        1912
+[08:21:31:945] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.is_primary                    0
+[08:21:31:946] [52262:6dd5b001] [INFO][com.freerdp.client.SDL] - [applyMonitorScaleOverride]: monitor 1 ('M27UP') scale override: desktopScaleFactor 200 -> 175, deviceScaleFactor 100 -> 100
+[08:21:31:946] [52262:6dd5b001] [INFO][com.freerdp.client.SDL] - [applyMonitorScaleOverride]: monitor 2 ('Built-in Retina Display') scale override: desktopScaleFactor 200 -> 100, deviceScaleFactor 100 -> 100
+[08:21:31:946] [52262:6dd5b001] [INFO][com.freerdp.client.SDL] - [preConnect]: Update size to 6780x2160
+[08:21:31:955] [52262:6dd5b001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[08:21:32:042] [52262:6dd5b001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[08:21:32:221] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_SYSTEM] SDL chose render backend 'metal'
+[08:21:32:221] [52262:ee9add81] [INFO][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_RENDER] Created renderer: metal
+[08:21:32:231] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.orig_screen                   1
+[08:21:32:231] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.x                             0
+[08:21:32:231] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.y                             0
+[08:21:32:231] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.width                         3840
+[08:21:32:231] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.height                        2160
+[08:21:32:231] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] moni[08:21:32:286] [52262:6dd5b001] [WARN][com.winpr.thread] - [SetThreadPriority]: pthread_setschedprio(0) not implemented, requires POSIX 2008 or later
+[08:21:32:288] [52262:6e017001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[08:21:32:289] [52262:6e017001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+tor.is_primary                    1
+[08:21:32:232] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.attributes.desktopScaleFactor 200
+[08:21:32:232] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.attributes.deviceScaleFactor  100
+[08:21:32:232] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.attributes.orientation        ORIENTATION_LANDSCAPE
+[08:21:32:232] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.attributes.physicalWidth      3840
+[08:21:32:232] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.attributes.physicalHeight     2160
+[08:21:32:259] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_SYSTEM] SDL chose render backend 'metal'
+[08:21:32:259] [52262:ee9add81] [INFO][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_RENDER] Created renderer: metal
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.orig_screen                   2
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.x                             0
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.y                             0
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.width                         2940
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.height                        1912
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.is_primary                    1
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.attributes.desktopScaleFactor 200
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.attributes.deviceScaleFactor  100
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.attributes.orientation        ORIENTATION_LANDSCAPE
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.attributes.physicalWidth      2940
+[08:21:32:269] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] monitor.attributes.physicalHeight     1912
+[08:21:32:269] [52262:6dd5b001] [INFO][com.freerdp.gdi] - [gdi_init_ex]: Local framebuffer format  PIXEL_FORMAT_BGRA32
+[08:21:32:269] [52262:6dd5b001] [INFO][com.freerdp.gdi] - [gdi_init_ex]: Remote framebuffer format PIXEL_FORMAT_BGRA32
+[08:21:32:285] [52262:6dd5b001] [INFO][com.freerdp.channels.rdpsnd.client] - [rdpsnd_load_device_plugin]: [static] Loaded fake backend for rdpsnd
+[08:21:32:285] [52262:6dd5b001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel ainput
+[08:21:32:286] [52262:6dd5b001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel rdpgfx
+[08:21:32:286] [52262:6dd5b001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel disp
+[08:21:32:286] [52262:6dd5b001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel rdpsnd
+[08:21:32:289] [52262:6e017001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[08:21:32:317] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: [5] -960x-540-3840x2160 {-960x-540-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:32:355] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 0
+[08:21:32:364] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_RESIZED: [5] -960x-540-3840x2160 {-960x-540-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:32:364] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: [5] -960x-540-3840x2160 {-960x-540-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:32:418] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 0
+[08:21:32:443] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_SAFE_AREA_CHANGED: [5] -960x-540-3840x2160 {-960x-540-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:32:469] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED: [6] -2205x-478-2940x1912 {-2205x-478-1470x956}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:32:487] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 0
+[08:21:32:496] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_RESIZED: [6] -2205x-478-2940x1912 {-2205x-478-1470x956}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:32:497] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: [6] -2205x-478-2940x1912 {-2205x-478-1470x956}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:32:512] [52262:6e017001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[08:21:32:524] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 0
+[08:21:32:524] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_SAFE_AREA_CHANGED: [6] -2205x-478-2940x1912 {-2205x-478-1470x956}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:33:198] [52262:6e017001] [INFO][com.freerdp.channels.rdpsnd.client] - [rdpsnd_load_device_plugin]: [dynamic] Loaded fake backend for rdpsnd
+[08:21:33:784] [52262:6e017001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[08:21:34:062] [52262:6e017001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[08:21:34:227] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_MOVED: [5] 0x0-3840x2160 {0x0-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:227] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] 5: 0x0-3840x2160
+[08:21:34:227] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_SHOWN: [5] 0x0-3840x2160 {0x0-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:227] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_OCCLUDED: [5] 0x0-3840x2160 {0x0-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:227] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_SHOWN: [6] -1470x33-2940x1846 {-1470x33-1470x923}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:227] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_OCCLUDED: [6] -1470x33-2940x1846 {-1470x33-1470x923}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:227] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 0
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_FOCUS_GAINED: [6] -1470x33-2940x1846 {-1470x33-1470x923}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_UNKNOWNEVENT[0x00000158]: [1, M27UP] 0x0-1920x1080 {orientation=SDL_ORIENTATION_LANDSCAPE, scale=1.000000}[id=1,fmt=372645892,w=1920,h=1080,dpi=2,refresh=144,num=144,denom=1]
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_UNKNOWNEVENT[0x00000158]: [2, Built-in Retina Display] -1470x0-1470x956 {orientation=SDL_ORIENTATION_LANDSCAPE, scale=1.000000}[id=2,fmt=372645892,w=1470,h=956,dpi=2,refresh=60,num=60,denom=1]
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_EXPOSED: [6] -1470x33-2940x1846 {-1470x33-1470x923}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_ENTER_FULLSCREEN: [5] 0x0-3840x2160 {0x0-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_MOVED: [5] 0x0-3840x2160 {0x0-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] 5: 0x0-3840x2160
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_RESIZED: [5] 0x0-3840x2160 {0x0-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_ENTER_FULLSCREEN: [6] -1470x33-2940x1846 {-1470x33-1470x923}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_MOVED: [6] -1470x33-2940x1846 {-1470x33-1470x923}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] 6: -1470x33-2940x1846
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_RESIZED: [6] -1470x33-2940x1846 {-1470x33-1470x923}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:228] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: [6] -1470x33-2940x1846 {-1470x33-1470x923}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:239] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:21:34:239] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_SAFE_AREA_CHANGED: [6] -1470x33-2940x1846 {-1470x33-1470x923}{scale=2DRAG_CONVERT 1789539795.796476 age_ms=1.302 wid=6 state=0 raw=941.00,268.00 converted=1882.00,536.00 global=-529.00,301.00 ok=1
+DRAG_CONVERT 1789539795.985887 age_ms=0.244 wid=6 state=1 raw=943.25,268.00 converted=1886.50,536.00 global=-526.75,301.00 ok=1
+DRAG_CONVERT 1789539796.003497 age_ms=0.220 wid=6 state=1 raw=945.50,268.00 converted=1890.99,536.00 global=-524.50,301.00 ok=1
+DRAG_CONVERT 1789539796.027092 age_ms=0.945 wid=6 state=1 raw=947.74,268.00 converted=1895.49,536.00 global=-522.26,301.00 ok=1
+DRAG_CONVERT 1789539796.047400 age_ms=0.404 wid=6 state=1 raw=949.99,268.00 converted=1899.98,536.00 global=-520.01,301.00 ok=1
+DRAG_CONVERT 1789539796.067557 age_ms=0.652 wid=6 state=1 raw=952.24,268.00 converted=1904.48,536.00 global=-517.76,301.00 ok=1
+DRAG_CONVERT 1789539796.086710 age_ms=0.280 wid=6 state=1 raw=954.49,268.00 converted=1908.97,536.00 global=-515.51,301.00 ok=1
+DRAG_CONVERT 1789539796.110451 age_ms=0.389 wid=6 state=1 raw=956.74,268.00 converted=1913.47,536.00 global=-513.26,301.00 ok=1
+DRAG_CONVERT 1789539796.125612 age_ms=0.234 wid=6 state=1 raw=958.98,268.00 converted=1917.97,536.00 global=-511.02,301.00 ok=1
+DRAG_CONVERT 1789539796.142061 age_ms=0.245 wid=6 state=1 raw=961.23,268.00 converted=1922.46,536.00 global=-508.77,301.00 ok=1
+DRAG_CONVERT 1789539796.160189 age_ms=0.147 wid=6 state=1 raw=963.48,268.00 converted=1926.96,536.00 global=-506.52,301.00 ok=1
+DRAG_CONVERT 1789539796.328578 age_ms=9.478 wid=6 state=1 raw=983.71,268.00 converted=1967.42,536.00 global=-486.29,301.00 ok=1
+DRAG_CONVERT 1789539796.336818 age_ms=0.757 wid=6 state=1 raw=985.96,268.00 converted=1971.92,536.00 global=-484.04,301.00 ok=1
+DRAG_CONVERT 1789539796.356948 age_ms=0.108 wid=6 state=1 raw=988.21,268.00 converted=1976.41,536.00 global=-481.79,301.00 ok=1
+DRAG_CONVERT 1789539796.374022 age_ms=0.197 wid=6 state=1 raw=990.45,268.00 converted=1980.91,536.00 global=-479.55,301.00 ok=1
+DRAG_CONVERT 1789539796.393843 age_ms=0.192 wid=6 state=1 raw=992.70,268.00 converted=1985.40,536.00 global=-477.30,301.00 ok=1
+DRAG_CONVERT 1789539796.414733 age_ms=0.196 wid=6 state=1 raw=994.95,268.00 converted=1989.90,536.00 global=-475.05,301.00 ok=1
+DRAG_CONVERT 1789539796.433817 age_ms=0.102 wid=6 state=1 raw=997.20,268.00 converted=1994.40,536.00 global=-472.80,301.00 ok=1
+DRAG_CONVERT 1789539796.450540 age_ms=0.120 wid=6 state=1 raw=999.45,268.00 converted=1998.89,536.00 global=-470.55,301.00 ok=1
+DRAG_CONVERT 1789539796.471501 age_ms=0.171 wid=6 state=1 raw=1001.69,268.00 converted=2003.39,536.00 global=-468.31,301.00 ok=1
+DRAG_CONVERT 1789539796.492290 age_ms=0.110 wid=6 state=1 raw=1003.94,268.00 converted=2007.88,536.00 global=-466.06,301.00 ok=1
+DRAG_CONVERT 1789539796.509830 age_ms=0.800 wid=6 state=1 raw=1006.19,268.00 converted=2012.38,536.00 global=-463.81,301.00 ok=1
+DRAG_CONVERT 1789539796.530002 age_ms=0.113 wid=6 state=1 raw=1008.44,268.00 converted=2016.88,536.00 global=-461.56,301.00 ok=1
+DRAG_CONVERT 1789539796.550977 age_ms=0.172 wid=6 state=1 raw=1010.69,268.00 converted=2021.37,536.00 global=-459.31,301.00 ok=1
+DRAG_CONVERT 1789539796.572478 age_ms=0.568 wid=6 state=1 raw=1012.93,268.00 converted=2025.87,536.00 global=-457.07,301.00 ok=1
+DRAG_CONVERT 1789539796.592768 age_ms=0.175 wid=6 state=1 raw=1015.18,268.00 converted=2030.36,536.00 global=-454.82,301.00 ok=1
+DRAG_CONVERT 1789539796.609657 age_ms=0.095 wid=6 state=1 raw=1017.43,268.00 converted=2034.86,536.00 global=-452.57,301.00 ok=1
+DRAG_CONVERT 1789539796.627314 age_ms=0.273 wid=6 state=1 raw=1019.68,268.00 converted=2039.35,536.00 global=-450.32,301.00 ok=1
+DRAG_CONVERT 1789539796.647827 age_ms=0.376 wid=6 state=1 raw=1021.92,268.00 converted=2043.85,536.00 global=-448.08,301.00 ok=1
+DRAG_CONVERT 1789539796.668690 age_ms=0.382 wid=6 state=1 raw=1024.17,268.00 converted=2048.35,536.00 global=-445.83,301.00 ok=1
+DRAG_CONVERT 1789539796.688210 age_ms=0.606 wid=6 state=1 raw=1026.42,268.00 converted=2052.84,536.00 global=-443.58,301.00 ok=1
+DRAG_CONVERT 1789539796.709229 age_ms=0.265 wid=6 state=1 raw=1028.67,268.00 converted=2057.34,536.00 global=-441.33,301.00 ok=1
+DRAG_CONVERT 1789539796.736758 age_ms=3.265 wid=6 state=1 raw=1030.92,268.00 converted=2061.83,536.00 global=-439.08,301.00 ok=1
+DRAG_CONVERT 1789539796.756163 age_ms=0.122 wid=6 state=1 raw=1033.16,268.00 converted=2066.33,536.00 global=-436.84,301.00 ok=1
+DRAG_CONVERT 1789539796.769654 age_ms=0.210 wid=6 state=1 raw=1035.41,268.00 converted=2070.82,536.00 global=-434.59,301.00 ok=1
+DRAG_CONVERT 1789539796.789637 age_ms=0.157 wid=6 state=1 raw=1037.66,268.00 converted=2075.32,536.00 global=-432.34,301.00 ok=1
+DRAG_CONVERT 1789539796.810520 age_ms=0.163 wid=6 state=1 raw=1039.91,268.00 converted=2079.82,536.00 global=-430.09,301.00 ok=1
+DRAG_CONVERT 1789539796.829693 age_ms=0.249 wid=6 state=1 raw=1042.16,268.00 converted=2084.31,536.00 global=-427.84,301.00 ok=1
+DRAG_CONVERT 1789539796.846878 age_ms=0.257 wid=6 state=1 raw=1044.40,268.00 converted=2088.81,536.00 global=-425.60,301.00 ok=1
+DRAG_CONVERT 1789539796.864073 age_ms=0.244 wid=6 state=1 raw=1046.65,268.00 converted=2093.30,536.00 global=-423.35,301.00 ok=1
+DRAG_CONVERT 1789539796.883263 age_ms=2.675 wid=6 state=1 raw=1048.90,268.00 converted=2097.80,536.00 global=-421.10,301.00 ok=1
+DRAG_CONVERT 1789539796.899160 age_ms=0.296 wid=6 state=1 raw=1051.15,268.00 converted=2102.30,536.00 global=-418.85,301.00 ok=1
+DRAG_CONVERT 1789539796.915390 age_ms=0.241 wid=6 state=1 raw=1053.40,268.00 converted=2106.79,536.00 global=-416.60,301.00 ok=1
+DRAG_CONVERT 1789539796.936365 age_ms=0.309 wid=6 state=1 raw=1055.64,268.00 converted=2111.29,536.00 global=-414.36,301.00 ok=1
+DRAG_CONVERT 1789539796.953626 age_ms=0.183 wid=6 state=1 raw=1057.89,268.00 converted=2115.78,536.00 global=-412.11,301.00 ok=1
+DRAG_CONVERT 1789539796.975475 age_ms=1.138 wid=6 state=1 raw=1060.14,268.00 converted=2120.28,536.00 global=-409.86,301.00 ok=1
+DRAG_CONVERT 1789539796.992454 age_ms=0.372 wid=6 state=1 raw=1062.39,268.00 converted=2124.77,536.00 global=-407.61,301.00 ok=1
+DRAG_CONVERT 1789539797.009677 age_ms=0.221 wid=6 state=1 raw=1064.64,268.00 converted=2129.27,536.00 global=-405.36,301.00 ok=1
+DRAG_CONVERT 1789539797.030610 age_ms=0.256 wid=6 state=1 raw=1066.88,268.00 converted=2133.77,536.00 global=-403.12,301.00 ok=1
+DRAG_CONVERT 1789539797.051711 age_ms=0.304 wid=6 state=1 raw=1069.13,268.00 converted=2138.26,536.00 global=-400.87,301.00 ok=1
+DRAG_CONVERT 1789539797.070221 age_ms=2.144 wid=6 state=1 raw=1071.38,268.00 converted=2142.76,536.00 global=-398.62,301.00 ok=1
+DRAG_CONVERT 1789539797.085943 age_ms=0.318 wid=6 state=1 raw=1073.63,268.00 converted=2147.25,536.00 global=-396.37,301.00 ok=1
+DRAG_CONVERT 1789539797.105723 age_ms=0.243 wid=6 state=1 raw=1075.88,268.00 converted=2151.75,536.00 global=-394.12,301.00 ok=1
+DRAG_CONVERT 1789539797.126409 age_ms=0.140 wid=6 state=1 raw=1078.12,268.00 converted=2156.25,536.00 global=-391.88,301.00 ok=1
+DRAG_CONVERT 1789539797.147356 age_ms=0.191 wid=6 state=1 raw=1080.37,268.00 converted=2160.74,536.00 global=-389.63,301.00 ok=1
+DRAG_CONVERT 1789539797.166987 age_ms=0.434 wid=6 state=1 raw=1082.62,268.00 converted=2165.24,536.00 global=-387.38,301.00 ok=1
+DRAG_CONVERT 1789539797.184265 age_ms=0.334 wid=6 state=1 raw=1084.87,268.00 converted=2169.73,536.00 global=-385.13,301.00 ok=1
+DRAG_CONVERT 1789539797.204556 age_ms=0.272 wid=6 state=1 raw=1087.11,268.00 converted=2174.23,536.00 global=-382.89,301.00 ok=1
+DRAG_CONVERT 1789539797.222771 age_ms=1.322 wid=6 state=1 raw=1089.36,268.00 converted=2178.73,536.00 global=-380.64,301.00 ok=1
+DRAG_CONVERT 1789539797.242746 age_ms=0.356 wid=6 state=1 raw=1091.61,268.00 converted=2183.22,536.00 global=-378.39,301.00 ok=1
+DRAG_CONVERT 1789539797.263450 age_ms=0.180 wid=6 state=1 raw=1093.86,268.00 converted=2187.72,536.00 global=-376.14,301.00 ok=1
+DRAG_CONVERT 1789539797.281858 age_ms=0.162 wid=6 state=1 raw=1096.11,268.00 converted=2192.21,536.00 global=-373.89,301.00 ok=1
+DRAG_CONVERT 1789539797.301919 age_ms=0.362 wid=6 state=1 raw=1098.35,268.00 converted=2196.71,536.00 global=-371.65,301.00 ok=1
+DRAG_CONVERT 1789539797.322734 age_ms=0.345 wid=6 state=1 raw=1100.60,268.00 converted=2201.20,536.00 global=-369.40,301.00 ok=1
+DRAG_CONVERT 1789539797.343665 age_ms=0.384 wid=6 state=1 raw=1102.85,268.00 converted=2205.70,536.00 global=-367.15,301.00 ok=1
+DRAG_CONVERT 1789539797.364522 age_ms=0.346 wid=6 state=1 raw=1105.10,268.00 converted=2210.20,536.00 global=-364.90,301.00 ok=1
+DRAG_CONVERT 1789539797.382426 age_ms=0.635 wid=6 state=1 raw=1107.35,268.00 converted=2214.69,536.00 global=-362.65,301.00 ok=1
+DRAG_CONVERT 1789539797.402931 age_ms=0.240 wid=6 state=1 raw=1109.59,268.00 converted=2219.19,536.00 global=-360.41,301.00 ok=1
+DRAG_CONVERT 1789539797.423985 age_ms=0.381 wid=6 state=1 raw=1111.84,268.00 converted=2223.68,536.00 global=-358.16,301.00 ok=1
+DRAG_CONVERT 1789539797.445310 age_ms=0.294 wid=6 state=1 raw=1114.09,268.00 converted=2228.18,536.00 global=-355.91,301.00 ok=1
+DRAG_CONVERT 1789539797.462988 age_ms=0.261 wid=6 state=1 raw=1116.34,268.00 converted=2232.68,536.00 global=-353.66,301.00 ok=1
+DRAG_CONVERT 1789539797.482881 age_ms=1.428 wid=6 state=1 raw=1118.59,268.00 converted=2237.17,536.00 global=-351.41,301.00 ok=1
+DRAG_CONVERT 1789539797.500823 age_ms=0.275 wid=6 state=1 raw=1120.83,268.00 converted=2241.67,536.00 global=-349.17,301.00 ok=1
+DRAG_CONVERT 1789539797.521959 age_ms=0.193 wid=6 state=1 raw=1123.08,268.00 converted=2246.16,536.00 global=-346.92,301.00 ok=1
+DRAG_CONVERT 1789539797.540408 age_ms=0.275 wid=6 state=1 raw=1125.33,268.00 converted=2250.66,536.00 global=-344.67,301.00 ok=1
+DRAG_CONVERT 1789539797.561270 age_ms=0.192 wid=6 state=1 raw=1127.58,268.00 converted=2255.15,536.00 global=-342.42,301.00 ok=1
+DRAG_CONVERT 1789539797.582097 age_ms=0.281 wid=6 state=1 raw=1129.82,268.00 converted=2259.65,536.00 global=-340.17,301.00 ok=1
+DRAG_CONVERT 1789539797.603157 age_ms=0.409 wid=6 state=1 raw=1132.07,268.00 converted=2264.15,536.00 global=-337.93,301.00 ok=1
+DRAG_CONVERT 1789539797.624278 age_ms=0.202 wid=6 state=1 raw=1134.32,268.00 converted=2268.64,536.00 global=-335.68,301.00 ok=1
+DRAG_CONVERT 1789539797.644740 age_ms=0.271 wid=6 state=1 raw=1136.57,268.00 converted=2273.14,536.00 global=-333.43,301.00 ok=1
+DRAG_CONVERT 1789539797.661589 age_ms=0.367 wid=6 state=1 raw=1138.82,268.00 converted=2277.63,536.00 global=-331.18,301.00 ok=1
+DRAG_CONVERT 1789539797.679273 age_ms=0.857 wid=6 state=1 raw=1141.06,268.00 converted=2282.13,536.00 global=-328.94,301.00 ok=1
+DRAG_CONVERT 1789539797.695965 age_ms=0.461 wid=6 state=1 raw=1143.31,268.00 converted=2286.62,536.00 global=-326.69,301.00 ok=1
+DRAG_CONVERT 1789539797.716726 age_ms=0.356 wid=6 state=1 raw=1145.56,268.00 converted=2291.12,536.00 global=-324.44,301.00 ok=1
+DRAG_CONVERT 1789539797.737609 age_ms=0.335 wid=6 state=1 raw=1147.81,268.00 converted=2295.62,536.00 global=-322.19,301.00 ok=1
+DRAG_CONVERT 1789539797.754593 age_ms=0.605 wid=6 state=1 raw=1150.06,268.00 converted=2300.11,536.00 global=-319.94,301.00 ok=1
+DRAG_CONVERT 1789539797.773876 age_ms=0.355 wid=6 state=1 raw=1152.30,268.00 converted=2304.61,536.00 global=-317.70,301.00 ok=1
+DRAG_CONVERT 1789539797.792668 age_ms=2.261 wid=6 state=1 raw=1154.55,268.00 converted=2309.10,536.00 global=-315.45,301.00 ok=1
+DRAG_CONVERT 1789539797.812634 age_ms=1.350 wid=6 state=1 raw=1156.80,268.00 converted=2313.60,536.00 global=-313.20,301.00 ok=1
+DRAG_CONVERT 1789539797.832499 age_ms=0.313 wid=6 state=1 raw=1159.05,268.00 converted=2318.10,536.00 global=-310.95,301.00 ok=1
+DRAG_CONVERT 1789539797.853516 age_ms=0.421 wid=6 state=1 raw=1161.30,268.00 converted=2322.59,536.00 global=-308.70,301.00 ok=1
+DRAG_CONVERT 1789539797.870659 age_ms=0.256 wid=6 state=1 raw=1163.54,268.00 converted=2327.09,536.00 global=-306.46,301.00 ok=1
+DRAG_CONVERT 1789539797.889998 age_ms=0.416 wid=6 state=1 raw=1165.79,268.00 converted=2331.58,536.00 global=-304.21,301.00 ok=1
+DRAG_CONVERT 1789539797.909238 age_ms=0.320 wid=6 state=1 raw=1168.04,268.00 converted=2336.08,536.00 global=-301.96,301.00 ok=1
+DRAG_CONVERT 1789539797.930145 age_ms=0.343 wid=6 state=1 raw=1170.29,268.00 converted=2340.57,536.00 global=-299.71,301.00 ok=1
+DRAG_CONVERT 1789539797.950060 age_ms=0.336 wid=6 state=1 raw=1172.54,268.00 converted=2345.07,536.00 global=-297.46,301.00 ok=1
+DRAG_CONVERT 1789539797.967944 age_ms=0.331 wid=6 state=1 raw=1174.78,268.00 converted=2349.57,536.00 global=-295.22,301.00 ok=1
+DRAG_CONVERT 1789539797.987844 age_ms=0.362 wid=6 state=1 raw=1177.03,268.00 converted=2354.06,536.00 global=-292.97,301.00 ok=1
+DRAG_CONVERT 1789539798.007479 age_ms=1.991 wid=6 state=1 raw=1179.28,268.00 converted=2358.56,536.00 global=-290.72,301.00 ok=1
+DRAG_CONVERT 1789539798.027578 age_ms=0.660 wid=6 state=1 raw=1181.53,268.00 converted=2363.05,536.00 global=-288.47,301.00 ok=1
+DRAG_CONVERT 1789539798.049016 age_ms=1.715 wid=6 state=1 raw=1183.78,268.00 converted=2367.55,536.00 global=-286.23,301.00 ok=1
+DRAG_CONVERT 1789539798.064754 age_ms=0.301 wid=6 state=1 raw=1186.02,268.00 converted=2372.05,536.00 global=-283.98,301.00 ok=1
+DRAG_CONVERT 1789539798.085637 age_ms=0.279 wid=6 state=1 raw=1188.27,268.00 converted=2376.54,536.00 global=-281.73,301.00 ok=1
+DRAG_CONVERT 1789539798.106471 age_ms=0.237 wid=6 state=1 raw=1190.52,268.00 converted=2381.04,536.00 global=-279.48,301.00 ok=1
+DRAG_CONVERT 1789539798.126106 age_ms=0.325 wid=6 state=1 raw=1192.77,268.00 converted=2385.53,536.00 global=-277.23,301.00 ok=1
+DRAG_CONVERT 1789539798.147127 age_ms=0.484 wid=6 state=1 raw=1195.01,268.00 converted=2390.03,536.00 global=-274.99,301.00 ok=1
+DRAG_CONVERT 1789539798.168019 age_ms=0.431 wid=6 state=1 raw=1197.26,268.00 converted=2394.52,536.00 global=-272.74,301.00 ok=1
+DRAG_CONVERT 1789539798.188931 age_ms=0.485 wid=6 state=1 raw=1199.51,268.00 converted=2399.02,536.00 global=-270.49,301.00 ok=1
+DRAG_CONVERT 1789539798.209698 age_ms=0.317 wid=6 state=1 raw=1201.76,268.00 converted=2403.52,536.00 global=-268.24,301.00 ok=1
+DRAG_CONVERT 1789539798.228296 age_ms=0.330 wid=6 state=1 raw=1204.01,268.00 converted=2408.01,536.00 global=-265.99,301.00 ok=1
+DRAG_CONVERT 1789539798.249513 age_ms=0.237 wid=6 state=1 raw=1206.25,268.00 converted=2412.51,536.00 global=-263.75,301.00 ok=1
+DRAG_CONVERT 1789539798.269759 age_ms=0.250 wid=6 state=1 raw=1208.50,268.00 converted=2417.00,536.00 global=-261.50,301.00 ok=1
+DRAG_CONVERT 1789539798.290750 age_ms=0.554 wid=6 state=1 raw=1210.75,268.00 converted=2421.50,536.00 global=-259.25,301.00 ok=1
+DRAG_CONVERT 1789539798.309678 age_ms=0.214 wid=6 state=1 raw=1213.00,268.00 converted=2426.00,536.00 global=-257.00,301.00 ok=1
+DRAG_CONVERT 1789539798.330719 age_ms=0.322 wid=6 state=1 raw=1215.25,268.00 converted=2430.49,536.00 global=-254.75,301.00 ok=1
+DRAG_CONVERT 1789539798.349411 age_ms=2.240 wid=6 state=1 raw=1217.49,268.00 converted=2434.99,536.00 global=-252.51,301.00 ok=1
+DRAG_CONVERT 1789539798.368174 age_ms=0.168 wid=6 state=1 raw=1219.74,268.00 converted=2439.48,536.00 global=-250.26,301.00 ok=1
+DRAG_CONVERT 1789539798.385698 age_ms=0.213 wid=6 state=1 raw=1221.99,268.00 converted=2443.98,536.00 global=-248.01,301.00 ok=1
+DRAG_CONVERT 1789539798.406782 age_ms=0.408 wid=6 state=1 raw=1224.24,268.00 converted=2448.48,536.00 global=-245.76,301.00 ok=1
+DRAG_CONVERT 1789539798.426486 age_ms=0.267 wid=6 state=1 raw=1226.49,268.00 converted=2452.97,536.00 global=-243.51,301.00 ok=1
+DRAG_CONVERT 1789539798.446196 age_ms=0.319 wid=6 state=1 raw=1228.73,268.00 converted=2457.47,536.00 global=-241.27,301.00 ok=1
+DRAG_CONVERT 1789539798.466983 age_ms=0.227 wid=6 state=1 raw=1230.98,268.00 converted=2461.96,536.00 global=-239.02,301.00 ok=1
+DRAG_CONVERT 1789539798.488420 age_ms=0.749 wid=6 state=1 raw=1233.23,268.00 converted=2466.46,536.00 global=-236.77,301.00 ok=1
+DRAG_CONVERT 1789539798.505069 age_ms=0.591 wid=6 state=1 raw=1235.48,268.00 converted=2470.95,536.00 global=-234.52,301.00 ok=1
+DRAG_CONVERT 1789539798.525828 age_ms=0.230 wid=6 state=1 raw=1237.72,268.00 converted=2475.45,536.00 global=-232.27,301.00 ok=1
+DRAG_CONVERT 1789539798.547476 age_ms=0.578 wid=6 state=1 raw=1239.97,268.00 converted=2479.95,536.00 global=-230.03,301.00 ok=1
+DRAG_CONVERT 1789539798.565399 age_ms=0.260 wid=6 state=1 raw=1242.22,268.00 converted=2484.44,536.00 global=-227.78,301.00 ok=1
+DRAG_CONVERT 1789539798.582867 age_ms=0.449 wid=6 state=1 raw=1244.47,268.00 converted=2488.94,536.00 global=-225.53,301.00 ok=1
+DRAG_CONVERT 1789539798.598959 age_ms=0.382 wid=6 state=1 raw=1246.72,268.00 converted=2493.43,536.00 global=-223.28,301.00 ok=1
+DRAG_CONVERT 1789539798.617120 age_ms=0.643 wid=6 state=1 raw=1248.96,268.00 converted=2497.93,536.00 global=-221.04,301.00 ok=1
+DRAG_CONVERT 1789539798.637029 age_ms=2.666 wid=6 state=1 raw=1251.21,268.00 converted=2502.43,536.00 global=-218.79,301.00 ok=1
+DRAG_CONVERT 1789539798.654982 age_ms=0.344 wid=6 state=1 raw=1253.46,268.00 converted=2506.92,536.00 global=-216.54,301.00 ok=1
+DRAG_CONVERT 1789539798.673842 age_ms=0.320 wid=6 state=1 raw=1255.71,268.00 converted=2511.42,536.00 global=-214.29,301.00 ok=1
+DRAG_CONVERT 1789539798.690728 age_ms=0.310 wid=6 state=1 raw=1257.96,268.00 converted=2515.91,536.00 global=-212.04,301.00 ok=1
+DRAG_CONVERT 1789539798.711615 age_ms=0.282 wid=6 state=1 raw=1260.20,268.00 converted=2520.41,536.00 global=-209.80,301.00 ok=1
+DRAG_CONVERT 1789539798.729535 age_ms=0.195 wid=6 state=1 raw=1262.45,268.00 converted=2524.90,536.00 global=-207.55,301.00 ok=1
+DRAG_CONVERT 1789539798.750491 age_ms=0.273 wid=6 state=1 raw=1264.70,268.00 converted=2529.40,536.00 global=-205.30,301.00 ok=1
+DRAG_CONVERT 1789539798.771706 age_ms=0.555 wid=6 state=1 raw=1266.95,268.00 converted=2533.90,536.00 global=-203.05,301.00 ok=1
+DRAG_CONVERT 1789539798.792708 age_ms=0.658 wid=6 state=1 raw=1269.20,268.00 converted=2538.39,536.00 global=-200.80,301.00 ok=1
+DRAG_CONVERT 1789539798.813285 age_ms=0.379 wid=6 state=1 raw=1271.44,268.00 converted=2542.89,536.00 global=-198.56,301.00 ok=1
+DRAG_CONVERT 1789539798.834790 age_ms=0.485 wid=6 state=1 raw=1273.69,268.00 converted=2547.38,536.00 global=-196.31,301.00 ok=1
+DRAG_CONVERT 1789539798.851545 age_ms=0.852 wid=6 state=1 raw=1275.94,268.00 converted=2551.88,536.00 global=-194.06,301.00 ok=1
+DRAG_CONVERT 1789539798.870883 age_ms=0.251 wid=6 state=1 raw=1278.19,268.00 converted=2556.38,536.00 global=-191.81,301.00 ok=1
+DRAG_CONVERT 1789539798.892240 age_ms=0.721 wid=6 state=1 raw=1280.44,268.00 converted=2560.87,536.00 global=-189.56,301.00 ok=1
+DRAG_CONVERT 1789539798.908464 age_ms=0.241 wid=6 state=1 raw=1282.68,268.00 converted=2565.37,536.00 global=-187.32,301.00 ok=1
+DRAG_CONVERT 1789539798.929433 age_ms=0.213 wid=6 state=1 raw=1284.93,268.00 converted=2569.86,536.00 global=-185.07,301.00 ok=1
+DRAG_CONVERT 1789539798.950654 age_ms=0.435 wid=6 state=1 raw=1287.18,268.00 converted=2574.36,536.00 global=-182.82,301.00 ok=1
+DRAG_CONVERT 1789539798.970070 age_ms=0.186 wid=6 state=1 raw=1289.43,268.00 converted=2578.85,536.00 global=-180.57,301.00 ok=1
+DRAG_CONVERT 1789539798.990624 age_ms=0.227 wid=6 state=1 raw=1291.68,268.00 converted=2583.35,536.00 global=-178.32,301.00 ok=1
+DRAG_CONVERT 1789539799.010732 age_ms=0.221 wid=6 state=1 raw=1293.92,268.00 converted=2587.85,536.00 global=-176.08,301.00 ok=1
+DRAG_CONVERT 1789539799.032210 age_ms=0.807 wid=6 state=1 raw=1296.17,268.00 converted=2592.34,536.00 global=-173.83,301.00 ok=1
+DRAG_CONVERT 1789539799.052500 age_ms=0.238 wid=6 state=1 raw=1298.42,268.00 converted=2596.84,536.00 global=-171.58,301.00 ok=1
+DRAG_CONVERT 1789539799.071554 age_ms=1.943 wid=6 state=1 raw=1300.67,268.00 converted=2601.33,536.00 global=-169.33,301.00 ok=1
+DRAG_CONVERT 1789539799.090762 age_ms=0.282 wid=6 state=1 raw=1302.91,268.00 converted=2605.83,536.00 global=-167.09,301.00 ok=1
+DRAG_CONVERT 1789539799.108816 age_ms=0.206 wid=6 state=1 raw=1305.16,268.00 converted=2610.32,536.00 global=-164.84,301.00 ok=1
+DRAG_CONVERT 1789539799.126115 age_ms=0.255 wid=6 state=1 raw=1307.41,268.00 converted=2614.82,536.00 global=-162.59,301.00 ok=1
+DRAG_CONVERT 1789539799.147108 age_ms=0.180 wid=6 state=1 raw=1309.66,268.00 converted=2619.32,536.00 global=-160.34,301.00 ok=1
+DRAG_CONVERT 1789539799.167825 age_ms=0.370 wid=6 state=1 raw=1311.91,268.00 converted=2623.81,536.00 global=-158.09,301.00 ok=1
+DRAG_CONVERT 1789539799.188528 age_ms=0.224 wid=6 state=1 raw=1314.15,268.00 converted=2628.31,536.00 global=-155.85,301.00 ok=1
+DRAG_CONVERT 1789539799.205892 age_ms=0.356 wid=6 state=1 raw=1316.40,268.00 converted=2632.80,536.00 global=-153.60,301.00 ok=1
+DRAG_CONVERT 1789539799.226796 age_ms=0.373 wid=6 state=1 raw=1318.65,268.00 converted=2637.30,536.00 global=-151.35,301.00 ok=1
+DRAG_CONVERT 1789539799.247589 age_ms=0.288 wid=6 state=1 raw=1320.90,268.00 converted=2641.80,536.00 global=-149.10,301.00 ok=1
+DRAG_CONVERT 1789539799.264731 age_ms=0.239 wid=6 state=1 raw=1323.15,268.00 converted=2646.29,536.00 global=-146.85,301.00 ok=1
+DRAG_CONVERT 1789539799.281635 age_ms=0.173 wid=6 state=1 raw=1325.39,268.00 converted=2650.79,536.00 global=-144.61,301.00 ok=1
+DRAG_CONVERT 1789539799.302779 age_ms=0.386 wid=6 state=1 raw=1327.64,268.00 converted=2655.28,536.00 global=-142.36,301.00 ok=1
+DRAG_CONVERT 1789539799.320504 age_ms=0.504 wid=6 state=1 raw=1329.89,268.00 converted=2659.78,536.00 global=-140.11,301.00 ok=1
+DRAG_CONVERT 1789539799.337964 age_ms=0.483 wid=6 state=1 raw=1332.14,268.00 converted=2664.27,536.00 global=-137.86,301.00 ok=1
+DRAG_CONVERT 1789539799.356203 age_ms=0.356 wid=6 state=1 raw=1334.39,268.00 converted=2668.77,536.00 global=-135.61,301.00 ok=1
+DRAG_CONVERT 1789539799.373985 age_ms=0.461 wid=6 state=1 raw=1336.63,268.00 converted=2673.27,536.00 global=-133.37,301.00 ok=1
+DRAG_CONVERT 1789539799.394714 age_ms=0.312 wid=6 state=1 raw=1338.88,268.00 converted=2677.76,536.00 global=-131.12,301.00 ok=1
+DRAG_CONVERT 1789539799.413716 age_ms=2.384 wid=6 state=1 raw=1341.13,268.00 converted=2682.26,536.00 global=-128.87,301.00 ok=1
+DRAG_CONVERT 1789539799.432428 age_ms=0.326 wid=6 state=1 raw=1343.38,268.00 converted=2686.75,536.00 global=-126.62,301.00 ok=1
+DRAG_CONVERT 1789539799.449781 age_ms=0.370 wid=6 state=1 raw=1345.62,268.00 converted=2691.25,536.00 global=-124.38,301.00 ok=1
+DRAG_CONVERT 1789539799.470251 age_ms=0.405 wid=6 state=1 raw=1347.87,268.00 converted=2695.75,536.00 global=-122.13,301.00 ok=1
+DRAG_CONVERT 1789539799.489863 age_ms=0.313 wid=6 state=1 raw=1350.12,268.00 converted=2700.24,536.00 global=-119.88,301.00 ok=1
+DRAG_CONVERT 1789539799.509591 age_ms=2.639 wid=6 state=1 raw=1352.37,268.00 converted=2704.74,536.00 global=-117.63,301.00 ok=1
+DRAG_CONVERT 1789539799.528386 age_ms=0.482 wid=6 state=1 raw=1354.62,268.00 converted=2709.23,536.00 global=-115.38,301.00 ok=1
+DRAG_CONVERT 1789539799.549147 age_ms=0.324 wid=6 state=1 raw=1356.86,268.00 converted=2713.73,536.00 global=-113.14,301.00 ok=1
+DRAG_CONVERT 1789539799.566092 age_ms=0.386 wid=6 state=1 raw=1359.11,268.00 converted=2718.23,536.00 global=-110.89,301.00 ok=1
+DRAG_CONVERT 1789539799.586960 age_ms=0.342 wid=6 state=1 raw=1361.36,268.00 converted=2722.72,536.00 global=-108.64,301.00 ok=1
+DRAG_CONVERT 1789539799.607614 age_ms=0.407 wid=6 state=1 raw=1363.61,268.00 converted=2727.22,536.00 global=-106.39,301.00 ok=1
+DRAG_CONVERT 1789539799.627317 age_ms=0.348 wid=6 state=1 raw=1365.86,268.00 converted=2731.71,536.00 global=-104.14,301.00 ok=1
+DRAG_CONVERT 1789539799.648245 age_ms=0.351 wid=6 state=1 raw=1368.10,268.00 converted=2736.21,536.00 global=-101.90,301.00 ok=1
+DRAG_CONVERT 1789539799.669102 age_ms=0.338 wid=6 state=1 raw=1370.35,268.00 converted=2740.70,536.00 global=-99.65,301.00 ok=1
+DRAG_CONVERT 1789539799.688041 age_ms=0.624 wid=6 state=1 raw=1372.60,268.00 converted=2745.20,536.00 global=-97.40,301.00 ok=1
+DRAG_CONVERT 1789539799.705886 age_ms=0.346 wid=6 state=1 raw=1374.85,268.00 converted=2749.70,536.00 global=-95.15,301.00 ok=1
+DRAG_CONVERT 1789539799.722857 age_ms=0.433 wid=6 state=1 raw=1377.10,268.00 converted=2754.19,536.00 global=-92.90,301.00 ok=1
+DRAG_CONVERT 1789539799.743548 age_ms=0.248 wid=6 state=1 raw=1379.34,268.00 converted=2758.69,536.00 global=-90.66,301.00 ok=1
+DRAG_CONVERT 1789539799.764613 age_ms=0.437 wid=6 state=1 raw=1381.59,268.00 converted=2763.18,536.00 global=-88.41,301.00 ok=1
+DRAG_CONVERT 1789539799.783436 age_ms=0.211 wid=6 state=1 raw=1383.84,268.00 converted=2767.68,536.00 global=-86.16,301.00 ok=1
+DRAG_CONVERT 1789539799.804378 age_ms=0.235 wid=6 state=1 raw=1386.09,268.00 converted=2772.18,536.00 global=-83.91,301.00 ok=1
+DRAG_CONVERT 1789539799.823111 age_ms=0.196 wid=6 state=1 raw=1388.34,268.00 converted=2776.67,536.00 global=-81.66,301.00 ok=1
+DRAG_CONVERT 1789539799.841452 age_ms=0.337 wid=6 state=1 raw=1390.58,268.00 converted=2781.17,536.00 global=-79.42,301.00 ok=1
+DRAG_CONVERT 1789539799.861885 age_ms=0.373 wid=6 state=1 raw=1392.83,268.00 converted=2785.66,536.00 global=-77.17,301.00 ok=1
+DRAG_CONVERT 1789539799.878431 age_ms=0.235 wid=6 state=1 raw=1395.08,268.00 converted=2790.16,536.00 global=-74.92,301.00 ok=1
+DRAG_CONVERT 1789539799.897617 age_ms=0.145 wid=6 state=1 raw=1397.33,268.00 converted=2794.65,536.00 global=-72.67,301.00 ok=1
+DRAG_CONVERT 1789539799.915390 age_ms=0.391 wid=6 state=1 raw=1399.57,268.00 converted=2799.15,536.00 global=-70.43,301.00 ok=1
+DRAG_CONVERT 1789539799.935728 age_ms=0.233 wid=6 state=1 raw=1401.82,268.00 converted=2803.65,536.00 global=-68.18,301.00 ok=1
+DRAG_CONVERT 1789539799.956738 age_ms=0.318 wid=6 state=1 raw=1404.07,268.00 converted=2808.14,536.00 global=-65.93,301.00 ok=1
+DRAG_CONVERT 1789539799.977565 age_ms=0.248 wid=6 state=1 raw=1406.32,268.00 converted=2812.64,536.00 global=-63.68,301.00 ok=1
+DRAG_CONVERT 1789539799.998490 age_ms=0.328 wid=6 state=1 raw=1408.57,268.00 converted=2817.13,536.00 global=-61.43,301.00 ok=1
+DRAG_CONVERT 1789539800.019334 age_ms=0.263 wid=6 state=1 raw=1410.81,268.00 converted=2821.63,536.00 global=-59.19,301.00 ok=1
+DRAG_CONVERT 1789539800.040308 age_ms=0.273 wid=6 state=1 raw=1413.06,268.00 converted=2826.12,536.00 global=-56.94,301.00 ok=1
+DRAG_CONVERT 1789539800.061192 age_ms=0.312 wid=6 state=1 raw=1415.31,268.00 converted=2830.62,536.00 global=-54.69,301.00 ok=1
+DRAG_CONVERT 1789539800.082132 age_ms=0.387 wid=6 state=1 raw=1417.56,268.00 converted=2835.12,536.00 global=-52.44,301.00 ok=1
+DRAG_CONVERT 1789539800.102254 age_ms=0.210 wid=6 state=1 raw=1419.81,268.00 converted=2839.61,536.00 global=-50.19,301.00 ok=1
+DRAG_CONVERT 1789539800.123053 age_ms=0.157 wid=6 state=1 raw=1422.05,268.00 converted=2844.11,536.00 global=-47.95,301.00 ok=1
+DRAG_CONVERT 1789539800.145016 age_ms=0.377 wid=6 state=1 raw=1424.30,268.00 converted=2848.60,536.00 global=-45.70,301.00 ok=1
+DRAG_CONVERT 1789539800.163109 age_ms=2.288 wid=6 state=1 raw=1426.55,268.00 converted=2853.10,536.00 global=-43.45,301.00 ok=1
+DRAG_CONVERT 1789539800.179847 age_ms=0.162 wid=6 state=1 raw=1428.80,268.00 converted=2857.60,536.00 global=-41.20,301.00 ok=1
+DRAG_CONVERT 1789539800.198234 age_ms=1.368 wid=6 state=1 raw=1431.05,268.00 converted=2862.09,536.00 global=-38.95,301.00 ok=1
+DRAG_CONVERT 1789539800.217162 age_ms=0.252 wid=6 state=1 raw=1433.29,268.00 converted=2866.59,536.00 global=-36.71,301.00 ok=1
+DRAG_CONVERT 1789539800.238084 age_ms=0.291 wid=6 state=1 raw=1435.54,268.00 converted=2871.08,536.00 global=-34.46,301.00 ok=1
+DRAG_CONVERT 1789539800.258701 age_ms=0.447 wid=6 state=1 raw=1437.79,268.00 converted=2875.58,536.00 global=-32.21,301.00 ok=1
+DRAG_CONVERT 1789539800.277760 age_ms=0.170 wid=6 state=1 raw=1440.04,268.00 converted=2880.07,536.00 global=-29.96,301.00 ok=1
+DRAG_CONVERT 1789539800.297925 age_ms=0.416 wid=6 state=1 raw=1442.29,268.00 converted=2884.57,536.00 global=-27.71,301.00 ok=1
+DRAG_CONVERT 1789539800.314729 age_ms=0.251 wid=6 state=1 raw=1444.53,268.00 converted=2889.07,536.00 global=-25.47,301.00 ok=1
+DRAG_CONVERT 1789539800.335347 age_ms=0.299 wid=6 state=1 raw=1446.78,268.00 converted=2893.56,536.00 global=-23.22,301.00 ok=1
+DRAG_CONVERT 1789539800.357575 age_ms=1.779 wid=6 state=1 raw=1449.03,268.00 converted=2898.06,536.00 global=-20.97,301.00 ok=1
+DRAG_CONVERT 1789539800.374477 age_ms=0.159 wid=6 state=1 raw=1451.28,268.00 converted=2902.55,536.00 global=-18.72,301.00 ok=1
+DRAG_CONVERT 1789539800.395343 age_ms=0.228 wid=6 state=1 raw=1453.53,268.00 converted=2907.05,536.00 global=-16.48,301.00 ok=1
+DRAG_CONVERT 1789539800.416236 age_ms=0.255 wid=6 state=1 raw=1455.77,268.00 converted=2911.55,536.00 global=-14.23,301.00 ok=1
+DRAG_CONVERT 1789539800.438009 age_ms=0.197 wid=6 state=1 raw=1458.02,268.00 converted=2916.04,536.00 global=-11.98,301.00 ok=1
+DRAG_CONVERT 1789539800.450493 age_ms=0.254 wid=6 state=1 raw=1460.27,268.00 converted=2920.54,536.00 global=-9.73,301.00 ok=1
+DRAG_CONVERT 1789539800.470193 age_ms=1.647 wid=6 state=1 raw=1462.52,268.00 converted=2925.03,536.00 global=-7.48,301.00 ok=1
+DRAG_CONVERT 1789539800.487631 age_ms=0.347 wid=6 state=1 raw=1464.76,268.00 converted=2929.53,536.00 global=-5.24,301.00 ok=1
+DRAG_CONVERT 1789539800.508177 age_ms=0.323 wid=6 state=1 raw=1467.01,268.00 converted=2934.02,536.00 global=-2.99,301.00 ok=1
+DRAG_CONVERT 1789539800.525809 age_ms=0.347 wid=6 state=1 raw=1469.26,268.00 converted=2938.52,536.00 global=-0.74,301.00 ok=1
+DRAG_CONVERT 1789539800.544926 age_ms=0.754 wid=6 state=1 raw=1471.51,268.00 converted=2943.02,536.00 global=1.51,301.00 ok=1
+DRAG_CONVERT 1789539800.569581 age_ms=6.706 wid=6 state=1 raw=1473.76,268.00 converted=2947.51,536.00 global=3.76,301.00 ok=1
+DRAG_CONVERT 1789539800.594871 age_ms=11.117 wid=6 state=1 raw=1476.00,268.00 converted=2952.01,536.00 global=6.00,301.00 ok=1
+DRAG_CONVERT 1789539800.601601 age_ms=0.323 wid=6 state=1 raw=1478.25,268.00 converted=2956.50,536.00 global=8.25,301.00 ok=1
+DRAG_CONVERT 1789539800.622580 age_ms=0.747 wid=6 state=1 raw=1480.50,268.00 converted=2961.00,536.00 global=10.50,301.00 ok=1
+DRAG_CONVERT 1789539800.640796 age_ms=0.284 wid=6 state=1 raw=1482.75,268.00 converted=2965.50,536.00 global=12.75,301.00 ok=1
+DRAG_CONVERT 1789539800.658923 age_ms=0.308 wid=6 state=1 raw=1485.00,268.00 converted=2969.99,536.00 global=15.00,301.00 ok=1
+DRAG_CONVERT 1789539800.679694 age_ms=0.195 wid=6 state=1 raw=1487.24,268.00 converted=2974.49,536.00 global=17.24,301.00 ok=1
+DRAG_CONVERT 1789539800.698923 age_ms=0.276 wid=6 state=1 raw=1489.49,268.00 converted=2978.98,536.00 global=19.49,301.00 ok=1
+DRAG_CONVERT 1789539800.715911 age_ms=0.464 wid=6 state=1 raw=1491.74,268.00 converted=2983.48,536.00 global=21.74,301.00 ok=1
+DRAG_CONVERT 1789539800.734774 age_ms=0.433 wid=6 state=1 raw=1493.99,268.00 converted=2987.98,536.00 global=23.99,301.00 ok=1
+DRAG_CONVERT 1789539800.751354 age_ms=0.228 wid=6 state=1 raw=1496.24,268.00 converted=2992.47,536.00 global=26.24,301.00 ok=1
+DRAG_CONVERT 1789539800.769753 age_ms=0.238 wid=6 state=1 raw=1498.48,268.00 converted=2996.97,536.00 global=28.48,301.00 ok=1
+DRAG_CONVERT 1789539800.790876 age_ms=4.343 wid=6 state=1 raw=1500.73,268.00 converted=3001.46,536.00 global=30.73,301.00 ok=1
+DRAG_CONVERT 1789539800.807117 age_ms=1.169 wid=6 state=1 raw=1502.98,268.00 converted=3005.96,536.00 global=32.98,301.00 ok=1
+DRAG_CONVERT 1789539800.825713 age_ms=0.210 wid=6 state=1 raw=1505.23,268.00 converted=3010.45,536.00 global=35.23,301.00 ok=1
+DRAG_CONVERT 1789539800.845695 age_ms=0.212 wid=6 state=1 raw=1507.47,268.00 converted=3014.95,536.00 global=37.47,301.00 ok=1
+DRAG_CONVERT 1789539800.865664 age_ms=0.611 wid=6 state=1 raw=1509.72,268.00 converted=3019.45,536.00 global=39.72,301.00 ok=1
+DRAG_CONVERT 1789539800.882484 age_ms=0.287 wid=6 state=1 raw=1511.97,268.00 converted=3023.94,536.00 global=41.97,301.00 ok=1
+DRAG_CONVERT 1789539800.901798 age_ms=0.292 wid=6 state=1 raw=1514.22,268.00 converted=3028.44,536.00 global=44.22,301.00 ok=1
+DRAG_CONVERT 1789539800.921820 age_ms=0.308 wid=6 state=1 raw=1516.47,268.00 converted=3032.93,536.00 global=46.47,301.00 ok=1
+DRAG_CONVERT 1789539800.942253 age_ms=0.569 wid=6 state=1 raw=1518.71,268.00 converted=3037.43,536.00 global=48.71,301.00 ok=1
+DRAG_CONVERT 1789539800.959594 age_ms=0.212 wid=6 state=1 raw=1520.96,268.00 converted=3041.93,536.00 global=50.96,301.00 ok=1
+DRAG_CONVERT 1789539800.981920 age_ms=5.664 wid=6 state=1 raw=1523.21,268.00 converted=3046.42,536.00 global=53.21,301.00 ok=1
+DRAG_CONVERT 1789539800.997408 age_ms=0.302 wid=6 state=1 raw=1525.46,268.00 converted=3050.92,536.00 global=55.46,301.00 ok=1
+DRAG_CONVERT 1789539801.017449 age_ms=0.265 wid=6 state=1 raw=1527.71,268.00 converted=3055.41,536.00 global=57.71,301.00 ok=1
+DRAG_CONVERT 1789539801.047876 age_ms=13.447 wid=6 state=1 raw=1529.95,268.00 converted=3059.91,536.00 global=59.95,301.00 ok=1
+DRAG_CONVERT 1789539801.055660 age_ms=0.283 wid=6 state=1 raw=1532.20,268.00 converted=3064.40,536.00 global=62.20,301.00 ok=1
+DRAG_CONVERT 1789539801.076691 age_ms=0.414 wid=6 state=1 raw=1534.45,268.00 converted=3068.90,536.00 global=64.45,301.00 ok=1
+DRAG_CONVERT 1789539801.095157 age_ms=2.150 wid=6 state=1 raw=1536.70,268.00 converted=3073.40,536.00 global=66.70,301.00 ok=1
+DRAG_CONVERT 1789539801.113900 age_ms=0.201 wid=6 state=1 raw=1538.95,268.00 converted=3077.89,536.00 global=68.95,301.00 ok=1
+DRAG_CONVERT 1789539801.134686 age_ms=0.145 wid=6 state=1 raw=1541.19,268.00 converted=3082.39,536.00 global=71.19,301.00 ok=1
+DRAG_CONVERT 1789539801.153622 age_ms=0.161 wid=6 state=1 raw=1543.44,268.00 converted=3086.88,536.00 global=73.44,301.00 ok=1
+DRAG_CONVERT 1789539801.174806 age_ms=0.395 wid=6 state=1 raw=1545.69,268.00 converted=3091.38,536.00 global=75.69,301.00 ok=1
+DRAG_CONVERT 1789539801.195460 age_ms=0.218 wid=6 state=1 raw=1547.94,268.00 converted=3095.88,536.00 global=77.94,301.00 ok=1
+DRAG_CONVERT 1789539801.216476 age_ms=0.337 wid=6 state=1 raw=1550.19,268.00 converted=3100.37,536.00 global=80.19,301.00 ok=1
+DRAG_CONVERT 1789539801.237298 age_ms=0.287 wid=6 state=1 raw=1552.43,268.00 converted=3104.87,536.00 global=82.43,301.00 ok=1
+DRAG_CONVERT 1789539801.257715 age_ms=0.215 wid=6 state=1 raw=1554.68,268.00 converted=3109.36,536.00 global=84.68,301.00 ok=1
+DRAG_CONVERT 1789539801.277853 age_ms=0.370 wid=6 state=1 raw=1556.93,268.00 converted=3113.86,536.00 global=86.93,301.00 ok=1
+DRAG_CONVERT 1789539801.298560 age_ms=0.193 wid=6 state=1 raw=1559.18,268.00 converted=3118.35,536.00 global=89.18,301.00 ok=1
+DRAG_CONVERT 1789539801.319451 age_ms=0.219 wid=6 state=1 raw=1561.43,268.00 converted=3122.85,536.00 global=91.43,301.00 ok=1
+DRAG_CONVERT 1789539801.336316 age_ms=0.214 wid=6 state=1 raw=1563.67,268.00 converted=3127.35,536.00 global=93.67,301.00 ok=1
+DRAG_CONVERT 1789539801.360023 age_ms=7.180 wid=6 state=1 raw=1565.92,268.00 converted=3131.84,536.00 global=95.92,301.00 ok=1
+DRAG_CONVERT 1789539801.373926 age_ms=0.390 wid=6 state=1 raw=1568.17,268.00 converted=3136.34,536.00 global=98.17,301.00 ok=1
+DRAG_CONVERT 1789539801.394620 age_ms=0.221 wid=6 state=1 raw=1570.42,268.00 converted=3140.83,536.00 global=100.42,301.00 ok=1
+DRAG_CONVERT 1789539801.411752 age_ms=0.169 wid=6 state=1 raw=1572.66,268.00 converted=3145.33,536.00 global=102.66,301.00 ok=1
+DRAG_CONVERT 1789539801.432559 age_ms=3.056 wid=6 state=1 raw=1574.91,268.00 converted=3149.82,536.00 global=104.91,301.00 ok=1
+DRAG_CONVERT 1789539801.476844 age_ms=10.607 wid=6 state=1 raw=1579.41,268.00 converted=3158.82,536.00 global=109.41,301.00 ok=1
+DRAG_CONVERT 1789539801.487428 age_ms=0.253 wid=6 state=1 raw=1581.66,268.00 converted=3163.31,536.00 global=111.66,301.00 ok=1
+DRAG_CONVERT 1789539801.504084 age_ms=0.161 wid=6 state=1 raw=1583.90,268.00 converted=3167.81,536.00 global=113.90,301.00 ok=1
+DRAG_CONVERT 1789539801.524993 age_ms=0.222 wid=6 state=1 raw=1586.15,268.00 converted=3172.30,536.00 global=116.15,301.00 ok=1
+DRAG_CONVERT 1789539801.541722 age_ms=0.181 wid=6 state=1 raw=1588.40,268.00 converted=3176.80,536.00 global=118.40,301.00 ok=1
+DRAG_CONVERT 1789539801.558829 age_ms=0.207 wid=6 state=1 raw=1590.65,268.00 converted=3181.30,536.00 global=120.65,301.00 ok=1
+DRAG_CONVERT 1789539801.577672 age_ms=0.190 wid=6 state=1 raw=1592.90,268.00 converted=3185.79,536.00 global=122.90,301.00 ok=1
+DRAG_CONVERT 1789539801.598563 age_ms=0.159 wid=6 state=1 raw=1595.14,268.00 converted=3190.29,536.00 global=125.14,301.00 ok=1
+DRAG_CONVERT 1789539801.617540 age_ms=0.340 wid=6 state=1 raw=1597.39,268.00 converted=3194.78,536.00 global=127.39,301.00 ok=1
+DRAG_CONVERT 1789539801.633932 age_ms=0.200 wid=6 state=1 raw=1599.64,268.00 converted=3199.28,536.00 global=129.64,301.00 ok=1
+DRAG_CONVERT 1789539801.652554 age_ms=0.197 wid=6 state=1 raw=1601.89,268.00 converted=3203.77,536.00 global=131.89,301.00 ok=1
+DRAG_CONVERT 1789539801.673876 age_ms=0.552 wid=6 state=1 raw=1604.14,268.00 converted=3208.27,536.00 global=134.14,301.00 ok=1
+DRAG_CONVERT 1789539801.692669 age_ms=0.471 wid=6 state=1 raw=1606.38,268.00 converted=3212.77,536.00 global=136.38,301.00 ok=1
+DRAG_CONVERT 1789539801.713252 age_ms=0.191 wid=6 state=1 raw=1608.63,268.00 converted=3217.26,536.00 global=138.63,301.00 ok=1
+DRAG_CONVERT 1789539801.733810 age_ms=0.216 wid=6 state=1 raw=1610.88,268.00 converted=3221.76,536.00 global=140.88,301.00 ok=1
+DRAG_CONVERT 1789539801.751494 age_ms=0.152 wid=6 state=1 raw=1613.13,268.00 converted=3226.25,536.00 global=143.13,301.00 ok=1
+DRAG_CONVERT 1789539801.769781 age_ms=0.659 wid=6 state=1 raw=1615.38,268.00 converted=3230.75,536.00 global=145.38,301.00 ok=1
+DRAG_CONVERT 1789539801.791568 age_ms=1.075 wid=6 state=1 raw=1617.62,268.00 converted=3235.25,536.00 global=147.62,301.00 ok=1
+DRAG_CONVERT 1789539801.809865 age_ms=0.266 wid=6 state=1 raw=1619.87,268.00 converted=3239.74,536.00 global=149.87,301.00 ok=1
+DRAG_CONVERT 1789539801.830677 age_ms=0.208 wid=6 state=1 raw=1622.12,268.00 converted=3244.24,536.00 global=152.12,301.00 ok=1
+DRAG_CONVERT 1789539801.851296 age_ms=0.142 wid=6 state=1 raw=1624.37,268.00 converted=3248.73,536.00 global=154.37,301.00 ok=1
+DRAG_CONVERT 1789539801.872205 age_ms=0.333 wid=6 state=1 raw=1626.61,268.00 converted=3253.23,536.00 global=156.61,301.00 ok=1
+DRAG_CONVERT 1789539801.889715 age_ms=0.219 wid=6 state=1 raw=1628.86,268.00 converted=3257.73,536.00 global=158.86,301.00 ok=1
+DRAG_CONVERT 1789539801.906452 age_ms=0.257 wid=6 state=1 raw=1631.11,268.00 converted=3262.22,536.00 global=161.11,301.00 ok=1
+DRAG_CONVERT 1789539801.929689 age_ms=2.544 wid=6 state=1 raw=1633.36,268.00 converted=3266.72,536.00 global=163.36,301.00 ok=1
+DRAG_CONVERT 1789539801.948255 age_ms=0.259 wid=6 state=1 raw=1635.61,268.00 converted=3271.21,536.00 global=165.61,301.00 ok=1
+DRAG_CONVERT 1789539801.969139 age_ms=0.268 wid=6 state=1 raw=1637.85,268.00 converted=3275.71,536.00 global=167.85,301.00 ok=1
+DRAG_CONVERT 1789539801.986304 age_ms=0.274 wid=6 state=1 raw=1640.10,268.00 converted=3280.20,536.00 global=170.10,301.00 ok=1
+DRAG_CONVERT 1789539802.005251 age_ms=0.227 wid=6 state=1 raw=1642.35,268.00 converted=3284.70,536.00 global=172.35,301.00 ok=1
+DRAG_CONVERT 1789539802.025740 age_ms=0.232 wid=6 state=1 raw=1644.60,268.00 converted=3289.20,536.00 global=174.60,301.00 ok=1
+DRAG_CONVERT 1789539802.042538 age_ms=0.312 wid=6 state=1 raw=1646.85,268.00 converted=3293.69,536.00 global=176.85,301.00 ok=1
+DRAG_CONVERT 1789539802.061672 age_ms=0.182 wid=6 state=1 raw=1649.09,268.00 converted=3298.19,536.00 global=179.09,301.00 ok=1
+DRAG_CONVERT 1789539802.078583 age_ms=0.347 wid=6 state=1 raw=1651.34,268.00 converted=3302.68,536.00 global=181.34,301.00 ok=1
+DRAG_CONVERT 1789539802.095249 age_ms=0.301 wid=6 state=1 raw=1653.59,268.00 converted=3307.18,536.00 global=183.59,301.00 ok=1
+DRAG_CONVERT 1789539802.113806 age_ms=0.241 wid=6 state=1 raw=1655.84,268.00 converted=3311.68,536.00 global=185.84,301.00 ok=1
+DRAG_CONVERT 1789539802.134693 age_ms=0.267 wid=6 state=1 raw=1658.09,268.00 converted=3316.17,536.00 global=188.09,301.00 ok=1
+DRAG_CONVERT 1789539802.157680 age_ms=4.173 wid=6 state=1 raw=1660.33,268.00 converted=3320.67,536.00 global=190.33,301.00 ok=1
+DRAG_CONVERT 1789539802.173461 age_ms=0.195 wid=6 state=1 raw=1662.58,268.00 converted=3325.16,536.00 global=192.58,301.00 ok=1
+DRAG_CONVERT 1789539802.194091 age_ms=0.157 wid=6 state=1 raw=1664.83,268.00 converted=3329.66,536.00 global=194.83,301.00 ok=1
+DRAG_CONVERT 1789539802.215092 age_ms=0.254 wid=6 state=1 raw=1667.08,268.00 converted=3334.15,536.00 global=197.08,301.00 ok=1
+DRAG_CONVERT 1789539802.231706 age_ms=0.162 wid=6 state=1 raw=1669.32,268.00 converted=3338.65,536.00 global=199.32,301.00 ok=1
+DRAG_CONVERT 1789539802.249801 age_ms=0.300 wid=6 state=1 raw=1671.57,268.00 converted=3343.15,536.00 global=201.57,301.00 ok=1
+DRAG_CONVERT 1789539802.270640 age_ms=0.241 wid=6 state=1 raw=1673.82,268.00 converted=3347.64,536.00 global=203.82,301.00 ok=1
+DRAG_CONVERT 1789539802.290205 age_ms=0.183 wid=6 state=1 raw=1676.07,268.00 converted=3352.14,536.00 global=206.07,301.00 ok=1
+DRAG_CONVERT 1789539802.310129 age_ms=0.365 wid=6 state=1 raw=1678.32,268.00 converted=3356.63,536.00 global=208.32,301.00 ok=1
+DRAG_CONVERT 1789539802.326767 age_ms=0.246 wid=6 state=1 raw=1680.56,268.00 converted=3361.13,536.00 global=210.56,301.00 ok=1
+DRAG_CONVERT 1789539802.347550 age_ms=0.149 wid=6 state=1 raw=1682.81,268.00 converted=3365.62,536.00 global=212.81,301.00 ok=1
+DRAG_CONVERT 1789539802.368705 age_ms=0.431 wid=6 state=1 raw=1685.06,268.00 converted=3370.12,536.00 global=215.06,301.00 ok=1
+DRAG_CONVERT 1789539802.385750 age_ms=0.257 wid=6 state=1 raw=1687.31,268.00 converted=3374.62,536.00 global=217.31,301.00 ok=1
+DRAG_CONVERT 1789539802.406698 age_ms=0.158 wid=6 state=1 raw=1689.56,268.00 converted=3379.11,536.00 global=219.56,301.00 ok=1
+DRAG_CONVERT 1789539802.429266 age_ms=5.475 wid=6 state=1 raw=1691.80,268.00 converted=3383.61,536.00 global=221.80,301.00 ok=1
+DRAG_CONVERT 1789539802.442420 age_ms=0.172 wid=6 state=1 raw=1694.05,268.00 converted=3388.10,536.00 global=224.05,301.00 ok=1
+DRAG_CONVERT 1789539802.460391 age_ms=0.296 wid=6 state=1 raw=1696.30,268.00 converted=3392.60,536.00 global=226.30,301.00 ok=1
+DRAG_CONVERT 1789539802.477734 age_ms=0.237 wid=6 state=1 raw=1698.55,268.00 converted=3397.10,536.00 global=228.55,301.00 ok=1
+DRAG_CONVERT 1789539802.498617 age_ms=0.252 wid=6 state=1 raw=1700.80,268.00 converted=3401.59,536.00 global=230.80,301.00 ok=1
+DRAG_CONVERT 1789539802.515337 age_ms=0.253 wid=6 state=1 raw=1703.04,268.00 converted=3406.09,536.00 global=233.04,301.00 ok=1
+DRAG_CONVERT 1789539802.533734 age_ms=0.234 wid=6 state=1 raw=1705.29,268.00 converted=3410.58,536.00 global=235.29,301.00 ok=1
+DRAG_CONVERT 1789539802.554544 age_ms=0.201 wid=6 state=1 raw=1707.54,268.00 converted=3415.08,536.00 global=237.54,301.00 ok=1
+DRAG_CONVERT 1789539802.572392 age_ms=0.205 wid=6 state=1 raw=1709.79,268.00 converted=3419.57,536.00 global=239.79,301.00 ok=1
+DRAG_CONVERT 1789539802.589819 age_ms=0.305 wid=6 state=1 raw=1712.04,268.00 converted=3424.07,536.00 global=242.04,301.00 ok=1
+DRAG_CONVERT 1789539802.609768 age_ms=0.272 wid=6 state=1 raw=1714.28,268.00 converted=3428.57,536.00 global=244.28,301.00 ok=1
+DRAG_CONVERT 1789539802.628892 age_ms=0.227 wid=6 state=1 raw=1716.53,268.00 converted=3433.06,536.00 global=246.53,301.00 ok=1
+DRAG_CONVERT 1789539802.647766 age_ms=1.478 wid=6 state=1 raw=1718.78,268.00 converted=3437.56,536.00 global=248.78,301.00 ok=1
+DRAG_CONVERT 1789539802.666164 age_ms=0.254 wid=6 state=1 raw=1721.03,268.00 converted=3442.05,536.00 global=251.03,301.00 ok=1
+DRAG_CONVERT 1789539802.685782 age_ms=0.273 wid=6 state=1 raw=1723.28,268.00 converted=3446.55,536.00 global=253.27,301.00 ok=1
+DRAG_CONVERT 1789539802.702509 age_ms=0.275 wid=6 state=1 raw=1725.52,268.00 converted=3451.05,536.00 global=255.52,301.00 ok=1
+DRAG_CONVERT 1789539802.723479 age_ms=0.210 wid=6 state=1 raw=1727.77,268.00 converted=3455.54,536.00 global=257.77,301.00 ok=1
+DRAG_CONVERT 1789539802.741781 age_ms=0.258 wid=6 state=1 raw=1730.02,268.00 converted=3460.04,536.00 global=260.02,301.00 ok=1
+DRAG_CONVERT 1789539802.761652 age_ms=0.249 wid=6 state=1 raw=1732.27,268.00 converted=3464.53,536.00 global=262.27,301.00 ok=1
+DRAG_CONVERT 1789539802.783350 age_ms=1.070 wid=6 state=1 raw=1734.51,268.00 converted=3469.03,536.00 global=264.51,301.00 ok=1
+DRAG_CONVERT 1789539802.803493 age_ms=0.277 wid=6 state=1 raw=1736.76,268.00 converted=3473.52,536.00 global=266.76,301.00 ok=1
+DRAG_CONVERT 1789539802.824040 age_ms=0.160 wid=6 state=1 raw=1739.01,268.00 converted=3478.02,536.00 global=269.01,301.00 ok=1
+DRAG_CONVERT 1789539802.861972 age_ms=17.355 wid=6 state=1 raw=1743.51,268.00 converted=3487.01,536.00 global=273.51,301.00 ok=1
+DRAG_CONVERT 1789539802.883151 age_ms=0.805 wid=6 state=1 raw=1745.75,268.00 converted=3491.51,536.00 global=275.75,301.00 ok=1
+DRAG_CONVERT 1789539802.912142 age_ms=10.639 wid=6 state=1 raw=1748.00,268.00 converted=3496.00,536.00 global=278.00,301.00 ok=1
+DRAG_CONVERT 1789539802.920440 age_ms=0.215 wid=6 state=1 raw=1750.25,268.00 converted=3500.50,536.00 global=280.25,301.00 ok=1
+DRAG_CONVERT 1789539802.945433 age_ms=4.326 wid=6 state=1 raw=1752.50,268.00 converted=3505.00,536.00 global=282.50,301.00 ok=1
+DRAG_CONVERT 1789539802.979148 age_ms=15.816 wid=6 state=1 raw=1754.75,268.00 converted=3509.49,536.00 global=284.75,301.00 ok=1
+DRAG_CONVERT 1789539802.981889 age_ms=0.218 wid=6 state=1 raw=1756.99,268.00 converted=3513.99,536.00 global=286.99,301.00 ok=1
+DRAG_CONVERT 1789539803.012369 age_ms=9.774 wid=6 state=1 raw=1759.24,268.00 converted=3518.48,536.00 global=289.24,301.00 ok=1
+DRAG_CONVERT 1789539803.019508 age_ms=0.225 wid=6 state=1 raw=1761.49,268.00 converted=3522.98,536.00 global=291.49,301.00 ok=1
+DRAG_CONVERT 1789539803.045883 age_ms=5.744 wid=6 state=1 raw=1763.74,268.00 converted=3527.48,536.00 global=293.74,301.00 ok=1
+DRAG_CONVERT 1789539803.112419 age_ms=14.074 wid=6 state=1 raw=1770.48,268.00 converted=3540.96,536.00 global=300.48,301.00 ok=1
+DRAG_CONVERT 1789539803.119831 age_ms=0.217 wid=6 state=1 raw=1772.73,268.00 converted=3545.46,536.00 global=302.73,301.00 ok=1
+DRAG_CONVERT 1789539803.136365 age_ms=0.209 wid=6 state=1 raw=1774.98,268.00 converted=3549.95,536.00 global=304.98,301.00 ok=1
+DRAG_CONVERT 1789539803.157424 age_ms=0.343 wid=6 state=1 raw=1777.22,268.00 converted=3554.45,536.00 global=307.23,301.00 ok=1
+DRAG_CONVERT 1789539803.179274 age_ms=1.730 wid=6 state=1 raw=1779.47,268.00 converted=3558.95,536.00 global=309.47,301.00 ok=1
+DRAG_CONVERT 1789539803.198631 age_ms=0.245 wid=6 state=1 raw=1781.72,268.00 converted=3563.44,536.00 global=311.72,301.00 ok=1
+DRAG_CONVERT 1789539803.219498 age_ms=0.238 wid=6 state=1 raw=1783.97,268.00 converted=3567.94,536.00 global=313.97,301.00 ok=1
+DRAG_CONVERT 1789539803.236332 age_ms=0.306 wid=6 state=1 raw=1786.22,268.00 converted=3572.43,536.00 global=316.22,301.00 ok=1
+DRAG_CONVERT 1789539803.253764 age_ms=0.259 wid=6 state=1 raw=1788.46,268.00 converted=3576.93,536.00 global=318.46,301.00 ok=1
+DRAG_CONVERT 1789539803.279084 age_ms=4.617 wid=6 state=1 raw=1790.71,268.00 converted=3581.43,536.00 global=320.71,301.00 ok=1
+DRAG_CONVERT 1789539803.293630 age_ms=0.165 wid=6 state=1 raw=1792.96,268.00 converted=3585.92,536.00 global=322.96,301.00 ok=1
+DRAG_CONVERT 1789539803.314546 age_ms=0.197 wid=6 state=1 raw=1795.21,268.00 converted=3590.42,536.00 global=325.21,301.00 ok=1
+DRAG_CONVERT 1789539803.345716 age_ms=10.482 wid=6 state=1 raw=1797.46,268.00 converted=3594.91,536.00 global=327.46,301.00 ok=1
+DRAG_CONVERT 1789539803.354064 age_ms=0.569 wid=6 state=1 raw=1799.70,268.00 converted=3599.41,536.00 global=329.70,301.00 ok=1
+DRAG_CONVERT 1789539803.378794 age_ms=4.409 wid=6 state=1 raw=1801.95,268.00 converted=3603.90,536.00 global=331.95,301.00 ok=1
+DRAG_CONVERT 1789539803.412208 age_ms=18.644 wid=6 state=1 raw=1804.20,268.00 converted=3608.40,536.00 global=334.20,301.00 ok=1
+DRAG_CONVERT 1789539803.413403 age_ms=0.392 wid=6 state=1 raw=1806.45,268.00 converted=3612.90,536.00 global=336.45,301.00 ok=1
+DRAG_CONVERT 1789539803.479099 age_ms=7.716 wid=6 state=1 raw=1813.19,268.00 converted=3626.38,536.00 global=343.19,301.00 ok=1
+DRAG_CONVERT 1789539803.491873 age_ms=0.303 wid=6 state=1 raw=1815.44,268.00 converted=3630.88,536.00 global=345.44,301.00 ok=1
+DRAG_CONVERT 1789539803.512770 age_ms=0.229 wid=6 state=1 raw=1817.69,268.00 converted=3635.38,536.00 global=347.69,301.00 ok=1
+DRAG_CONVERT 1789539803.532948 age_ms=0.217 wid=6 state=1 raw=1819.94,268.00 converted=3639.87,536.00 global=349.94,301.00 ok=1
+DRAG_CONVERT 1789539803.549712 age_ms=0.228 wid=6 state=1 raw=1822.18,268.00 converted=3644.37,536.00 global=352.18,301.00 ok=1
+DRAG_CONVERT 1789539803.570599 age_ms=0.229 wid=6 state=1 raw=1824.43,268.00 converted=3648.86,536.00 global=354.43,301.00 ok=1
+DRAG_CONVERT 1789539803.591442 age_ms=0.195 wid=6 state=1 raw=1826.68,268.00 converted=3653.36,536.00 global=356.68,301.00 ok=1
+DRAG_CONVERT 1789539803.608173 age_ms=0.237 wid=6 state=1 raw=1828.93,268.00 converted=3657.85,536.00 global=358.93,301.00 ok=1
+DRAG_CONVERT 1789539803.624909 age_ms=0.235 wid=6 state=1 raw=1831.18,268.00 converted=3662.35,536.00 global=361.17,301.00 ok=1
+DRAG_CONVERT 1789539803.643616 age_ms=2.193 wid=6 state=1 raw=1833.42,268.00 converted=3666.85,536.00 global=363.42,301.00 ok=1
+DRAG_CONVERT 1789539803.661724 age_ms=0.217 wid=6 state=1 raw=1835.67,268.00 converted=3671.34,536.00 global=365.67,301.00 ok=1
+DRAG_CONVERT 1789539803.681657 age_ms=0.175 wid=6 state=1 raw=1837.92,268.00 converted=3675.84,536.00 global=367.92,301.00 ok=1
+DRAG_CONVERT 1789539803.701796 age_ms=0.313 wid=6 state=1 raw=1840.17,268.00 converted=3680.33,536.00 global=370.17,301.00 ok=1
+DRAG_CONVERT 1789539803.718591 age_ms=0.289 wid=6 state=1 raw=1842.41,268.00 converted=3684.83,536.00 global=372.41,301.00 ok=1
+DRAG_CONVERT 1789539803.738668 age_ms=2.312 wid=6 state=1 raw=1844.66,268.00 converted=3689.32,536.00 global=374.66,301.00 ok=1
+DRAG_CONVERT 1789539803.757401 age_ms=0.197 wid=6 state=1 raw=1846.91,268.00 converted=3693.82,536.00 global=376.91,301.00 ok=1
+DRAG_CONVERT 1789539803.778235 age_ms=0.167 wid=6 state=1 raw=1849.16,268.00 converted=3698.32,536.00 global=379.16,301.00 ok=1
+DRAG_CONVERT 1789539803.795739 age_ms=0.165 wid=6 state=1 raw=1851.41,268.00 converted=3702.81,536.00 global=381.41,301.00 ok=1
+DRAG_CONVERT 1789539803.812774 age_ms=0.256 wid=6 state=1 raw=1853.65,268.00 converted=3707.31,536.00 global=383.65,301.00 ok=1
+DRAG_CONVERT 1789539803.831647 age_ms=2.348 wid=6 state=1 raw=1855.90,268.00 converted=3711.80,536.00 global=385.90,301.00 ok=1
+DRAG_CONVERT 1789539803.850750 age_ms=0.561 wid=6 state=1 raw=1858.15,268.00 converted=3716.30,536.00 global=388.15,301.00 ok=1
+DRAG_CONVERT 1789539803.871393 age_ms=0.201 wid=6 state=1 raw=1860.40,268.00 converted=3720.80,536.00 global=390.40,301.00 ok=1
+DRAG_CONVERT 1789539803.887889 age_ms=0.174 wid=6 state=1 raw=1862.65,268.00 converted=3725.29,536.00 global=392.65,301.00 ok=1
+DRAG_CONVERT 1789539803.905680 age_ms=0.202 wid=6 state=1 raw=1864.89,268.00 converted=3729.79,536.00 global=394.89,301.00 ok=1
+DRAG_CONVERT 1789539803.928866 age_ms=6.498 wid=6 state=1 raw=1867.14,268.00 converted=3734.28,536.00 global=397.14,301.00 ok=1
+DRAG_CONVERT 1789539803.940886 age_ms=0.246 wid=6 state=1 raw=1869.39,268.00 converted=3738.78,536.00 global=399.39,301.00 ok=1
+DRAG_CONVERT 1789539803.962340 age_ms=2.814 wid=6 state=1 raw=1871.64,268.00 converted=3743.27,536.00 global=401.64,301.00 ok=1
+DRAG_CONVERT 1789539803.978960 age_ms=1.471 wid=6 state=1 raw=1873.89,268.00 converted=3747.77,536.00 global=403.89,301.00 ok=1
+DRAG_CONVERT 1789539803.998331 age_ms=0.193 wid=6 state=1 raw=1876.13,268.00 converted=3752.27,536.00 global=406.13,301.00 ok=1
+DRAG_CONVERT 1789539804.029159 age_ms=11.621 wid=6 state=1 raw=1878.38,268.00 converted=3756.76,536.00 global=408.38,301.00 ok=1
+DRAG_CONVERT 1789539804.045744 age_ms=7.386 wid=6 state=1 raw=1880.63,268.00 converted=3761.26,536.00 global=410.63,301.00 ok=1
+DRAG_CONVERT 1789539804.062287 age_ms=4.779 wid=6 state=1 raw=1882.88,268.00 converted=3765.75,536.00 global=412.88,301.00 ok=1
+DRAG_CONVERT 1789539804.079132 age_ms=3.873 wid=6 state=1 raw=1885.12,268.00 converted=3770.25,536.00 global=415.12,301.00 ok=1
+DRAG_CONVERT 1789539804.096829 age_ms=0.310 wid=6 state=1 raw=1887.37,268.00 converted=3774.75,536.00 global=417.37,301.00 ok=1
+DRAG_CONVERT 1789539804.164587 age_ms=9.306 wid=6 state=1 raw=1894.12,268.00 converted=3788.23,536.00 global=424.12,301.00 ok=1
+DRAG_CONVERT 1789539804.176428 age_ms=0.269 wid=6 state=1 raw=1896.36,268.00 converted=3792.73,536.00 global=426.36,301.00 ok=1
+DRAG_CONVERT 1789539804.197482 age_ms=0.183 wid=6 state=1 raw=1898.61,268.00 converted=3797.23,536.00 global=428.61,301.00 ok=1
+DRAG_CONVERT 1789539804.218233 age_ms=0.333 wid=6 state=1 raw=1900.86,268.00 converted=3801.72,536.00 global=430.86,301.00 ok=1
+DRAG_CONVERT 1789539804.239074 age_ms=0.273 wid=6 state=1 raw=1903.11,268.00 converted=3806.22,536.00 global=433.11,301.00 ok=1
+DRAG_CONVERT 1789539804.256039 age_ms=0.402 wid=6 state=1 raw=1905.36,268.00 converted=3810.71,536.00 global=435.36,301.00 ok=1
+DRAG_CONVERT 1789539804.276854 age_ms=0.327 wid=6 state=1 raw=1907.60,268.00 converted=3815.21,536.00 global=437.60,301.00 ok=1
+DRAG_CONVERT 1789539804.293769 age_ms=0.238 wid=6 state=1 raw=1909.85,268.00 converted=3819.70,536.00 global=439.85,301.00 ok=1
+DRAG_CONVERT 1789539804.313779 age_ms=1.876 wid=6 state=1 raw=1912.10,268.00 converted=3824.20,536.00 global=442.10,301.00 ok=1
+DRAG_CONVERT 1789539804.328919 age_ms=0.167 wid=6 state=1 raw=1914.35,268.00 converted=3828.70,536.00 global=444.35,301.00 ok=1
+DRAG_CONVERT 1789539804.345952 age_ms=0.446 wid=6 state=1 raw=1916.60,268.00 converted=3833.19,536.00 global=446.60,301.00 ok=1
+DRAG_CONVERT 1789539804.366842 age_ms=0.273 wid=6 state=1 raw=1918.84,268.00 converted=3837.69,536.00 global=448.84,301.00 ok=1
+DRAG_CONVERT 1789539804.386037 age_ms=0.213 wid=6 state=1 raw=1921.09,268.00 converted=3842.18,536.00 global=451.09,301.00 ok=1
+DRAG_CONVERT 1789539804.405748 age_ms=0.235 wid=6 state=1 raw=1923.34,268.00 converted=3846.68,536.00 global=453.34,301.00 ok=1
+DRAG_CONVERT 1789539804.422480 age_ms=0.231 wid=6 state=1 raw=1925.59,268.00 converted=3851.18,536.00 global=455.59,301.00 ok=1
+DRAG_CONVERT 1789539804.443332 age_ms=0.194 wid=6 state=1 raw=1927.84,268.00 converted=3855.67,536.00 global=457.84,301.00 ok=1
+DRAG_CONVERT 1789539804.461763 age_ms=0.214 wid=6 state=1 raw=1930.08,268.00 converted=3860.17,536.00 global=460.08,301.00 ok=1
+DRAG_CONVERT 1789539804.480718 age_ms=0.169 wid=6 state=1 raw=1932.33,268.00 converted=3864.66,536.00 global=462.33,301.00 ok=1
+DRAG_CONVERT 1789539804.497545 age_ms=0.286 wid=6 state=1 raw=1934.58,268.00 converted=3869.16,536.00 global=464.58,301.00 ok=1
+DRAG_CONVERT 1789539804.514997 age_ms=0.985 wid=6 state=1 raw=1936.83,268.00 converted=3873.65,536.00 global=466.83,301.00 ok=1
+DRAG_CONVERT 1789539804.545534 age_ms=10.607 wid=6 state=1 raw=1939.07,268.00 converted=3878.15,536.00 global=469.08,301.00 ok=1
+DRAG_CONVERT 1789539804.578919 age_ms=9.878 wid=6 state=1 raw=1943.57,268.00 converted=3887.14,536.00 global=473.57,301.00 ok=1
+DRAG_CONVERT 1789539804.629201 age_ms=3.672 wid=6 state=1 raw=1950.31,268.00 converted=3900.63,536.00 global=480.31,301.00 ok=1
+DRAG_CONVERT 1789539804.646930 age_ms=0.195 wid=6 state=1 raw=1952.56,268.00 converted=3905.12,536.00 global=482.56,301.00 ok=1
+DRAG_CONVERT 1789539804.665680 age_ms=0.173 wid=6 state=1 raw=1954.81,268.00 converted=3909.62,536.00 global=484.81,301.00 ok=1
+DRAG_CONVERT 1789539804.685622 age_ms=0.303 wid=6 state=1 raw=1957.06,268.00 converted=3914.12,536.00 global=487.06,301.00 ok=1
+DRAG_CONVERT 1789539804.705727 age_ms=0.221 wid=6 state=1 raw=1959.31,268.00 converted=3918.61,536.00 global=489.31,301.00 ok=1
+DRAG_CONVERT 1789539804.726577 age_ms=0.219 wid=6 state=1 raw=1961.55,268.00 converted=3923.11,536.00 global=491.55,301.00 ok=1
+DRAG_CONVERT 1789539804.746276 age_ms=1.182 wid=6 state=1 raw=1963.80,268.00 converted=3927.60,536.00 global=493.80,301.00 ok=1
+DRAG_CONVERT 1789539804.764115 age_ms=0.447 wid=6 state=1 raw=1966.05,268.00 converted=3932.10,536.00 global=496.05,301.00 ok=1
+DRAG_CONVERT 1789539804.779786 age_ms=0.187 wid=6 state=1 raw=1968.30,268.00 converted=3936.60,536.00 global=498.30,301.00 ok=1
+DRAG_CONVERT 1789539804.796536 age_ms=0.178 wid=6 state=1 raw=1970.55,268.00 converted=3941.09,536.00 global=500.55,301.00 ok=1
+DRAG_CONVERT 1789539804.813712 age_ms=0.198 wid=6 state=1 raw=1972.79,268.00 converted=3945.59,536.00 global=502.79,301.00 ok=1
+DRAG_CONVERT 1789539804.830560 age_ms=0.331 wid=6 state=1 raw=1975.04,268.00 converted=3950.08,536.00 global=505.04,301.00 ok=1
+DRAG_CONVERT 1789539804.851315 age_ms=0.219 wid=6 state=1 raw=1977.29,268.00 converted=3954.58,536.00 global=507.29,301.00 ok=1
+DRAG_CONVERT 1789539804.871554 age_ms=0.391 wid=6 state=1 raw=1979.54,268.00 converted=3959.07,536.00 global=509.54,301.00 ok=1
+DRAG_CONVERT 1789539804.889738 age_ms=0.213 wid=6 state=1 raw=1981.79,268.00 converted=3963.57,536.00 global=511.79,301.00 ok=1
+DRAG_CONVERT 1789539804.910636 age_ms=0.201 wid=6 state=1 raw=1984.03,268.00 converted=3968.07,536.00 global=514.03,301.00 ok=1
+DRAG_CONVERT 1789539804.930624 age_ms=3.451 wid=6 state=1 raw=1986.28,268.00 converted=3972.56,536.00 global=516.28,301.00 ok=1
+DRAG_CONVERT 1789539804.948271 age_ms=0.238 wid=6 state=1 raw=1988.53,268.00 converted=3977.06,536.00 global=518.53,301.00 ok=1
+DRAG_CONVERT 1789539804.969502 age_ms=0.207 wid=6 state=1 raw=1990.78,268.00 converted=3981.55,536.00 global=520.78,301.00 ok=1
+DRAG_CONVERT 1789539804.989943 age_ms=0.160 wid=6 state=1 raw=1993.03,268.00 converted=3986.05,536.00 global=523.03,301.00 ok=1
+DRAG_CONVERT 1789539805.009694 age_ms=0.187 wid=6 state=1 raw=1995.27,268.00 converted=3990.55,536.00 global=525.27,301.00 ok=1
+DRAG_CONVERT 1789539805.030613 age_ms=0.242 wid=6 state=1 raw=1997.52,268.00 converted=3995.04,536.00 global=527.52,301.00 ok=1
+DRAG_CONVERT 1789539805.051548 age_ms=0.263 wid=6 state=1 raw=1999.77,268.00 converted=3999.54,536.00 global=529.77,301.00 ok=1
+DRAG_CONVERT 1789539805.069637 age_ms=0.153 wid=6 state=1 raw=2002.02,268.00 converted=4004.03,536.00 global=532.02,301.00 ok=1
+DRAG_CONVERT 1789539805.090769 age_ms=0.336 wid=6 state=1 raw=2004.26,268.00 converted=4008.53,536.00 global=534.26,301.00 ok=1
+DRAG_CONVERT 1789539805.111563 age_ms=0.248 wid=6 state=1 raw=2006.51,268.00 converted=4013.02,536.00 global=536.51,301.00 ok=1
+DRAG_CONVERT 1789539805.128322 age_ms=0.243 wid=6 state=1 raw=2008.76,268.00 converted=4017.52,536.00 global=538.76,301.00 ok=1
+DRAG_CONVERT 1789539805.146947 age_ms=0.394 wid=6 state=1 raw=2011.01,268.00 converted=4022.02,536.00 global=541.01,301.00 ok=1
+DRAG_CONVERT 1789539805.164021 age_ms=0.287 wid=6 state=1 raw=2013.26,268.00 converted=4026.51,536.00 global=543.26,301.00 ok=1
+DRAG_CONVERT 1789539805.181773 age_ms=0.233 wid=6 state=1 raw=2015.50,268.00 converted=4031.01,536.00 global=545.50,301.00 ok=1
+DRAG_CONVERT 1789539805.198453 age_ms=0.247 wid=6 state=1 raw=2017.75,268.00 converted=4035.50,536.00 global=547.75,301.00 ok=1
+DRAG_CONVERT 1789539805.219344 age_ms=0.228 wid=6 state=1 raw=2020.00,268.00 converted=4040.00,536.00 global=550.00,301.00 ok=1
+DRAG_CONVERT 1789539817.244351 age_ms=1.844 wid=6 state=1 raw=2017.75,268.00 converted=4035.50,536.00 global=547.75,301.00 ok=1
+DRAG_CONVERT 1789539817.262824 age_ms=1.185 wid=6 state=1 raw=2015.50,268.00 converted=4031.01,536.00 global=545.50,301.00 ok=1
+DRAG_CONVERT 1789539817.282237 age_ms=1.253 wid=6 state=1 raw=2013.26,268.00 converted=4026.51,536.00 global=543.26,301.00 ok=1
+DRAG_CONVERT 1789539817.303103 age_ms=1.268 wid=6 state=1 raw=2011.01,268.00 converted=4022.02,536.00 global=541.01,301.00 ok=1
+DRAG_CONVERT 1789539817.323480 age_ms=0.783 wid=6 state=1 raw=2008.76,268.00 converted=4017.52,536.00 global=538.76,301.00 ok=1
+DRAG_CONVERT 1789539817.344439 age_ms=1.073 wid=6 state=1 raw=2006.51,268.00 converted=4013.02,536.00 global=536.51,301.00 ok=1
+DRAG_CONVERT 1789539817.467377 age_ms=9.396 wid=6 state=1 raw=1993.03,268.00 converted=3986.05,536.00 global=523.03,301.00 ok=1
+DRAG_CONVERT 1789539817.469842 age_ms=0.303 wid=6 state=1 raw=1990.78,268.00 converted=3981.55,536.00 global=520.78,301.00 ok=1
+DRAG_CONVERT 1789539817.490482 age_ms=0.091 wid=6 state=1 raw=1988.53,268.00 converted=3977.06,536.00 global=518.53,301.00 ok=1
+DRAG_CONVERT 1789539817.508119 age_ms=0.185 wid=6 state=1 raw=1986.28,268.00 converted=3972.56,536.00 global=516.28,301.00 ok=1
+DRAG_CONVERT 1789539817.526352 age_ms=0.203 wid=6 state=1 raw=1984.03,268.00 converted=3968.07,536.00 global=514.03,301.00 ok=1
+DRAG_CONVERT 1789539817.545833 age_ms=0.309 wid=6 state=1 raw=1981.79,268.00 converted=3963.57,536.00 global=511.79,301.00 ok=1
+DRAG_CONVERT 1789539817.566623 age_ms=0.257 wid=6 state=1 raw=1979.54,268.00 converted=3959.07,536.00 global=509.54,301.00 ok=1
+DRAG_CONVERT 1789539817.587518 age_ms=0.276 wid=6 state=1 raw=1977.29,268.00 converted=3954.58,536.00 global=507.29,301.00 ok=1
+DRAG_CONVERT 1789539817.604374 age_ms=0.268 wid=6 state=1 raw=1975.04,268.00 converted=3950.08,536.00 global=505.04,301.00 ok=1
+DRAG_CONVERT 1789539817.626045 age_ms=0.226 wid=6 state=1 raw=1972.79,268.00 converted=3945.59,536.00 global=502.79,301.00 ok=1
+DRAG_CONVERT 1789539817.645874 age_ms=0.316 wid=6 state=1 raw=1970.55,268.00 converted=3941.09,536.00 global=500.55,301.00 ok=1
+DRAG_CONVERT 1789539817.666630 age_ms=0.250 wid=6 state=1 raw=1968.30,268.00 converted=3936.60,536.00 global=498.30,301.00 ok=1
+DRAG_CONVERT 1789539817.684168 age_ms=0.330 wid=6 state=1 raw=1966.05,268.00 converted=3932.10,536.00 global=496.05,301.00 ok=1
+DRAG_CONVERT 1789539817.702261 age_ms=0.241 wid=6 state=1 raw=1963.80,268.00 converted=3927.60,536.00 global=493.80,301.00 ok=1
+DRAG_CONVERT 1789539817.723505 age_ms=0.206 wid=6 state=1 raw=1961.55,268.00 converted=3923.11,536.00 global=491.55,301.00 ok=1
+DRAG_CONVERT 1789539817.744147 age_ms=0.355 wid=6 state=1 raw=1959.31,268.00 converted=3918.61,536.00 global=489.31,301.00 ok=1
+DRAG_CONVERT 1789539817.761741 age_ms=0.242 wid=6 state=1 raw=1957.06,268.00 converted=3914.12,536.00 global=487.06,301.00 ok=1
+DRAG_CONVERT 1789539817.779028 age_ms=0.293 wid=6 state=1 raw=1954.81,268.00 converted=3909.62,536.00 global=484.81,301.00 ok=1
+DRAG_CONVERT 1789539817.799585 age_ms=0.333 wid=6 state=1 raw=1952.56,268.00 converted=3905.12,536.00 global=482.56,301.00 ok=1
+DRAG_CONVERT 1789539817.820942 age_ms=0.260 wid=6 state=1 raw=1950.31,268.00 converted=3900.63,536.00 global=480.31,301.00 ok=1
+DRAG_CONVERT 1789539817.843874 age_ms=2.896 wid=6 state=1 raw=1948.07,268.00 converted=3896.13,536.00 global=478.07,301.00 ok=1
+DRAG_CONVERT 1789539817.858060 age_ms=0.314 wid=6 state=1 raw=1945.82,268.00 converted=3891.64,536.00 global=475.82,301.00 ok=1
+DRAG_CONVERT 1789539817.878776 age_ms=0.173 wid=6 state=1 raw=1943.57,268.00 converted=3887.14,536.00 global=473.57,301.00 ok=1
+DRAG_CONVERT 1789539817.896786 age_ms=0.306 wid=6 state=1 raw=1941.32,268.00 converted=3882.65,536.00 global=471.32,301.00 ok=1
+DRAG_CONVERT 1789539817.916847 age_ms=0.165 wid=6 state=1 raw=1939.07,268.00 converted=3878.15,536.00 global=469.08,301.00 ok=1
+DRAG_CONVERT 1789539817.935169 age_ms=0.409 wid=6 state=1 raw=1936.83,268.00 converted=3873.65,536.00 global=466.83,301.00 ok=1
+DRAG_CONVERT 1789539817.956128 age_ms=0.209 wid=6 state=1 raw=1934.58,268.00 converted=3869.16,536.00 global=464.58,301.00 ok=1
+DRAG_CONVERT 1789539817.974033 age_ms=0.419 wid=6 state=1 raw=1932.33,268.00 converted=3864.66,536.00 global=462.33,301.00 ok=1
+DRAG_CONVERT 1789539817.992392 age_ms=0.272 wid=6 state=1 raw=1930.08,268.00 converted=3860.17,536.00 global=460.08,301.00 ok=1
+DRAG_CONVERT 1789539818.013471 age_ms=0.199 wid=6 state=1 raw=1927.84,268.00 converted=3855.67,536.00 global=457.84,301.00 ok=1
+DRAG_CONVERT 1789539818.033030 age_ms=2.657 wid=6 state=1 raw=1925.59,268.00 converted=3851.18,536.00 global=455.59,301.00 ok=1
+DRAG_CONVERT 1789539818.047011 age_ms=0.237 wid=6 state=1 raw=1923.34,268.00 converted=3846.68,536.00 global=453.34,301.00 ok=1
+DRAG_CONVERT 1789539818.066499 age_ms=0.224 wid=6 state=1 raw=1921.09,268.00 converted=3842.18,536.00 global=451.09,301.00 ok=1
+DRAG_CONVERT 1789539818.086753 age_ms=0.351 wid=6 state=1 raw=1918.84,268.00 converted=3837.69,536.00 global=448.84,301.00 ok=1
+DRAG_CONVERT 1789539818.104554 age_ms=0.321 wid=6 state=1 raw=1916.60,268.00 converted=3833.19,536.00 global=446.60,301.00 ok=1
+DRAG_CONVERT 1789539818.122876 age_ms=0.323 wid=6 state=1 raw=1914.35,268.00 converted=3828.70,536.00 global=444.35,301.00 ok=1
+DRAG_CONVERT 1789539818.144602 age_ms=3.080 wid=6 state=1 raw=1912.10,268.00 converted=3824.20,536.00 global=442.10,301.00 ok=1
+DRAG_CONVERT 1789539818.162602 age_ms=0.230 wid=6 state=1 raw=1909.85,268.00 converted=3819.70,536.00 global=439.85,301.00 ok=1
+DRAG_CONVERT 1789539818.181614 age_ms=0.251 wid=6 state=1 raw=1907.60,268.00 converted=3815.21,536.00 global=437.60,301.00 ok=1
+DRAG_CONVERT 1789539818.198591 age_ms=0.211 wid=6 state=1 raw=1905.36,268.00 converted=3810.71,536.00 global=435.36,301.00 ok=1
+DRAG_CONVERT 1789539818.218983 age_ms=0.252 wid=6 state=1 raw=1903.11,268.00 converted=3806.22,536.00 global=433.11,301.00 ok=1
+DRAG_CONVERT 1789539818.236230 age_ms=0.196 wid=6 state=1 raw=1900.86,268.00 converted=3801.72,536.00 global=430.86,301.00 ok=1
+DRAG_CONVERT 1789539818.257410 age_ms=0.497 wid=6 state=1 raw=1898.61,268.00 converted=3797.23,536.00 global=428.61,301.00 ok=1
+DRAG_CONVERT 1789539818.278006 age_ms=0.258 wid=6 state=1 raw=1896.36,268.00 converted=3792.73,536.00 global=426.36,301.00 ok=1
+DRAG_CONVERT 1789539818.294863 age_ms=0.285 wid=6 state=1 raw=1894.12,268.00 converted=3788.23,536.00 global=424.12,301.00 ok=1
+DRAG_CONVERT 1789539818.313433 age_ms=1.659 wid=6 state=1 raw=1891.87,268.00 converted=3783.74,536.00 global=421.87,301.00 ok=1
+DRAG_CONVERT 1789539818.330283 age_ms=0.232 wid=6 state=1 raw=1889.62,268.00 converted=3779.24,536.00 global=419.62,301.00 ok=1
+DRAG_CONVERT 1789539818.346323 age_ms=0.206 wid=6 state=1 raw=1887.37,268.00 converted=3774.75,536.00 global=417.37,301.00 ok=1
+DRAG_CONVERT 1789539818.363439 age_ms=0.191 wid=6 state=1 raw=1885.12,268.00 converted=3770.25,536.00 global=415.12,301.00 ok=1
+DRAG_CONVERT 1789539818.384180 age_ms=0.196 wid=6 state=1 raw=1882.88,268.00 converted=3765.75,536.00 global=412.88,301.00 ok=1
+DRAG_CONVERT 1789539818.403809 age_ms=0.432 wid=6 state=1 raw=1880.63,268.00 converted=3761.26,536.00 global=410.63,301.00 ok=1
+DRAG_CONVERT 1789539818.421012 age_ms=0.269 wid=6 state=1 raw=1878.38,268.00 converted=3756.76,536.00 global=408.38,301.00 ok=1
+DRAG_CONVERT 1789539818.441726 age_ms=0.318 wid=6 state=1 raw=1876.13,268.00 converted=3752.27,536.00 global=406.13,301.00 ok=1
+DRAG_CONVERT 1789539818.460877 age_ms=0.246 wid=6 state=1 raw=1873.89,268.00 converted=3747.77,536.00 global=403.89,301.00 ok=1
+DRAG_CONVERT 1789539818.482368 age_ms=0.461 wid=6 state=1 raw=1871.64,268.00 converted=3743.27,536.00 global=401.64,301.00 ok=1
+DRAG_CONVERT 1789539818.499061 age_ms=0.601 wid=6 state=1 raw=1869.39,268.00 converted=3738.78,536.00 global=399.39,301.00 ok=1
+DRAG_CONVERT 1789539818.516536 age_ms=0.252 wid=6 state=1 raw=1867.14,268.00 converted=3734.28,536.00 global=397.14,301.00 ok=1
+DRAG_CONVERT 1789539818.538023 age_ms=0.247 wid=6 state=1 raw=1864.89,268.00 converted=3729.79,536.00 global=394.89,301.00 ok=1
+DRAG_CONVERT 1789539818.558301 age_ms=0.257 wid=6 state=1 raw=1862.65,268.00 converted=3725.29,536.00 global=392.65,301.00 ok=1
+DRAG_CONVERT 1789539818.634883 age_ms=1.317 wid=6 state=1 raw=1853.65,268.00 converted=3707.31,536.00 global=383.65,301.00 ok=1
+DRAG_CONVERT 1789539818.652817 age_ms=0.321 wid=6 state=1 raw=1851.41,268.00 converted=3702.81,536.00 global=381.41,301.00 ok=1
+DRAG_CONVERT 1789539818.670756 age_ms=0.792 wid=6 state=1 raw=1849.16,268.00 converted=3698.32,536.00 global=379.16,301.00 ok=1
+DRAG_CONVERT 1789539818.689496 age_ms=0.385 wid=6 state=1 raw=1846.91,268.00 converted=3693.82,536.00 global=376.91,301.00 ok=1
+DRAG_CONVERT 1789539818.706321 age_ms=0.424 wid=6 state=1 raw=1844.66,268.00 converted=3689.32,536.00 global=374.66,301.00 ok=1
+DRAG_CONVERT 1789539818.727287 age_ms=0.507 wid=6 state=1 raw=1842.41,268.00 converted=3684.83,536.00 global=372.41,301.00 ok=1
+DRAG_CONVERT 1789539818.747250 age_ms=0.678 wid=6 state=1 raw=1840.17,268.00 converted=3680.33,536.00 global=370.17,301.00 ok=1
+DRAG_CONVERT 1789539818.766041 age_ms=0.317 wid=6 state=1 raw=1837.92,268.00 converted=3675.84,536.00 global=367.92,301.00 ok=1
+DRAG_CONVERT 1789539818.782439 age_ms=0.364 wid=6 state=1 raw=1835.67,268.00 converted=3671.34,536.00 global=365.67,301.00 ok=1
+DRAG_CONVERT 1789539818.803377 age_ms=1.432 wid=6 state=1 raw=1833.42,268.00 converted=3666.85,536.00 global=363.42,301.00 ok=1
+DRAG_CONVERT 1789539818.821329 age_ms=0.224 wid=6 state=1 raw=1831.18,268.00 converted=3662.35,536.00 global=361.17,301.00 ok=1
+DRAG_CONVERT 1789539818.842186 age_ms=0.276 wid=6 state=1 raw=1828.93,268.00 converted=3657.85,536.00 global=358.93,301.00 ok=1
+DRAG_CONVERT 1789539818.861553 age_ms=2.425 wid=6 state=1 raw=1826.68,268.00 converted=3653.36,536.00 global=356.68,301.00 ok=1
+DRAG_CONVERT 1789539818.880881 age_ms=0.246 wid=6 state=1 raw=1824.43,268.00 converted=3648.86,536.00 global=354.43,301.00 ok=1
+DRAG_CONVERT 1789539818.897777 age_ms=0.272 wid=6 state=1 raw=1822.18,268.00 converted=3644.37,536.00 global=352.18,301.00 ok=1
+DRAG_CONVERT 1789539818.917712 age_ms=0.225 wid=6 state=1 raw=1819.94,268.00 converted=3639.87,536.00 global=349.94,301.00 ok=1
+DRAG_CONVERT 1789539818.936752 age_ms=0.293 wid=6 state=1 raw=1817.69,268.00 converted=3635.38,536.00 global=347.69,301.00 ok=1
+DRAG_CONVERT 1789539818.956721 age_ms=2.811 wid=6 state=1 raw=1815.44,268.00 converted=3630.88,536.00 global=345.44,301.00 ok=1
+DRAG_CONVERT 1789539818.974349 age_ms=0.220 wid=6 state=1 raw=1813.19,268.00 converted=3626.38,536.00 global=343.19,301.00 ok=1
+DRAG_CONVERT 1789539818.991151 age_ms=0.227 wid=6 state=1 raw=1810.94,268.00 converted=3621.89,536.00 global=340.94,301.00 ok=1
+DRAG_CONVERT 1789539819.011044 age_ms=0.213 wid=6 state=1 raw=1808.70,268.00 converted=3617.39,536.00 global=338.70,301.00 ok=1
+DRAG_CONVERT 1789539819.029755 age_ms=0.236 wid=6 state=1 raw=1806.45,268.00 converted=3612.90,536.00 global=336.45,301.00 ok=1
+DRAG_CONVERT 1789539819.052392 age_ms=1.992 wid=6 state=1 raw=1804.20,268.00 converted=3608.40,536.00 global=334.20,301.00 ok=1
+DRAG_CONVERT 1789539819.071706 age_ms=0.395 wid=6 state=1 raw=1801.95,268.00 converted=3603.90,536.00 global=331.95,301.00 ok=1
+DRAG_CONVERT 1789539819.088584 age_ms=0.289 wid=6 state=1 raw=1799.70,268.00 converted=3599.41,536.00 global=329.70,301.00 ok=1
+DRAG_CONVERT 1789539819.105306 age_ms=0.268 wid=6 state=1 raw=1797.46,268.00 converted=3594.91,536.00 global=327.46,301.00 ok=1
+DRAG_CONVERT 1789539819.122052 age_ms=0.289 wid=6 state=1 raw=1795.21,268.00 converted=3590.42,536.00 global=325.21,301.00 ok=1
+DRAG_CONVERT 1789539819.138746 age_ms=0.248 wid=6 state=1 raw=1792.96,268.00 converted=3585.92,536.00 global=322.96,301.00 ok=1
+DRAG_CONVERT 1789539819.158714 age_ms=0.321 wid=6 state=1 raw=1790.71,268.00 converted=3581.43,536.00 global=320.71,301.00 ok=1
+DRAG_CONVERT 1789539819.177015 age_ms=0.542 wid=6 state=1 raw=1788.46,268.00 converted=3576.93,536.00 global=318.46,301.00 ok=1
+DRAG_CONVERT 1789539819.193801 age_ms=0.260 wid=6 state=1 raw=1786.22,268.00 converted=3572.43,536.00 global=316.22,301.00 ok=1
+DRAG_CONVERT 1789539819.214635 age_ms=0.269 wid=6 state=1 raw=1783.97,268.00 converted=3567.94,536.00 global=313.97,301.00 ok=1
+DRAG_CONVERT 1789539819.232752 age_ms=0.240 wid=6 state=1 raw=1781.72,268.00 converted=3563.44,536.00 global=311.72,301.00 ok=1
+DRAG_CONVERT 1789539819.249688 age_ms=0.296 wid=6 state=1 raw=1779.47,268.00 converted=3558.95,536.00 global=309.47,301.00 ok=1
+DRAG_CONVERT 1789539819.270154 age_ms=0.617 wid=6 state=1 raw=1777.22,268.00 converted=3554.45,536.00 global=307.23,301.00 ok=1
+DRAG_CONVERT 1789539819.290654 age_ms=0.252 wid=6 state=1 raw=1774.98,268.00 converted=3549.95,536.00 global=304.98,301.00 ok=1
+DRAG_CONVERT 1789539819.311588 age_ms=0.310 wid=6 state=1 raw=1772.73,268.00 converted=3545.46,536.00 global=302.73,301.00 ok=1
+DRAG_CONVERT 1789539819.331809 age_ms=0.268 wid=6 state=1 raw=1770.48,268.00 converted=3540.96,536.00 global=300.48,301.00 ok=1
+DRAG_CONVERT 1789539819.352767 age_ms=0.324 wid=6 state=1 raw=1768.23,268.00 converted=3536.47,536.00 global=298.23,301.00 ok=1
+DRAG_CONVERT 1789539819.369931 age_ms=0.399 wid=6 state=1 raw=1765.99,268.00 converted=3531.97,536.00 global=295.99,301.00 ok=1
+DRAG_CONVERT 1789539819.386937 age_ms=0.293 wid=6 state=1 raw=1763.74,268.00 converted=3527.48,536.00 global=293.74,301.00 ok=1
+DRAG_CONVERT 1789539819.405718 age_ms=0.216 wid=6 state=1 raw=1761.49,268.00 converted=3522.98,536.00 global=291.49,301.00 ok=1
+DRAG_CONVERT 1789539819.425920 age_ms=0.293 wid=6 state=1 raw=1759.24,268.00 converted=3518.48,536.00 global=289.24,301.00 ok=1
+DRAG_CONVERT 1789539819.445825 age_ms=0.296 wid=6 state=1 raw=1756.99,268.00 converted=3513.99,536.00 global=286.99,301.00 ok=1
+DRAG_CONVERT 1789539819.463013 age_ms=0.801 wid=6 state=1 raw=1754.75,268.00 converted=3509.49,536.00 global=284.75,301.00 ok=1
+DRAG_CONVERT 1789539819.480812 age_ms=0.217 wid=6 state=1 raw=1752.50,268.00 converted=3505.00,536.00 global=282.50,301.00 ok=1
+DRAG_CONVERT 1789539819.498029 age_ms=0.452 wid=6 state=1 raw=1750.25,268.00 converted=3500.50,536.00 global=280.25,301.00 ok=1
+DRAG_CONVERT 1789539819.514440 age_ms=0.229 wid=6 state=1 raw=1748.00,268.00 converted=3496.00,536.00 global=278.00,301.00 ok=1
+DRAG_CONVERT 1789539819.535426 age_ms=0.307 wid=6 state=1 raw=1745.75,268.00 converted=3491.51,536.00 global=275.75,301.00 ok=1
+DRAG_CONVERT 1789539819.556433 age_ms=0.432 wid=6 state=1 raw=1743.51,268.00 converted=3487.01,536.00 global=273.51,301.00 ok=1
+DRAG_CONVERT 1789539819.575533 age_ms=0.229 wid=6 state=1 raw=1741.26,268.00 converted=3482.52,536.00 global=271.26,301.00 ok=1
+DRAG_CONVERT 1789539819.594277 age_ms=0.252 wid=6 state=1 raw=1739.01,268.00 converted=3478.02,536.00 global=269.01,301.00 ok=1
+DRAG_CONVERT 1789539819.613826 age_ms=0.277 wid=6 state=1 raw=1736.76,268.00 converted=3473.52,536.00 global=266.76,301.00 ok=1
+DRAG_CONVERT 1789539819.633822 age_ms=0.278 wid=6 state=1 raw=1734.51,268.00 converted=3469.03,536.00 global=264.51,301.00 ok=1
+DRAG_CONVERT 1789539819.652745 age_ms=0.401 wid=6 state=1 raw=1732.27,268.00 converted=3464.53,536.00 global=262.27,301.00 ok=1
+DRAG_CONVERT 1789539819.672920 age_ms=0.308 wid=6 state=1 raw=1730.02,268.00 converted=3460.04,536.00 global=260.02,301.00 ok=1
+DRAG_CONVERT 1789539819.689643 age_ms=0.301 wid=6 state=1 raw=1727.77,268.00 converted=3455.54,536.00 global=257.77,301.00 ok=1
+DRAG_CONVERT 1789539819.709915 age_ms=0.376 wid=6 state=1 raw=1725.52,268.00 converted=3451.05,536.00 global=255.52,301.00 ok=1
+DRAG_CONVERT 1789539819.729116 age_ms=0.246 wid=6 state=1 raw=1723.28,268.00 converted=3446.55,536.00 global=253.27,301.00 ok=1
+DRAG_CONVERT 1789539819.750792 age_ms=0.253 wid=6 state=1 raw=1721.03,268.00 converted=3442.05,536.00 global=251.03,301.00 ok=1
+DRAG_CONVERT 1789539819.766606 age_ms=0.266 wid=6 state=1 raw=1718.78,268.00 converted=3437.56,536.00 global=248.78,301.00 ok=1
+DRAG_CONVERT 1789539819.787488 age_ms=0.248 wid=6 state=1 raw=1716.53,268.00 converted=3433.06,536.00 global=246.53,301.00 ok=1
+DRAG_CONVERT 1789539819.808480 age_ms=0.364 wid=6 state=1 raw=1714.28,268.00 converted=3428.57,536.00 global=244.28,301.00 ok=1
+DRAG_CONVERT 1789539819.829305 age_ms=0.322 wid=6 state=1 raw=1712.04,268.00 converted=3424.07,536.00 global=242.04,301.00 ok=1
+DRAG_CONVERT 1789539819.850222 age_ms=0.375 wid=6 state=1 raw=1709.79,268.00 converted=3419.57,536.00 global=239.79,301.00 ok=1
+DRAG_CONVERT 1789539819.878175 age_ms=8.617 wid=6 state=1 raw=1707.54,268.00 converted=3415.08,536.00 global=237.54,301.00 ok=1
+DRAG_CONVERT 1789539819.888657 age_ms=0.230 wid=6 state=1 raw=1705.29,268.00 converted=3410.58,536.00 global=235.29,301.00 ok=1
+DRAG_CONVERT 1789539819.907697 age_ms=0.419 wid=6 state=1 raw=1703.04,268.00 converted=3406.09,536.00 global=233.04,301.00 ok=1
+DRAG_CONVERT 1789539819.926962 age_ms=0.745 wid=6 state=1 raw=1700.80,268.00 converted=3401.59,536.00 global=230.80,301.00 ok=1
+DRAG_CONVERT 1789539819.947364 age_ms=0.271 wid=6 state=1 raw=1698.55,268.00 converted=3397.10,536.00 global=228.55,301.00 ok=1
+DRAG_CONVERT 1789539819.965767 age_ms=0.243 wid=6 state=1 raw=1696.30,268.00 converted=3392.60,536.00 global=226.30,301.00 ok=1
+DRAG_CONVERT 1789539819.990072 age_ms=4.526 wid=6 state=1 raw=1694.05,268.00 converted=3388.10,536.00 global=224.05,301.00 ok=1
+DRAG_CONVERT 1789539820.006673 age_ms=0.265 wid=6 state=1 raw=1691.80,268.00 converted=3383.61,536.00 global=221.80,301.00 ok=1
+DRAG_CONVERT 1789539820.027396 age_ms=0.281 wid=6 state=1 raw=1689.56,268.00 converted=3379.11,536.00 global=219.56,301.00 ok=1
+DRAG_CONVERT 1789539820.045763 age_ms=0.258 wid=6 state=1 raw=1687.31,268.00 converted=3374.62,536.00 global=217.31,301.00 ok=1
+DRAG_CONVERT 1789539820.066400 age_ms=0.271 wid=6 state=1 raw=1685.06,268.00 converted=3370.12,536.00 global=215.06,301.00 ok=1
+DRAG_CONVERT 1789539820.085817 age_ms=0.298 wid=6 state=1 raw=1682.81,268.00 converted=3365.62,536.00 global=212.81,301.00 ok=1
+DRAG_CONVERT 1789539820.105782 age_ms=0.565 wid=6 state=1 raw=1680.56,268.00 converted=3361.13,536.00 global=210.56,301.00 ok=1
+DRAG_CONVERT 1789539820.125524 age_ms=0.286 wid=6 state=1 raw=1678.32,268.00 converted=3356.63,536.00 global=208.32,301.00 ok=1
+DRAG_CONVERT 1789539820.149186 age_ms=3.250 wid=6 state=1 raw=1676.07,268.00 converted=3352.14,536.00 global=206.07,301.00 ok=1
+DRAG_CONVERT 1789539820.165256 age_ms=1.770 wid=6 state=1 raw=1673.82,268.00 converted=3347.64,536.00 global=203.82,301.00 ok=1
+DRAG_CONVERT 1789539820.184663 age_ms=0.259 wid=6 state=1 raw=1671.57,268.00 converted=3343.15,536.00 global=201.57,301.00 ok=1
+DRAG_CONVERT 1789539820.201566 age_ms=0.378 wid=6 state=1 raw=1669.32,268.00 converted=3338.65,536.00 global=199.32,301.00 ok=1
+DRAG_CONVERT 1789539820.222333 age_ms=0.295 wid=6 state=1 raw=1667.08,268.00 converted=3334.15,536.00 global=197.08,301.00 ok=1
+DRAG_CONVERT 1789539820.243350 age_ms=0.436 wid=6 state=1 raw=1664.83,268.00 converted=3329.66,536.00 global=194.83,301.00 ok=1
+DRAG_CONVERT 1789539820.260924 age_ms=0.307 wid=6 state=1 raw=1662.58,268.00 converted=3325.16,536.00 global=192.58,301.00 ok=1
+DRAG_CONVERT 1789539820.282012 age_ms=0.230 wid=6 state=1 raw=1660.33,268.00 converted=3320.67,536.00 global=190.33,301.00 ok=1
+DRAG_CONVERT 1789539820.300826 age_ms=2.138 wid=6 state=1 raw=1658.09,268.00 converted=3316.17,536.00 global=188.09,301.00 ok=1
+DRAG_CONVERT 1789539820.319829 age_ms=0.267 wid=6 state=1 raw=1655.84,268.00 converted=3311.68,536.00 global=185.84,301.00 ok=1
+DRAG_CONVERT 1789539820.338018 age_ms=0.475 wid=6 state=1 raw=1653.59,268.00 converted=3307.18,536.00 global=183.59,301.00 ok=1
+DRAG_CONVERT 1789539820.357619 age_ms=0.576 wid=6 state=1 raw=1651.34,268.00 converted=3302.68,536.00 global=181.34,301.00 ok=1
+DRAG_CONVERT 1789539820.378176 age_ms=0.265 wid=6 state=1 raw=1649.09,268.00 converted=3298.19,536.00 global=179.09,301.00 ok=1
+DRAG_CONVERT 1789539820.399813 age_ms=1.816 wid=6 state=1 raw=1646.85,268.00 converted=3293.69,536.00 global=176.85,301.00 ok=1
+DRAG_CONVERT 1789539820.414686 age_ms=0.219 wid=6 state=1 raw=1644.60,268.00 converted=3289.20,536.00 global=174.60,301.00 ok=1
+DRAG_CONVERT 1789539820.434420 age_ms=0.409 wid=6 state=1 raw=1642.35,268.00 converted=3284.70,536.00 global=172.35,301.00 ok=1
+DRAG_CONVERT 1789539820.451057 age_ms=0.262 wid=6 state=1 raw=1640.10,268.00 converted=3280.20,536.00 global=170.10,301.00 ok=1
+DRAG_CONVERT 1789539820.471412 age_ms=0.302 wid=6 state=1 raw=1637.85,268.00 converted=3275.71,536.00 global=167.85,301.00 ok=1
+DRAG_CONVERT 1789539820.492968 age_ms=0.295 wid=6 state=1 raw=1635.61,268.00 converted=3271.21,536.00 global=165.61,301.00 ok=1
+DRAG_CONVERT 1789539820.509725 age_ms=0.215 wid=6 state=1 raw=1633.36,268.00 converted=3266.72,536.00 global=163.36,301.00 ok=1
+DRAG_CONVERT 1789539820.530596 age_ms=0.225 wid=6 state=1 raw=1631.11,268.00 converted=3262.22,536.00 global=161.11,301.00 ok=1
+DRAG_CONVERT 1789539820.551477 age_ms=0.232 wid=6 state=1 raw=1628.86,268.00 converted=3257.73,536.00 global=158.86,301.00 ok=1
+DRAG_CONVERT 1789539820.573449 age_ms=1.310 wid=6 state=1 raw=1626.61,268.00 converted=3253.23,536.00 global=156.61,301.00 ok=1
+DRAG_CONVERT 1789539820.593280 age_ms=0.276 wid=6 state=1 raw=1624.37,268.00 converted=3248.73,536.00 global=154.37,301.00 ok=1
+DRAG_CONVERT 1789539820.610129 age_ms=0.375 wid=6 state=1 raw=1622.12,268.00 converted=3244.24,536.00 global=152.12,301.00 ok=1
+DRAG_CONVERT 1789539820.629631 age_ms=1.013 wid=6 state=1 raw=1619.87,268.00 converted=3239.74,536.00 global=149.87,301.00 ok=1
+DRAG_CONVERT 1789539820.651703 age_ms=0.663 wid=6 state=1 raw=1617.62,268.00 converted=3235.25,536.00 global=147.62,301.00 ok=1
+DRAG_CONVERT 1789539820.668450 age_ms=0.290 wid=6 state=1 raw=1615.38,268.00 converted=3230.75,536.00 global=145.38,301.00 ok=1
+DRAG_CONVERT 1789539820.689464 age_ms=0.385 wid=6 state=1 raw=1613.13,268.00 converted=3226.25,536.00 global=143.13,301.00 ok=1
+DRAG_CONVERT 1789539820.705969 age_ms=0.222 wid=6 state=1 raw=1610.88,268.00 converted=3221.76,536.00 global=140.88,301.00 ok=1
+DRAG_CONVERT 1789539820.725859 age_ms=0.322 wid=6 state=1 raw=1608.63,268.00 converted=3217.26,536.00 global=138.63,301.00 ok=1
+DRAG_CONVERT 1789539820.746859 age_ms=0.431 wid=6 state=1 raw=1606.38,268.00 converted=3212.77,536.00 global=136.38,301.00 ok=1
+DRAG_CONVERT 1789539820.763729 age_ms=0.267 wid=6 state=1 raw=1604.14,268.00 converted=3208.27,536.00 global=134.14,301.00 ok=1
+DRAG_CONVERT 1789539820.784686 age_ms=0.328 wid=6 state=1 raw=1601.89,268.00 converted=3203.77,536.00 global=131.89,301.00 ok=1
+DRAG_CONVERT 1789539820.802884 age_ms=0.272 wid=6 state=1 raw=1599.64,268.00 converted=3199.28,536.00 global=129.64,301.00 ok=1
+DRAG_CONVERT 1789539820.821812 age_ms=0.251 wid=6 state=1 raw=1597.39,268.00 converted=3194.78,536.00 global=127.39,301.00 ok=1
+DRAG_CONVERT 1789539820.842742 age_ms=0.300 wid=6 state=1 raw=1595.14,268.00 converted=3190.29,536.00 global=125.14,301.00 ok=1
+DRAG_CONVERT 1789539820.863307 age_ms=0.317 wid=6 state=1 raw=1592.90,268.00 converted=3185.79,536.00 global=122.90,301.00 ok=1
+DRAG_CONVERT 1789539820.882276 age_ms=0.359 wid=6 state=1 raw=1590.65,268.00 converted=3181.30,536.00 global=120.65,301.00 ok=1
+DRAG_CONVERT 1789539820.902694 age_ms=0.298 wid=6 state=1 raw=1588.40,268.00 converted=3176.80,536.00 global=118.40,301.00 ok=1
+DRAG_CONVERT 1789539820.919408 age_ms=0.256 wid=6 state=1 raw=1586.15,268.00 converted=3172.30,536.00 global=116.15,301.00 ok=1
+DRAG_CONVERT 1789539820.940246 age_ms=0.237 wid=6 state=1 raw=1583.90,268.00 converted=3167.81,536.00 global=113.90,301.00 ok=1
+DRAG_CONVERT 1789539820.961933 age_ms=4.645 wid=6 state=1 raw=1581.66,268.00 converted=3163.31,536.00 global=111.66,301.00 ok=1
+DRAG_CONVERT 1789539820.978392 age_ms=0.216 wid=6 state=1 raw=1579.41,268.00 converted=3158.82,536.00 global=109.41,301.00 ok=1
+DRAG_CONVERT 1789539820.999403 age_ms=0.359 wid=6 state=1 raw=1577.16,268.00 converted=3154.32,536.00 global=107.16,301.00 ok=1
+DRAG_CONVERT 1789539821.016213 age_ms=0.375 wid=6 state=1 raw=1574.91,268.00 converted=3149.82,536.00 global=104.91,301.00 ok=1
+DRAG_CONVERT 1789539821.033878 age_ms=0.338 wid=6 state=1 raw=1572.66,268.00 converted=3145.33,536.00 global=102.66,301.00 ok=1
+DRAG_CONVERT 1789539821.062083 age_ms=9.098 wid=6 state=1 raw=1570.42,268.00 converted=3140.83,536.00 global=100.42,301.00 ok=1
+DRAG_CONVERT 1789539821.073189 age_ms=0.253 wid=6 state=1 raw=1568.17,268.00 converted=3136.34,536.00 global=98.17,301.00 ok=1
+DRAG_CONVERT 1789539821.095994 age_ms=2.465 wid=6 state=1 raw=1565.92,268.00 converted=3131.84,536.00 global=95.92,301.00 ok=1
+DRAG_CONVERT 1789539821.131724 age_ms=17.308 wid=6 state=1 raw=1563.67,268.00 converted=3127.35,536.00 global=93.67,301.00 ok=1
+DRAG_CONVERT 1789539821.135562 age_ms=0.287 wid=6 state=1 raw=1561.43,268.00 converted=3122.85,536.00 global=91.43,301.00 ok=1
+DRAG_CONVERT 1789539821.162432 age_ms=8.899 wid=6 state=1 raw=1559.18,268.00 converted=3118.35,536.00 global=89.18,301.00 ok=1
+DRAG_CONVERT 1789539821.171016 age_ms=0.399 wid=6 state=1 raw=1556.93,268.00 converted=3113.86,536.00 global=86.93,301.00 ok=1
+DRAG_CONVERT 1789539821.195510 age_ms=5.976 wid=6 state=1 raw=1554.68,268.00 converted=3109.36,536.00 global=84.68,301.00 ok=1
+DRAG_CONVERT 1789539821.206588 age_ms=0.319 wid=6 state=1 raw=1552.43,268.00 converted=3104.87,536.00 global=82.43,301.00 ok=1
+DRAG_CONVERT 1789539821.229119 age_ms=3.266 wid=6 state=1 raw=1550.19,268.00 converted=3100.37,536.00 global=80.19,301.00 ok=1
+DRAG_CONVERT 1789539821.331009 age_ms=8.527 wid=6 state=1 raw=1538.95,268.00 converted=3077.89,536.00 global=68.95,301.00 ok=1
+DRAG_CONVERT 1789539821.343676 age_ms=0.323 wid=6 state=1 raw=1536.70,268.00 converted=3073.40,536.00 global=66.70,301.00 ok=1
+DRAG_CONVERT 1789539821.364559 age_ms=0.334 wid=6 state=1 raw=1534.45,268.00 converted=3068.90,536.00 global=64.45,301.00 ok=1
+DRAG_CONVERT 1789539821.396073 age_ms=9.823 wid=6 state=1 raw=1532.20,268.00 converted=3064.40,536.00 global=62.20,301.00 ok=1
+DRAG_CONVERT 1789539821.429343 age_ms=2.865 wid=6 state=1 raw=1527.71,268.00 converted=3055.41,536.00 global=57.71,301.00 ok=1
+DRAG_CONVERT 1789539821.462395 age_ms=16.212 wid=6 state=1 raw=1525.46,268.00 converted=3050.92,536.00 global=55.46,301.00 ok=1
+DRAG_CONVERT 1789539821.463565 age_ms=0.445 wid=6 state=1 raw=1523.21,268.00 converted=3046.42,536.00 global=53.21,301.00 ok=1
+DRAG_CONVERT 1789539821.495580 age_ms=11.456 wid=6 state=1 raw=1520.96,268.00 converted=3041.93,536.00 global=50.96,301.00 ok=1
+DRAG_CONVERT 1789539821.529244 age_ms=6.793 wid=6 state=1 raw=1516.47,268.00 converted=3032.93,536.00 global=46.47,301.00 ok=1
+DRAG_CONVERT 1789539821.562549 age_ms=19.215 wid=6 state=1 raw=1514.22,268.00 converted=3028.44,536.00 global=44.22,301.00 ok=1
+DRAG_CONVERT 1789539821.563895 age_ms=0.461 wid=6 state=1 raw=1511.97,268.00 converted=3023.94,536.00 global=41.97,301.00 ok=1
+DRAG_CONVERT 1789539821.629120 age_ms=6.573 wid=6 state=1 raw=1505.23,268.00 converted=3010.45,536.00 global=35.23,301.00 ok=1
+DRAG_CONVERT 1789539821.643717 age_ms=0.340 wid=6 state=1 raw=1502.98,268.00 converted=3005.96,536.00 global=32.98,301.00 ok=1
+DRAG_CONVERT 1789539821.660289 age_ms=0.241 wid=6 state=1 raw=1500.73,268.00 converted=3001.46,536.00 global=30.73,301.00 ok=1
+DRAG_CONVERT 1789539821.678006 age_ms=0.378 wid=6 state=1 raw=1498.48,268.00 converted=2996.97,536.00 global=28.48,301.00 ok=1
+DRAG_CONVERT 1789539821.698656 age_ms=0.196 wid=6 state=1 raw=1496.24,268.00 converted=2992.47,536.00 global=26.24,301.00 ok=1
+DRAG_CONVERT 1789539821.717791 age_ms=0.288 wid=6 state=1 raw=1493.99,268.00 converted=2987.98,536.00 global=23.99,301.00 ok=1
+DRAG_CONVERT 1789539821.738727 age_ms=0.316 wid=6 state=1 raw=1491.74,268.00 converted=2983.48,536.00 global=21.74,301.00 ok=1
+DRAG_CONVERT 1789539821.759953 age_ms=0.571 wid=6 state=1 raw=1489.49,268.00 converted=2978.98,536.00 global=19.49,301.00 ok=1
+DRAG_CONVERT 1789539821.780797 age_ms=0.472 wid=6 state=1 raw=1487.24,268.00 converted=2974.49,536.00 global=17.24,301.00 ok=1
+DRAG_CONVERT 1789539821.801510 age_ms=0.510 wid=6 state=1 raw=1485.00,268.00 converted=2969.99,536.00 global=15.00,301.00 ok=1
+DRAG_CONVERT 1789539821.822087 age_ms=0.399 wid=6 state=1 raw=1482.75,268.00 converted=2965.50,536.00 global=12.75,301.00 ok=1
+DRAG_CONVERT 1789539821.840782 age_ms=0.234 wid=6 state=1 raw=1480.50,268.00 converted=2961.00,536.00 global=10.50,301.00 ok=1
+DRAG_CONVERT 1789539821.860084 age_ms=2.481 wid=6 state=1 raw=1478.25,268.00 converted=2956.50,536.00 global=8.25,301.00 ok=1
+DRAG_CONVERT 1789539821.878091 age_ms=0.603 wid=6 state=1 raw=1476.00,268.00 converted=2952.01,536.00 global=6.00,301.00 ok=1
+DRAG_CONVERT 1789539821.906266 age_ms=10.202 wid=6 state=1 raw=1473.76,268.00 converted=2947.51,536.00 global=3.76,301.00 ok=1
+DRAG_CONVERT 1789539821.917193 age_ms=0.239 wid=6 state=1 raw=1471.51,268.00 converted=2943.02,536.00 global=1.51,301.00 ok=1
+DRAG_CONVERT 1789539821.939229 age_ms=1.711 wid=6 state=1 raw=1469.26,268.00 converted=2938.52,536.00 global=-0.74,301.00 ok=1
+DRAG_CONVERT 1789539821.967914 age_ms=4.920 wid=6 state=1 raw=1467.01,268.00 converted=2934.02,536.00 global=-2.99,301.00 ok=1
+DRAG_CONVERT 1789539821.976909 age_ms=0.208 wid=6 state=1 raw=1464.76,268.00 converted=2929.53,536.00 global=-5.24,301.00 ok=1
+DRAG_CONVERT 1789539821.999285 age_ms=1.593 wid=6 state=1 raw=1462.52,268.00 converted=2925.03,536.00 global=-7.48,301.00 ok=1
+DRAG_CONVERT 1789539822.016707 age_ms=0.163 wid=6 state=1 raw=1460.27,268.00 converted=2920.54,536.00 global=-9.73,301.00 ok=1
+.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:240] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_EXPOSED: [5] 0x0-3840x2160 {0x0-1920x1080}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:21:34:240] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:21:34:240] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:21:34:240] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:21:34:240] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:21:34:641] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:21:34:641] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:21:35:451] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:21:35:451] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:21:36:192] [52262:6dd5b001] [INFO][com.freerdp.client.common] - [client_common_save_session_info]: Logon Info V2 [WIN-RL37D50MR0J\David [2]]
+[08:21:36:193] [52262:6dd5b001] [INFO][com.freerdp.client.common] - [client_common_save_session_info]: Logon Extended Info [cookie: TRUE, LogonId: 2, errorInfo: FALSE, notifyType: 0, notifyData: 0]
+[08:21:36:228] [52262:6e017001] [INFO][com.freerdp.channels.rdpsnd.client] - [rdpsnd_load_device_plugin]: [dynamic] Loaded fake backend for rdpsnd
+[08:21:37:192] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 0
+[08:21:37:214] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:21:37:214] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:21:37:282] [52262:6e017001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[08:21:37:302] [52262:6e017001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[08:21:37:372] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:21:37:372] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:21:37:788] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:21:37:788] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:21:38:631] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:21:38:631] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:23:15:796] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_APPLICATION] SDL_EVENT_WINDOW_MOUSE_ENTER: [6] -1470x33-2940x1846 {-1470x33-1470x923}{scale=2.000000,orientation=SDL_ORIENTATION_LANDSCAPE}
+[08:23:15:796] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 1
+[08:23:15:820] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:23:15:820] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [sdl_Pointer_Set_Process]: cursor scale: pixel:SDL_Rect{0x0-48x48}, display:SDL_Rect{0x0-24x24}
+[08:23:15:842] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:23:15:842] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [sdl_Pointer_Set_Process]: cursor scale: pixel:SDL_Rect{0x0-32x32}, display:SDL_Rect{0x0-16x16}
+[08:23:20:571] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:23:20:572] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [sdl_Pointer_Set_Process]: cursor scale: pixel:SDL_Rect{0x0-48x48}, display:SDL_Rect{0x0-24x24}
+[08:23:42:016] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [restoreCursor]: restore cursor: 2
+[08:23:42:016] [52262:ee9add81] [DEBUG][com.freerdp.client.SDL] - [sdl_Pointer_Set_Process]: cursor scale:DRAG_CONVERT 1789539822.044600 age_ms=7.715 wid=6 state=1 raw=1458.02,268.00 converted=2916.04,536.00 global=-11.98,301.00 ok=1
+DRAG_CONVERT 1789539822.055302 age_ms=0.265 wid=6 state=1 raw=1455.77,268.00 converted=2911.55,536.00 global=-14.23,301.00 ok=1
+DRAG_CONVERT 1789539822.079284 age_ms=3.397 wid=6 state=1 raw=1453.53,268.00 converted=2907.05,536.00 global=-16.48,301.00 ok=1
+DRAG_CONVERT 1789539822.095112 age_ms=0.243 wid=6 state=1 raw=1451.28,268.00 converted=2902.55,536.00 global=-18.72,301.00 ok=1
+DRAG_CONVERT 1789539822.113882 age_ms=0.290 wid=6 state=1 raw=1449.03,268.00 converted=2898.06,536.00 global=-20.97,301.00 ok=1
+DRAG_CONVERT 1789539822.131847 age_ms=0.330 wid=6 state=1 raw=1446.78,268.00 converted=2893.56,536.00 global=-23.22,301.00 ok=1
+DRAG_CONVERT 1789539822.151967 age_ms=0.255 wid=6 state=1 raw=1444.53,268.00 converted=2889.07,536.00 global=-25.47,301.00 ok=1
+DRAG_CONVERT 1789539822.169860 age_ms=0.317 wid=6 state=1 raw=1442.29,268.00 converted=2884.57,536.00 global=-27.71,301.00 ok=1
+DRAG_CONVERT 1789539822.188024 age_ms=0.326 wid=6 state=1 raw=1440.04,268.00 converted=2880.07,536.00 global=-29.96,301.00 ok=1
+DRAG_CONVERT 1789539822.207439 age_ms=0.322 wid=6 state=1 raw=1437.79,268.00 converted=2875.58,536.00 global=-32.21,301.00 ok=1
+DRAG_CONVERT 1789539822.225846 age_ms=0.312 wid=6 state=1 raw=1435.54,268.00 converted=2871.08,536.00 global=-34.46,301.00 ok=1
+DRAG_CONVERT 1789539822.246656 age_ms=0.267 wid=6 state=1 raw=1433.29,268.00 converted=2866.59,536.00 global=-36.71,301.00 ok=1
+DRAG_CONVERT 1789539822.263719 age_ms=0.327 wid=6 state=1 raw=1431.05,268.00 converted=2862.09,536.00 global=-38.95,301.00 ok=1
+DRAG_CONVERT 1789539822.284298 age_ms=2.482 wid=6 state=1 raw=1428.80,268.00 converted=2857.60,536.00 global=-41.20,301.00 ok=1
+DRAG_CONVERT 1789539822.304093 age_ms=1.379 wid=6 state=1 raw=1426.55,268.00 converted=2853.10,536.00 global=-43.45,301.00 ok=1
+DRAG_CONVERT 1789539822.325296 age_ms=0.518 wid=6 state=1 raw=1424.30,268.00 converted=2848.60,536.00 global=-45.70,301.00 ok=1
+DRAG_CONVERT 1789539822.343035 age_ms=0.380 wid=6 state=1 raw=1422.05,268.00 converted=2844.11,536.00 global=-47.95,301.00 ok=1
+DRAG_CONVERT 1789539822.360728 age_ms=0.779 wid=6 state=1 raw=1419.81,268.00 converted=2839.61,536.00 global=-50.19,301.00 ok=1
+DRAG_CONVERT 1789539822.380375 age_ms=4.441 wid=6 state=1 raw=1417.56,268.00 converted=2835.12,536.00 global=-52.44,301.00 ok=1
+DRAG_CONVERT 1789539822.479061 age_ms=4.556 wid=6 state=1 raw=1406.32,268.00 converted=2812.64,536.00 global=-63.68,301.00 ok=1
+DRAG_CONVERT 1789539822.491569 age_ms=0.216 wid=6 state=1 raw=1404.07,268.00 converted=2808.14,536.00 global=-65.93,301.00 ok=1
+DRAG_CONVERT 1789539822.513100 age_ms=0.420 wid=6 state=1 raw=1401.82,268.00 converted=2803.65,536.00 global=-68.18,301.00 ok=1
+DRAG_CONVERT 1789539822.529418 age_ms=0.204 wid=6 state=1 raw=1399.57,268.00 converted=2799.15,536.00 global=-70.43,301.00 ok=1
+DRAG_CONVERT 1789539822.551836 age_ms=4.873 wid=6 state=1 raw=1397.33,268.00 converted=2794.65,536.00 global=-72.67,301.00 ok=1
+DRAG_CONVERT 1789539822.579094 age_ms=13.660 wid=6 state=1 raw=1395.08,268.00 converted=2790.16,536.00 global=-74.92,301.00 ok=1
+DRAG_CONVERT 1789539822.586820 age_ms=0.507 wid=6 state=1 raw=1392.83,268.00 converted=2785.66,536.00 global=-77.17,301.00 ok=1
+DRAG_CONVERT 1789539822.605919 age_ms=0.352 wid=6 state=1 raw=1390.58,268.00 converted=2781.17,536.00 global=-79.42,301.00 ok=1
+DRAG_CONVERT 1789539822.626819 age_ms=0.392 wid=6 state=1 raw=1388.34,268.00 converted=2776.67,536.00 global=-81.66,301.00 ok=1
+DRAG_CONVERT 1789539822.651112 age_ms=4.418 wid=6 state=1 raw=1386.09,268.00 converted=2772.18,536.00 global=-83.91,301.00 ok=1
+DRAG_CONVERT 1789539822.665469 age_ms=0.325 wid=6 state=1 raw=1383.84,268.00 converted=2767.68,536.00 global=-86.16,301.00 ok=1
+DRAG_CONVERT 1789539822.685087 age_ms=0.334 wid=6 state=1 raw=1381.59,268.00 converted=2763.18,536.00 global=-88.41,301.00 ok=1
+DRAG_CONVERT 1789539822.702282 age_ms=0.753 wid=6 state=1 raw=1379.34,268.00 converted=2758.69,536.00 global=-90.66,301.00 ok=1
+DRAG_CONVERT 1789539822.719366 age_ms=0.389 wid=6 state=1 raw=1377.10,268.00 converted=2754.19,536.00 global=-92.90,301.00 ok=1
+DRAG_CONVERT 1789539822.736864 age_ms=0.235 wid=6 state=1 raw=1374.85,268.00 converted=2749.70,536.00 global=-95.15,301.00 ok=1
+DRAG_CONVERT 1789539822.756127 age_ms=0.298 wid=6 state=1 raw=1372.60,268.00 converted=2745.20,536.00 global=-97.40,301.00 ok=1
+DRAG_CONVERT 1789539822.773915 age_ms=0.380 wid=6 state=1 raw=1370.35,268.00 converted=2740.70,536.00 global=-99.65,301.00 ok=1
+DRAG_CONVERT 1789539822.792082 age_ms=1.575 wid=6 state=1 raw=1368.10,268.00 converted=2736.21,536.00 global=-101.90,301.00 ok=1
+DRAG_CONVERT 1789539822.811398 age_ms=0.284 wid=6 state=1 raw=1365.86,268.00 converted=2731.71,536.00 global=-104.14,301.00 ok=1
+DRAG_CONVERT 1789539822.829849 age_ms=0.285 wid=6 state=1 raw=1363.61,268.00 converted=2727.22,536.00 global=-106.39,301.00 ok=1
+DRAG_CONVERT 1789539822.846323 age_ms=0.225 wid=6 state=1 raw=1361.36,268.00 converted=2722.72,536.00 global=-108.64,301.00 ok=1
+DRAG_CONVERT 1789539822.867279 age_ms=0.303 wid=6 state=1 raw=1359.11,268.00 converted=2718.23,536.00 global=-110.89,301.00 ok=1
+DRAG_CONVERT 1789539822.886485 age_ms=0.428 wid=6 state=1 raw=1356.86,268.00 converted=2713.73,536.00 global=-113.14,301.00 ok=1
+DRAG_CONVERT 1789539822.906803 age_ms=0.312 wid=6 state=1 raw=1354.62,268.00 converted=2709.23,536.00 global=-115.38,301.00 ok=1
+DRAG_CONVERT 1789539822.927707 age_ms=0.315 wid=6 state=1 raw=1352.37,268.00 converted=2704.74,536.00 global=-117.63,301.00 ok=1
+DRAG_CONVERT 1789539822.945855 age_ms=0.346 wid=6 state=1 raw=1350.12,268.00 converted=2700.24,536.00 global=-119.88,301.00 ok=1
+DRAG_CONVERT 1789539822.966731 age_ms=0.316 wid=6 state=1 raw=1347.87,268.00 converted=2695.75,536.00 global=-122.13,301.00 ok=1
+DRAG_CONVERT 1789539822.987702 age_ms=0.342 wid=6 state=1 raw=1345.62,268.00 converted=2691.25,536.00 global=-124.38,301.00 ok=1
+DRAG_CONVERT 1789539823.007754 age_ms=0.347 wid=6 state=1 raw=1343.38,268.00 converted=2686.75,536.00 global=-126.62,301.00 ok=1
+DRAG_CONVERT 1789539823.027810 age_ms=0.239 wid=6 state=1 raw=1341.13,268.00 converted=2682.26,536.00 global=-128.87,301.00 ok=1
+DRAG_CONVERT 1789539823.048831 age_ms=0.374 wid=6 state=1 raw=1338.88,268.00 converted=2677.76,536.00 global=-131.12,301.00 ok=1
+DRAG_CONVERT 1789539823.065462 age_ms=0.307 wid=6 state=1 raw=1336.63,268.00 converted=2673.27,536.00 global=-133.37,301.00 ok=1
+DRAG_CONVERT 1789539823.085804 age_ms=0.278 wid=6 state=1 raw=1334.39,268.00 converted=2668.77,536.00 global=-135.61,301.00 ok=1
+DRAG_CONVERT 1789539823.106834 age_ms=0.372 wid=6 state=1 raw=1332.14,268.00 converted=2664.27,536.00 global=-137.86,301.00 ok=1
+DRAG_CONVERT 1789539823.126602 age_ms=0.321 wid=6 state=1 raw=1329.89,268.00 converted=2659.78,536.00 global=-140.11,301.00 ok=1
+DRAG_CONVERT 1789539823.147585 age_ms=0.370 wid=6 state=1 raw=1327.64,268.00 converted=2655.28,536.00 global=-142.36,301.00 ok=1
+DRAG_CONVERT 1789539823.166312 age_ms=1.807 wid=6 state=1 raw=1325.39,268.00 converted=2650.79,536.00 global=-144.61,301.00 ok=1
+DRAG_CONVERT 1789539823.181920 age_ms=0.389 wid=6 state=1 raw=1323.15,268.00 converted=2646.29,536.00 global=-146.85,301.00 ok=1
+DRAG_CONVERT 1789539823.200185 age_ms=0.392 wid=6 state=1 raw=1320.90,268.00 converted=2641.80,536.00 global=-149.10,301.00 ok=1
+DRAG_CONVERT 1789539823.220134 age_ms=0.498 wid=6 state=1 raw=1318.65,268.00 converted=2637.30,536.00 global=-151.35,301.00 ok=1
+DRAG_CONVERT 1789539823.241072 age_ms=0.517 wid=6 state=1 raw=1316.40,268.00 converted=2632.80,536.00 global=-153.60,301.00 ok=1
+DRAG_CONVERT 1789539823.260109 age_ms=0.433 wid=6 state=1 raw=1314.15,268.00 converted=2628.31,536.00 global=-155.85,301.00 ok=1
+DRAG_CONVERT 1789539823.280947 age_ms=0.371 wid=6 state=1 raw=1311.91,268.00 converted=2623.81,536.00 global=-158.09,301.00 ok=1
+DRAG_CONVERT 1789539823.298013 age_ms=0.407 wid=6 state=1 raw=1309.66,268.00 converted=2619.32,536.00 global=-160.34,301.00 ok=1
+DRAG_CONVERT 1789539823.314860 age_ms=0.379 wid=6 state=1 raw=1307.41,268.00 converted=2614.82,536.00 global=-162.59,301.00 ok=1
+DRAG_CONVERT 1789539823.333932 age_ms=0.530 wid=6 state=1 raw=1305.16,268.00 converted=2610.32,536.00 global=-164.84,301.00 ok=1
+DRAG_CONVERT 1789539823.355101 age_ms=1.344 wid=6 state=1 raw=1302.91,268.00 converted=2605.83,536.00 global=-167.09,301.00 ok=1
+DRAG_CONVERT 1789539823.374548 age_ms=0.488 wid=6 state=1 raw=1300.67,268.00 converted=2601.33,536.00 global=-169.33,301.00 ok=1
+DRAG_CONVERT 1789539823.395303 age_ms=0.345 wid=6 state=1 raw=1298.42,268.00 converted=2596.84,536.00 global=-171.58,301.00 ok=1
+DRAG_CONVERT 1789539823.412396 age_ms=0.711 wid=6 state=1 raw=1296.17,268.00 converted=2592.34,536.00 global=-173.83,301.00 ok=1
+DRAG_CONVERT 1789539823.432942 age_ms=0.385 wid=6 state=1 raw=1293.92,268.00 converted=2587.85,536.00 global=-176.08,301.00 ok=1
+DRAG_CONVERT 1789539823.450356 age_ms=0.596 wid=6 state=1 raw=1291.68,268.00 converted=2583.35,536.00 global=-178.32,301.00 ok=1
+DRAG_CONVERT 1789539823.471124 age_ms=0.451 wid=6 state=1 raw=1289.43,268.00 converted=2578.85,536.00 global=-180.57,301.00 ok=1
+DRAG_CONVERT 1789539823.490282 age_ms=0.661 wid=6 state=1 raw=1287.18,268.00 converted=2574.36,536.00 global=-182.82,301.00 ok=1
+DRAG_CONVERT 1789539823.508758 age_ms=2.151 wid=6 state=1 raw=1284.93,268.00 converted=2569.86,536.00 global=-185.07,301.00 ok=1
+DRAG_CONVERT 1789539823.526006 age_ms=0.391 wid=6 state=1 raw=1282.68,268.00 converted=2565.37,536.00 global=-187.32,301.00 ok=1
+DRAG_CONVERT 1789539823.547318 age_ms=0.428 wid=6 state=1 raw=1280.44,268.00 converted=2560.87,536.00 global=-189.56,301.00 ok=1
+DRAG_CONVERT 1789539823.564953 age_ms=0.667 wid=6 state=1 raw=1278.19,268.00 converted=2556.38,536.00 global=-191.81,301.00 ok=1
+DRAG_CONVERT 1789539823.584963 age_ms=0.384 wid=6 state=1 raw=1275.94,268.00 converted=2551.88,536.00 global=-194.06,301.00 ok=1
+DRAG_CONVERT 1789539823.605039 age_ms=0.951 wid=6 state=1 raw=1273.69,268.00 converted=2547.38,536.00 global=-196.31,301.00 ok=1
+DRAG_CONVERT 1789539823.626407 age_ms=0.521 wid=6 state=1 raw=1271.44,268.00 converted=2542.89,536.00 global=-198.56,301.00 ok=1
+DRAG_CONVERT 1789539823.642630 age_ms=0.421 wid=6 state=1 raw=1269.20,268.00 converted=2538.39,536.00 global=-200.80,301.00 ok=1
+DRAG_CONVERT 1789539823.660270 age_ms=0.529 wid=6 state=1 raw=1266.95,268.00 converted=2533.90,536.00 global=-203.05,301.00 ok=1
+DRAG_CONVERT 1789539823.680813 age_ms=0.383 wid=6 state=1 raw=1264.70,268.00 converted=2529.40,536.00 global=-205.30,301.00 ok=1
+DRAG_CONVERT 1789539823.699782 age_ms=2.133 wid=6 state=1 raw=1262.45,268.00 converted=2524.90,536.00 global=-207.55,301.00 ok=1
+DRAG_CONVERT 1789539823.718883 age_ms=0.441 wid=6 state=1 raw=1260.20,268.00 converted=2520.41,536.00 global=-209.80,301.00 ok=1
+DRAG_CONVERT 1789539823.738870 age_ms=0.359 wid=6 state=1 raw=1257.96,268.00 converted=2515.91,536.00 global=-212.04,301.00 ok=1
+DRAG_CONVERT 1789539823.758343 age_ms=2.423 wid=6 state=1 raw=1255.71,268.00 converted=2511.42,536.00 global=-214.29,301.00 ok=1
+DRAG_CONVERT 1789539823.773882 age_ms=0.339 wid=6 state=1 raw=1253.46,268.00 converted=2506.92,536.00 global=-216.54,301.00 ok=1
+DRAG_CONVERT 1789539823.794880 age_ms=0.438 wid=6 state=1 raw=1251.21,268.00 converted=2502.43,536.00 global=-218.79,301.00 ok=1
+DRAG_CONVERT 1789539823.813709 age_ms=0.315 wid=6 state=1 raw=1248.96,268.00 converted=2497.93,536.00 global=-221.04,301.00 ok=1
+DRAG_CONVERT 1789539823.834714 age_ms=0.256 wid=6 state=1 raw=1246.72,268.00 converted=2493.43,536.00 global=-223.28,301.00 ok=1
+DRAG_CONVERT 1789539823.854756 age_ms=0.382 wid=6 state=1 raw=1244.47,268.00 converted=2488.94,536.00 global=-225.53,301.00 ok=1
+DRAG_CONVERT 1789539823.875855 age_ms=0.384 wid=6 state=1 raw=1242.22,268.00 converted=2484.44,536.00 global=-227.78,301.00 ok=1
+DRAG_CONVERT 1789539823.896380 age_ms=0.304 wid=6 state=1 raw=1239.97,268.00 converted=2479.95,536.00 global=-230.03,301.00 ok=1
+DRAG_CONVERT 1789539823.917657 age_ms=0.622 wid=6 state=1 raw=1237.72,268.00 converted=2475.45,536.00 global=-232.27,301.00 ok=1
+DRAG_CONVERT 1789539823.937899 age_ms=0.352 wid=6 state=1 raw=1235.48,268.00 converted=2470.95,536.00 global=-234.52,301.00 ok=1
+DRAG_CONVERT 1789539823.954798 age_ms=0.277 wid=6 state=1 raw=1233.23,268.00 converted=2466.46,536.00 global=-236.77,301.00 ok=1
+DRAG_CONVERT 1789539823.971583 age_ms=0.377 wid=6 state=1 raw=1230.98,268.00 converted=2461.96,536.00 global=-239.02,301.00 ok=1
+DRAG_CONVERT 1789539823.989119 age_ms=0.266 wid=6 state=1 raw=1228.73,268.00 converted=2457.47,536.00 global=-241.27,301.00 ok=1
+DRAG_CONVERT 1789539824.012095 age_ms=0.591 wid=6 state=1 raw=1226.49,268.00 converted=2452.97,536.00 global=-243.51,301.00 ok=1
+DRAG_CONVERT 1789539824.031315 age_ms=0.327 wid=6 state=1 raw=1224.24,268.00 converted=2448.48,536.00 global=-245.76,301.00 ok=1
+DRAG_CONVERT 1789539824.051910 age_ms=0.417 wid=6 state=1 raw=1221.99,268.00 converted=2443.98,536.00 global=-248.01,301.00 ok=1
+DRAG_CONVERT 1789539824.073492 age_ms=0.536 wid=6 state=1 raw=1219.74,268.00 converted=2439.48,536.00 global=-250.26,301.00 ok=1
+DRAG_CONVERT 1789539824.090608 age_ms=0.536 wid=6 state=1 raw=1217.49,268.00 converted=2434.99,536.00 global=-252.51,301.00 ok=1
+DRAG_CONVERT 1789539824.107624 age_ms=0.588 wid=6 state=1 raw=1215.25,268.00 converted=2430.49,536.00 global=-254.75,301.00 ok=1
+DRAG_CONVERT 1789539824.126001 age_ms=0.432 wid=6 state=1 raw=1213.00,268.00 converted=2426.00,536.00 global=-257.00,301.00 ok=1
+DRAG_CONVERT 1789539824.147767 age_ms=0.695 wid=6 state=1 raw=1210.75,268.00 converted=2421.50,536.00 global=-259.25,301.00 ok=1
+DRAG_CONVERT 1789539824.166358 age_ms=3.476 wid=6 state=1 raw=1208.50,268.00 converted=2417.00,536.00 global=-261.50,301.00 ok=1
+DRAG_CONVERT 1789539824.184903 age_ms=1.010 wid=6 state=1 raw=1206.25,268.00 converted=2412.51,536.00 global=-263.75,301.00 ok=1
+DRAG_CONVERT 1789539824.205802 age_ms=0.363 wid=6 state=1 raw=1204.01,268.00 converted=2408.01,536.00 global=-265.99,301.00 ok=1
+DRAG_CONVERT 1789539824.222107 age_ms=0.610 wid=6 state=1 raw=1201.76,268.00 converted=2403.52,536.00 global=-268.24,301.00 ok=1
+DRAG_CONVERT 1789539824.242774 age_ms=0.394 wid=6 state=1 raw=1199.51,268.00 converted=2399.02,536.00 global=-270.49,301.00 ok=1
+DRAG_CONVERT 1789539824.261899 age_ms=0.318 wid=6 state=1 raw=1197.26,268.00 converted=2394.52,536.00 global=-272.74,301.00 ok=1
+DRAG_CONVERT 1789539824.282460 age_ms=0.366 wid=6 state=1 raw=1195.01,268.00 converted=2390.03,536.00 global=-274.99,301.00 ok=1
+DRAG_CONVERT 1789539824.303465 age_ms=0.472 wid=6 state=1 raw=1192.77,268.00 converted=2385.53,536.00 global=-277.23,301.00 ok=1
+DRAG_CONVERT 1789539824.320621 age_ms=0.617 wid=6 state=1 raw=1190.52,268.00 converted=2381.04,536.00 global=-279.48,301.00 ok=1
+DRAG_CONVERT 1789539824.341380 age_ms=0.486 wid=6 state=1 raw=1188.27,268.00 converted=2376.54,536.00 global=-281.73,301.00 ok=1
+DRAG_CONVERT 1789539824.361984 age_ms=0.391 wid=6 state=1 raw=1186.02,268.00 converted=2372.05,536.00 global=-283.98,301.00 ok=1
+DRAG_CONVERT 1789539824.378729 age_ms=0.375 wid=6 state=1 raw=1183.78,268.00 converted=2367.55,536.00 global=-286.23,301.00 ok=1
+DRAG_CONVERT 1789539824.397835 age_ms=0.290 wid=6 state=1 raw=1181.53,268.00 converted=2363.05,536.00 global=-288.47,301.00 ok=1
+DRAG_CONVERT 1789539824.419186 age_ms=0.439 wid=6 state=1 raw=1179.28,268.00 converted=2358.56,536.00 global=-290.72,301.00 ok=1
+DRAG_CONVERT 1789539824.439622 age_ms=0.838 wid=6 state=1 raw=1177.03,268.00 converted=2354.06,536.00 global=-292.97,301.00 ok=1
+DRAG_CONVERT 1789539824.459963 age_ms=0.313 wid=6 state=1 raw=1174.78,268.00 converted=2349.57,536.00 global=-295.22,301.00 ok=1
+DRAG_CONVERT 1789539824.478390 age_ms=0.825 wid=6 state=1 raw=1172.54,268.00 converted=2345.07,536.00 global=-297.46,301.00 ok=1
+DRAG_CONVERT 1789539824.497926 age_ms=0.369 wid=6 state=1 raw=1170.29,268.00 converted=2340.57,536.00 global=-299.71,301.00 ok=1
+DRAG_CONVERT 1789539824.518947 age_ms=0.472 wid=6 state=1 raw=1168.04,268.00 converted=2336.08,536.00 global=-301.96,301.00 ok=1
+DRAG_CONVERT 1789539824.536281 age_ms=1.015 wid=6 state=1 raw=1165.79,268.00 converted=2331.58,536.00 global=-304.21,301.00 ok=1
+DRAG_CONVERT 1789539824.553260 age_ms=0.249 wid=6 state=1 raw=1163.54,268.00 converted=2327.09,536.00 global=-306.46,301.00 ok=1
+DRAG_CONVERT 1789539824.574351 age_ms=0.462 wid=6 state=1 raw=1161.30,268.00 converted=2322.59,536.00 global=-308.70,301.00 ok=1
+DRAG_CONVERT 1789539824.593574 age_ms=0.296 wid=6 state=1 raw=1159.05,268.00 converted=2318.10,536.00 global=-310.95,301.00 ok=1
+DRAG_CONVERT 1789539824.613963 age_ms=0.353 wid=6 state=1 raw=1156.80,268.00 converted=2313.60,536.00 global=-313.20,301.00 ok=1
+DRAG_CONVERT 1789539824.631968 age_ms=0.414 wid=6 state=1 raw=1154.55,268.00 converted=2309.10,536.00 global=-315.45,301.00 ok=1
+DRAG_CONVERT 1789539824.652761 age_ms=0.336 wid=6 state=1 raw=1152.30,268.00 converted=2304.61,536.00 global=-317.70,301.00 ok=1
+DRAG_CONVERT 1789539824.670093 age_ms=0.381 wid=6 state=1 raw=1150.06,268.00 converted=2300.11,536.00 global=-319.94,301.00 ok=1
+DRAG_CONVERT 1789539824.690909 age_ms=0.479 wid=6 state=1 raw=1147.81,268.00 converted=2295.62,536.00 global=-322.19,301.00 ok=1
+DRAG_CONVERT 1789539824.710345 age_ms=0.425 wid=6 state=1 raw=1145.56,268.00 converted=2291.12,536.00 global=-324.44,301.00 ok=1
+DRAG_CONVERT 1789539824.731767 age_ms=2.151 wid=6 state=1 raw=1143.31,268.00 converted=2286.62,536.00 global=-326.69,301.00 ok=1
+DRAG_CONVERT 1789539824.749875 age_ms=0.320 wid=6 state=1 raw=1141.06,268.00 converted=2282.13,536.00 global=-328.94,301.00 ok=1
+DRAG_CONVERT 1789539824.770903 age_ms=0.432 wid=6 state=1 raw=1138.82,268.00 converted=2277.63,536.00 global=-331.18,301.00 ok=1
+DRAG_CONVERT 1789539824.791777 age_ms=0.420 wid=6 state=1 raw=1136.57,268.00 converted=2273.14,536.00 global=-333.43,301.00 ok=1
+DRAG_CONVERT 1789539824.812596 age_ms=0.371 wid=6 state=1 raw=1134.32,268.00 converted=2268.64,536.00 global=-335.68,301.00 ok=1
+DRAG_CONVERT 1789539824.833522 age_ms=0.410 wid=6 state=1 raw=1132.07,268.00 converted=2264.15,536.00 global=-337.93,301.00 ok=1
+DRAG_CONVERT 1789539824.852344 age_ms=1.961 wid=6 state=1 raw=1129.82,268.00 converted=2259.65,536.00 global=-340.17,301.00 ok=1
+DRAG_CONVERT 1789539824.871200 age_ms=0.310 wid=6 state=1 raw=1127.58,268.00 converted=2255.15,536.00 global=-342.42,301.00 ok=1
+DRAG_CONVERT 1789539824.892124 age_ms=0.344 wid=6 state=1 raw=1125.33,268.00 converted=2250.66,536.00 global=-344.67,301.00 ok=1
+DRAG_CONVERT 1789539824.909266 age_ms=0.361 wid=6 state=1 raw=1123.08,268.00 converted=2246.16,536.00 global=-346.92,301.00 ok=1
+DRAG_CONVERT 1789539824.930121 age_ms=0.362 wid=6 state=1 raw=1120.83,268.00 converted=2241.67,536.00 global=-349.17,301.00 ok=1
+DRAG_CONVERT 1789539824.951047 age_ms=0.383 wid=6 state=1 raw=1118.59,268.00 converted=2237.17,536.00 global=-351.41,301.00 ok=1
+DRAG_CONVERT 1789539824.970388 age_ms=0.410 wid=6 state=1 raw=1116.34,268.00 converted=2232.68,536.00 global=-353.66,301.00 ok=1
+DRAG_CONVERT 1789539824.990041 age_ms=0.435 wid=6 state=1 raw=1114.09,268.00 converted=2228.18,536.00 global=-355.91,301.00 ok=1
+DRAG_CONVERT 1789539825.011044 age_ms=0.335 wid=6 state=1 raw=1111.84,268.00 converted=2223.68,536.00 global=-358.16,301.00 ok=1
+DRAG_CONVERT 1789539825.031765 age_ms=0.391 wid=6 state=1 raw=1109.59,268.00 converted=2219.19,536.00 global=-360.41,301.00 ok=1
+DRAG_CONVERT 1789539825.051764 age_ms=0.431 wid=6 state=1 raw=1107.35,268.00 converted=2214.69,536.00 global=-362.65,301.00 ok=1
+DRAG_CONVERT 1789539825.071726 age_ms=2.121 wid=6 state=1 raw=1105.10,268.00 converted=2210.20,536.00 global=-364.90,301.00 ok=1
+DRAG_CONVERT 1789539825.090825 age_ms=0.362 wid=6 state=1 raw=1102.85,268.00 converted=2205.70,536.00 global=-367.15,301.00 ok=1
+DRAG_CONVERT 1789539825.112326 age_ms=0.979 wid=6 state=1 raw=1100.60,268.00 converted=2201.20,536.00 global=-369.40,301.00 ok=1
+DRAG_CONVERT 1789539825.128899 age_ms=0.664 wid=6 state=1 raw=1098.35,268.00 converted=2196.71,536.00 global=-371.65,301.00 ok=1
+DRAG_CONVERT 1789539825.149487 age_ms=0.337 wid=6 state=1 raw=1096.11,268.00 converted=2192.21,536.00 global=-373.89,301.00 ok=1
+DRAG_CONVERT 1789539825.169820 age_ms=0.275 wid=6 state=1 raw=1093.86,268.00 converted=2187.72,536.00 global=-376.14,301.00 ok=1
+DRAG_CONVERT 1789539825.188258 age_ms=0.480 wid=6 state=1 raw=1091.61,268.00 converted=2183.22,536.00 global=-378.39,301.00 ok=1
+DRAG_CONVERT 1789539825.209204 age_ms=0.519 wid=6 state=1 raw=1089.36,268.00 converted=2178.73,536.00 global=-380.64,301.00 ok=1
+DRAG_CONVERT 1789539825.227934 age_ms=0.614 wid=6 state=1 raw=1087.11,268.00 converted=2174.23,536.00 global=-382.89,301.00 ok=1
+DRAG_CONVERT 1789539825.249210 age_ms=0.360 wid=6 state=1 raw=1084.87,268.00 converted=2169.73,536.00 global=-385.13,301.00 ok=1
+DRAG_CONVERT 1789539825.269478 age_ms=0.378 wid=6 state=1 raw=1082.62,268.00 converted=2165.24,536.00 global=-387.38,301.00 ok=1
+DRAG_CONVERT 1789539825.286304 age_ms=0.436 wid=6 state=1 raw=1080.37,268.00 converted=2160.74,536.00 global=-389.63,301.00 ok=1
+DRAG_CONVERT 1789539825.307431 age_ms=0.360 wid=6 state=1 raw=1078.12,268.00 converted=2156.25,536.00 global=-391.88,301.00 ok=1
+DRAG_CONVERT 1789539825.328189 age_ms=0.381 wid=6 state=1 raw=1075.88,268.00 converted=2151.75,536.00 global=-394.12,301.00 ok=1
+DRAG_CONVERT 1789539825.345836 age_ms=0.699 wid=6 state=1 raw=1073.63,268.00 converted=2147.25,536.00 global=-396.37,301.00 ok=1
+DRAG_CONVERT 1789539825.366444 age_ms=0.425 wid=6 state=1 raw=1071.38,268.00 converted=2142.76,536.00 global=-398.62,301.00 ok=1
+DRAG_CONVERT 1789539825.387180 age_ms=0.318 wid=6 state=1 raw=1069.13,268.00 converted=2138.26,536.00 global=-400.87,301.00 ok=1
+DRAG_CONVERT 1789539825.408335 age_ms=0.552 wid=6 state=1 raw=1066.88,268.00 converted=2133.77,536.00 global=-403.12,301.00 ok=1
+DRAG_CONVERT 1789539825.429011 age_ms=0.531 wid=6 state=1 raw=1064.64,268.00 converted=2129.27,536.00 global=-405.36,301.00 ok=1
+DRAG_CONVERT 1789539825.445956 age_ms=0.618 wid=6 state=1 raw=1062.39,268.00 converted=2124.77,536.00 global=-407.61,301.00 ok=1
+DRAG_CONVERT 1789539825.466852 age_ms=0.627 wid=6 state=1 raw=1060.14,268.00 converted=2120.28,536.00 global=-409.86,301.00 ok=1
+DRAG_CONVERT 1789539825.486152 age_ms=0.572 wid=6 state=1 raw=1057.89,268.00 converted=2115.78,536.00 global=-412.11,301.00 ok=1
+DRAG_CONVERT 1789539825.503105 age_ms=0.644 wid=6 state=1 raw=1055.64,268.00 converted=2111.29,536.00 global=-414.36,301.00 ok=1
+DRAG_CONVERT 1789539825.523838 age_ms=0.472 wid=6 state=1 raw=1053.40,268.00 converted=2106.79,536.00 global=-416.60,301.00 ok=1
+DRAG_CONVERT 1789539825.542023 age_ms=0.436 wid=6 state=1 raw=1051.15,268.00 converted=2102.30,536.00 global=-418.85,301.00 ok=1
+DRAG_CONVERT 1789539825.559907 age_ms=0.289 wid=6 state=1 raw=1048.90,268.00 converted=2097.80,536.00 global=-421.10,301.00 ok=1
+DRAG_CONVERT 1789539825.579310 age_ms=0.267 wid=6 state=1 raw=1046.65,268.00 converted=2093.30,536.00 global=-423.35,301.00 ok=1
+DRAG_CONVERT 1789539825.597098 age_ms=0.397 wid=6 state=1 raw=1044.40,268.00 converted=2088.81,536.00 global=-425.60,301.00 ok=1
+DRAG_CONVERT 1789539825.613828 age_ms=0.271 wid=6 state=1 raw=1042.16,268.00 converted=2084.31,536.00 global=-427.84,301.00 ok=1
+DRAG_CONVERT 1789539825.630753 age_ms=0.398 wid=6 state=1 raw=1039.91,268.00 converted=2079.82,536.00 global=-430.09,301.00 ok=1
+DRAG_CONVERT 1789539825.649831 age_ms=0.236 wid=6 state=1 raw=1037.66,268.00 converted=2075.32,536.00 global=-432.34,301.00 ok=1
+DRAG_CONVERT 1789539825.667357 age_ms=0.450 wid=6 state=1 raw=1035.41,268.00 converted=2070.82,536.00 global=-434.59,301.00 ok=1
+DRAG_CONVERT 1789539825.685857 age_ms=0.315 wid=6 state=1 raw=1033.16,268.00 converted=2066.33,536.00 global=-436.84,301.00 ok=1
+DRAG_CONVERT 1789539825.706726 age_ms=0.295 wid=6 state=1 raw=1030.92,268.00 converted=2061.83,536.00 global=-439.08,301.00 ok=1
+DRAG_CONVERT 1789539825.723950 age_ms=0.372 wid=6 state=1 raw=1028.67,268.00 converted=2057.34,536.00 global=-441.33,301.00 ok=1
+DRAG_CONVERT 1789539825.744833 age_ms=0.363 wid=6 state=1 raw=1026.42,268.00 converted=2052.84,536.00 global=-443.58,301.00 ok=1
+DRAG_CONVERT 1789539825.764708 age_ms=0.290 wid=6 state=1 raw=1024.17,268.00 converted=2048.35,536.00 global=-445.83,301.00 ok=1
+DRAG_CONVERT 1789539825.781841 age_ms=0.402 wid=6 state=1 raw=1021.92,268.00 converted=2043.85,536.00 global=-448.08,301.00 ok=1
+DRAG_CONVERT 1789539825.799561 age_ms=0.333 wid=6 state=1 raw=1019.68,268.00 converted=2039.35,536.00 global=-450.32,301.00 ok=1
+DRAG_CONVERT 1789539825.817528 age_ms=0.297 wid=6 state=1 raw=1017.43,268.00 converted=2034.86,536.00 global=-452.57,301.00 ok=1
+DRAG_CONVERT 1789539825.836733 age_ms=0.332 wid=6 state=1 raw=1015.18,268.00 converted=2030.36,536.00 global=-454.82,301.00 ok=1
+DRAG_CONVERT 1789539825.857806 age_ms=0.815 wid=6 state=1 raw=1012.93,268.00 converted=2025.87,536.00 global=-457.07,301.00 ok=1
+DRAG_CONVERT 1789539825.877936 age_ms=0.273 wid=6 state=1 raw=1010.69,268.00 converted=2021.37,536.00 global=-459.31,301.00 ok=1
+DRAG_CONVERT 1789539825.899015 age_ms=0.246 wid=6 state=1 raw=1008.44,268.00 converted=2016.88,536.00 global=-461.56,301.00 ok=1
+DRAG_CONVERT 1789539825.919663 age_ms=0.244 wid=6 state=1 raw=1006.19,268.00 converted=2012.38,536.00 global=-463.81,301.00 ok=1
+DRAG_CONVERT 1789539825.938965 age_ms=0.198 wid=6 state=1 raw=1003.94,268.00 converted=2007.88,536.00 global=-466.06,301.00 ok=1
+DRAG_CONVERT 1789539825.959628 age_ms=0.234 wid=6 state=1 raw=1001.69,268.00 converted=2003.39,536.00 global=-468.31,301.00 ok=1
+DRAG_CONVERT 1789539825.979564 age_ms=0.274 wid=6 state=1 raw=999.45,268.00 converted=1998.89,536.00 global=-470.55,301.00 ok=1
+DRAG_CONVERT 1789539825.999480 age_ms=0.222 wid=6 state=1 raw=997.20,268.00 converted=1994.40,536.00 global=-472.80,301.00 ok=1
+DRAG_CONVERT 1789539826.020478 age_ms=0.321 wid=6 state=1 raw=994.95,268.00 converted=1989.90,536.00 global=-475.05,301.00 ok=1
+DRAG_CONVERT 1789539826.040239 age_ms=0.385 wid=6 state=1 raw=992.70,268.00 converted=1985.40,536.00 global=-477.30,301.00 ok=1
+DRAG_CONVERT 1789539826.057906 age_ms=0.366 wid=6 state=1 raw=990.45,268.00 converted=1980.91,536.00 global=-479.55,301.00 ok=1
+DRAG_CONVERT 1789539826.078420 age_ms=0.428 wid=6 state=1 raw=988.21,268.00 converted=1976.41,536.00 global=-481.79,301.00 ok=1
+DRAG_CONVERT 1789539826.098084 age_ms=0.488 wid=6 state=1 raw=985.96,268.00 converted=1971.92,536.00 global=-484.04,301.00 ok=1
+DRAG_CONVERT 1789539826.118719 age_ms=0.268 wid=6 state=1 raw=983.71,268.00 converted=1967.42,536.00 global=-486.29,301.00 ok=1
+DRAG_CONVERT 1789539826.139884 age_ms=0.476 wid=6 state=1 raw=981.46,268.00 converted=1962.93,536.00 global=-488.54,301.00 ok=1
+DRAG_CONVERT 1789539826.156503 age_ms=0.320 wid=6 state=1 raw=979.21,268.00 converted=1958.43,536.00 global=-490.79,301.00 ok=1
+DRAG_CONVERT 1789539826.177985 age_ms=0.812 wid=6 state=1 raw=976.97,268.00 converted=1953.93,536.00 global=-493.03,301.00 ok=1
+DRAG_CONVERT 1789539826.194632 age_ms=0.588 wid=6 state=1 raw=974.72,268.00 converted=1949.44,536.00 global=-495.28,301.00 ok=1
+DRAG_CONVERT 1789539826.214920 age_ms=0.681 wid=6 state=1 raw=972.47,268.00 converted=1944.94,536.00 global=-497.53,301.00 ok=1
+DRAG_CONVERT 1789539826.234416 age_ms=0.710 wid=6 state=1 raw=970.22,268.00 converted=1940.45,536.00 global=-499.78,301.00 ok=1
+DRAG_CONVERT 1789539826.252553 age_ms=0.387 wid=6 state=1 raw=967.97,268.00 converted=1935.95,536.00 global=-502.02,301.00 ok=1
+DRAG_CONVERT 1789539826.272941 age_ms=0.486 wid=6 state=1 raw=965.73,268.00 converted=1931.45,536.00 global=-504.27,301.00 ok=1
+DRAG_CONVERT 1789539826.291638 age_ms=1.266 wid=6 state=1 raw=963.48,268.00 converted=1926.96,536.00 global=-506.52,301.00 ok=1
+DRAG_CONVERT 1789539826.310780 age_ms=0.700 wid=6 state=1 raw=961.23,268.00 converted=1922.46,536.00 global=-508.77,301.00 ok=1
+DRAG_CONVERT 1789539826.329919 age_ms=0.925 wid=6 state=1 raw=958.98,268.00 converted=1917.97,536.00 global=-511.02,301.00 ok=1
+DRAG_CONVERT 1789539826.347736 age_ms=0.765 wid=6 state=1 raw=956.74,268.00 converted=1913.47,536.00 global=-513.26,301.00 ok=1
+DRAG_CONVERT 1789539826.367573 age_ms=0.882 wid=6 state=1 raw=954.49,268.00 converted=1908.97,536.00 global=-515.51,301.00 ok=1
+DRAG_CONVERT 1789539826.387247 age_ms=1.328 wid=6 state=1 raw=952.24,268.00 converted=1904.48,536.00 global=-517.76,301.00 ok=1
+DRAG_CONVERT 1789539826.406050 age_ms=1.279 wid=6 state=1 raw=949.99,268.00 converted=1899.98,536.00 global=-520.01,301.00 ok=1
+DRAG_CONVERT 1789539826.423093 age_ms=1.005 wid=6 state=1 raw=947.74,268.00 converted=1895.49,536.00 global=-522.26,301.00 ok=1
+DRAG_CONVERT 1789539826.453665 age_ms=0.417 wid=6 state=1 raw=945.50,268.00 converted=1890.99,536.00 global=-524.50,301.00 ok=1
+DRAG_CONVERT 1789539826.474406 age_ms=0.786 wid=6 state=1 raw=943.25,268.00 converted=1886.50,536.00 global=-526.75,301.00 ok=1
+DRAG_CONVERT 1789539826.495055 age_ms=0.540 wid=6 state=1 raw=941.00,268.00 converted=1882.00,536.00 global=-529.00,301.00 ok=1
+[08:24:56:186] [52262:ee9add81] [ERROR][com.freerdp.utils.signal] - [fsig_term_handler]: Caught signal 'Interrupt: 2' [2]
+[08:24:56:186] [52262:ee9add81] [ERROR][com.freerdp.core] - [freerdp_abort_connect_context]: ERRCONNECT_CONNECT_CANCELLED [0x0002000B]
+[08:24:56:293] [52262:ee9add81] [ERROR][com.freerdp.client.SDL] - [handleShow]: 
+ pixel:SDL_Rect{0x0-32x32}, display:SDL_Rect{0x0-16x16}
+[08:24:56:186] [52262:ee9add81] [INFO][com.freerdp.core] - [sig_abort_connect]: Signal Interrupt: 2 [2], terminating session 0x106d19580
+[08:24:56:186] [52262:6dd5b001] [INFO][com.freerdp.client.common] - [client_auto_reconnect_ex]: Network disconnect!
