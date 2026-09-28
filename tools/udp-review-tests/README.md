@@ -112,3 +112,39 @@ Historical evidence and its measured values are unchanged. Raw client logs
 and newly generated result directories remain local. The milestone extracts
 are client log events, not packet captures or packet payload extracts.
 No new live VM run was performed for this preservation.
+
+## Offline September 16–17 stall diagnostics
+
+The Python scripts under `logs/stale-20260916/` and `logs/stale-20260917/`
+are historical incident-analysis fixtures. Their session paths, flow filters,
+frame checkpoints, sequence offsets, and timestamps intentionally retain the
+original reproduction context. They do not automatically discover new sessions.
+
+| Script | Historical local inputs and purpose |
+| --- | --- |
+| `stale-20260916/check-channel-stream.py` | Reads `/tmp/freerdp-stale-20260916/channel-payloads.tsv`, reconstructs the encrypted channel stream, and checks TLS record framing around the first omitted-zero wrap. Writes the reconstructed stream locally. |
+| `stale-20260916/replay.py` | Uses `tshark` and a matching FreeRDP library to replay the recorded UDP flow. `--library`, `--capture`, and optional `--expected-stream` override the stored local defaults. |
+| `stale-20260916/verify-tls-continuity.py` | Reads the reconstructed stream and the original September 16 local TLS key log, then authenticates records across the sequence gap with OpenSSL 3. |
+| `stale-20260917/replay.py` | Reads `/tmp/freerdp-sleep-20260917/replay-input.tsv` and the stored local FreeRDP library path, reporting stream progress at incident checkpoints. |
+| `stale-20260917/verify-blocked-stream.py` | Reconstructs and authenticates the September 17 stream with its local TLS key log. Reports protocol channel counts without printing or saving application payloads. |
+| `stale-20260917/analyze-stall-acks.py` | Reads `stall-udp-wire.tsv` and `inbound-sequences.tsv` under `/tmp/freerdp-sleep-20260917`, reporting ACK timing and retransmission totals. |
+
+The replay helpers use the receive-test ABI recorded in their source; use a
+matching library when reproducing historical behavior. The TLS verification
+scripts use the stored Homebrew OpenSSL 3 library path. Python itself needs
+only the standard library. Local capture/key-log paths remain in the scripts
+as input references; the captures, keys, reconstructed payload streams, and
+packet-level extracts are not included in these preservation commits.
+
+Preserved aggregate and regression results:
+
+- `stale-20260916/regression-before.txt`
+- `stale-20260916/regression-after.txt`
+- `stale-20260916/tls-continuity-result.txt`
+- `stale-20260917/analyze-stall-acks.txt`
+- `stale-20260917/verify-blocked-stream.txt`
+
+These files retain the original measurements and outcomes. They are historical
+results, not fresh tests of the current master. Related findings are in
+[the September 16 report](../../bugs/stale-connection-20260916.md) and
+[the September 17 report](../../bugs/sleep-report-20260917.md).

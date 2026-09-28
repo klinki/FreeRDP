@@ -1,0 +1,8 @@
+last ACK before stall 2026-09-17T09:18:05.786302 DataSeq 0x796 merged frame 867660
+first ACK after stall 2026-09-17T09:18:10.829427 DataSeq 0x7de merged frame 867743
+final ACK 2026-09-17T09:22:34.772336 DataSeq 0x820 merged frame 868206
+First ACK delay after blocked arrival: 5.027265 seconds
+ACKs during stalled interval: 49
+Post-stall channel attempts: {'0x1': 6, '0x2': 6, '0x3': 6, '0x4': 6, '0x5': 6, '0x6': 6, '0x7': 5, '0x8': 5, '0x9': 5, '0xa': 5, '0xb': 5, '0xc': 5, '0xd': 5, '0xe': 1}
+Unique channel chunks: 14 Retransmissions: 58
+Stall until disconnect: 271.89658 seconds
