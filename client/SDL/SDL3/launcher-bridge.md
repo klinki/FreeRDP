@@ -80,3 +80,13 @@ The query test requires Python 3 and checks exact JSON, poisoned SDL drivers,
 blocking configuration, and rejection of combined arguments before network access.
 It also runs with `-DWITH_LAUNCHER_BRIDGE=OFF` to verify clean query rejection.
 The tests do not open a remote connection or use real credentials.
+
+Also build `TestSDLMonitorDetection`, `TestSDLInputInitialization`, and
+`TestSDLShutdown`, then run `ctest --test-dir <build>/client/SDL/SDL3 -R
+'TestSDL(MonitorDetection|InputInitialization|Shutdown)' --output-on-failure`.
+These dummy-driver regressions cover repeated detection, queued events for
+removed displays, event-queue preservation during display probing, removal of
+windows already migrated by macOS, fallback to a remaining display, and a
+shutdown request surviving the abort-event reset performed by reconnect.
+Physical external-display disconnection was also verified with a live
+multimonitor session on macOS 26.7 on 2026-09-28.
