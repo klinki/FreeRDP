@@ -205,6 +205,7 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 				if (windowEvent.type == SDL_EVENT_MOUSE_MOTION)
 				{
 					SDL_Event next{};
+					uint64_t coalesced = 0;
 					for (;;)
 					{
 						/* Peek the queue head in order (no type filter):
@@ -232,7 +233,10 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 						windowEvent.motion.xrel += next.motion.xrel;
 						windowEvent.motion.yrel += next.motion.yrel;
 						windowEvent.motion.timestamp = next.motion.timestamp;
+						++coalesced;
 					}
+					if (coalesced != 0)
+						sdl->noteMotionsCoalesced(coalesced);
 				}
 
 				if (sdl->getDialog().handleEvent(windowEvent))
@@ -298,13 +302,18 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 					break;
 					case SDL_EVENT_USER_UPDATE:
 					{
-						std::vector<SDL_Rect> rectangles;
-						do
-						{
-							rectangles = sdl->pop();
-							if (!sdl->drawToWindows(rectangles))
-								throw ErrorMsg{ -1, windowEvent.type, "sdl->drawToWindows" };
-						} while (!rectangles.empty());
+						/* Draw one snapshot, then return to event pumping. Video
+						 * can produce damage continuously; draining until empty
+						 * starves keyboard/mouse input indefinitely. */
+						sdl->noteUpdateReceived();
+						const auto rectangles = sdl->pop();
+						if (!rectangles.empty())
+							sdl->noteUpdateActed();
+						if (!sdl->drawToWindows(rectangles))
+							throw ErrorMsg{ -1, windowEvent.type, "sdl->drawToWindows" };
+						/* Service native input even when another redraw is
+						 * already queued and the next wait returns immediately. */
+						SDL_PumpEvents();
 					}
 					break;
 					case SDL_EVENT_USER_CREATE_WINDOWS:

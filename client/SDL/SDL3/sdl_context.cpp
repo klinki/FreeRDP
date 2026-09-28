@@ -19,6 +19,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <string>
 #include <freerdp/client/cmdline.h>
 
 #include "sdl_context.hpp"
@@ -27,6 +29,7 @@
 #include "sdl_input_mapping.hpp"
 #include "sdl_monitor.hpp"
 #include "sdl_pointer.hpp"
+#include "sdl_render_geometry.hpp"
 #include "sdl_touch.hpp"
 
 #include <sdl_common_utils.hpp>
@@ -345,6 +348,7 @@ void SdlContext::postDisconnect(freerdp* instance)
 
 	auto sdl = get_context(instance->context);
 	sdl->setConnected(false);
+	sdl->_updates.clear();
 
 	gdi_free(instance);
 }
@@ -598,8 +602,7 @@ BOOL SdlContext::endPaint(rdpContext* context)
 		rects.push_back({ rgn.x, rgn.y, rgn.w, rgn.h });
 	}
 
-	sdl->push(std::move(rects));
-	return sdl_push_user_event(SDL_EVENT_USER_UPDATE);
+	return sdl->push(rects);
 }
 
 void SdlContext::sdl_client_cleanup(int exit_code, const std::string& error_msg)
@@ -937,6 +940,27 @@ bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& re
 
 	std::unique_lock lock(_critical);
 	auto surface = _primary.get();
+	auto& metrics = window.renderMetrics();
+	uint64_t attemptedPixels = 0;
+	if (metrics.enabled() && surface)
+	{
+		if (rects.empty())
+			attemptedPixels = static_cast<uint64_t>(surface->w) * surface->h;
+		else
+		{
+			for (const auto& rect : rects)
+			{
+				if ((rect.w > 0) && (rect.h > 0))
+					attemptedPixels += static_cast<uint64_t>(rect.w) * rect.h;
+			}
+		}
+	}
+	metrics.beginFrame(attemptedPixels);
+	struct EndMetricsFrame
+	{
+		SdlRenderMetrics& metrics;
+		~EndMetricsFrame() { metrics.endFrame(); }
+	} endMetricsFrame{ metrics };
 
 	if (useLocalScale())
 	{
@@ -1984,13 +2008,59 @@ bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects)
 {
 	if (rects.empty())
 		return true;
+	if (!isConnected())
+		return true;
+
+	const auto settings = context()->settings;
+	const bool multimon = freerdp_settings_get_bool(settings, FreeRDP_UseMultimon);
+	const bool scaled = useLocalScale();
 
 	for (auto& window : _windows)
 	{
-		if (!drawToWindow(window.second, rects))
+		auto& target = window.second;
+		if (scaled)
+		{
+			if (!drawToWindow(target, rects))
+				return false;
+			continue;
+		}
+
+		/* Recreate and clear the target before deciding that this window has no
+		 * overlap. A newly created target requires a full source repaint even if
+		 * the current damage belongs to another monitor. */
+		if (!target.ensureRenderTarget())
+			return false;
+		/* Keep each framebuffer snapshot and its clipping/draw operation under
+		 * the same recursive lock used by drawToWindow. This preserves the
+		 * existing unlock between windows while avoiding stale surfaces during a
+		 * resize or reconnect. */
+		std::unique_lock lock(_critical);
+		auto surface = _primary.get();
+		if (!surface || (surface->w <= 0) || (surface->h <= 0))
+			return false;
+		const SDL_Rect sourceBounds = { 0, 0, surface->w, surface->h };
+		if (target.needsFullRedraw(surface->w, surface->h))
+		{
+			if (!drawToWindow(target))
+				return false;
+			continue;
+		}
+
+		SDL_Point offset{ 0, 0 };
+		if (multimon)
+			offset = { target.offsetX(), target.offsetY() };
+		const auto clipped = sdl::render::clipSourceRects(rects, sourceBounds, offset,
+		                                                  target.pixelViewport());
+		if (clipped.empty())
+		{
+			target.renderMetrics().notePresentSkip();
+			continue;
+		}
+		if (!drawToWindow(target, clipped))
 			return false;
 	}
 
+	flushQueueMetrics(false);
 	return true;
 }
 
@@ -2161,22 +2231,84 @@ int64_t SdlContext::monitorId(uint32_t index) const
 	return _monitorIds.at(index);
 }
 
-void SdlContext::push(std::vector<SDL_Rect>&& rects)
+bool SdlContext::push(const std::vector<SDL_Rect>& rects)
 {
-	std::unique_lock lock(_queue_mux);
-	_queue.emplace(std::move(rects));
+	return _updates.push(rects, SDL_EVENT_USER_UPDATE);
 }
 
 std::vector<SDL_Rect> SdlContext::pop()
 {
-	std::unique_lock lock(_queue_mux);
-	if (_queue.empty())
-	{
-		return {};
-	}
-	auto val = std::move(_queue.front());
-	_queue.pop();
-	return val;
+	return _updates.pop();
+}
+
+void SdlContext::noteMotionsCoalesced(uint64_t count)
+{
+	_queueAccum.motionsCoalesced += count;
+}
+
+void SdlContext::noteUpdateReceived()
+{
+	++_queueAccum.updateReceived;
+}
+
+void SdlContext::noteUpdateActed()
+{
+	++_queueAccum.updateActed;
+}
+
+void SdlContext::flushQueueMetrics(bool force)
+{
+	const auto snapshot = _updates.takeSnapshot();
+	_queueAccum.pushes += snapshot.pushes;
+	_queueAccum.attemptedRects += snapshot.attemptedRects;
+	_queueAccum.mergedRects += snapshot.mergedRects;
+	_queueAccum.collapsedEvents += snapshot.collapsedEvents;
+	_queueAccum.pops += snapshot.pops;
+	_queueAccum.emptyPops += snapshot.emptyPops;
+	_queueAccum.popRects += snapshot.popRects;
+	_queueAccum.queueWaitNs += snapshot.queueWaitNs;
+
+	if (!_queueAccum.active())
+		return;
+
+	const auto now = SDL_GetTicksNS();
+	if (_queueIntervalStartNs == 0)
+		_queueIntervalStartNs = now;
+	const uint64_t duration = now >= _queueIntervalStartNs ? now - _queueIntervalStartNs : 0;
+	/* Offline replay drives drawToWindows without the event queue, so it
+	 * never pops: with no pops there is nothing to attribute and no record
+	 * is written, keeping replay metrics comparable. */
+	if (!force && (duration < SdlRenderMetrics::intervalNs || _queueAccum.pops == 0))
+		return;
+
+	char line[1024];
+	std::snprintf(line, sizeof(line),
+	              "{\"schema\":\"freerdp.sdl_queue_metrics\",\"version\":1,"
+	              "\"window_id\":0,\"monitor_id\":0,"
+	              "\"interval_start_ns\":%llu,\"interval_duration_ns\":%llu,"
+	              "\"pushes\":%llu,\"attempted_rects\":%llu,"
+	              "\"merged_rects\":%llu,\"collapsed_events\":%llu,"
+	              "\"pops\":%llu,\"empty_pops\":%llu,\"pop_rects\":%llu,"
+	              "\"queue_wait_ns\":%llu,"
+	              "\"update_events_received\":%llu,\"update_events_acted\":%llu,"
+	              "\"motions_coalesced\":%llu}",
+	              static_cast<unsigned long long>(_queueIntervalStartNs),
+	              static_cast<unsigned long long>(duration),
+	              static_cast<unsigned long long>(_queueAccum.pushes),
+	              static_cast<unsigned long long>(_queueAccum.attemptedRects),
+	              static_cast<unsigned long long>(_queueAccum.mergedRects),
+	              static_cast<unsigned long long>(_queueAccum.collapsedEvents),
+	              static_cast<unsigned long long>(_queueAccum.pops),
+	              static_cast<unsigned long long>(_queueAccum.emptyPops),
+	              static_cast<unsigned long long>(_queueAccum.popRects),
+	              static_cast<unsigned long long>(_queueAccum.queueWaitNs),
+	              static_cast<unsigned long long>(_queueAccum.updateReceived),
+	              static_cast<unsigned long long>(_queueAccum.updateActed),
+	              static_cast<unsigned long long>(_queueAccum.motionsCoalesced));
+	line[sizeof(line) - 1] = '\0';
+	SdlRenderMetrics::appendJsonLine(line);
+	_queueAccum = QueueAccum{};
+	_queueIntervalStartNs = now;
 }
 
 bool SdlContext::setFullscreen(bool enter, bool forceOriginalDisplay)

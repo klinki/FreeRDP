@@ -30,6 +30,9 @@ set(SRCS
     sdl_input.cpp
     sdl_input.hpp
     sdl_input_mapping.hpp
+    sdl_update_queue.hpp
+    sdl_render_metrics.hpp
+    sdl_render_geometry.hpp
     sdl_touch.cpp
     sdl_touch.hpp
     sdl_pointer.cpp
@@ -95,6 +98,38 @@ installwithrpath(TARGETS ${MODULE_NAME} DESTINATION ${CMAKE_INSTALL_BINDIR} COMP
 install_freerdp_desktop("${MODULE_NAME}" "${SDL_CLIENT_UUID}")
 
 if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
+  add_executable(TestSDLRenderGeometry test/TestSDLRenderGeometry.cpp)
+  target_link_libraries(TestSDLRenderGeometry PRIVATE SDL3::Headers)
+  set_target_properties(TestSDLRenderGeometry PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                        "${TESTING_OUTPUT_DIRECTORY}")
+  add_test(NAME TestSDLRenderGeometry COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLRenderGeometry)
+  set_property(TARGET TestSDLRenderGeometry PROPERTY FOLDER "FreeRDP/Client/Test")
+
+  add_executable(TestSDLRenderWindow test/TestSDLRenderWindow.cpp sdl_window.cpp sdl_utils.cpp)
+  target_link_libraries(TestSDLRenderWindow PRIVATE ${LIBS})
+  set_target_properties(TestSDLRenderWindow PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                        "${TESTING_OUTPUT_DIRECTORY}")
+  add_test(NAME TestSDLRenderWindow COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLRenderWindow)
+  set_property(TARGET TestSDLRenderWindow PROPERTY FOLDER "FreeRDP/Client/Test")
+
+  add_executable(TestSDLRenderMetrics test/TestSDLRenderMetrics.cpp)
+  target_link_libraries(TestSDLRenderMetrics PRIVATE Threads::Threads)
+  set_target_properties(TestSDLRenderMetrics PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                        "${TESTING_OUTPUT_DIRECTORY}")
+  add_test(NAME TestSDLRenderMetrics COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLRenderMetrics)
+  set_property(TARGET TestSDLRenderMetrics PROPERTY FOLDER "FreeRDP/Client/Test")
+
+  add_executable(TestSDLUpdateQueue test/TestSDLUpdateQueue.cpp)
+  if(WITH_SDL_LINK_SHARED)
+    target_link_libraries(TestSDLUpdateQueue PRIVATE SDL3::SDL3 Threads::Threads)
+  else()
+    target_link_libraries(TestSDLUpdateQueue PRIVATE SDL3::SDL3-static Threads::Threads)
+  endif()
+  set_target_properties(TestSDLUpdateQueue PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                        "${TESTING_OUTPUT_DIRECTORY}")
+  add_test(NAME TestSDLUpdateQueue COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLUpdateQueue)
+  set_property(TARGET TestSDLUpdateQueue PROPERTY FOLDER "FreeRDP/Client/Test")
+
   add_executable(TestSDLInputMapping test/TestSDLInputMapping.cpp)
   target_link_libraries(TestSDLInputMapping PRIVATE SDL3::Headers)
   set_target_properties(TestSDLInputMapping PROPERTIES RUNTIME_OUTPUT_DIRECTORY
