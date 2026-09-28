@@ -135,7 +135,9 @@ bool sdl_Pointer_Set_Process(SdlContext* sdl)
 		return true;
 
 	rdpGdi* gdi = context->gdi;
-	WINPR_ASSERT(gdi);
+	if (!gdi)
+		return true; /* teardown race: cursor refresh with GDI already freed
+		              * is a no-op (mirrors the !ptr case above) */
 
 	auto ix = static_cast<float>(pointer->xPos);
 	auto iy = static_cast<float>(pointer->yPos);
