@@ -135,6 +135,10 @@ class SdlContext
 	[[nodiscard]] bool drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& rects = {});
 	[[nodiscard]] bool minimizeAllWindows();
 	[[nodiscard]] int exitCode() const;
+	[[nodiscard]] const std::string& exitDetail() const
+	{
+		return _exitDetail;
+	}
 	[[nodiscard]] SDL_PixelFormat pixelFormat() const;
 
 	[[nodiscard]] const SdlWindow* getWindowForId(SDL_WindowID id) const;
@@ -297,6 +301,7 @@ class SdlContext
 	bool _grabMouse = false;
 	bool _grabKeyboard = false;
 	int _exitCode = -1;
+	std::string _exitDetail;
 	std::atomic<bool> _rdpThreadRunning = false;
 	SDL_PixelFormat _sdlPixelFormat = SDL_PIXELFORMAT_UNKNOWN;
 

@@ -55,6 +55,16 @@ set(SRCS
     sdl_context.cpp
 )
 
+option(WITH_LAUNCHER_BRIDGE "Build the private native macOS launcher bridge" ON)
+set(SDL_LAUNCHER_BRIDGE_ENABLED OFF)
+if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON)
+  set(SDL_LAUNCHER_BRIDGE_ENABLED ON)
+  set(CMAKE_OBJCXX_STANDARD 17)
+  list(APPEND SRCS sdl_launcher.cpp sdl_launcher.hpp sdl_launcher_macos.mm)
+  list(APPEND LIBS "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit")
+  add_compile_definitions(WITH_SDL_LAUNCHER_BRIDGE)
+endif()
+
 add_win_console_manifest(SRCS)
 
 list(
@@ -146,3 +156,34 @@ if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
 endif()
 
 add_subdirectory(man)
+
+option(SDL_LAUNCHER_TEST "Build private launcher transport tests" OFF)
+if(SDL_LAUNCHER_TEST AND APPLE)
+  enable_testing()
+  find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  add_test(NAME TestSDLLauncherCapabilities
+           COMMAND ${Python3_EXECUTABLE}
+                   ${CMAKE_CURRENT_SOURCE_DIR}/test/TestSDLLauncherCapabilities.py
+                   $<TARGET_FILE:sdl3-freerdp> ${SDL_LAUNCHER_BRIDGE_ENABLED})
+  set_tests_properties(TestSDLLauncherCapabilities PROPERTIES TIMEOUT 30)
+
+  set(SDL_MONITOR_TEST_SRCS ${SRCS})
+  list(REMOVE_ITEM SDL_MONITOR_TEST_SRCS sdl_freerdp.cpp)
+  add_executable(TestSDLMonitorDetection test/TestSDLMonitorDetection.cpp ${SDL_MONITOR_TEST_SRCS})
+  target_include_directories(TestSDLMonitorDetection PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(TestSDLMonitorDetection PRIVATE ${LIBS})
+  add_test(NAME TestSDLMonitorDetection COMMAND TestSDLMonitorDetection)
+  set_tests_properties(TestSDLMonitorDetection PROPERTIES TIMEOUT 30)
+
+  add_executable(TestSDLInputInitialization test/TestSDLInputInitialization.cpp ${SDL_MONITOR_TEST_SRCS})
+  target_include_directories(TestSDLInputInitialization PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(TestSDLInputInitialization PRIVATE ${LIBS})
+  add_test(NAME TestSDLInputInitialization COMMAND TestSDLInputInitialization)
+  set_tests_properties(TestSDLInputInitialization PROPERTIES TIMEOUT 30)
+endif()
+if(SDL_LAUNCHER_BRIDGE_ENABLED AND SDL_LAUNCHER_TEST)
+  add_executable(TestSDLLauncherTransport test/TestSDLLauncherTransport.cpp sdl_launcher.cpp sdl_launcher_macos.mm)
+  target_link_libraries(TestSDLLauncherTransport PRIVATE winpr freerdp freerdp-client Threads::Threads
+                        SDL3::SDL3 "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit")
+  add_test(NAME TestSDLLauncherTransport COMMAND TestSDLLauncherTransport)
+endif()

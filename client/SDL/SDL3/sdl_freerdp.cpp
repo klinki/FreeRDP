@@ -71,6 +71,12 @@
 #include "sdl_channels.hpp"
 #include "sdl_freerdp.hpp"
 #include "sdl_context.hpp"
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+#include "sdl_launcher.hpp"
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#endif
 #include "sdl_monitor.hpp"
 #include "sdl_pointer.hpp"
 #include "sdl_prefs.hpp"
@@ -173,9 +179,17 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 	{
 		while (!sdl->shallAbort())
 		{
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+			if (auto bridge = SdlLauncher::active())
+				bridge->serviceFocus();
+#endif
 			SDL_Event windowEvent = {};
 			while (!sdl->shallAbort() && SDL_WaitEventTimeout(nullptr, 1000))
 			{
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+				if (auto bridge = SdlLauncher::active())
+					bridge->serviceFocus();
+#endif
 				/* Only poll standard SDL events and SDL_EVENT_USERS meant to create
 				 * dialogs. do not process the dialog return value events here.
 				 */
@@ -263,6 +277,13 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 				switch (windowEvent.type)
 				{
 					case SDL_EVENT_QUIT:
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+						if (auto bridge = SdlLauncher::active())
+						{
+							std::ignore = bridge->requestClose();
+							break;
+						}
+#endif
 						std::ignore = freerdp_abort_connect_context(sdl->context());
 						break;
 					case SDL_EVENT_USER_CERT_DIALOG:
@@ -689,6 +710,28 @@ static void SDLCALL rdp_file_cb(void* userdata, const char* const* filelist,
 
 int main(int argc, char* argv[])
 {
+	// Handle discovery before even creating the context: that loads SDL preferences.
+	for (int x = 1; x < argc; x++)
+	{
+		if (strcmp(argv[x], "/launcher-capabilities") != 0)
+			continue;
+		if (argc != 2)
+		{
+			fprintf(stderr, "/launcher-capabilities must be the sole argument\n");
+			return 1;
+		}
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+		auto capabilities = SdlLauncher::capabilities();
+		std::unique_ptr<char, decltype(&free)> encoded(
+		    capabilities ? WINPR_JSON_PrintUnformatted(capabilities.get()) : nullptr, free);
+		if (!encoded)
+			return 1;
+		return (fprintf(stdout, "%s\n", encoded.get()) > 0 && fflush(stdout) == 0) ? 0 : 1;
+#else
+		fprintf(stderr, "Launcher bridge support is not compiled in\n");
+		return 1;
+#endif
+	}
 #if defined(_WIN32)
 	sdl::win32::release_transient_console();
 #endif
@@ -712,8 +755,75 @@ int main(int argc, char* argv[])
 	std::string rdp_file;
 	std::vector<char*> args;
 	args.reserve(WINPR_ASSERTING_INT_CAST(size_t, argc));
-	for (auto x = 0; x < argc; x++)
-		args.push_back(argv[x]);
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	int launcherFd = -1;
+	std::string launcherSession;
+	bool launcherDockSingle = false;
+	for (int x = 1; x < argc; x++)
+	{
+		const std::string arg = argv[x];
+		if (arg.rfind("/launcher-fd:", 0) == 0)
+		{
+			char* end = nullptr;
+			const long value = strtol(arg.c_str() + 13, &end, 10);
+			if (!end || *end || value < 3 || value > INT_MAX || launcherFd != -1)
+				return -1;
+			launcherFd = static_cast<int>(value);
+		}
+		else if (arg.rfind("/launcher-session:", 0) == 0)
+			launcherSession = arg.substr(18);
+		else if (arg == "/launcher-dock:single")
+			launcherDockSingle = true;
+	}
+	if (launcherDockSingle && launcherFd < 0)
+		return -1;
+	std::unique_ptr<SdlLauncher> bridge;
+	std::vector<std::string> launcherArguments;
+	if (launcherFd >= 0)
+	{
+		int socketType = 0;
+		socklen_t size = sizeof(socketType);
+		sockaddr_storage socketAddress{};
+		socklen_t addressSize = sizeof(socketAddress);
+		if (getsockname(launcherFd, reinterpret_cast<sockaddr*>(&socketAddress), &addressSize) !=
+		        0 ||
+		    socketAddress.ss_family != AF_UNIX)
+			return -1;
+		if (launcherSession.empty() || launcherSession.size() > 128 ||
+		    getsockopt(launcherFd, SOL_SOCKET, SO_TYPE, &socketType, &size) != 0 ||
+		    socketType != SOCK_STREAM)
+			return -1;
+		std::ignore = fcntl(launcherFd, F_SETFD, FD_CLOEXEC);
+		if (launcherDockSingle && !SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP, "1"))
+			return -1;
+		if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+			return -1;
+		if (launcherDockSingle && !SdlLauncher::useAccessoryActivationPolicy())
+			SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+			            "Could not hide the FreeRDP Dock icon; using regular app mode");
+		bridge = std::make_unique<SdlLauncher>(launcherFd, launcherSession, sdl->context());
+		sdl->getDialog().setSuppressed(true);
+		std::string error;
+		if (!bridge->prepare(launcherArguments, error))
+		{
+			if (bridge->cancelled())
+				bridge->ended(0, "Cancelled before connection");
+			else
+				bridge->setupFailed(error);
+			bridge.reset();
+			SDL_Quit();
+			return 0;
+		}
+		args.push_back(argv[0]);
+		for (auto& value : launcherArguments)
+			args.push_back(value.data());
+	}
+	else
+#endif
+	{
+		for (auto x = 0; x < argc; x++)
+			args.push_back(argv[x]);
+	}
 
 	if (argc == 1)
 	{
@@ -730,6 +840,15 @@ int main(int argc, char* argv[])
 	sdl_rdp->sdl->setMetadata();
 	if (status)
 	{
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+		if (bridge)
+		{
+			bridge->setupFailed("FreeRDP rejected the supplied connection settings");
+			bridge.reset();
+			SDL_Quit();
+			return -1;
+		}
+#endif
 		rc = freerdp_client_settings_command_line_status_print_ex(settings, status, argc, argv,
 		                                                          sdl->args());
 		if (freerdp_settings_get_bool(settings, FreeRDP_ListMonitors))
@@ -775,8 +894,11 @@ int main(int argc, char* argv[])
 #endif
 
 	/* Basic SDL initialization */
-	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
-		return -1;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (!bridge)
+#endif
+		if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
+			return -1;
 
 	/* Redirect SDL log messages to wLog */
 	SDL_SetLogOutputFunction(winpr_LogOutputFunction, sdl);
@@ -816,6 +938,9 @@ int main(int argc, char* argv[])
 
 	if (sdl->exitCode() != 0)
 		rc = sdl->exitCode();
-
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (bridge)
+		bridge->ended(rc, sdl->exitDetail());
+#endif
 	return rc;
 }

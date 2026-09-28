@@ -687,8 +687,10 @@ bool sdlInput::initialize()
 {
 	auto settings = _sdl->context()->settings;
 	WINPR_ASSERT(settings);
-	WINPR_ASSERT(!_remapTable);
 
+	// PreConnect runs again when sign-in is retried. Remapping comes from the
+	// connection arguments and remains valid for this input context's lifetime.
+	if (!_remapTable)
 	{
 		auto list = freerdp_settings_get_string(settings, FreeRDP_KeyboardRemappingList);
 		_remapTable = freerdp_keyboard_remap_string_to_list(list);
