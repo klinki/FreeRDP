@@ -29,7 +29,8 @@ namespace
 	constexpr unsigned bridgeProtocolVersion = 1;
 	constexpr const char* bridgeCapabilities[] = {
 		"auth", "certificate", "focus", "retry", "display_uuid", "per_monitor_scaling",
-		"dynamic_resolution", "multimon", "close_confirmation", "session_thumbnail"
+		"dynamic_resolution", "multimon", "close_confirmation", "session_thumbnail",
+		"dock_accessory"
 	};
 	// The nonconnecting query and the live handshake must advertise the same features.
 	bool addCapabilities(WINPR_JSON* message)
@@ -929,6 +930,7 @@ void SdlLauncher::serviceFocus()
 {
 	if (!_focus.exchange(false))
 		return;
+	activateAccessorySession();
 	int count = 0;
 	auto windows = SDL_GetWindows(&count);
 	for (int i = 0; windows && i < count; i++)
