@@ -24,6 +24,7 @@ class SdlLauncher
 	static SdlLauncher* active();
 	// Pure discovery: no context, transport, SDL, display, or configuration access.
 	static Json capabilities();
+	static bool useAccessoryActivationPolicy(); // macOS main thread, after SDL_Init.
 	bool prepare(std::vector<std::string>& arguments, std::string& error);
 	bool authenticate(char** username, char** password, char** domain, rdp_auth_reason reason,
 	                  bool rejected = false);
@@ -53,6 +54,7 @@ class SdlLauncher
 	void writeLoop();
 	void thumbnailLoop();
 	void yieldActivationToLauncher(); // SDL main thread, before a close request.
+	void activateAccessorySession(); // SDL main thread, before raising its windows.
 	bool receive(Json event);
 	std::vector<std::pair<std::string, UINT32>> displays(WINPR_JSON* array);
 	void terminal(const char* outcome, int code, const std::string& detail);
