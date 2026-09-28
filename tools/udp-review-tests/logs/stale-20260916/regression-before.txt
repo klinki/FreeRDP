@@ -1,0 +1,15 @@
+Test project /tmp/freerdp-udp-sequence-build
+    Start 125: TestRdpeUdp
+1/1 Test #125: TestRdpeUdp ......................***Failed    1.21 sec
+channel wrap case 'captured wrap', step 1: next=0000 len=65535
+rx_integration FAILED line 1564: FALSE
+test_rx_channel_wrap FAILED
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   1.24 sec
+
+The following tests FAILED:
+	125 - TestRdpeUdp (Failed)
+Errors while running CTest
