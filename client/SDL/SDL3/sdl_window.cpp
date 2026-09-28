@@ -59,6 +59,7 @@ SdlWindow::SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect&
 	std::ignore = SDL_SyncWindow(_window);
 
 	_renderer = SDL_CreateRenderer(_window, nullptr);
+	_topBar = std::make_unique<SdlTopBar>(_renderer, title);
 
 	std::ignore = resizeToScale();
 
@@ -70,7 +71,7 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
       _gdiTexture(other._gdiTexture), _gdiTextureW(other._gdiTextureW),
       _gdiTextureH(other._gdiTextureH), _initialW(other._initialW), _initialH(other._initialH),
       _displayID(other._displayID), _offset_x(other._offset_x), _offset_y(other._offset_y),
-      _monitor(other._monitor)
+      _monitor(other._monitor), _topBar(std::move(other._topBar))
 {
 	other._window = nullptr;
 	other._renderer = nullptr;
@@ -80,6 +81,9 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
 
 SdlWindow::~SdlWindow()
 {
+	/* SdlTopBar owns textures created from this renderer. Destroy it before
+	 * SDL_DestroyRenderer so its texture deleters never see stale handles. */
+	_topBar.reset();
 	if (_gdiTexture)
 		SDL_DestroyTexture(_gdiTexture);
 	if (_renderTarget)
@@ -549,20 +553,145 @@ bool SdlWindow::blit(SDL_Surface* surface, const SDL_Rect& srcRect, SDL_Rect& ds
 	return true;
 }
 
-void SdlWindow::updateSurface()
+bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& pointer)
 {
 	if (!_renderer)
-		return;
+		return false;
 
 	ensureRenderTarget();
+	if (!_renderTarget)
+		return false;
 
 	/* Copy accumulated render target to screen and present */
 	if (!SDL_SetRenderTarget(_renderer, nullptr))
-		return;
+		return false;
 	if (!SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr))
-		return;
-	if (!SDL_RenderPresent(_renderer))
-		return;
+		return false;
+
+	if (showTopBar && _topBar)
+	{
+		const auto viewport = pixelViewport();
+		if (viewport.w <= 0 || viewport.h <= 0)
+			return false;
+		if (!_topBarRectInit)
+			_topBarRect = SdlTopBar::defaultRect(viewport, _topBarCompact);
+		_topBarRect = SdlTopBar::clampToViewport(_topBarRect, viewport, _topBarCompact);
+		if (!_topBar->draw(_topBarRect, viewport, pinned, pointer))
+			return false;
+	}
+
+	return SDL_RenderPresent(_renderer);
+}
+
+SdlTopBarRect SdlWindow::topBarRect() const
+{
+	return _topBarRect;
+}
+
+void SdlWindow::setTopBarRect(const SdlTopBarRect& rect)
+{
+	_topBarRect = rect;
+	_topBarRectInit = true;
+}
+
+void SdlWindow::resetTopBarRect()
+{
+	_topBarRect = {};
+	_topBarRectInit = false;
+}
+
+bool SdlWindow::topBarCompact() const
+{
+	return _topBarCompact;
+}
+
+void SdlWindow::setTopBarCompact(bool compact)
+{
+	_topBarCompact = compact;
+}
+
+static bool windowRenderPoint(SDL_Renderer* renderer, float x, float y, SDL_FPoint& point)
+{
+	if (!renderer)
+		return false;
+	return SDL_RenderCoordinatesFromWindow(renderer, x, y, &point.x, &point.y) != 0;
+}
+
+static SDL_Rect windowViewport(SDL_Window* window)
+{
+	int width = 0;
+	int height = 0;
+	if (window)
+		SDL_GetWindowSizeInPixels(window, &width, &height);
+	return { 0, 0, width, height };
+}
+
+SDL_Rect SdlWindow::pixelViewport() const
+{
+	int width = 0;
+	int height = 0;
+	if (_window)
+		SDL_GetWindowSizeInPixels(_window, &width, &height);
+	return { 0, 0, width, height };
+}
+
+bool SdlWindow::topBarContains(float x, float y) const
+{
+	if (!_renderer || !_topBar)
+		return false;
+
+	SDL_FPoint pointer{};
+	if (!windowRenderPoint(_renderer, x, y, pointer))
+		return false;
+	return _topBar->contains(_topBarRect, pointer);
+}
+
+bool SdlWindow::topBarNearTop(float x, float y) const
+{
+	if (!_renderer || !_topBar)
+		return false;
+
+	SDL_FPoint pointer{};
+	if (!windowRenderPoint(_renderer, x, y, pointer))
+		return false;
+
+	return _topBar->nearTop(windowViewport(_window), pointer, _topBarCompact);
+}
+
+SdlTopBarButton SdlWindow::topBarButtonAt(float x, float y) const
+{
+	if (!_renderer || !_topBar)
+		return SdlTopBarButton::None;
+
+	SDL_FPoint pointer{};
+	if (!windowRenderPoint(_renderer, x, y, pointer))
+		return SdlTopBarButton::None;
+
+	return _topBar->hitTest(_topBarRect, windowViewport(_window), pointer);
+}
+
+bool SdlWindow::topBarMoveAt(float x, float y) const
+{
+	if (!_renderer || !_topBar)
+		return false;
+
+	SDL_FPoint pointer{};
+	if (!windowRenderPoint(_renderer, x, y, pointer))
+		return false;
+
+	return _topBar->hitMove(_topBarRect, windowViewport(_window), pointer);
+}
+
+bool SdlWindow::topBarResizeAt(float x, float y) const
+{
+	if (!_renderer || !_topBar)
+		return false;
+
+	SDL_FPoint pointer{};
+	if (!windowRenderPoint(_renderer, x, y, pointer))
+		return false;
+
+	return _topBar->hitResize(_topBarRect, windowViewport(_window), pointer);
 }
 
 SdlWindow SdlWindow::create(SDL_DisplayID id, const std::string& title, Uint32 flags, Uint32 width,

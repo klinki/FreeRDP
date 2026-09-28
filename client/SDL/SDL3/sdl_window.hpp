@@ -21,10 +21,13 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 #include <SDL3/SDL.h>
 
 #include <freerdp/settings_types.h>
+
+#include "dialogs/sdl_topbar.hpp"
 
 class SdlWindow
 {
@@ -81,7 +84,14 @@ class SdlWindow
 
 	[[nodiscard]] bool fill(Uint8 r = 0x00, Uint8 g = 0x00, Uint8 b = 0x00, Uint8 a = 0xff);
 	[[nodiscard]] bool blit(SDL_Surface* surface, const SDL_Rect& src, SDL_Rect& dst);
-	void updateSurface();
+	[[nodiscard]] bool updateSurface(bool showTopBar = false, bool pinned = true,
+	                                 const SDL_FPoint& pointer = {});
+	[[nodiscard]] bool topBarContains(float x, float y) const;
+	[[nodiscard]] bool topBarNearTop(float x, float y) const;
+	[[nodiscard]] SdlTopBarButton topBarButtonAt(float x, float y) const;
+	[[nodiscard]] bool topBarMoveAt(float x, float y) const;
+	[[nodiscard]] bool topBarResizeAt(float x, float y) const;
+	[[nodiscard]] SDL_Rect pixelViewport() const;
 
   protected:
 	SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect& rect, Uint32 flags);
@@ -120,4 +130,15 @@ class SdlWindow
 	Sint32 _offset_x = 0;
 	Sint32 _offset_y = 0;
 	rdpMonitor _monitor{};
+	std::unique_ptr<SdlTopBar> _topBar;
+	SdlTopBarRect _topBarRect{};
+	bool _topBarRectInit = false;
+	bool _topBarCompact = true;
+
+  public:
+	[[nodiscard]] SdlTopBarRect topBarRect() const;
+	void setTopBarRect(const SdlTopBarRect& rect);
+	void resetTopBarRect();
+	[[nodiscard]] bool topBarCompact() const;
+	void setTopBarCompact(bool compact);
 };

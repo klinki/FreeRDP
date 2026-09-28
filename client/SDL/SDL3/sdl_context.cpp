@@ -122,6 +122,15 @@ void SdlContext::cleanup()
 {
 	std::unique_lock lock(_critical);
 	_windows.clear();
+	_topBarWindowId = 0;
+	_topBarVisible = true;
+	_topBarPinned = true;
+	_topBarPointer = { -1.0f, -1.0f };
+	_topBarHoveredButton = SdlTopBarButton::None;
+	_topBarGestureOwner = TopBarGestureOwner::None;
+	_topBarCaptures = {};
+	_topBarDrag = TopBarDragMode::None;
+	_topBarDragWindow = 0;
 	_dialog.destroy();
 	_primary.reset();
 }
@@ -375,6 +384,13 @@ bool SdlContext::createWindows()
 
 	Sint32 originX = 0;
 	Sint32 originY = 0;
+	_topBarWindowId = 0;
+	_topBarPointer = { -1.0f, -1.0f };
+	_topBarHoveredButton = SdlTopBarButton::None;
+	_topBarGestureOwner = TopBarGestureOwner::None;
+	_topBarCaptures = {};
+	_topBarDrag = TopBarDragMode::None;
+	_topBarDragWindow = 0;
 	for (UINT32 x = 0; x < windowCount; x++)
 	{
 		auto id = monitorId(x);
@@ -438,6 +454,8 @@ bool SdlContext::createWindows()
 			window.setOffsetY(originY - monitor->y);
 		}
 
+		if (_topBarWindowId == 0)
+			_topBarWindowId = window.id();
 		_windows.insert({ window.id(), std::move(window) });
 	}
 
@@ -810,6 +828,10 @@ void SdlContext::applyMonitorOffset(SDL_WindowID window, float& x, float& y) con
 	if (!freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon))
 		return;
 
+	/* Input mapping uses the dedicated input offsets (raw negotiated RDP
+	 * coordinates), never the draw offsets: those are origin-normalized for
+	 * GDI surface indexing and shift input by -origin whenever a monitor
+	 * lives at negative desktop coordinates. */
 	auto w = getWindowForId(window);
 	x -= static_cast<float>(w->offsetX());
 	y -= static_cast<float>(w->offsetY());
@@ -927,7 +949,25 @@ bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& re
 			return false;
 	}
 
-	window.updateSurface();
+	const auto settings = context()->settings;
+	const bool showTopBar = _topBarVisible && (window.id() == _topBarWindowId) &&
+	                        (_fullscreen || freerdp_settings_get_bool(settings, FreeRDP_UseMultimon));
+	const auto topBarPointer = _topBarHoveredButton != SdlTopBarButton::None
+	                               ? _topBarPointer
+	                               : SDL_FPoint{ -1.0f, -1.0f };
+	return window.updateSurface(showTopBar, _topBarPinned, topBarPointer);
+}
+
+bool SdlContext::redrawWindows()
+{
+	if (!isConnected())
+		return true;
+
+	for (auto& entry : _windows)
+	{
+		if (!drawToWindow(entry.second))
+			return false;
+	}
 	return true;
 }
 
@@ -1055,12 +1095,17 @@ bool SdlContext::moveMouseTo(const SDL_FPoint& pos)
 
 	const auto id = SDL_GetWindowID(window);
 	const auto spos = pixelToScreen(id, pos);
+	WLog_Print(_log, WLOG_DEBUG, "warp mouse to %.0f,%.0f on window %u", spos.x, spos.y,
+	           (unsigned)id);
 	SDL_WarpMouseInWindow(window, spos.x, spos.y);
 	return true;
 }
 
 bool SdlContext::handleEvent(const SDL_MouseMotionEvent& ev)
 {
+	if (handleTopBarMotion(ev))
+		return true;
+
 	if (!getWindowForId(ev.windowID))
 		return true; /* Event for an untracked window (e.g. closed dialog) */
 	SDL_Event copy{};
@@ -1072,6 +1117,92 @@ bool SdlContext::handleEvent(const SDL_MouseMotionEvent& ev)
 	applyMonitorOffset(copy.motion.windowID, copy.motion.x, copy.motion.y);
 
 	return SdlTouch::handleEvent(this, copy.motion);
+}
+
+bool SdlContext::handleTopBarMotion(const SDL_MouseMotionEvent& ev)
+{
+	/* Active move/resize gesture takes precedence over hover handling below:
+	 * it must run even though the gesture owner is Local (which would
+	 * otherwise return early), or drags never move. */
+	if (_topBarDrag != TopBarDragMode::None)
+	{
+		auto window = getWindowForId(_topBarDragWindow);
+		if (!window)
+		{
+			_topBarDrag = TopBarDragMode::None;
+			_topBarDragWindow = 0;
+			std::ignore = SDL_CaptureMouse(false);
+			return true;
+		}
+		const auto cur = screenToPixel(_topBarDragWindow, { ev.x, ev.y });
+		auto rect = _topBarDragRect;
+		if (_topBarDrag == TopBarDragMode::Move)
+		{
+			/* Glued to the top like mstsc: horizontal dragging only. */
+			rect.x += cur.x - _topBarDragGrab.x;
+		}
+		else
+		{
+			if (_topBarDragLeftEdge)
+			{
+				const float dx = cur.x - _topBarDragGrab.x;
+				rect.x += dx;
+				rect.w -= dx;
+			}
+			else
+			{
+				rect.w += cur.x - _topBarDragGrab.x;
+			}
+		}
+		rect = SdlTopBar::clampToViewport(rect, window->pixelViewport(),
+		                                  window->topBarCompact());
+		window->setTopBarRect(rect);
+		_topBarPointer = cur;
+		if (!redrawWindows())
+			WLog_Print(_log, WLOG_WARN, "Unable to redraw the SDL connection bar");
+		return true;
+	}
+
+	/* A local topbar gesture owns motion until its matching button release. A
+	 * remote gesture must continue to receive motion even when the pointer
+	 * crosses the overlay. */
+	if (_topBarGestureOwner == TopBarGestureOwner::Local)
+		return true;
+	if (_topBarGestureOwner == TopBarGestureOwner::Remote)
+		return false;
+
+	const auto settings = context()->settings;
+	if (!_topBarWindowId ||
+	    !(_fullscreen || freerdp_settings_get_bool(settings, FreeRDP_UseMultimon)))
+		return false;
+
+	auto window = getWindowForId(ev.windowID);
+	if (!window || ev.windowID != _topBarWindowId)
+		return false;
+
+	_topBarPointer = screenToPixel(ev.windowID, { ev.x, ev.y });
+	const bool overBar = window->topBarContains(ev.x, ev.y);
+	const bool nearTop = window->topBarNearTop(ev.x, ev.y);
+	const bool wasVisible = _topBarVisible;
+
+	if (!_topBarPinned)
+	{
+		if (nearTop)
+			_topBarVisible = true;
+		else if (!overBar)
+			_topBarVisible = false;
+	}
+
+	const auto hoveredButton = _topBarVisible && overBar
+	                               ? window->topBarButtonAt(ev.x, ev.y)
+	                               : SdlTopBarButton::None;
+	const bool hoverChanged = hoveredButton != _topBarHoveredButton;
+	_topBarHoveredButton = hoveredButton;
+
+	if ((_topBarVisible != wasVisible || hoverChanged) && !redrawWindows())
+		WLog_Print(_log, WLOG_WARN, "Unable to redraw the SDL connection bar");
+
+	return _topBarVisible && overBar;
 }
 
 bool SdlContext::handleEvent(const SDL_MouseWheelEvent& ev)
@@ -1111,6 +1242,20 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 	{
 		case SDL_EVENT_WINDOW_MOUSE_ENTER:
 			return restoreCursor();
+		case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+			if (ev.windowID == _topBarWindowId &&
+			    _topBarGestureOwner == TopBarGestureOwner::None)
+			{
+				const bool wasVisible = _topBarVisible;
+				if (!_topBarPinned)
+					_topBarVisible = false;
+				_topBarPointer = { -1.0f, -1.0f };
+				const bool hoverChanged = _topBarHoveredButton != SdlTopBarButton::None;
+				_topBarHoveredButton = SdlTopBarButton::None;
+				if ((_topBarVisible != wasVisible || hoverChanged) && !redrawWindows())
+					return false;
+			}
+			break;
 		case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
 			if (!resizeToScale(window))
 				return false;
@@ -1189,15 +1334,204 @@ bool SdlContext::handleEvent(const SDL_DisplayEvent& ev)
 
 bool SdlContext::handleEvent(const SDL_MouseButtonEvent& ev)
 {
-	if (!getWindowForId(ev.windowID))
+	const auto* capture = ev.type == SDL_EVENT_MOUSE_BUTTON_UP ? topBarCapture(ev.button) : nullptr;
+	const auto capturedWindowId = capture && capture->active ? capture->windowId : 0;
+
+	if (handleTopBarButton(ev))
+		return true;
+
+	/* SDL can report a release without a tracked window after the pointer has
+	 * left the client. Route it through the window that received the press so
+	 * the remote button-up is not lost. */
+	auto windowId = ev.windowID;
+	if (!getWindowForId(windowId) && capturedWindowId)
+		windowId = capturedWindowId;
+
+	if (!getWindowForId(windowId))
 		return true;
 	SDL_Event copy = {};
 	copy.button = ev;
-	if (!eventToPixelCoordinates(ev.windowID, copy))
+	copy.button.windowID = windowId;
+	if (!eventToPixelCoordinates(windowId, copy))
 		return true;
 	removeLocalScaling(copy.button.x, copy.button.y);
 	applyMonitorOffset(copy.button.windowID, copy.button.x, copy.button.y);
 	return SdlTouch::handleEvent(this, copy.button);
+}
+
+bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
+{
+	auto* capture = topBarCapture(ev.button);
+	if (ev.button == SDL_BUTTON_LEFT && _topBarDrag != TopBarDragMode::None)
+	{
+		_topBarDrag = TopBarDragMode::None;
+		_topBarDragWindow = 0;
+		std::ignore = SDL_CaptureMouse(false);
+	}
+	if (ev.type == SDL_EVENT_MOUSE_BUTTON_UP && capture && capture->active)
+	{
+		const auto gesture = *capture;
+		*capture = {};
+		if (!hasTopBarCapture(gesture.local))
+			_topBarGestureOwner = TopBarGestureOwner::None;
+
+		/* Remote presses are deliberately left for the normal RDP input path. */
+		if (!gesture.local)
+			return false;
+
+		/* A local press owns its release, even if the pointer is now outside the
+		 * bar or the window state changed in the meantime. */
+		if (gesture.windowId != ev.windowID || gesture.button == SdlTopBarButton::None)
+			return true;
+
+		const auto settings = context()->settings;
+		if (!_topBarVisible ||
+		    !(_fullscreen || freerdp_settings_get_bool(settings, FreeRDP_UseMultimon)))
+			return true;
+
+		auto window = getWindowForId(gesture.windowId);
+		if (!window || !window->topBarContains(ev.x, ev.y))
+			return true;
+
+		_topBarPointer = screenToPixel(ev.windowID, { ev.x, ev.y });
+		if (window->topBarButtonAt(ev.x, ev.y) != gesture.button)
+			return true;
+
+		switch (gesture.button)
+		{
+			case SdlTopBarButton::Compact:
+			{
+				/* Test toggle between the normal (3/4) and compact (1/2)
+				 * bar heights. */
+				window->setTopBarCompact(!window->topBarCompact());
+				auto rect = window->topBarRect();
+				rect.h = SdlTopBar::fixedHeight(window->pixelViewport(),
+				                                window->topBarCompact());
+				rect = SdlTopBar::clampToViewport(rect, window->pixelViewport(),
+				                                  window->topBarCompact());
+				window->setTopBarRect(rect);
+				if (!redrawWindows())
+					return false;
+				break;
+			}
+			case SdlTopBarButton::Pin:
+				_topBarPinned = !_topBarPinned;
+				_topBarVisible = true;
+				if (!redrawWindows())
+					return false;
+				break;
+			case SdlTopBarButton::Minimize:
+				return setMinimized();
+			case SdlTopBarButton::Restore:
+				return toggleFullscreen();
+			case SdlTopBarButton::Close:
+				return freerdp_abort_connect_context(context()) != FALSE;
+			case SdlTopBarButton::None:
+				break;
+		}
+		return true;
+	}
+
+	if (ev.type != SDL_EVENT_MOUSE_BUTTON_DOWN)
+		return false;
+
+	/* Do not hit-test the bar's geometry unless it is actually visible. */
+	const auto settings = context()->settings;
+	auto window = getWindowForId(ev.windowID);
+	if (!window)
+		return false;
+
+	/* Keep gesture ownership bounded to buttons that have a capture slot. An
+	 * unsupported button must not create an owner that can never be cleared by
+	 * a matching release. */
+	auto* buttonCapture = topBarCapture(ev.button);
+	if (!buttonCapture)
+		return false;
+
+	const bool overVisibleBar =
+	    _topBarWindowId && ev.windowID == _topBarWindowId && _topBarVisible &&
+	    (_fullscreen || freerdp_settings_get_bool(settings, FreeRDP_UseMultimon)) &&
+	    window->topBarContains(ev.x, ev.y);
+
+	if (_topBarGestureOwner == TopBarGestureOwner::None)
+		_topBarGestureOwner = overVisibleBar ? TopBarGestureOwner::Local
+		                                    : TopBarGestureOwner::Remote;
+
+	if (_topBarGestureOwner == TopBarGestureOwner::Local)
+	{
+		buttonCapture->active = true;
+		buttonCapture->local = true;
+		buttonCapture->windowId = ev.windowID;
+		buttonCapture->button = overVisibleBar && ev.button == SDL_BUTTON_LEFT
+		                             ? window->topBarButtonAt(ev.x, ev.y)
+		                             : SdlTopBarButton::None;
+		if (overVisibleBar)
+		{
+			_topBarPointer = screenToPixel(ev.windowID, { ev.x, ev.y });
+			_topBarHoveredButton = window->topBarButtonAt(ev.x, ev.y);
+		}
+		/* mstsc-style move/resize gestures: left press on the title area
+		 * drags the bar, press on an edge grip resizes its width. */
+		if (overVisibleBar && ev.button == SDL_BUTTON_LEFT)
+		{
+			const auto grab = screenToPixel(ev.windowID, { ev.x, ev.y });
+			const bool isResize = window->topBarResizeAt(ev.x, ev.y);
+			const bool isMove = window->topBarMoveAt(ev.x, ev.y);
+			WLog_Print(_log, WLOG_DEBUG,
+			           "topbar press win=%u resize=%d move=%d at %.0f,%.0f",
+			           (unsigned)ev.windowID, (int)isResize, (int)isMove, grab.x, grab.y);
+			if (isResize)
+			{
+				_topBarDrag = TopBarDragMode::Resize;
+				_topBarDragWindow = ev.windowID;
+				_topBarDragGrab = grab;
+				_topBarDragRect = window->topBarRect();
+				_topBarDragLeftEdge =
+				    grab.x < _topBarDragRect.x + _topBarDragRect.w / 2.0f;
+				std::ignore = SDL_CaptureMouse(true);
+			}
+			else if (isMove)
+			{
+				_topBarDrag = TopBarDragMode::Move;
+				_topBarDragWindow = ev.windowID;
+				_topBarDragGrab = grab;
+				_topBarDragRect = window->topBarRect();
+				std::ignore = SDL_CaptureMouse(true);
+			}
+		}
+		return true;
+	}
+
+	/* Record remote ownership for every tracked press, including presses just
+	 * below a hidden bar and additional buttons pressed over the visible bar.
+	 * Once a remote gesture starts, the overlay cannot claim another button. */
+	buttonCapture->active = true;
+	buttonCapture->local = false;
+	buttonCapture->windowId = ev.windowID;
+	buttonCapture->button = SdlTopBarButton::None;
+	return false;
+}
+
+SdlContext::TopBarPointerCapture* SdlContext::topBarCapture(Uint8 button)
+{
+	if (button >= _topBarCaptures.size())
+		return nullptr;
+	return &_topBarCaptures[button];
+}
+
+const SdlContext::TopBarPointerCapture* SdlContext::topBarCapture(Uint8 button) const
+{
+	if (button >= _topBarCaptures.size())
+		return nullptr;
+	return &_topBarCaptures[button];
+}
+
+bool SdlContext::hasTopBarCapture(bool local) const
+{
+	return std::any_of(_topBarCaptures.cbegin(), _topBarCaptures.cend(),
+	                   [local](const auto& capture) {
+		                   return capture.active && capture.local == local;
+	                   });
 }
 
 bool SdlContext::handleEvent(const SDL_TouchFingerEvent& ev)
@@ -1714,6 +2048,9 @@ bool SdlContext::setFullscreen(bool enter, bool forceOriginalDisplay)
 			return false;
 	}
 	_fullscreen = enter;
+	_topBarVisible = enter;
+	_topBarPointer = { -1.0f, -1.0f };
+	_topBarHoveredButton = SdlTopBarButton::None;
 	return true;
 }
 

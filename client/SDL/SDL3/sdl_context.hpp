@@ -18,6 +18,7 @@
  */
 #pragma once
 
+#include <array>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -182,6 +183,27 @@ class SdlContext
 	[[nodiscard]] bool handleEvent(const SDL_MouseMotionEvent& ev);
 	[[nodiscard]] bool handleEvent(const SDL_MouseWheelEvent& ev);
 	[[nodiscard]] bool handleEvent(const SDL_TouchFingerEvent& ev);
+	[[nodiscard]] bool handleTopBarMotion(const SDL_MouseMotionEvent& ev);
+	[[nodiscard]] bool handleTopBarButton(const SDL_MouseButtonEvent& ev);
+	struct TopBarPointerCapture
+	{
+		bool active = false;
+		bool local = false;
+		SDL_WindowID windowId = 0;
+		SdlTopBarButton button = SdlTopBarButton::None;
+	};
+
+	enum class TopBarGestureOwner
+	{
+		None,
+		Local,
+		Remote
+	};
+
+	[[nodiscard]] TopBarPointerCapture* topBarCapture(Uint8 button);
+	[[nodiscard]] const TopBarPointerCapture* topBarCapture(Uint8 button) const;
+	[[nodiscard]] bool hasTopBarCapture(bool local) const;
+	[[nodiscard]] bool redrawWindows();
 
 	void addOrUpdateDisplay(SDL_DisplayID id);
 	void deleteDisplay(SDL_DisplayID id);
@@ -238,6 +260,26 @@ class SdlContext
 	std::map<SDL_DisplayID, rdpMonitor> _displays;
 	std::map<SDL_WindowID, SdlWindow> _windows;
 	std::map<SDL_DisplayID, std::pair<SDL_Rect, SDL_Rect>> _offsets;
+	SDL_WindowID _topBarWindowId = 0;
+	bool _topBarPinned = true;
+	bool _topBarVisible = true;
+	SDL_FPoint _topBarPointer{ -1.0f, -1.0f };
+	SdlTopBarButton _topBarHoveredButton = SdlTopBarButton::None;
+	/* Floating-bar move/resize gesture (mstsc-style): press on the title area
+	 * drags the bar, press on an edge handle resizes its width. */
+	enum class TopBarDragMode
+	{
+		None,
+		Move,
+		Resize
+	};
+	TopBarDragMode _topBarDrag = TopBarDragMode::None;
+	SDL_WindowID _topBarDragWindow = 0;
+	SDL_FPoint _topBarDragGrab{};
+	SdlTopBarRect _topBarDragRect{};
+	bool _topBarDragLeftEdge = false;
+	TopBarGestureOwner _topBarGestureOwner = TopBarGestureOwner::None;
+	std::array<TopBarPointerCapture, SDL_BUTTON_X2 + 1> _topBarCaptures{};
 
 	uint32_t _windowWidth = 0;
 	uint32_t _windowHeight = 0;
