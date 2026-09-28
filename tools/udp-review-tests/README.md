@@ -77,3 +77,38 @@ rejection. Its original three-argument source is preserved verbatim in
 `support/udp-review-33e-framing-original.c.txt`. The envelope check is now a
 legacy utility rejection test, not a test of the current production sender.
 The accompanying `33e` AOA harness intentionally retains its historical bug.
+
+## Live VM connection and reconnect diagnostics
+
+The scripts in `integration/` preserve bounded live-session diagnostics from
+September 2026. They retain the historical VM, account, display, and build
+defaults used for those runs. Inspect those settings before using another
+environment, and supply `RDP_TEST_PASSWORD` through the environment.
+
+- `integration/udp-connect-repeat.py` starts separate clients through a PTY,
+  records connection milestones and graphics frame counts, and intentionally
+  disconnects only the clients it creates. Supply `--binary` and a new local
+  `--output` directory; `--count`, `--observe`, `--startup-timeout`, and `--gap`
+  control the observation windows. Its historical display IDs are 3 and 2.
+- `integration/reconnect-relay.py` relays TCP and UDP on localhost port 13389
+  to the historical VM at `192.168.64.2:3389`, using the client at
+  `/tmp/freerdp-build/client/SDL/SDL3/sdl-freerdp`. It actively aborts its TCP
+  connections and drops UDP for `RDP_TEST_OUTAGE` seconds, then observes recovery.
+  Configure retry count with `RDP_TEST_RETRIES` and local client-log destination
+  with `RDP_TEST_LOG`. This does not simulate a silent TCP blackhole.
+- [Short reconnect result](integration/reconnect-vm-result.md) and
+  [retry-exhaustion result](integration/reconnect-vm-long-result.md) describe
+  the original measured behavior and its limits.
+
+The [ten-connection report](../../bugs/udp-connect-repeat-20260916.md) explains
+the received-graphics readiness criterion and the initial TCP warning.
+`logs/udp-connect-20260916/` retains original observations, final aggregate
+analysis, compact client milestone extracts, and the exact `harness-as-run.py`.
+That original runner required an ACTIVE marker without enabling its logger;
+its provisional incomplete labels are not transport failures. The reusable
+runner uses UDP receive migration and the first graphics frame for readiness.
+
+Historical evidence and its measured values are unchanged. Raw client logs
+and newly generated result directories remain local. The milestone extracts
+are client log events, not packet captures or packet payload extracts.
+No new live VM run was performed for this preservation.
