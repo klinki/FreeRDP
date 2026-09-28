@@ -82,7 +82,7 @@ Pre-fix evidence is in `../tools/udp-review-tests/logs/drag-20260916/dell-retry/
 - Built-in: 1470×956 local points, 2940×1912 backing pixels, SDL ID 2; requested Windows scaling 100%.
 - Built-in is left of M27UP: local desktop origin (-1470,0). Its fullscreen client content frame is (-1470,33,1470,923), due to the top safe area. M27UP content frame is (0,0,1920,1080).
 - BOTH local displays have 2× backing density. This does not reproduce the original 2×/1× local display pair, despite differing Windows DPI settings.
-- Initial UDP-enabled session established a tunnel but logged that it retained TCP transport. Subsequent reconnect attempts ended with a server logoff response and a UDP timeout/reset respectively. The instrumented measurements below explicitly used TCP (-multitransport).
+- Correction after the [ten-connection check](udp-connect-repeat-20260916.md): the initial UDP-enabled session established a tunnel and subsequently logged UDP receive migration. Its earlier “staying on TCP” warning did not mean a persistent TCP-only session. Subsequent reconnect attempts ended with a server logoff response and a genuine UDP timeout/reset respectively. The preliminary instrumented measurements below explicitly used TCP (-multitransport).
 
 ## Method
 

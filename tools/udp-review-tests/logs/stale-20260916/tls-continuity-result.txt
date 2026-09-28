@@ -1,0 +1,4 @@
+TLS cipher suite 0x1302
+Application record start index 3
+Checking records crossing/after gap: 173
+PASS: all 173 records spanning and following the sequence gap authenticate without inserting or removing any payload bytes.

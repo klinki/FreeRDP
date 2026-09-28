@@ -1,0 +1,18 @@
+[09:23:53:266] [61487:6b593001] [INFO][com.freerdp.core.rdpeudp] - [rdpeudp_connect]: RDP-UDP connected to 192.168.64.2:3389 (RDPEUDP2)
+[09:23:53:994] [61487:6b593001] [INFO][com.freerdp.core.rdpeudp] - [rdpeudp_tls_connect]: TLS over RDP-UDP established to 192.168.64.2:3389
+[09:23:53:997] [61487:6b593001] [INFO][com.freerdp.core.rdpeudp] - [rdpeudp_tunnel_create]: RDP multitransport tunnel 12 established over UDP
+[09:23:53:997] [61487:6b593001] [WARN][com.freerdp.core.multitransport] - [multitransport_udp_connect_thread]: UDP tunnel ready post-ACTIVE without Soft-Sync; staying on TCP to preserve ordering
+[09:23:53:999] [61487:6b47b001] [INFO][com.freerdp.core.multitransport] - [multitransport_check_fds]: UDP recv migrated on first DVC PDU (37 bytes, no Soft-Sync)
+[09:23:59:067] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 1
+[09:23:59:073] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 2
+[09:23:59:113] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 3
+[09:23:59:155] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 4
+[09:23:59:596] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 5
+[09:23:59:672] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 6
+[09:23:59:737] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 7
+[09:23:59:899] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 8
+[09:24:01:039] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 9
+[09:24:02:717] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 10
+[09:24:03:065] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 11
+[09:24:03:208] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 12
+[09:24:07:192] [61487:6b7c3001] [TRACE][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_end_frame_pdu]: RecvEndFramePdu: frameId: 13

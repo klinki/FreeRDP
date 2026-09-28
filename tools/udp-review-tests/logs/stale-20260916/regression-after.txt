@@ -1,0 +1,13 @@
+Test project /tmp/freerdp-udp-sequence-build/libfreerdp/core/test
+    Start 1: TestVersion
+1/4 Test #1: TestVersion ......................   Passed    0.57 sec
+    Start 2: TestSettings
+2/4 Test #2: TestSettings .....................   Passed   28.24 sec
+    Start 3: TestUtils
+3/4 Test #3: TestUtils ........................   Passed    0.01 sec
+    Start 4: TestRdpeUdp
+4/4 Test #4: TestRdpeUdp ......................   Passed    0.83 sec
+
+100% tests passed out of 4
+
+Total Test time (real) =  29.66 sec
