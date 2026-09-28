@@ -425,7 +425,13 @@ int main()
 		std::cerr << "SDL init failed: " << SDL_GetError() << '\n';
 		return 1;
 	}
-	const bool ok = rendererLifecycle();
+	bool ok = rendererLifecycle();
+	{
+		auto window = SdlWindow::create(SDL_GetPrimaryDisplay(), "Reconnect teardown", 0, 640, 480);
+		ok = expect(window.updateStalledSurface(1), "reconnect overlay failed") && ok;
+		SDL_ClearError();
+	}
+	ok = expect(SDL_GetError()[0] == '\0', "reconnect teardown used a stale SDL resource") && ok;
 	TTF_Quit();
 	SDL_Quit();
 	return ok ? 0 : 1;
