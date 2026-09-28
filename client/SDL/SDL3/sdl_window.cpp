@@ -727,7 +727,7 @@ static SDL_Window* createDummy(SDL_DisplayID id)
 	 * read back pixel dimensions — a fullscreen slideshow across all
 	 * displays before any network connect (fully meaningless when the
 	 * host is offline and connect fails). Keep the probe hidden; pixel
-	 * dimensions are derived from display bounds x content scale below,
+	 * dimensions are derived from display bounds and pixel density below,
 	 * so no positioning or fullscreen transition is needed. */
 	const auto x = SDL_WINDOWPOS_CENTERED_DISPLAY(id);
 	const auto y = SDL_WINDOWPOS_CENTERED_DISPLAY(id);
@@ -754,23 +754,30 @@ static SDL_Window* createDummy(SDL_DisplayID id)
 	return window;
 }
 
-/* Windowless monitor probe: no SDL_Window at all, hence no slideshow.
- * Pixel dimensions = logical display bounds x content scale. Per-window
- * scale is read from a hidden dummy (never shown, never fullscreen) so
- * Windows/macOS per-monitor DPI still resolves without any visible flash. */
-static float probeDisplayScale(SDL_DisplayID id)
+/* Read scale and pixel density from a hidden window. Content scale controls
+ * UI size; only pixel density converts display coordinates to pixels. */
+static float probeDisplayScale(SDL_DisplayID id, float& pixelDensity)
 {
 	std::unique_ptr<SDL_Window, void (*)(SDL_Window*)> window(createDummy(id), SDL_DestroyWindow);
 	float scale = 0.0f;
+	pixelDensity = 0.0f;
 	if (window)
 	{
 		scale = SDL_GetWindowDisplayScale(window.get());
+		pixelDensity = SDL_GetWindowPixelDensity(window.get());
 		SDL_Event event{};
 		while (SDL_PollEvent(&event))
 			;
 	}
+	if (pixelDensity <= 0.0f)
+	{
+		const auto mode = SDL_GetCurrentDisplayMode(id);
+		pixelDensity = mode ? mode->pixel_density : 1.0f;
+	}
+	if (pixelDensity <= 0.0f)
+		pixelDensity = 1.0f;
 	if (scale <= 0.0f)
-		scale = SDL_GetDisplayContentScale(id);
+		scale = SDL_GetDisplayContentScale(id) * pixelDensity;
 	if (scale <= 0.0f)
 		scale = 1.0f;
 	return scale;
@@ -782,9 +789,10 @@ rdpMonitor SdlWindow::query(SDL_DisplayID id, bool forceAsPrimary)
 	if (!SDL_GetDisplayBounds(id, &bounds) || (bounds.w <= 0) || (bounds.h <= 0))
 		return {};
 
-	const float scale = probeDisplayScale(id);
-	const auto pw = static_cast<INT32>(std::roundf(static_cast<float>(bounds.w) * scale));
-	const auto ph = static_cast<INT32>(std::roundf(static_cast<float>(bounds.h) * scale));
+	float pixelDensity = 1.0f;
+	const float scale = probeDisplayScale(id, pixelDensity);
+	const auto pw = static_cast<INT32>(std::roundf(static_cast<float>(bounds.w) * pixelDensity));
+	const auto ph = static_cast<INT32>(std::roundf(static_cast<float>(bounds.h) * pixelDensity));
 	if ((pw <= 0) || (ph <= 0))
 		return {};
 
@@ -821,9 +829,10 @@ SDL_Rect SdlWindow::rect(SDL_DisplayID id, bool forceAsPrimary)
 	SDL_Rect bounds = {};
 	if (!SDL_GetDisplayBounds(id, &bounds))
 		return {};
-	const float scale = probeDisplayScale(id);
-	const auto pw = static_cast<int>(std::roundf(static_cast<float>(bounds.w) * scale));
-	const auto ph = static_cast<int>(std::roundf(static_cast<float>(bounds.h) * scale));
+	float pixelDensity = 1.0f;
+	std::ignore = probeDisplayScale(id, pixelDensity);
+	const auto pw = static_cast<int>(std::roundf(static_cast<float>(bounds.w) * pixelDensity));
+	const auto ph = static_cast<int>(std::roundf(static_cast<float>(bounds.h) * pixelDensity));
 	SDL_Rect rect = {};
 	rect.x = forceAsPrimary ? 0 : bounds.x;
 	rect.y = forceAsPrimary ? 0 : bounds.y;
