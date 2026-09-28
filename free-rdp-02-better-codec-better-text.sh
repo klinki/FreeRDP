@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 #
 # Live UDP test client: same fine-tuned 4K/AVC444 config as free-rdp-02,
-# but running OUR build (feat/add-udp) with multitransport + TLS secrets
+# using this checkout's VideoToolbox build with multitransport + TLS secrets
 # for Wireshark dissection. Logs go to /tmp/rdp-udp-test.log.
 #
 # Env overrides: SERVER (default davidpc), RDP_USER (default david),
-# FREERDP_BIN (default: our /tmp build).
+# FREERDP_BIN (default: this checkout's build/videotoolbox client).
 
 set -euo pipefail
 
-FREERDP_BIN="${FREERDP_BIN:-/tmp/freerdp-build/client/SDL/SDL3/sdl-freerdp}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+FREERDP_BIN="${FREERDP_BIN:-${SCRIPT_DIR}/build/videotoolbox/client/SDL/SDL3/sdl-freerdp}"
 SERVER="${SERVER:-davidpc}"
 RDP_USER="${RDP_USER:-david}"
 SECRETS_FILE="${SECRETS_FILE:-/tmp/rdp-secrets.txt}"
