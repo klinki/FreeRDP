@@ -157,6 +157,7 @@ class SdlContext
 	[[nodiscard]] bool parseMonitorScaleOverrides(const char* value);
 	[[nodiscard]] bool validateMonitorScaleOverrides() const;
 	void applyMonitorScaleOverride(rdpMonitor& monitor) const;
+	void applyPrimaryMonitor(std::vector<rdpMonitor>& monitors) const;
 
 	[[nodiscard]] sdlDispContext& getDisplayChannelContext();
 	[[nodiscard]] sdlInput& getInputChannelContext();

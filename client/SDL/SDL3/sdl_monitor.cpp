@@ -216,20 +216,7 @@ int sdl_list_monitors([[maybe_unused]] SdlContext* sdl)
 		sdl->applyMonitorScaleOverride(monitor);
 		monitors.emplace_back(monitor);
 	}
-	// With an explicit /monitors: list the first entry is the primary (like xfreerdp),
-	// not whatever the local desktop considers primary.
-	if (!monitors.empty() && (freerdp_settings_get_uint32(settings, FreeRDP_NumMonitorIds) > 0))
-	{
-		for (auto& monitor : monitors)
-			monitor.is_primary = FALSE;
-		monitors.at(0).is_primary = TRUE;
-	}
-	// /monitors: may select a subset that excludes the SDL primary. The
-	// library rejects arrays without a primary, so promote the first entry
-	// when none is marked.
-	if (!monitors.empty() && std::none_of(monitors.cbegin(), monitors.cend(),
-	                                      [](const rdpMonitor& m) { return m.is_primary; }))
-		monitors.at(0).is_primary = true;
+	sdl->applyPrimaryMonitor(monitors);
 	return freerdp_settings_set_monitor_def_array_sorted(settings, monitors.data(),
 	                                                     monitors.size());
 }
