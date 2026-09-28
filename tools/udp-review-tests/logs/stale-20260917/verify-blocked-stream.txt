@@ -1,0 +1,7 @@
+Unique channel chunks: 196619 identical retransmissions: 1397 missing sequence labels: [65536, 131072, 196608]
+Reassembled TLS bytes: 127669048 bytes held after stalled offset: 4956
+Complete TLS records: 204178 trailing bytes: 0
+PASS: authenticated all 17 TLS records spanning/following the third wrap without any inserted or removed payload bytes.
+TLS inner content types/counts: {23: 17} Tunnel DATA PDUs: 17 higher-layer bytes: 4486 DVC (command, channel) counts: {(3, 7): 14, (4, 10): 1}
+Encrypted reassembly SHA-256: 362775d852643ece44d620db1e1f3ee28cabc91a254f76a399b743de5bdea4bb
+Known protocol channel names: {2: 'Microsoft::Windows::RDS::CoreInput', 7: 'Microsoft::Windows::RDS::Graphics', 8: 'Microsoft::Windows::RDS::MouseCursor', 10: 'AUDIO_PLAYBACK_DVC', 11: 'Microsoft::Windows::RDS::Input', 12: 'Microsoft::Windows::RDS::Geometry::v08.01'}
