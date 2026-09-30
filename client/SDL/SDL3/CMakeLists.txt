@@ -161,10 +161,15 @@ option(SDL_LAUNCHER_TEST "Build private launcher transport tests" OFF)
 if(SDL_LAUNCHER_TEST AND APPLE)
   enable_testing()
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  set(SDL_TLS_KEYLOG_ENABLED OFF)
+  if(SDL_LAUNCHER_BRIDGE_ENABLED AND WITH_OPENSSL AND OPENSSL_VERSION VERSION_GREATER_EQUAL 1.1.1)
+    set(SDL_TLS_KEYLOG_ENABLED ON)
+  endif()
   add_test(NAME TestSDLLauncherCapabilities
            COMMAND ${Python3_EXECUTABLE}
                    ${CMAKE_CURRENT_SOURCE_DIR}/test/TestSDLLauncherCapabilities.py
-                   $<TARGET_FILE:sdl3-freerdp> ${SDL_LAUNCHER_BRIDGE_ENABLED})
+                   $<TARGET_FILE:sdl3-freerdp> ${SDL_LAUNCHER_BRIDGE_ENABLED}
+                   ${SDL_TLS_KEYLOG_ENABLED})
   set_tests_properties(TestSDLLauncherCapabilities PROPERTIES TIMEOUT 30)
 
   set(SDL_MONITOR_TEST_SRCS ${SRCS})

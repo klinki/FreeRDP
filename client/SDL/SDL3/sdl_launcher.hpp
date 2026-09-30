@@ -26,6 +26,7 @@ class SdlLauncher
 	static Json capabilities();
 	static bool useAccessoryActivationPolicy(); // macOS main thread, after SDL_Init.
 	bool prepare(std::vector<std::string>& arguments, std::string& error);
+	bool applyTlsSecretsFile(rdpSettings* settings, std::string& error) const;
 	bool authenticate(char** username, char** password, char** domain, rdp_auth_reason reason,
 	                  bool rejected = false);
 	DWORD certificate(const char* host, UINT16 port, const char* commonName, const char* subject,
@@ -60,6 +61,7 @@ class SdlLauncher
 	void terminal(const char* outcome, int code, const std::string& detail);
 	int _fd;
 	std::string _sessionId;
+	std::string _tlsSecretsFile;
 	rdpContext* _context;
 	std::mutex _mutex;
 	std::condition_variable _condition;

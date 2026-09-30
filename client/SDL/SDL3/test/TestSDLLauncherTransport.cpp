@@ -8,8 +8,13 @@
 #include <future>
 #include <iostream>
 #include <poll.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#ifdef WITH_OPENSSL
+#include <openssl/opensslv.h>
+#endif
 
 // The production implementation only posts a quit event; avoid initializing a UI in this test.
 bool sdl_push_quit()
@@ -262,6 +267,66 @@ namespace
 		        "Query and live handshake capabilities differ");
 		require(WINPR_JSON_IsArray(WINPR_JSON_GetObjectItemCaseSensitive(hello.get(), "displays")),
 		        "Handshake lost its display inventory");
+		const std::string listed = queryEncoded.get();
+#if defined(WITH_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10101000L
+		require(listed.find("\"tls_keylog\"") != std::string::npos, "TLS keylog support not advertised");
+#else
+		require(listed.find("\"tls_keylog\"") == std::string::npos, "Unavailable TLS keylog advertised");
+#endif
+	}
+	void tlsSecretsOptions()
+	{
+		char directoryTemplate[] = "/private/tmp/freerdp-tls-keylog-XXXXXX";
+		const char* created = mkdtemp(directoryTemplate);
+		require(created != nullptr, "Cannot create private TLS test directory");
+		const std::string directory = created;
+		const std::string file = directory + "/secrets";
+		const std::string alias = directory + "/alias";
+		const std::string linkedDirectory = directory + "/linked";
+		int fd = open(file.c_str(), O_CREAT | O_EXCL | O_RDWR, 0600);
+		require(fd >= 0, "Cannot create private TLS test file");
+		close(fd);
+		require(symlink(file.c_str(), alias.c_str()) == 0 &&
+		            symlink(directory.c_str(), linkedDirectory.c_str()) == 0,
+		        "Cannot create TLS symlink fixtures");
+		auto run = [&](const std::string& fields, bool accepted, bool configured) {
+			Connection c;
+			const auto args = fields.find("\"arguments\"") == std::string::npos
+			                      ? ",\"arguments\":[]" : "";
+			c.command("start", args + std::string(",\"displaySelections\":[]") + fields);
+			std::vector<std::string> arguments;
+			std::string error;
+			require(c.bridge->prepare(arguments, error) == accepted, "Wrong TLS start acceptance");
+			if (accepted)
+			{
+				require(arguments.empty(), "TLS start changed ordinary arguments");
+				require(c.bridge->applyTlsSecretsFile(c.rdp->context->settings, error),
+				        "Cannot apply valid TLS secrets setting");
+				const char* actual = freerdp_settings_get_string(c.rdp->context->settings,
+				                                               FreeRDP_TlsSecretsFile);
+				require((actual != nullptr) == configured, "TLS setting changed without request");
+				if (configured)
+					require(actual == file, "Wrong TLS secrets file setting");
+			}
+		};
+		run("", true, false);
+		run(",\"tlsSecretsFile\":\"" + file + "\"", true, true);
+		run(",\"arguments\":[\"/tls:secrets-file:" + file + "\"]", false, false);
+		run(",\"arguments\":[\"/tls-secrets-file:" + file + "\"]", false, false);
+		run(",\"tlsSecretsFile\":null", false, false);
+		run(",\"tlsSecretsFile\":\"\"", false, false);
+		run(",\"tlsSecretsFile\":\"relative/path\"", false, false);
+		run(",\"tlsSecretsFile\":\"" + alias + "\"", false, false);
+		run(",\"tlsSecretsFile\":\"" + linkedDirectory + "/secrets\"", false, false);
+		run(",\"tlsSecretsFile\":\"" + directory + "\"", false, false);
+		run(",\"tlsSecretsFile\":\"" + directory + "/missing\"", false, false);
+		run(",\"tlsSecretsFile\":\"" + file + "\\u0000suffix\"", false, false);
+		require(chmod(file.c_str(), 0644) == 0, "Cannot change TLS fixture permissions");
+		run(",\"tlsSecretsFile\":\"" + file + "\"", false, false);
+		unlink(linkedDirectory.c_str());
+		unlink(alias.c_str());
+		unlink(file.c_str());
+		rmdir(directory.c_str());
 	}
 	void promptAndStaleResponse()
 	{
@@ -457,6 +522,7 @@ int main()
 	try
 	{
 		handshakeCapabilities();
+		tlsSecretsOptions();
 		promptAndStaleResponse();
 		concurrentPromptsAndCertificate();
 		malformedAndVersion();

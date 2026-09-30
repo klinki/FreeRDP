@@ -874,6 +874,20 @@ int main(int argc, char* argv[])
 		return rc;
 	}
 
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (bridge)
+	{
+		std::string error;
+		if (!bridge->applyTlsSecretsFile(settings, error))
+		{
+			bridge->setupFailed(error);
+			bridge.reset();
+			SDL_Quit();
+			return -1;
+		}
+	}
+#endif
+
 	if (!SDL_SetHint(SDL_HINT_ALLOW_ALT_TAB_WHILE_GRABBED, "0"))
 		return -1;
 	if (!SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0"))
