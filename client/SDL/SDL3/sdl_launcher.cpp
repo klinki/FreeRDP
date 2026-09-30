@@ -17,9 +17,16 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
+#include <limits.h>
 #include <poll.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#ifdef WITH_OPENSSL
+#include <openssl/opensslv.h>
+#endif
 #include <freerdp/error.h>
 #include <freerdp/crypto/certificate.h>
 
@@ -27,6 +34,12 @@ namespace
 {
 	SdlLauncher* launcher = nullptr;
 	constexpr unsigned bridgeProtocolVersion = 1;
+	constexpr char escapedNul[] = "\\u0000";
+#if defined(WITH_OPENSSL) && OPENSSL_VERSION_NUMBER >= 0x10101000L
+	constexpr bool tlsKeylogSupported = true;
+#else
+	constexpr bool tlsKeylogSupported = false;
+#endif
 	constexpr const char* bridgeCapabilities[] = {
 		"auth", "certificate", "focus", "retry", "display_uuid", "per_monitor_scaling",
 		"dynamic_resolution", "multimon", "close_confirmation", "session_thumbnail",
@@ -45,7 +58,52 @@ namespace
 				return false;
 			std::ignore = item.release();
 		}
+		if (tlsKeylogSupported)
+		{
+			SdlLauncher::Json item(WINPR_JSON_CreateString("tls_keylog"), WINPR_JSON_Delete);
+			if (!item || !WINPR_JSON_AddItemToArray(array, item.get()))
+				return false;
+			std::ignore = item.release();
+		}
 		return true;
+	}
+	bool validTlsSecretsFile(const std::string& path)
+	{
+		if (path.empty() || path.front() != '/' || path.size() >= PATH_MAX ||
+		    path.find('\0') != std::string::npos)
+			return false;
+		int directory = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+		if (directory < 0)
+			return false;
+		bool valid = false;
+		size_t begin = 1;
+		while (begin < path.size())
+		{
+			const auto end = path.find('/', begin);
+			const auto component = path.substr(begin, end - begin);
+			if (component.empty() || component == "." || component == "..")
+				break;
+			const bool last = end == std::string::npos;
+			const int next = openat(directory, component.c_str(),
+			                        O_RDONLY | O_NOFOLLOW | O_CLOEXEC | (last ? 0 : O_DIRECTORY));
+			if (next < 0)
+				break;
+			close(directory);
+			directory = next;
+			if (last)
+			{
+				struct stat file{};
+				struct statfs filesystem{};
+				valid = fstat(directory, &file) == 0 && S_ISREG(file.st_mode) &&
+				        file.st_uid == geteuid() && (file.st_mode & 077) == 0 &&
+				        (file.st_mode & 0600) == 0600 && fstatfs(directory, &filesystem) == 0 &&
+				        (filesystem.f_flags & MNT_LOCAL) != 0;
+				break;
+			}
+			begin = end + 1;
+		}
+		close(directory);
+		return valid;
 	}
 	constexpr size_t maxFrame = 1024 * 1024;
 	constexpr size_t maxThumbnailPNG = 262144;
@@ -177,7 +235,8 @@ namespace
 			                      "launcher-fd",
 			                      "launcher-session",
 			                      "log-level",
-			                      "log-filters" };
+			                      "log-filters",
+			                      "tls-secrets-file" };
 		for (const auto entry : blocked)
 			if (key == entry)
 				return false;
@@ -323,7 +382,14 @@ void SdlLauncher::readLoop()
 		size_t end = 0;
 		while ((end = buffer.find('\n')) != std::string::npos)
 		{
-			if (end == 0 || end > maxFrame || buffer.find('\0', 0) < end)
+			// JSON can encode a NUL as \u0000, which the generic string API truncates.
+			const auto nul = std::search(buffer.begin(), buffer.begin() + end,
+			                             escapedNul, escapedNul + sizeof(escapedNul) - 1,
+			                             [](char a, char b) {
+				                             return std::tolower(static_cast<unsigned char>(a)) == b;
+			                             });
+			if (end == 0 || end > maxFrame || buffer.find('\0', 0) < end ||
+			    nul != buffer.begin() + end)
 			{
 				cancel();
 				return;
@@ -688,11 +754,23 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 		return false;
 	auto args = item(start.get(), "arguments");
 	auto selections = item(start.get(), "displaySelections");
+	auto secrets = item(start.get(), "tlsSecretsFile");
 	if (!WINPR_JSON_IsArray(args) || !WINPR_JSON_IsArray(selections) ||
-	    WINPR_JSON_GetArraySize(args) > 256)
+	    WINPR_JSON_GetArraySize(args) > 256 ||
+	    (secrets && (!tlsKeylogSupported || !WINPR_JSON_IsString(secrets))))
 	{
 		error = "Invalid start command";
 		return false;
+	}
+	if (secrets)
+	{
+		const auto path = WINPR_JSON_GetStringValue(secrets);
+		if (!path || !validTlsSecretsFile(path))
+		{
+			error = "Invalid TLS secrets file";
+			return false;
+		}
+		_tlsSecretsFile = path;
 	}
 	for (size_t i = 0; i < WINPR_JSON_GetArraySize(args); i++)
 	{
@@ -764,6 +842,18 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 			}
 		}
 		arguments.push_back("/sdl-monitor-scale:" + scaleArg);
+	}
+	return true;
+}
+bool SdlLauncher::applyTlsSecretsFile(rdpSettings* settings, std::string& error) const
+{
+	if (_tlsSecretsFile.empty())
+		return true;
+	if (!validTlsSecretsFile(_tlsSecretsFile) ||
+	    !freerdp_settings_set_string(settings, FreeRDP_TlsSecretsFile, _tlsSecretsFile.c_str()))
+	{
+		error = "Cannot configure TLS secrets file";
+		return false;
 	}
 	return true;
 }

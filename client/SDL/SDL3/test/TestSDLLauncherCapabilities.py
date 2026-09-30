@@ -20,7 +20,7 @@ def run(binary, arguments, environment):
 
 
 def main():
-    binary, enabled = sys.argv[1:]
+    binary, enabled, tls_enabled = sys.argv[1:]
     supported = enabled == "ON"
     query = "/launcher-capabilities"
     with tempfile.TemporaryDirectory(prefix="freerdp-capabilities-") as directory:
@@ -48,9 +48,12 @@ def main():
                     "Missing engine version")
             require(type(result["bridgeProtocolVersion"]) is int and
                     result["bridgeProtocolVersion"] == 1, "Wrong bridge version")
-            require(result["capabilities"] == ["auth", "certificate", "focus", "retry",
+            expected = ["auth", "certificate", "focus", "retry",
                     "display_uuid", "per_monitor_scaling", "dynamic_resolution", "multimon",
-                    "close_confirmation", "session_thumbnail", "dock_accessory", "primary_monitor"],
+                    "close_confirmation", "session_thumbnail", "dock_accessory", "primary_monitor"]
+            if tls_enabled == "ON":
+                expected.append("tls_keylog")
+            require(result["capabilities"] == expected,
                     "Wrong compiled capabilities")
         else:
             require(response.returncode != 0 and response.stdout == "" and

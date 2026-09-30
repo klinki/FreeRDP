@@ -14,7 +14,7 @@ file, or any other argument exits nonzero with no stdout. In a bridge-enabled
 build it writes exactly one JSON object and a newline to stdout, then exits 0:
 
 ```json
-{"schemaVersion":1,"client":"sdl3","engineVersion":"3.31.2-dev0","bridgeProtocolVersion":1,"capabilities":["auth","certificate","focus","retry","display_uuid","per_monitor_scaling","dynamic_resolution","multimon","close_confirmation","session_thumbnail"]}
+{"schemaVersion":1,"client":"sdl3","engineVersion":"3.31.2-dev0","bridgeProtocolVersion":1,"capabilities":["auth","certificate","focus","retry","display_uuid","per_monitor_scaling","dynamic_resolution","multimon","close_confirmation","session_thumbnail","dock_accessory","primary_monitor","tls_keylog"]}
 ```
 
 `engineVersion` is the build's actual `freerdp_get_version_string()` value. The
@@ -26,6 +26,8 @@ reject the query with exit 1, no stdout, and a diagnostic on stderr. Older binar
 may likewise reject it; their existing socket `hello` remains available to a
 launcher that supports legacy discovery. The query does not alter the live
 handshake format or enumerate current displays.
+The tls_keylog capability is present only when the bridge is built with
+OpenSSL 1.1.1 or later.
 
 Messages are UTF-8, newline-delimited JSON with `v:1`, `type`, and `sessionId`.
 Frames are limited to 1 MiB. After SDL initialization on its main thread the
@@ -34,6 +36,16 @@ The launcher responds with `start` containing `arguments` and `displaySelections
 or `cancel` for discovery. Selected display UUIDs are mapped to current SDL IDs
 by unambiguous CoreGraphics bounds matching. Missing, duplicate, or ambiguous
 selections fail before connecting.
+
+When tls_keylog is advertised, start may contain an optional tlsSecretsFile
+string. It must name an existing, absolute path on a local filesystem. The
+path may not traverse a symlink; the target must be a regular file owned by
+the client user with owner read/write access and no group or other permissions
+(typically mode 0600). The bridge validates it before starting and applies
+the existing FreeRDP TLS secrets setting after ordinary command-line parsing
+and before connecting. A missing field leaves normal startup unchanged. The
+general arguments array still rejects TLS secrets switches. The underlying
+FreeRDP callback appends secrets to this file.
 
 The client emits `auth_request`, `certificate_request`, `state`, `retry`, and
 one `ended` event. Prompts include string `requestId` values. The launcher replies
