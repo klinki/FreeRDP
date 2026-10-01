@@ -245,6 +245,28 @@ namespace
 		        "Unread thumbnail prevented bounded writer/worker teardown");
 	}
 
+	void mouseWheelOptions()
+	{
+		for (const auto fields : { "", ",\"reverseMouseWheel\":false", ",\"reverseMouseWheel\":true" })
+		{
+			Connection c;
+			c.command("start", std::string(",\"arguments\":[],\"displaySelections\":[]") + fields);
+			std::vector<std::string> arguments;
+			std::string error;
+			require(c.bridge->prepare(arguments, error), "Valid wheel option rejected");
+			require(c.bridge->reverseMouseWheel() == (strstr(fields, "true") != nullptr),
+			        "Wrong per-session mouse wheel option");
+			require(arguments.empty(), "Mouse wheel option leaked into ordinary arguments");
+		}
+		for (const auto fields : { ",\"reverseMouseWheel\":\"true\"", ",\"reverseMouseWheel\":1",
+		                          ",\"reverseMouseWheel\":null" })
+		{
+			Connection c;
+			c.command("start", std::string(",\"arguments\":[],\"displaySelections\":[]") + fields);
+			eventually([&] { return c.bridge->cancelled(); }, "Malformed wheel option accepted");
+			require(!c.bridge->reverseMouseWheel(), "Malformed wheel option changed scroll direction");
+		}
+	}
 	void handshakeCapabilities()
 	{
 		Connection c;
@@ -522,6 +544,7 @@ int main()
 	try
 	{
 		handshakeCapabilities();
+		mouseWheelOptions();
 		tlsSecretsOptions();
 		promptAndStaleResponse();
 		concurrentPromptsAndCertificate();

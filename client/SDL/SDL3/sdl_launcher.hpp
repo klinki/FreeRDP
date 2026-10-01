@@ -43,6 +43,7 @@ class SdlLauncher
 	bool requestClose(); // SDL main thread: queues a decision; never waits.
 	bool closeConfirmationEnabled() const;
 	bool thumbnailsEnabled() const;
+	bool reverseMouseWheel() const;
 	// Composing RDP thread only, after the completed BGRA frame's writes finish.
 	bool captureThumbnail(const BYTE* bgra, UINT32 width, UINT32 height, UINT32 stride);
 	static bool isAuthenticationError(UINT32 error);
@@ -84,6 +85,7 @@ class SdlLauncher
 	std::chrono::steady_clock::time_point _lastThumbnailFrame{}, _lastThumbnailRequest{};
 	std::thread _reader, _writer, _thumbnailWorker;
 	std::atomic<bool> _confirmSessionClose{ false }, _thumbnailEnabled{ false }, _connected{ false };
+	std::atomic<bool> _reverseMouseWheel{ false };
 	std::atomic<bool> _cancelled{ false }, _closing{ false }, _focus{ false };
 	std::atomic<bool> _hadConnected{ false }, _terminal{ false };
 	bool _credentialsRead = false;

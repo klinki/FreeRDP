@@ -14,7 +14,7 @@ file, or any other argument exits nonzero with no stdout. In a bridge-enabled
 build it writes exactly one JSON object and a newline to stdout, then exits 0:
 
 ```json
-{"schemaVersion":1,"client":"sdl3","engineVersion":"3.31.2-dev0","bridgeProtocolVersion":1,"capabilities":["auth","certificate","focus","retry","display_uuid","per_monitor_scaling","dynamic_resolution","multimon","close_confirmation","session_thumbnail","dock_accessory","primary_monitor","tls_keylog"]}
+{"schemaVersion":1,"client":"sdl3","engineVersion":"3.31.2-dev0","bridgeProtocolVersion":1,"capabilities":["auth","certificate","focus","retry","display_uuid","per_monitor_scaling","dynamic_resolution","multimon","close_confirmation","session_thumbnail","dock_accessory","primary_monitor","reverse_mouse_wheel","tls_keylog"]}
 ```
 
 `engineVersion` is the build's actual `freerdp_get_version_string()` value. The
@@ -54,6 +54,13 @@ Stale session/request identifiers are ignored. Credentials travel only in an
 accepted `auth_response`; managed arguments reject password, certificate bypass,
 console callback, and other authentication overrides. EOF and cancellation wake
 all pending requests and abort the RDP session.
+
+A client advertising `reverse_mouse_wheel` accepts the optional boolean
+`start.reverseMouseWheel`. When true, it reverses both vertical and horizontal
+wheel/trackpad scroll input after applying the existing local scroll-direction
+preference, preserving magnitude and fractional wheel steps. The setting belongs
+to this client process, survives automatic reconnect, and defaults to false when
+absent. Ordinary CLI sessions keep their existing scrolling behavior.
 
 A client advertising `close_confirmation` accepts `start.confirmSessionClose`.
 When enabled, SDL window Close, fullscreen Close, and Quit queue a `close_request`
