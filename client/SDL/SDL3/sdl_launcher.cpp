@@ -43,7 +43,7 @@ namespace
 	constexpr const char* bridgeCapabilities[] = {
 		"auth", "certificate", "focus", "retry", "display_uuid", "per_monitor_scaling",
 		"dynamic_resolution", "multimon", "close_confirmation", "session_thumbnail",
-		"dock_accessory", "primary_monitor"
+		"dock_accessory", "primary_monitor", "reverse_mouse_wheel"
 	};
 	// The nonconnecting query and the live handshake must advertise the same features.
 	bool addCapabilities(WINPR_JSON* message)
@@ -475,11 +475,14 @@ bool SdlLauncher::receive(Json event)
 			return false;
 		const auto confirm = item(event.get(), "confirmSessionClose");
 		const auto thumbnails = item(event.get(), "thumbnailsEnabled");
+		const auto reverseWheel = item(event.get(), "reverseMouseWheel");
 		if ((confirm && !WINPR_JSON_IsBool(confirm)) ||
-		    (thumbnails && !WINPR_JSON_IsBool(thumbnails)))
+		    (thumbnails && !WINPR_JSON_IsBool(thumbnails)) ||
+		    (reverseWheel && !WINPR_JSON_IsBool(reverseWheel)))
 			return false;
 		_confirmSessionClose = WINPR_JSON_IsTrue(confirm);
 		_thumbnailEnabled = WINPR_JSON_IsTrue(thumbnails);
+		_reverseMouseWheel = WINPR_JSON_IsTrue(reverseWheel);
 		_started = true;
 		_start = std::move(event);
 	}
@@ -542,6 +545,10 @@ bool SdlLauncher::closeConfirmationEnabled() const
 bool SdlLauncher::thumbnailsEnabled() const
 {
 	return _thumbnailEnabled;
+}
+bool SdlLauncher::reverseMouseWheel() const
+{
+	return _reverseMouseWheel;
 }
 bool SdlLauncher::requestClose()
 {
