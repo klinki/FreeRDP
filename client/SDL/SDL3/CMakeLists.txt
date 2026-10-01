@@ -35,6 +35,7 @@ set(SRCS
     sdl_render_geometry.hpp
     sdl_touch.cpp
     sdl_touch.hpp
+    sdl_mouse_wheel.hpp
     sdl_pointer.cpp
     sdl_pointer.hpp
     sdl_disp.cpp
@@ -160,6 +161,9 @@ add_subdirectory(man)
 option(SDL_LAUNCHER_TEST "Build private launcher transport tests" OFF)
 if(SDL_LAUNCHER_TEST AND APPLE)
   enable_testing()
+  add_executable(TestSDLMouseWheel test/TestSDLMouseWheel.cpp)
+  target_link_libraries(TestSDLMouseWheel PRIVATE SDL3::Headers)
+  add_test(NAME TestSDLMouseWheel COMMAND TestSDLMouseWheel)
   find_package(Python3 REQUIRED COMPONENTS Interpreter)
   set(SDL_TLS_KEYLOG_ENABLED OFF)
   if(SDL_LAUNCHER_BRIDGE_ENABLED AND WITH_OPENSSL AND OPENSSL_VERSION VERSION_GREATER_EQUAL 1.1.1)
