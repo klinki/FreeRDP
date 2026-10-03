@@ -83,6 +83,7 @@
 #include <winpr/stream.h>
 
 #include "tcp.h"
+#include "performance.h"
 #include "../crypto/opensslcompat.h"
 
 #if defined(HAVE_AF_VSOCK_H)
@@ -1421,6 +1422,7 @@ int freerdp_tcp_default_connect(rdpContext* context, rdpSettings* settings, cons
 
 struct rdp_tcp_layer
 {
+	rdpContext* context;
 	int sockfd;
 	HANDLE hEvent;
 };
@@ -1437,6 +1439,7 @@ static int freerdp_tcp_layer_read(void* userContext, void* data, int bytes)
 
 	(void)WSAResetEvent(tcpLayer->hEvent);
 	const int status = _recv((SOCKET)tcpLayer->sockfd, data, bytes, 0);
+	if (status > 0) performance_account(tcpLayer->context, FALSE, FALSE, (size_t)status);
 
 	if (status > 0)
 		return status;
@@ -1460,6 +1463,7 @@ static int freerdp_tcp_layer_write(void* userContext, const void* data, int byte
 	rdpTcpLayer* tcpLayer = (rdpTcpLayer*)userContext;
 
 	const int status = _send((SOCKET)tcpLayer->sockfd, data, bytes, 0);
+	if (status > 0) performance_account(tcpLayer->context, FALSE, TRUE, (size_t)status);
 	if (status > 0)
 		return status;
 
@@ -1479,6 +1483,7 @@ static BOOL freerdp_tcp_layer_close(void* userContext)
 
 	rdpTcpLayer* tcpLayer = (rdpTcpLayer*)userContext;
 
+	performance_tcp_socket(tcpLayer->context, -1);
 	if (tcpLayer->sockfd >= 0)
 		closesocket((SOCKET)tcpLayer->sockfd);
 	if (tcpLayer->hEvent)
@@ -1584,6 +1589,8 @@ rdpTransportLayer* freerdp_tcp_connect_layer(rdpContext* context, const char* ho
 	}
 
 	tcpLayer->sockfd = sockfd;
+	tcpLayer->context = context;
+	performance_tcp_socket(context, sockfd);
 
 	return layer;
 

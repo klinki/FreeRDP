@@ -29,6 +29,7 @@
 
 #include "dialogs/sdl_topbar.hpp"
 #include "sdl_render_metrics.hpp"
+#include "sdl_performance_overlay.hpp"
 
 class SdlWindow
 {
@@ -51,6 +52,15 @@ class SdlWindow
 	[[nodiscard]] SDL_Window* window() const;
 	[[nodiscard]] SDL_Renderer* renderer() const;
 	[[nodiscard]] SdlRenderMetrics& renderMetrics() { return _renderMetrics; }
+    SdlRenderMetrics& liveMetrics() { return _liveMetrics; }
+    SdlRenderMetrics::MemorySnapshot takeLiveSnapshot(uint64_t now) {
+        auto out=_liveMetrics.takeMemorySnapshot(now); out.frames=_livePresents;_livePresents=0;return out;
+    }
+    void setPerformanceOverlay(bool visible,const std::string& text) {
+        if(!_performanceOverlay) _performanceOverlay=std::make_unique<SdlPerformanceOverlay>(_renderer);
+        _performanceOverlay->set(visible,text);
+    }
+    SdlPerformanceOverlay* performanceOverlay() {return _performanceOverlay.get();}
 	[[nodiscard]] bool ensureRenderTarget();
 	[[nodiscard]] bool needsFullRedraw() const;
 	[[nodiscard]] bool needsFullRedraw(int surfaceWidth, int surfaceHeight) const;
@@ -150,6 +160,9 @@ class SdlWindow
 	Sint32 _offset_x = 0;
 	Sint32 _offset_y = 0;
 	SdlRenderMetrics _renderMetrics;
+	SdlRenderMetrics _liveMetrics{0,0,nullptr,nullptr,true};
+	uint64_t _livePresents=0;
+	std::unique_ptr<SdlPerformanceOverlay> _performanceOverlay;
 	rdpMonitor _monitor{};
 	std::unique_ptr<SdlTopBar> _topBar;
 	SdlTopBarRect _topBarRect{};

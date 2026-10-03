@@ -37,6 +37,7 @@
 
 #include "udp.h"
 #include "rdpeudp.h"
+#include "performance.h"
 #include "tcp.h"
 #include "multitransport.h"
 #include "../crypto/tls.h"
@@ -1290,6 +1291,7 @@ rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port
 
 void rdpeudp_free(rdpUdpTransport* udp)
 {
+	if (udp && udp->connected) performance_udp_connected(udp->context, FALSE);
 	if (!udp)
 		return;
 
@@ -1701,6 +1703,7 @@ static BOOL rdpeudp_udp_send_stream(rdpUdpTransport* udp, wStream* s)
 		return FALSE;
 	const SSIZE_T sent = udp->testSend ? udp->testSend(udp->testSendContext, data, len)
 	                                   : freerdp_udp_send(udp->sockfd, data, len);
+	if (sent > 0) performance_account(udp->context, TRUE, TRUE, (size_t)sent);
 	if (sent != (SSIZE_T)len)
 		return FALSE;
 	udp->lastSendTs = udp_now_ms();
@@ -2198,6 +2201,7 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 {
 	BYTE buf[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
 	const SSIZE_T r = freerdp_udp_recv(udp->sockfd, buf, sizeof(buf), timeoutMs);
+	if (r > 0) performance_account(udp->context, TRUE, FALSE, (size_t)r);
 	if (r <= 0)
 		return FALSE;
 	udp->lastRecvTs = udp_now_ms();
@@ -2498,7 +2502,8 @@ BOOL rdpeudp_connect(rdpUdpTransport* udp, DWORD timeoutMs)
 		 * handshake. The accept path tolerates a missing final ACK
 		 * symmetrically (it also completes on first v2 DATA). */
 
-		udp->connected = TRUE;
+		if (!udp->connected) performance_udp_connected(udp->context, TRUE);
+	udp->connected = TRUE;
 		udp->useUdp2 = TRUE;
 		udp->lastRecvTs = udp_now_ms();
 		udp->lastSendTs = udp->lastRecvTs;
@@ -3862,6 +3867,7 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 
 	udp->peerInitialSeq = peerSeq;
 	udp->negotiatedVer = RDPUDP_PROTOCOL_VERSION_3;
+	if (!udp->connected) performance_udp_connected(udp->context, TRUE);
 	udp->connected = TRUE;
 	udp->useUdp2 = TRUE;
 	udp->lastRecvTs = udp_now_ms();

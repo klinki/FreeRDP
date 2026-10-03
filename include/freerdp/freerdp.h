@@ -366,7 +366,8 @@ extern "C"
 		ALIGN64 UINT channelErrorNum;     /*(offset 20)*/
 		ALIGN64 char* errorDescription;   /*(offset 21)*/
 
-		UINT64 paddingB[32 - 22]; /* 22 */
+		ALIGN64 void* performance; /* 22, owned by protocol metrics; consumes reserved ABI slot */
+		UINT64 paddingB[32 - 23]; /* 23 */
 
 		ALIGN64 rdpRdp*
 		    rdp;                           /**< (offset 32)

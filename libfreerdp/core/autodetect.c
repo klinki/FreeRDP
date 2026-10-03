@@ -23,6 +23,7 @@
 #include <winpr/assert.h>
 
 #include "autodetect.h"
+#include "performance.h"
 #include "multitransport.h"
 
 #define TYPE_ID_AUTODETECT_REQUEST 0x00
@@ -888,6 +889,7 @@ static BOOL autodetect_recv_netchar_request(rdpAutoDetect* autodetect, RDP_TRANS
 	           ", bandwidth=%" PRIu32 ", averageRTT=%" PRIu32 "",
 	           result.baseRTT, result.bandwidth, result.averageRTT);
 
+	performance_rtt(autodetect->context, transport == RDP_TRANSPORT_UDP_R, result.averageRTT);
 	IFCALLRET(autodetect->NetworkCharacteristicsResult, success, autodetect, transport,
 	          autodetectReqPdu->sequenceNumber, &result);
 	if (!success)

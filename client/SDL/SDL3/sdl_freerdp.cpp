@@ -182,7 +182,7 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 			sdl->getDisplayChannelContext().service();
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 			if (auto bridge = SdlLauncher::active())
-				bridge->serviceFocus();
+				{bridge->serviceFocus(); sdl->servicePerformance();}
 #endif
 			SDL_Event windowEvent = {};
 			while (!sdl->shallAbort() && SDL_WaitEventTimeout(nullptr, 1000))
@@ -190,7 +190,7 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 				sdl->getDisplayChannelContext().service();
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 				if (auto bridge = SdlLauncher::active())
-					bridge->serviceFocus();
+					{bridge->serviceFocus(); sdl->servicePerformance();}
 #endif
 				/* Only poll standard SDL events and SDL_EVENT_USERS meant to create
 				 * dialogs. do not process the dialog return value events here.
@@ -332,7 +332,7 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 						const auto rectangles = sdl->pop();
 						if (!rectangles.empty())
 							sdl->noteUpdateActed();
-						if (!sdl->drawToWindows(rectangles))
+						if (!sdl->drawToWindows(rectangles,true))
 							throw ErrorMsg{ -1, windowEvent.type, "sdl->drawToWindows" };
 						/* Service native input even when another redraw is
 						 * already queued and the next wait returns immediately. */

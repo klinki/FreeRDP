@@ -24,6 +24,9 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include "sdl_window.hpp"
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+#include "sdl_launcher.hpp"
+#endif
 #include "sdl_render_geometry.hpp"
 #include "sdl_utils.hpp"
 
@@ -105,7 +108,8 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
       _gdiTextureNeedsFullRedraw(other._gdiTextureNeedsFullRedraw), _initialW(other._initialW),
       _initialH(other._initialH), _displayID(other._displayID), _offset_x(other._offset_x),
       _offset_y(other._offset_y),
-      _renderMetrics(std::move(other._renderMetrics)), _monitor(other._monitor),
+      _renderMetrics(std::move(other._renderMetrics)), _liveMetrics(std::move(other._liveMetrics)),
+      _livePresents(other._livePresents), _performanceOverlay(std::move(other._performanceOverlay)), _monitor(other._monitor),
       _topBar(std::move(other._topBar))
 {
 	other._window = nullptr;
@@ -119,6 +123,7 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
 SdlWindow::~SdlWindow()
 {
 	/* Release owned textures before SDL_DestroyRenderer destroys them. */
+	_performanceOverlay.reset();
 	_topBar.reset();
 	_stalled.reset();
 	if (_gdiTexture)
@@ -676,6 +681,7 @@ bool SdlWindow::uploadTexture(SDL_Surface* surface, const SDL_Rect& srcRect)
 	const int bpp = details ? details->bytes_per_pixel : 4;
 	const auto* pixels = static_cast<const uint8_t*>(surface->pixels) +
 	                     (1ll * srcRect.y * surface->pitch) + (1ll * srcRect.x * bpp);
+	auto liveUploadTimer = _liveMetrics.beginUpload(static_cast<uint64_t>(srcRect.w)*srcRect.h,static_cast<uint64_t>(srcRect.w)*srcRect.h*bpp);
 	auto uploadTimer = _renderMetrics.beginUpload(
 	    static_cast<uint64_t>(srcRect.w) * srcRect.h,
 	    static_cast<uint64_t>(srcRect.w) * srcRect.h * bpp);
@@ -706,6 +712,7 @@ bool SdlWindow::drawOperations(const std::vector<DrawOperation>& operations)
 		                        static_cast<float>(operation.src.y),
 		                        static_cast<float>(operation.src.w),
 		                        static_cast<float>(operation.src.h) };
+		auto liveDrawTimer = _liveMetrics.beginDraw();
 		auto drawTimer = _renderMetrics.beginDraw();
 		if (!SDL_RenderTexture(_renderer, _gdiTexture, &src, &operation.dst))
 		{
@@ -750,6 +757,10 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 
 	if (showTopBar && _topBar)
 	{
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+        auto bridge=SdlLauncher::active();
+        _topBar->setPerformanceAvailable(bridge && bridge->performanceAvailable());
+#endif
 		const auto viewport = pixelViewport();
 		if (viewport.w <= 0 || viewport.h <= 0)
 			return false;
@@ -761,8 +772,12 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 		_renderMetrics.noteTopBarDraw();
 	}
 
-	auto presentTimer = _renderMetrics.beginPresent();
-	return SDL_RenderPresent(_renderer);
+    if(_performanceOverlay) _performanceOverlay->draw(pixelViewport(),SDL_GetWindowPixelDensity(_window));
+    auto livePresentTimer = _liveMetrics.beginPresent();
+    auto presentTimer = _renderMetrics.beginPresent();
+    const auto result=SDL_RenderPresent(_renderer);
+    if(result && _liveMetrics.enabled()) ++_livePresents;
+    return result;
 }
 
 SdlWindow::StalledText::~StalledText()

@@ -26,6 +26,7 @@
 enum class SdlTopBarButton
 {
 	None,
+	Performance,
 	Compact,
 	Pin,
 	Minimize,
@@ -49,6 +50,7 @@ class SdlTopBar
 {
   public:
 	explicit SdlTopBar(SDL_Renderer* renderer, std::string title);
+	void setPerformanceAvailable(bool value) { _performanceAvailable=value; }
 	SdlTopBar(const SdlTopBar& other) = delete;
 	SdlTopBar(SdlTopBar&& other) noexcept;
 	~SdlTopBar();
@@ -77,6 +79,7 @@ class SdlTopBar
 	                                      const SDL_FPoint& pointer) const;
 
   private:
+	bool _performanceAvailable=false;
 	struct Impl;
 	std::unique_ptr<Impl> _impl;
 };
