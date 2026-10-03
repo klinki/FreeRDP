@@ -34,6 +34,7 @@ set(SRCS
     sdl_render_metrics.hpp
     sdl_render_geometry.hpp
     sdl_touch.cpp
+    sdl_session_loop.hpp
     sdl_touch.hpp
     sdl_mouse_wheel.hpp
     sdl_pointer.cpp
@@ -161,6 +162,8 @@ add_subdirectory(man)
 option(SDL_LAUNCHER_TEST "Build private launcher transport tests" OFF)
 if(SDL_LAUNCHER_TEST AND APPLE)
   enable_testing()
+  add_executable(TestSDLReconnect test/TestSDLReconnect.cpp)
+  add_test(NAME TestSDLReconnect COMMAND TestSDLReconnect)
   add_executable(TestSDLMouseWheel test/TestSDLMouseWheel.cpp)
   target_link_libraries(TestSDLMouseWheel PRIVATE SDL3::Headers)
   add_test(NAME TestSDLMouseWheel COMMAND TestSDLMouseWheel)

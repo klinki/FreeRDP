@@ -1,6 +1,7 @@
 /** Actual private socket protocol regression tests; never contacts an RDP host. */
 #include "../sdl_launcher.hpp"
 #include <freerdp/error.h>
+#include <freerdp/client.h>
 #include <freerdp/crypto/crypto.h>
 #include <chrono>
 #include <thread>
@@ -482,6 +483,8 @@ namespace
 			auto ended = c.next();
 			require(getString(ended.get(), "outcome") == "disconnected",
 			        "Network loss mislabeled client error");
+			require(WINPR_JSON_GetNumberValue(WINPR_JSON_GetObjectItemCaseSensitive(ended.get(), "errorCode")) == FREERDP_ERROR_CONNECT_FAILED,
+			        "Transport failure without server error information must not report success");
 		}
 		{
 			Connection c;
@@ -521,7 +524,7 @@ namespace
 			c.bridge->state("connected");
 			std::ignore = c.next();
 			freerdp_set_error_info(c.rdp->context->rdp, ERRINFO_LOGOFF_BY_USER);
-			c.bridge->ended(2, "Synthetic remote logoff");
+			c.bridge->ended(11, "Synthetic remote logoff with DISCONNECT_BY_USER exit mapping");
 			auto ended = c.next();
 			require(getString(ended.get(), "outcome") == "remote_logoff",
 			        "Remote logoff mislabeled connection loss");
@@ -538,6 +541,26 @@ namespace
 		}
 	}
 
+	void reconnectPolicyExclusions()
+	{
+		for (unsigned scenario = 0; scenario < 4; ++scenario)
+		{
+			Connection c;
+			static unsigned calls = 0;
+			calls = 0;
+			c.rdp->RetryDialog = [](freerdp*, const char*, size_t, void*) -> SSIZE_T { ++calls; return -1; };
+			std::ignore = freerdp_settings_set_bool(c.rdp->context->settings, FreeRDP_AutoReconnectionEnabled, scenario != 0);
+			if (scenario == 1)
+				freerdp_set_error_info(c.rdp->context->rdp, ERRINFO_LOGOFF_BY_USER);
+			if (scenario == 2)
+				freerdp_set_last_error(c.rdp->context, FREERDP_ERROR_CONNECT_WRONG_PASSWORD);
+			if (scenario == 3)
+				freerdp_set_last_error(c.rdp->context, FREERDP_ERROR_CONNECT_CANCELLED);
+			require(!client_auto_reconnect_ex(c.rdp, nullptr) && calls == 0,
+			        "Disabled retries, server logoff, rejected credentials, and cancellation must not attempt recovery");
+		}
+	}
+
 }
 int main()
 {
@@ -551,6 +574,7 @@ int main()
 		malformedAndVersion();
 		lifecycle();
 		terminalDistinctions();
+		reconnectPolicyExclusions();
 		closeConfirmation();
 		closeCancellationAndEOF();
 		thumbnailBoundsAndDisable();

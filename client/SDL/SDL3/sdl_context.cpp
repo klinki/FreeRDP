@@ -35,6 +35,7 @@
 #include "sdl_pointer.hpp"
 #include "sdl_render_geometry.hpp"
 #include "sdl_touch.hpp"
+#include "sdl_session_loop.hpp"
 
 #include <sdl_common_utils.hpp>
 #include <scoped_guard.hpp>
@@ -865,91 +866,80 @@ int SdlContext::sdl_client_thread_run(std::string& error_msg)
 	WINPR_ASSERT(instance);
 
 	int exit_code = sdl::error::SUCCESS;
-	while (!_stopRequested && !freerdp_shall_disconnect_context(context()))
-	{
-		HANDLE handles[MAXIMUM_WAIT_OBJECTS] = {};
-		/*
-		 * win8 and server 2k12 seem to have some timing issue/race condition
-		 * when a initial sync request is send to sync the keyboard indicators
-		 * sending the sync event twice fixed this problem
-		 */
-		if (freerdp_focus_required(instance))
-		{
-			auto ctx = get_context(context());
-			WINPR_ASSERT(ctx);
-
-			auto& input = ctx->getInputChannelContext();
-			if (!input.keyboard_focus_in())
-				break;
-			if (!input.keyboard_focus_in())
-				break;
-		}
-
-		const DWORD nCount = freerdp_get_event_handles(context(), handles, ARRAYSIZE(handles));
-
-		if (nCount == 0)
-		{
-			WLog_Print(getWLog(), WLOG_ERROR, "freerdp_get_event_handles failed");
-			break;
-		}
-
-		const DWORD status = WaitForMultipleObjects(nCount, handles, FALSE, INFINITE);
-
-		if (status == WAIT_FAILED)
-		{
-			WLog_Print(getWLog(), WLOG_ERROR, "WaitForMultipleObjects WAIT_FAILED");
-			break;
-		}
-
-		if (_stopRequested)
-			break;
-		if (!freerdp_check_event_handles(context()))
-		{
-			if (_stopRequested)
-				break;
-			/* Transport reported dead, outcome unknown: dim the session
-			 * with a "Reconnecting..." overlay instead of a silent frozen
-			 * frame while auto-reconnect runs. Cleared on success below;
-			 * on final failure the error dialog / quit takes over. */
-			setReconnecting(true);
-			const auto reconnect = client_auto_reconnect_ex(
-			    instance, [](freerdp* i) -> BOOL
-			    {
-				    if (get_context(i->context)->_stopRequested)
-					    return FALSE;
+	const auto stopped = [this]() {
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
-				    auto bridge = SdlLauncher::active();
-				    if (bridge && bridge->cancelled())
-					    return FALSE;
+		if (auto bridge = SdlLauncher::active(); bridge && bridge->cancelled())
+			return true;
 #endif
-				    return TRUE;
-			    });
-			if (_stopRequested)
-				break;
-			if (reconnect)
-			{
-				// Retry was successful, discard dialog
-				setReconnecting(false);
-				getDialog().show(false);
-				continue;
-			}
-			else
-			{
-				/*
-				 * Indicate an unsuccessful connection attempt if reconnect
-				 * did not succeed and no other error was specified.
-				 */
-				if (freerdp_error_info(instance) == 0)
-					exit_code = sdl::error::CONN_FAILED;
-			}
+		return _stopRequested.load();
+	};
+	const auto result = sdl_run_session_loop(stopped,
+	    [this]() { return freerdp_shall_disconnect_context(context()) != FALSE; },
+	    [this, instance, &stopped]() {
+		    // Focus synchronization writes can discover transport loss before the
+		    // event-handle check. They must use the same recovery path.
+		    if (freerdp_focus_required(instance))
+		    {
+			    auto& input = getInputChannelContext();
+			    if (!input.keyboard_focus_in() || !input.keyboard_focus_in())
+			    {
+				    WLog_Print(getWLog(), WLOG_DEBUG, "Reconnect checkpoint: focus-sync write failed");
+				    return SdlSessionStep::FocusWriteFailure;
+			    }
+		    }
+		    HANDLE handles[MAXIMUM_WAIT_OBJECTS] = {};
+		    const DWORD count = freerdp_get_event_handles(context(), handles, ARRAYSIZE(handles));
+		    if (count == 0)
+		    {
+			    WLog_Print(getWLog(), WLOG_ERROR, "freerdp_get_event_handles failed");
+			    return freerdp_get_last_error(context()) == FREERDP_ERROR_CONNECT_TRANSPORT_FAILED
+			               ? SdlSessionStep::TransportFailure : SdlSessionStep::LocalFailure;
+		    }
+		    if (WaitForMultipleObjects(count, handles, FALSE, INFINITE) == WAIT_FAILED)
+		    {
+			    WLog_Print(getWLog(), WLOG_ERROR, "WaitForMultipleObjects WAIT_FAILED");
+			    return SdlSessionStep::LocalFailure;
+		    }
+		    if (stopped())
+			    return SdlSessionStep::Stopped;
+		    if (!freerdp_check_event_handles(context()))
+		    {
+			    WLog_Print(getWLog(), WLOG_DEBUG, "Reconnect checkpoint: event processing failed");
+			    return SdlSessionStep::TransportFailure;
+		    }
+		    return SdlSessionStep::Continue;
+	    },
+	    [this, instance, &stopped]() {
+		    if (stopped())
+			    return false;
+		    WLog_Print(getWLog(), WLOG_DEBUG, "Reconnect checkpoint: evaluating recovery policy");
+		    setReconnecting(true);
+		    const auto reconnect = client_auto_reconnect_ex(instance, [](freerdp* i) -> BOOL {
+			    if (get_context(i->context)->_stopRequested)
+				    return FALSE;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+			    if (auto bridge = SdlLauncher::active(); bridge && bridge->cancelled())
+				    return FALSE;
+#endif
+			    return TRUE;
+		    });
+		    if (reconnect && !stopped())
+		    {
+			    setReconnecting(false);
+			    getDialog().show(false);
+		    }
+		    return reconnect != FALSE;
+	    });
 
-			if (freerdp_get_last_error(context()) == FREERDP_ERROR_SUCCESS)
-				WLog_Print(getWLog(), WLOG_ERROR, "WaitForMultipleObjects failed with %" PRIu32 "",
-				           status);
-			if (freerdp_get_last_error(context()) == FREERDP_ERROR_SUCCESS)
-				WLog_Print(getWLog(), WLOG_ERROR, "Failed to check FreeRDP event handles");
-			break;
-		}
+	// Zero server error info only means no server reason was supplied; it does
+	// not erase a failed local transport operation or an exhausted retry loop.
+	if (result == SdlSessionResult::Failed && freerdp_error_info(instance) == ERRINFO_SUCCESS)
+	{
+		const auto last = freerdp_get_last_error(context());
+		exit_code = last == FREERDP_ERROR_CONNECT_CANCELLED ? sdl::error::CONNECT_CANCELLED
+		                                                  : sdl::error::CONN_FAILED;
+		error_msg = last == FREERDP_ERROR_SUCCESS ? "Connection event processing failed without server error information"
+		                                         : freerdp_get_last_error_string(last);
 	}
 
 	if (exit_code == sdl::error::SUCCESS)

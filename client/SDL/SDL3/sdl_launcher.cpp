@@ -993,7 +993,7 @@ void SdlLauncher::terminal(const char* outcome, int code, const std::string& det
 	number(event.get(), "errorCode",
 	       lastError != FREERDP_ERROR_SUCCESS
 	           ? lastError
-	           : (code < 0 ? FREERDP_ERROR_CONNECT_FAILED : FREERDP_ERROR_SUCCESS));
+	           : ((code < 0 || code == sdl::error::CONN_FAILED) ? FREERDP_ERROR_CONNECT_FAILED : FREERDP_ERROR_SUCCESS));
 	number(event.get(), "errorInfo", freerdp_error_info(_context->instance));
 	boolean(event.get(), "hadConnected", _hadConnected);
 	text(event.get(), "detail", detail.c_str());
@@ -1007,10 +1007,10 @@ void SdlLauncher::ended(int exitCode, const std::string& detail)
 {
 	const char* outcome = "client_error";
 	const auto info = freerdp_error_info(_context->instance);
-	if (_cancelled || exitCode == sdl::error::CONNECT_CANCELLED ||
-	    exitCode == sdl::error::DISCONNECT_BY_USER)
+	if (_cancelled || exitCode == sdl::error::CONNECT_CANCELLED)
 		outcome = "cancelled";
-	else if (exitCode == sdl::error::LOGOFF || info == ERRINFO_LOGOFF_BY_USER)
+	else if (exitCode == sdl::error::LOGOFF || exitCode == sdl::error::DISCONNECT_BY_USER ||
+	         info == ERRINFO_LOGOFF_BY_USER)
 		outcome = "remote_logoff";
 	else if (!_hadConnected)
 		outcome = isAuthenticationError(freerdp_get_last_error(_context)) ? "authentication_failed"
