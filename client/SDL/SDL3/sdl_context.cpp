@@ -1118,7 +1118,7 @@ void SdlContext::updateMonitorDataFromOffsets()
 	}
 }
 
-bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& rects)
+bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& rects, bool remoteContent)
 {
 	if (!isConnected())
 		return true;
@@ -1131,6 +1131,8 @@ bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& re
 	std::unique_lock lock(_critical);
 	auto surface = _primary.get();
 	auto& metrics = window.renderMetrics();
+	auto& live = window.liveMetrics();
+	live.setMemoryEnabled(_performanceEnabled && remoteContent);
 	uint64_t attemptedPixels = 0;
 	if (metrics.enabled() && surface)
 	{
@@ -1146,11 +1148,13 @@ bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& re
 		}
 	}
 	metrics.beginFrame(attemptedPixels);
+	live.beginFrame(attemptedPixels);
 	struct EndMetricsFrame
 	{
 		SdlRenderMetrics& metrics;
-		~EndMetricsFrame() { metrics.endFrame(); }
-	} endMetricsFrame{ metrics };
+		SdlRenderMetrics& live;
+		~EndMetricsFrame() { metrics.endFrame(); live.endFrame();live.setMemoryEnabled(false); }
+	} endMetricsFrame{ metrics,live };
 
 	if (useLocalScale())
 	{
@@ -1467,6 +1471,7 @@ bool SdlContext::moveMouseTo(const SDL_FPoint& pos)
 
 bool SdlContext::handleEvent(const SDL_MouseMotionEvent& ev)
 {
+	if(performanceMotion(ev)) return true;
 	if (handleTopBarMotion(ev))
 		return true;
 
@@ -1797,6 +1802,7 @@ bool SdlContext::handleEvent(const SDL_DisplayEvent& ev)
 
 bool SdlContext::handleEvent(const SDL_MouseButtonEvent& ev)
 {
+	if(performanceButton(ev)) return true;
 	const auto* capture = ev.type == SDL_EVENT_MOUSE_BUTTON_UP ? topBarCapture(ev.button) : nullptr;
 	const auto capturedWindowId = capture && capture->active ? capture->windowId : 0;
 
@@ -1889,6 +1895,11 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 
 		switch (gesture.button)
 		{
+            case SdlTopBarButton::Performance:
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+                if(auto bridge=SdlLauncher::active()) bridge->requestPerformanceOverlay((bridge->performanceMask()&2)==0);
+#endif
+                break;
 			case SdlTopBarButton::Compact:
 			{
 				/* Test toggle between the normal (3/4) and compact (1/2)
@@ -2459,7 +2470,7 @@ bool SdlContext::useLocalScale() const
 	return !dynResize && !fs && !multimon;
 }
 
-bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects)
+bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects, bool remoteContent)
 {
 	/* RAIL damage is per-window (_gfxDamage), not in the rects queue: repaint every tick. */
 	if (_rail.enabled())
@@ -2509,7 +2520,7 @@ bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects)
 		}
 		if (scaled)
 		{
-			if (!drawToWindow(target, rects))
+			if (!drawToWindow(target, rects,remoteContent))
 				return false;
 			continue;
 		}
@@ -2530,7 +2541,7 @@ bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects)
 		const SDL_Rect sourceBounds = { 0, 0, surface->w, surface->h };
 		if (target.needsFullRedraw(surface->w, surface->h))
 		{
-			if (!drawToWindow(target))
+			if (!drawToWindow(target, {},remoteContent))
 				return false;
 			continue;
 		}
@@ -2545,7 +2556,7 @@ bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects)
 			target.renderMetrics().notePresentSkip();
 			continue;
 		}
-		if (!drawToWindow(target, clipped))
+		if (!drawToWindow(target, clipped,remoteContent))
 			return false;
 	}
 
@@ -2802,21 +2813,30 @@ std::vector<SDL_Rect> SdlContext::pop()
 void SdlContext::noteMotionsCoalesced(uint64_t count)
 {
 	_queueAccum.motionsCoalesced += count;
+	if(_performanceEnabled) _performanceQueue.motionsCoalesced+=count;
 }
 
 void SdlContext::noteUpdateReceived()
 {
 	++_queueAccum.updateReceived;
+	if(_performanceEnabled) ++_performanceQueue.updateReceived;
 }
 
 void SdlContext::noteUpdateActed()
 {
 	++_queueAccum.updateActed;
+	if(_performanceEnabled) ++_performanceQueue.updateActed;
 }
 
 void SdlContext::flushQueueMetrics(bool force)
 {
 	const auto snapshot = _updates.takeSnapshot();
+    if(_performanceEnabled) {
+        _performanceQueue.pops+=snapshot.pops;
+        _performanceQueue.queueWaitNs+=snapshot.queueWaitNs;
+        _performanceQueue.pushes+=snapshot.pushes;
+        _performanceQueue.collapsedEvents+=snapshot.collapsedEvents;
+    }
 	_queueAccum.pushes += snapshot.pushes;
 	_queueAccum.attemptedRects += snapshot.attemptedRects;
 	_queueAccum.mergedRects += snapshot.mergedRects;

@@ -98,6 +98,7 @@ set(${MODULE_PREFIX}_SRCS
     server.h
     codecs.c
     metrics.c
+    performance.c
     capabilities.c
     capabilities.h
     connection.c
