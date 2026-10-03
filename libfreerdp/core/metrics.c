@@ -20,6 +20,7 @@
 #include <freerdp/config.h>
 
 #include "rdp.h"
+#include "performance.h"
 
 double metrics_write_bytes(rdpMetrics* metrics, UINT32 UncompressedBytes, UINT32 CompressedBytes)
 {
@@ -46,6 +47,7 @@ rdpMetrics* metrics_new(rdpContext* context)
 	if (metrics)
 	{
 		metrics->context = context;
+		if (!performance_init(metrics)) { free(metrics); return NULL; }
 	}
 
 	return metrics;
@@ -53,5 +55,6 @@ rdpMetrics* metrics_new(rdpContext* context)
 
 void metrics_free(rdpMetrics* metrics)
 {
+	performance_free(metrics);
 	free(metrics);
 }

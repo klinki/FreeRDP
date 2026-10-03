@@ -19,6 +19,8 @@
 #pragma once
 
 #include <array>
+#include <algorithm>
+#include <limits>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -131,10 +133,11 @@ class SdlRenderMetrics final
 	/* clock and opaque are intended for deterministic unit tests.  Production
 	 * callers can use the two-argument constructor. */
 	explicit SdlRenderMetrics(uint64_t windowId = 0, uint64_t monitorId = 0,
-	                          ClockFunction clock = nullptr, void* opaque = nullptr) noexcept
+	                          ClockFunction clock = nullptr, void* opaque = nullptr, bool memoryOnly = false) noexcept
 	    : _windowId(windowId), _monitorId(monitorId), _clock(clock ? clock : &steadyNowNs),
-	      _clockOpaque(opaque)
+	      _clockOpaque(opaque), _memoryOnly(memoryOnly)
 	{
+		if (memoryOnly) return;
 		const auto* path = std::getenv("FREERDP_SDL_RENDER_METRICS");
 		if (!path || path[0] == '\0')
 			return;
@@ -150,7 +153,7 @@ class SdlRenderMetrics final
 
 	SdlRenderMetrics(SdlRenderMetrics&& other) noexcept
 	    : _windowId(other._windowId), _monitorId(other._monitorId), _clock(other._clock),
-	      _clockOpaque(other._clockOpaque), _file(other._file), _enabled(other._enabled),
+	      _clockOpaque(other._clockOpaque), _file(other._file), _enabled(other._enabled), _memoryOnly(other._memoryOnly), _totalRedrawNs(other._totalRedrawNs),
 	      _intervalActive(other._intervalActive), _intervalStartNs(other._intervalStartNs),
 	      _frameActive(other._frameActive), _frameStartNs(other._frameStartNs),
 	      _lastPresentValid(other._lastPresentValid), _lastPresentNs(other._lastPresentNs),
@@ -181,6 +184,8 @@ class SdlRenderMetrics final
 			_clockOpaque = other._clockOpaque;
 			_file = other._file;
 			_enabled = other._enabled;
+			_memoryOnly = other._memoryOnly;
+			_totalRedrawNs = other._totalRedrawNs;
 			_intervalActive = other._intervalActive;
 			_intervalStartNs = other._intervalStartNs;
 			_frameActive = other._frameActive;
@@ -215,7 +220,36 @@ class SdlRenderMetrics final
 
 	~SdlRenderMetrics() { close(); }
 
-	[[nodiscard]] bool enabled() const noexcept { return _enabled; }
+	struct MemorySnapshot {
+        uint64_t frames=0, uploadedBytes=0, uploadCalls=0, drawCalls=0, presentCalls=0;
+        double redrawAverageMs=std::numeric_limits<double>::quiet_NaN();
+        double redrawP95Ms=std::numeric_limits<double>::quiet_NaN();
+        double uploadAverageMs=std::numeric_limits<double>::quiet_NaN();
+        double drawAverageMs=std::numeric_limits<double>::quiet_NaN();
+        double presentAverageMs=std::numeric_limits<double>::quiet_NaN();
+    };
+    void setMemoryEnabled(bool enabled) noexcept { if (_memoryOnly) _enabled=enabled; }
+    MemorySnapshot takeMemorySnapshot(uint64_t now) noexcept {
+        MemorySnapshot out;
+        out.frames=_frames; out.uploadedBytes=_uploadBytes;
+        out.uploadCalls=_uploadCalls; out.drawCalls=_drawCalls; out.presentCalls=_presentCalls;
+        const auto mean=[](uint64_t n,uint64_t total) {
+            return n?static_cast<double>(total)/n/1e6:std::numeric_limits<double>::quiet_NaN();
+        };
+        out.redrawAverageMs=mean(_redrawSamples.seen,_totalRedrawNs);
+        out.uploadAverageMs=mean(_uploadCalls,_uploadWallNs);
+        out.drawAverageMs=mean(_drawCalls,_drawWallNs);
+        out.presentAverageMs=mean(_presentCalls,_presentWallNs);
+        if (_redrawSamples.size) {
+            auto values=_redrawSamples.values;
+            std::sort(values.begin(),values.begin()+_redrawSamples.size);
+            const auto index=(_redrawSamples.size*95+99)/100-1;
+            out.redrawP95Ms=static_cast<double>(values[index])/1e6;
+        }
+        if (_memoryOnly) startInterval(now);
+        return out;
+    }
+    [[nodiscard]] bool enabled() const noexcept { return _enabled; }
 	[[nodiscard]] uint64_t nowNs() const noexcept
 	{
 		return _enabled ? _clock(_clockOpaque) : 0;
@@ -227,7 +261,7 @@ class SdlRenderMetrics final
 			return;
 
 		const auto now = nowNs();
-		if (!_intervalActive || (now >= _intervalStartNs && now - _intervalStartNs >= intervalNs))
+		if (!_intervalActive || (now >= _intervalStartNs && now - _intervalStartNs >= intervalNs && !_memoryOnly))
 		{
 			if (_intervalActive)
 				writeInterval(now);
@@ -251,6 +285,7 @@ class SdlRenderMetrics final
 			return;
 
 		const auto now = nowNs();
+		_totalRedrawNs += now >= _frameStartNs ? now - _frameStartNs : 0;
 		_recordSample(_redrawSamples, now >= _frameStartNs ? now - _frameStartNs : 0);
 		_frameActive = false;
 	}
@@ -434,6 +469,7 @@ class SdlRenderMetrics final
 		_intervalActive = true;
 		_intervalStartNs = now;
 		_frames = 0;
+		_totalRedrawNs = 0;
 		_attemptedDirtyPixels = 0;
 		_uploadPixels = 0;
 		_uploadBytes = 0;
@@ -455,7 +491,7 @@ class SdlRenderMetrics final
 	void ensureInterval(uint64_t now) noexcept
 	{
 		if (!_intervalActive || (!_frameActive && now >= _intervalStartNs &&
-		                         now - _intervalStartNs >= intervalNs))
+		                         now - _intervalStartNs >= intervalNs && !_memoryOnly))
 		{
 			if (_intervalActive)
 				writeInterval(now);
@@ -552,6 +588,8 @@ class SdlRenderMetrics final
 	void* _clockOpaque = nullptr;
 	FILE* _file = nullptr;
 	bool _enabled = false;
+	bool _memoryOnly = false;
+	uint64_t _totalRedrawNs = 0;
 	bool _intervalActive = false;
 	uint64_t _intervalStartNs = 0;
 	bool _frameActive = false;
