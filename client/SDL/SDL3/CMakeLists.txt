@@ -187,6 +187,12 @@ if(SDL_LAUNCHER_TEST AND APPLE)
   add_test(NAME TestSDLMonitorDetection COMMAND TestSDLMonitorDetection)
   set_tests_properties(TestSDLMonitorDetection PROPERTIES TIMEOUT 30)
 
+  add_executable(TestSDLFullscreenResize test/TestSDLFullscreenResize.cpp ${SDL_MONITOR_TEST_SRCS})
+  target_include_directories(TestSDLFullscreenResize PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(TestSDLFullscreenResize PRIVATE ${LIBS})
+  add_test(NAME TestSDLFullscreenResize COMMAND TestSDLFullscreenResize)
+  set_tests_properties(TestSDLFullscreenResize PROPERTIES TIMEOUT 30)
+
   add_executable(TestSDLShutdown test/TestSDLShutdown.cpp ${SDL_MONITOR_TEST_SRCS})
   target_include_directories(TestSDLShutdown PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
   target_link_libraries(TestSDLShutdown PRIVATE ${LIBS})

@@ -603,8 +603,10 @@ bool SdlContext::updateWindowList()
 
 bool SdlContext::updateWindow(SDL_WindowID id)
 {
-	if (freerdp_settings_get_bool(_context->settings, FreeRDP_Fullscreen) ||
-	    freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon))
+	// Multimon retains each physical display's geometry during window migration.
+	// A single fullscreen window must use its drawable pixels: on notched Macs,
+	// the fullscreen content is shorter than the full display bounds probed at startup.
+	if (freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon))
 		return true;
 
 	auto& w = _windows.at(id);

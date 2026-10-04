@@ -426,7 +426,12 @@ UINT sdlDispContext::DisplayControlCaps(UINT32 maxNumMonitors, UINT32 maxMonitor
 	_activated = true;
 
 	if (freerdp_settings_get_bool(settings, FreeRDP_Fullscreen))
-		return CHANNEL_RC_OK;
+	{
+		// Fullscreen size events can precede display-channel activation. Restart
+		// the resize timer so their final drawable dimensions reach the server
+		// even when no further window event follows the capabilities response.
+		return addTimer() ? CHANNEL_RC_OK : CHANNEL_RC_NO_MEMORY;
+	}
 
 	WLog_DBG(TAG, "DisplayControlCapsPdu: setting the window as resizable");
 	return setWindowResizeable() ? CHANNEL_RC_OK : CHANNEL_RC_NO_MEMORY;
