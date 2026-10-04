@@ -1207,7 +1207,8 @@ bool SdlContext::addDisplayWindow(SDL_DisplayID id)
 		if (entry.second.monitor(false).orig_screen == id)
 			return true;
 	}
-	const auto monitor = SdlWindow::query(id);
+	const auto found = _displays.find(id);
+	const auto monitor = found != _displays.end() ? found->second : SdlWindow::query(id);
 	if (monitor.width <= 0 || monitor.height <= 0)
 		return false;
 	const auto flags =
@@ -1256,16 +1257,90 @@ bool SdlContext::removeDisplayWindow(SDL_DisplayID id)
 bool SdlContext::detectDisplays()
 {
 	int count = 0;
-	auto display = SDL_GetDisplays(&count);
-	if (!display)
-		return false;
-	for (int x = 0; x < count; x++)
+	auto ids = SDL_GetDisplays(&count);
+	if (!ids || count <= 0)
 	{
-		const auto id = display[x];
-		addOrUpdateDisplay(id);
+		SDL_free(ids);
+		return false;
 	}
-	SDL_free(display);
+	std::map<SDL_DisplayID, rdpMonitor> current;
+	for (int i = 0; i < count; i++)
+	{
+		const auto monitor = SdlWindow::query(ids[i], false);
+		if (monitor.width <= 0 || monitor.height <= 0)
+		{
+			SDL_free(ids);
+			return false;
+		}
+		current.emplace(ids[i], monitor);
+	}
+	SDL_free(ids);
+	// Replace, rather than emplace into, the startup cache. Replugging can
+	// change both SDL IDs and backing dimensions; removed displays must vanish.
+	_displays = std::move(current);
+	updateDisplayOffsets();
 	return true;
+}
+
+bool SdlContext::refreshDisplayWindows()
+{
+	if (!detectDisplays())
+		return false;
+	if (_windows.empty())
+		return true; // Startup still owns initial window creation.
+	auto settings = context()->settings;
+	if (!freerdp_settings_get_bool(settings, FreeRDP_UseMultimon))
+	{
+		for (auto& entry : _windows)
+		{
+			const auto id = SDL_GetDisplayForWindow(entry.second.window());
+			if (_displays.count(id) == 0)
+				continue;
+			entry.second.setMonitor(_displays.at(id));
+			if (!updateWindow(entry.first))
+				return false;
+		}
+		return updateWindowList();
+	}
+	auto desired = getDisplayIds();
+	if (freerdp_settings_get_uint32(settings, FreeRDP_NumMonitorIds) > 0)
+	{
+		desired.clear();
+		for (const auto id : _monitorIds)
+			if (_displays.count(id))
+				desired.push_back(id);
+	}
+	if (desired.empty())
+	{
+		const auto primary = SDL_GetPrimaryDisplay();
+		if (_displays.count(primary))
+			desired.push_back(primary);
+	}
+	if (desired.empty())
+		return false;
+	for (auto it = _windows.begin(); it != _windows.end();)
+	{
+		const auto id = it->second.monitor(false).orig_screen;
+		if (std::find(desired.begin(), desired.end(), id) == desired.end())
+		{
+			if (it->first == _topBarWindowId)
+				_topBarWindowId = 0;
+			it = _windows.erase(it);
+		}
+		else
+		{
+			it->second.setMonitor(_displays.at(id));
+			if (SDL_GetDisplayForWindow(it->second.window()) != id)
+				it->second.fullscreen(true, true);
+			++it;
+		}
+	}
+	for (const auto id : desired)
+		if (!addDisplayWindow(id))
+			return false;
+	if (_topBarWindowId == 0 && !_windows.empty())
+		_topBarWindowId = _windows.begin()->first;
+	return updateWindowList();
 }
 
 rdpMonitor SdlContext::getDisplay(SDL_DisplayID id) const
@@ -1821,11 +1896,8 @@ bool SdlContext::handleEvent(const SDL_TouchFingerEvent& ev)
 	return SdlTouch::handleEvent(this, copy.tfinger);
 }
 
-void SdlContext::addOrUpdateDisplay(SDL_DisplayID id)
+void SdlContext::updateDisplayOffsets()
 {
-	auto monitor = SdlWindow::query(id, false);
-	_displays.emplace(id, monitor);
-
 	/* Update actual display rectangles:
 	 *
 	 * 1. Get logical display bounds
@@ -1849,7 +1921,11 @@ void SdlContext::addOrUpdateDisplay(SDL_DisplayID id)
 	 * 2. For each neighbor update all neighbors
 	 * 3. repeat until all displays updated.
 	 */
-	const auto primary = SDL_GetPrimaryDisplay();
+	if (_offsets.empty())
+		return;
+	auto primary = SDL_GetPrimaryDisplay();
+	if (_offsets.count(primary) == 0)
+		primary = _offsets.begin()->first;
 	std::vector<SDL_DisplayID> handled;
 	handled.push_back(primary);
 
@@ -1867,11 +1943,6 @@ void SdlContext::addOrUpdateDisplay(SDL_DisplayID id)
 		neighbors.insert(neighbors.end(), next.begin(), next.end());
 	}
 	updateMonitorDataFromOffsets();
-}
-
-void SdlContext::deleteDisplay(SDL_DisplayID id)
-{
-	_displays.erase(id);
 }
 
 bool SdlContext::eventToPixelCoordinates(SDL_WindowID id, SDL_Event& ev)
@@ -2679,9 +2750,11 @@ bool SdlContext::setResizeable(bool enable)
 	const bool smart = freerdp_settings_get_bool(settings, FreeRDP_SmartSizing);
 	bool use = (dyn && enable) || smart;
 
-	for (const auto& window : _windows)
+	for (auto& window : _windows)
 	{
-		if (!sdl_push_user_event(SDL_EVENT_USER_WINDOW_RESIZEABLE, &window.second, use))
+		if (SDL_IsMainThread())
+			window.second.resizeable(use);
+		else if (!sdl_push_user_event(SDL_EVENT_USER_WINDOW_RESIZEABLE, &window.second, use))
 			return false;
 	}
 	_resizeable = use;

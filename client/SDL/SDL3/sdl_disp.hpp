@@ -19,6 +19,8 @@
 #pragma once
 
 #include <vector>
+#include <atomic>
+#include <mutex>
 
 #include <freerdp/types.h>
 #include <freerdp/event.h>
@@ -45,17 +47,19 @@ class sdlDispContext
 
 	[[nodiscard]] bool handleEvent(const SDL_DisplayEvent& ev);
 	[[nodiscard]] bool handleEvent(const SDL_WindowEvent& ev);
+	void service();           // Display probing and resize sends run only on the SDL thread.
+	void service(UINT64 now); // Monotonic time injection for regression coverage.
 
   private:
 	[[nodiscard]] UINT DisplayControlCaps(UINT32 maxNumMonitors, UINT32 maxMonitorAreaFactorA,
 	                                      UINT32 maxMonitorAreaFactorB);
 	[[nodiscard]] bool setWindowResizeable();
 
-	[[nodiscard]] bool sendResize();
+	[[nodiscard]] bool sendResize(UINT64 now);
 	[[nodiscard]] bool settings_changed(const std::vector<DISPLAY_CONTROL_MONITOR_LAYOUT>& layout);
 	[[nodiscard]] bool sendLayout(const rdpMonitor* monitors, size_t nmonitors);
 
-	[[nodiscard]] bool addTimer();
+	[[nodiscard]] bool scheduleResize();
 
 	[[nodiscard]] bool updateMonitor(SDL_WindowID id);
 	[[nodiscard]] bool updateMonitors(SDL_EventType type, SDL_DisplayID displayID);
@@ -65,14 +69,17 @@ class sdlDispContext
 	                                             UINT32 maxMonitorAreaFactorB);
 	static void OnActivated(void* context, const ActivatedEventArgs* e);
 	static void OnGraphicsReset(void* context, const GraphicsResetEventArgs* e);
-	[[nodiscard]] static Uint32 SDLCALL OnTimer(void* param, SDL_TimerID timerID, Uint32 interval);
 
 	SdlContext* _sdl = nullptr;
 	DispClientContext* _disp = nullptr;
 	UINT64 _lastSentDate = 0;
-	bool _activated = false;
-	bool _waitingResize = false;
-	SDL_TimerID _timer = 0;
-	unsigned _timer_retries = 0;
+	std::mutex _channelMutex;
+	std::atomic<bool> _activated{ false };
+	std::atomic<bool> _resizeRequested{ false }, _topologyRequested{ false },
+	    _forceRequested{ false };
+	std::atomic<int> _resizeableUpdate{ -1 };
+	bool _pending = false, _refreshTopology = false, _forceLayout = false;
+	UINT64 _nextAttempt = 0;
+	unsigned _retries = 0;
 	std::vector<DISPLAY_CONTROL_MONITOR_LAYOUT> _last_sent_layout;
 };

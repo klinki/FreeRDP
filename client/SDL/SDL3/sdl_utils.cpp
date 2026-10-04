@@ -98,6 +98,8 @@ bool sdl_push_user_event(Uint32 type, ...)
 		case SDL_EVENT_USER_RETRY_DIALOG:
 			event->code = va_arg(ap, Sint32);
 			break;
+		case SDL_EVENT_USER_DISPLAY_REFRESH:
+			break;
 		case SDL_EVENT_USER_RECONNECTING:
 			event->code = va_arg(ap, Sint32);
 			break;
@@ -373,6 +375,7 @@ namespace sdl::utils
 			EV_CASE_STR(SDL_EVENT_USER_AUTH_RESULT);
 			EV_CASE_STR(SDL_EVENT_USER_SCARD_DIALOG);
 			EV_CASE_STR(SDL_EVENT_USER_RETRY_DIALOG);
+			EV_CASE_STR(SDL_EVENT_USER_DISPLAY_REFRESH);
 			EV_CASE_STR(SDL_EVENT_USER_RECONNECTING);
 			EV_CASE_STR(SDL_EVENT_USER_SCARD_RESULT);
 			EV_CASE_STR(SDL_EVENT_USER_UPDATE);
