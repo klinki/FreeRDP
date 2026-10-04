@@ -109,3 +109,27 @@ windows already migrated by macOS, fallback to a remaining display, and a
 shutdown request surviving the abort-event reset performed by reconnect.
 Physical external-display disconnection was also verified with a live
 multimonitor session on macOS 26.7 on 2026-09-28.
+
+## Monitor reconnection and rescaling
+
+Dynamic multimonitor sessions retain the launcher's requested display UUIDs,
+primary ordering and per-display scale factors in memory. A display topology,
+mode or density change schedules a refresh after 500 ms of quiet, with bounded
+one-second settling retries. The current display inventory replaces startup
+geometry; saved UUIDs are resolved to the new SDL IDs before applying overrides.
+Only selected available displays participate. If none are present, use the
+remaining primary display temporarily and remove that fallback when a selected
+display returns.
+
+SDL display/window work and Display Control layout sends run on the SDL main
+thread, woken by a coalesced resize request rather than a timer-thread probe.
+Reconnection forces a layout update even if the final layout equals the previous
+one; settling retries otherwise suppress duplicate layouts. Channel availability
+and dynamic-resolution settings still gate remote layout updates. Temporary
+probe/send failures retry without deliberately terminating the RDP connection.
+
+`TestSDLMonitorDetection` covers stable UUID mapping across changed display IDs,
+scale preservation, ambiguity and fallback selection. `TestSDLFullscreenResize`
+checks deferred refresh, fresh dimensions, saved DPI, layout deduplication, forced
+same-layout rescaling and main-thread sends. Physical dock/cable unplug and replug
+still requires verification on a real multimonitor Windows session.
