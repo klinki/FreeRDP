@@ -57,9 +57,14 @@ class SdlWindow
         auto out=_liveMetrics.takeMemorySnapshot(now); out.frames=_livePresents;_livePresents=0;return out;
     }
     void resetLiveMetrics(uint64_t now) { _liveMetrics.resetMemoryBaseline(now); _livePresents=0; }
-    void setPerformanceOverlay(bool visible,const std::string& text) {
+    void setPerformanceOverlay(bool visible,const std::string& text,
+                               SdlPerformanceOverlay::Style style = SdlPerformanceOverlay::Style::Panel) {
         if(!_performanceOverlay) _performanceOverlay=std::make_unique<SdlPerformanceOverlay>(_renderer);
-        _performanceOverlay->set(visible,text);
+        _performanceOverlay->set(visible,text,style);
+    }
+    void setPerformanceOverlayVisible(bool visible, SdlPerformanceOverlay::Style style) {
+        if(!_performanceOverlay) _performanceOverlay=std::make_unique<SdlPerformanceOverlay>(_renderer);
+        _performanceOverlay->setVisible(visible,style);
     }
     SdlPerformanceOverlay* performanceOverlay() {return _performanceOverlay.get();}
 	[[nodiscard]] bool ensureRenderTarget();

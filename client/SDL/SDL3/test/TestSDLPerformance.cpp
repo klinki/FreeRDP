@@ -22,6 +22,79 @@ static bool expect(bool ok, const char* msg)
 		fprintf(stderr, "FAIL: %s\n", msg);
 	return ok;
 }
+static bool overlayStyles(const char* directory = nullptr)
+{
+    std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> canvas(
+        SDL_CreateSurface(640, 480, SDL_PIXELFORMAT_RGBA32), SDL_DestroySurface);
+    if (!canvas) return false;
+    std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer(
+        SDL_CreateSoftwareRenderer(canvas.get()), SDL_DestroyRenderer);
+    if (!renderer) return false;
+    SdlPerformanceOverlay overlay(renderer.get());
+    const std::string readings = "FPS (remote): 60.0\nRx: 1.5 MiB/s   Tx: 3.0 KiB/s\nRTT (RDP UDP): 12 ms\nBandwidth: 80.0 Mbps\nDecode: 0.25 ms   ReTx: 0";
+    SDL_MouseButtonEvent down{}; down.type = SDL_EVENT_MOUSE_BUTTON_DOWN; down.button = SDL_BUTTON_LEFT;
+    auto up = down; up.type = SDL_EVENT_MOUSE_BUTTON_UP;
+    SdlPerformanceOverlay::Action action;
+    for (const auto style : {SdlPerformanceOverlay::Style::Panel, SdlPerformanceOverlay::Style::Quake})
+    {
+        SDL_SetRenderDrawColor(renderer.get(), 80, 100, 120, 255);
+        SDL_RenderClear(renderer.get());
+        overlay.set(true, readings, style);
+        if (!overlay.draw({0, 0, 640, 480}, 1)) return false;
+        SDL_RenderPresent(renderer.get());
+        const auto rect = overlay.bounds();
+        Uint8 r, g, b, a;
+        if (!SDL_ReadSurfacePixel(canvas.get(), static_cast<int>(rect.x + 1), static_cast<int>(rect.y + 1), &r, &g, &b, &a)) return false;
+        const bool unchanged = r == 80 && g == 100 && b == 120;
+        if (!expect(unchanged == (style == SdlPerformanceOverlay::Style::Quake), "Quake has no background or border; Panel retains its fill")) return false;
+        if (style == SdlPerformanceOverlay::Style::Quake)
+        {
+            size_t white = 0, black = 0;
+            for (int y = static_cast<int>(rect.y); y < rect.y + rect.h; y++)
+                for (int x = static_cast<int>(rect.x); x < rect.x + rect.w; x++)
+                {
+                    SDL_ReadSurfacePixel(canvas.get(), x, y, &r, &g, &b, &a);
+                    white += r > 220 && g > 220 && b > 220;
+                    black += r < 20 && g < 20 && b < 20;
+                }
+            if (!expect(white > 0 && black > 0, "Quake text has a white face and dark outline")) return false;
+        }
+        const float inset = style == SdlPerformanceOverlay::Style::Panel ? 20 : 10;
+        const SDL_FPoint details{rect.x + 20, rect.y + rect.h - inset};
+        const SDL_FPoint hide{rect.x + rect.w - 20, details.y};
+        if (!expect(overlay.button(down, details, action) && overlay.button(up, details, action) && action == SdlPerformanceOverlay::Details,
+                    "Details text remains a local action in both styles")) return false;
+        if (!expect(overlay.button(down, hide, action) && overlay.button(up, hide, action) && action == SdlPerformanceOverlay::Hide,
+                    "Hide text remains a local action in both styles")) return false;
+        if (directory)
+        {
+            const auto path = std::string(directory) + (style == SdlPerformanceOverlay::Style::Panel ? "/panel.bmp" : "/quake.bmp");
+            if (!SDL_SaveBMP(canvas.get(), path.c_str())) return false;
+        }
+    }
+    const auto before = overlay.bounds();
+    overlay.setVisible(true, SdlPerformanceOverlay::Style::Panel);
+    overlay.draw({0, 0, 640, 480}, 1);
+    if (!expect(overlay.bounds().x == before.x && overlay.bounds().y == before.y, "Switching style retains overlay position")) return false;
+    const SDL_FPoint grab{before.x + 10, before.y + 10};
+    if (!expect(overlay.button(down, grab, action) && overlay.capturing(), "First line captures a local drag")) return false;
+    overlay.setVisible(true, SdlPerformanceOverlay::Style::Quake);
+    overlay.draw({0, 0, 640, 480}, 2);
+    if (!expect(overlay.button(up, grab, action) && action == SdlPerformanceOverlay::None && !overlay.capturing(), "Style changes finish local mouse capture without remote input")) return false;
+    auto resized = overlay.bounds();
+    if (!expect(resized.x >= 0 && resized.y >= 0 && resized.x + resized.w <= 640 && resized.y + resized.h <= 480,
+                "Quake is clamped after a 1x-to-2x density change")) return false;
+    overlay.button(down, {resized.x + 10, resized.y + 10}, action);
+    overlay.motion({-100, -100});
+    overlay.draw({0, 0, 480, 320}, 1);
+    resized = overlay.bounds();
+    if (!expect(resized.x >= 0 && resized.y >= 0 && resized.x + resized.w <= 480 && resized.y + resized.h <= 320,
+                "Dragged Quake remains clamped after a density/viewport decrease")) return false;
+    overlay.button(up, {0, 0}, action);
+    overlay.setVisible(false, SdlPerformanceOverlay::Style::Quake);
+    return expect(overlay.hit({resized.x + 10, resized.y + 10}) == SdlPerformanceOverlay::None, "Hidden text has no hit targets");
+}
+
 static rdpPerformanceSnapshot snapshot(rdpContext* ctx)
 {
 	rdpPerformanceSnapshot s{};
@@ -251,7 +324,7 @@ static bool run()
 	if (!expect(!freerdp_performance_get_snapshot(ctx, &invalid),
 	            "sized API rejects short snapshots"))
 		return false;
-	if (!diagnosticMetrics(ctx) || !pacingMetrics()) return false;
+	if (!diagnosticMetrics(ctx) || !pacingMetrics() || !overlayStyles()) return false;
 	int count = 0;
 	auto ids = SDL_GetDisplays(&count);
 	if (!ids || count < 1)
@@ -274,8 +347,7 @@ static bool run()
 	if (!expect(rendered && frame.frames == 1 && frame.uploadedBytes > 0,
 	            "new remote pixels produce one update"))
 		return false;
-	window.setPerformanceOverlay(true, "Performance\nFPS (remote): 0 (idle)\nTraffic: 0 KiB/s\nRTT: "
-	                                   "unavailable\n\nDetails                       Hide");
+	window.setPerformanceOverlay(true, "FPS (remote): 0 (idle)\nTraffic: 0 KiB/s\nRTT: unavailable");
 	window.updateSurface(false, false, { -1, -1 });
 	if (!expect(window.takeLiveSnapshot(SDL_GetTicksNS()).frames == 0,
 	            "overlay-only paint never raises updates/s"))
@@ -295,6 +367,9 @@ static bool run()
 	if (!expect(overlay->button(up, { 40, 90 }, action) && !overlay->capturing(),
 	            "overlay drag ends locally"))
 		return false;
+    window.setPerformanceOverlayVisible(true, SdlPerformanceOverlay::Style::Quake);
+    window.updateSurface(false, false, { -1, -1 });
+    if (!expect(window.takeLiveSnapshot(SDL_GetTicksNS()).frames == 0, "Style changes never count as remote frames")) return false;
 	SDL_DestroySurface(surface);
 	return true;
 }
@@ -311,11 +386,13 @@ static bool benchmark()
 	if (!surface)
 		return false;
 	SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGBA(surface, 32, 64, 128, 255));
-	for (const bool enabled : { false, true })
+	for (const int mode : {0, 1, 2})
 	{
+        const bool enabled = mode != 0;
+        const auto style = mode == 2 ? SdlPerformanceOverlay::Style::Quake : SdlPerformanceOverlay::Style::Panel;
 		window.setPerformanceOverlay(enabled,
-		                             "Performance\nFPS (remote): 60\nReceive: 1.5 MiB/s\nRTT (TCP "
-		                             "estimate): 12 ms\n\nDetails                       Hide");
+		                             "FPS (remote): 60\nReceive: 1.5 MiB/s\nRTT (TCP "
+		                             "estimate): 12 ms", style);
 		std::vector<double> durations;
 		for (int frame = 0; frame < 212; frame++)
 		{
@@ -347,22 +424,22 @@ static bool benchmark()
 		}
 		std::sort(durations.begin(), durations.end());
 		printf("{\"backend\":\"SDL software "
-		       "fixture\",\"monitoring\":%s,\"samples\":%zu,\"p50_ms\":%.6f,\"p95_ms\":%.6f}\n",
-		       enabled ? "true" : "false", durations.size(), durations[durations.size() / 2],
+		       "fixture\",\"monitoring\":%s,\"style\":\"%s\",\"samples\":%zu,\"p50_ms\":%.6f,\"p95_ms\":%.6f}\n",
+		       enabled ? "true" : "false", mode == 0 ? "off" : mode == 1 ? "panel" : "quake", durations.size(), durations[durations.size() / 2],
 		       durations[durations.size() * 95 / 100]);
 	}
 	SDL_DestroySurface(surface);
 	return true;
 }
 
-int main(int argc, char**)
+int main(int argc, char** argv)
 {
 	SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
 	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "software");
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
 		return 1;
 	sdl_dialogs_init();
-	const bool ok = argc > 1 ? benchmark() : run();
+	const bool ok = argc > 2 && std::string(argv[1]) == "--overlay-fixtures" ? overlayStyles(argv[2]) : argc > 1 ? benchmark() : run();
 	sdl_dialogs_uninit();
 	SDL_Quit();
 	if (ok)

@@ -112,6 +112,32 @@ namespace
 		if (thumbnails)
 			eventually([&] { return c.bridge->thumbnailsEnabled(); }, "Thumbnail option not applied");
 	}
+	void performanceOverlayStyles()
+	{
+		Connection c;
+		c.command("start", ",\"arguments\":[],\"displaySelections\":[],\"performanceSupported\":true");
+		eventually([&] { return c.bridge->performanceAvailable(); }, "Performance option not applied");
+		c.command("performance_control", ",\"performanceEnabled\":true,\"performanceOverlayVisible\":true,\"performanceGeneration\":1,\"performanceOverlayStyle\":\"quake\"");
+		eventually([&] { return c.bridge->performanceMask() == 7 && c.bridge->performanceGeneration() == 1; }, "Quake style not applied");
+		c.bridge->requestPerformanceOverlay(false);
+		std::ignore = c.next();
+		require(c.bridge->performanceMask() == 5, "Hiding lost the Quake style");
+		c.bridge->requestPerformanceOverlay(true);
+		std::ignore = c.next();
+		require(c.bridge->performanceMask() == 7, "Showing lost the Quake style");
+		c.command("performance_control", ",\"performanceEnabled\":true,\"performanceOverlayVisible\":true,\"performanceGeneration\":2,\"performanceOverlayStyle\":\"panel\"");
+		eventually([&] { return c.bridge->performanceMask() == 3 && c.bridge->performanceGeneration() == 2; }, "Panel style not restored");
+		c.command("performance_control", ",\"performanceEnabled\":true,\"performanceOverlayVisible\":false,\"performanceGeneration\":3");
+		eventually([&] { return c.bridge->performanceMask() == 1 && c.bridge->performanceGeneration() == 3; }, "Older control defaults to Panel");
+		for (const auto field : {"\"invalid\"", "true", "null"})
+		{
+			Connection invalid;
+			invalid.command("start", ",\"arguments\":[],\"displaySelections\":[],\"performanceSupported\":true");
+			eventually([&] { return invalid.bridge->performanceAvailable(); }, "Performance option not applied");
+			invalid.command("performance_control", std::string(",\"performanceEnabled\":false,\"performanceOverlayVisible\":false,\"performanceOverlayStyle\":") + field);
+			eventually([&] { return invalid.bridge->cancelled(); }, "Invalid style did not reject the control");
+		}
+	}
 	void closeConfirmation()
 	{
 		Connection c;
@@ -575,6 +601,7 @@ int main()
 		lifecycle();
 		terminalDistinctions();
 		reconnectPolicyExclusions();
+		performanceOverlayStyles();
 		closeConfirmation();
 		closeCancellationAndEOF();
 		thumbnailBoundsAndDisable();

@@ -38,6 +38,7 @@ void SdlContext::servicePerformance()
 	const auto now = SDL_GetTicksNS();
 	const auto mask = bridge->performanceMask();
 	const auto generation = bridge->performanceGeneration();
+    const auto style = (mask & 4U) ? SdlPerformanceOverlay::Style::Quake : SdlPerformanceOverlay::Style::Panel;
 	if (mask != _performanceAppliedMask || generation != _performanceAppliedGeneration)
 	{
 		const bool wasEnabled = _performanceEnabled;
@@ -58,9 +59,12 @@ void SdlContext::servicePerformance()
 				entry.second.resetLiveMetrics(now);
 		}
 		for (auto& entry : _windows)
-			entry.second.setPerformanceOverlay(
-			    _performanceOverlayVisible,
-			    "Performance\nStarting…\n\n\n\nDetails                       Hide");
+        {
+            if (!wasEnabled && _performanceEnabled)
+                entry.second.setPerformanceOverlay(_performanceOverlayVisible, "Starting…", style);
+            else
+                entry.second.setPerformanceOverlayVisible(_performanceOverlayVisible, style);
+        }
 		std::ignore = redrawWindows();
 	}
 	if (!_performanceEnabled || now - _performanceLastNs < 1000000000ULL)
@@ -217,12 +221,11 @@ void SdlContext::servicePerformance()
 		else
 			std::snprintf(latency, sizeof(latency), "RTT: unavailable");
 		window.setPerformanceOverlay(_performanceOverlayVisible,
-		                             std::string("Performance — drag to move\n") + update + "\n↓ " +
-		                                 rate(tcpRx + udpRx) + "   ↑ " + rate(tcpTx + udpTx) +
+		                             std::string(update) + "\nRx: " +
+		                                 rate(tcpRx + udpRx) + "   Tx: " + rate(tcpTx + udpTx) +
 		                                 "\n" + latency + "\n" + capacity +
                                      "\nDecode: " + (std::isfinite(decodeAverage) ? std::to_string(decodeAverage).substr(0,4)+" ms" : "unavailable") +
-                                     "   ReTx: " + (udpAvailable && !reset ? std::to_string(network.udpRetransmissions-_performancePrevious.udpRetransmissions) : "—") +
-                                     "\n\nDetails                       Hide");
+                                     "   ReTx: " + (udpAvailable && !reset ? std::to_string(network.udpRetransmissions-_performancePrevious.udpRetransmissions) : "—"), style);
 	}
 	flushQueueMetrics(false);
 	auto queue = WINPR_JSON_AddObjectToObject(data, "queue");
