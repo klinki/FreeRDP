@@ -393,6 +393,8 @@ static BOOL autodetect_send_bandwidth_measure_results(rdpAutoDetect* autodetect,
 	           delta, autodetect->bandwidthMeasureByteCount,
 	           (transport == RDP_TRANSPORT_UDP_R) ? " in the UDP tunnel" : "");
 
+	performance_bandwidth_measurement(autodetect->context, transport != RDP_TRANSPORT_TCP, delta,
+	                                  autodetect->bandwidthMeasureByteCount);
 	IFCALLRET(autodetect->ClientBandwidthMeasureResult, success, autodetect, transport,
 	          responseType, sequenceNumber, delta, autodetect->bandwidthMeasureByteCount);
 	if (!success)
@@ -866,7 +868,10 @@ static BOOL autodetect_recv_netchar_request(rdpAutoDetect* autodetect, RDP_TRANS
 	           ", bandwidth=%" PRIu32 ", averageRTT=%" PRIu32 "",
 	           result.baseRTT, result.bandwidth, result.averageRTT);
 
-	performance_rtt(autodetect->context, transport == RDP_TRANSPORT_UDP_R, result.averageRTT);
+	performance_rtt(autodetect->context, transport != RDP_TRANSPORT_TCP, result.averageRTT);
+	if (result.type == RDP_NETCHAR_RESULT_TYPE_BW_AVG_RTT ||
+		result.type == RDP_NETCHAR_RESULT_TYPE_BASE_RTT_BW_AVG_RTT)
+		performance_bandwidth(autodetect->context, transport != RDP_TRANSPORT_TCP, result.bandwidth);
 	IFCALLRET(autodetect->NetworkCharacteristicsResult, success, autodetect, transport,
 	          autodetectReqPdu->sequenceNumber, &result);
 	if (!success)
