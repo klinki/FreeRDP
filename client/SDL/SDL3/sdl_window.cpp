@@ -773,10 +773,16 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 	}
 
     if(_performanceOverlay) _performanceOverlay->draw(pixelViewport(),SDL_GetWindowPixelDensity(_window));
-    auto livePresentTimer = _liveMetrics.beginPresent();
+    const auto liveStart=_liveMetrics.nowNs();
     auto presentTimer = _renderMetrics.beginPresent();
     const auto result=SDL_RenderPresent(_renderer);
-    if(result && _liveMetrics.enabled()) ++_livePresents;
+    if (_liveMetrics.enabled()) {
+        if (result) {
+            const auto now=_liveMetrics.nowNs();
+            _liveMetrics.notePresent(now >= liveStart ? now-liveStart : 0);
+            ++_livePresents;
+        } else { _liveMetrics.notePresentSkip(); }
+    }
     return result;
 }
 

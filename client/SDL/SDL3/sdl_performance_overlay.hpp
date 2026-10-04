@@ -52,7 +52,7 @@ class SdlPerformanceOverlay
 			dirty = true;
 		}
 		const float width = std::min(300.0f * scale, static_cast<float>(viewport.w));
-		const float height = std::min(160.0f * scale, static_cast<float>(viewport.h));
+		const float height = std::min(190.0f * scale, static_cast<float>(viewport.h));
 		if (!positioned)
 		{
 			rect = { viewport.w - width - 12 * scale, 70 * scale, width, height };
@@ -94,6 +94,13 @@ class SdlPerformanceOverlay
 				SDL_DestroySurface(surface);
 			}
 			dirty = false;
+		}
+		// Size the box to the rendered lines so the extra bandwidth reading and
+		// the local Details/Hide hit targets remain aligned at every density.
+		if (texture)
+		{
+			rect.h = std::min(th + 16 * scale, static_cast<float>(viewport.h));
+			rect.y = std::clamp(rect.y, 0.0f, std::max(0.0f, viewport.h - rect.h));
 		}
 		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 		if (light)

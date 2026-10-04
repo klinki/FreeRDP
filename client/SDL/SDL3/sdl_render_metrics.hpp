@@ -154,6 +154,8 @@ class SdlRenderMetrics final
 	SdlRenderMetrics(SdlRenderMetrics&& other) noexcept
 	    : _windowId(other._windowId), _monitorId(other._monitorId), _clock(other._clock),
 	      _clockOpaque(other._clockOpaque), _file(other._file), _enabled(other._enabled), _memoryOnly(other._memoryOnly), _totalRedrawNs(other._totalRedrawNs),
+      _frameIntervalWallNs(other._frameIntervalWallNs), _frameIntervalMaxNs(other._frameIntervalMaxNs),
+      _renderStalls(other._renderStalls),
 	      _intervalActive(other._intervalActive), _intervalStartNs(other._intervalStartNs),
 	      _frameActive(other._frameActive), _frameStartNs(other._frameStartNs),
 	      _lastPresentValid(other._lastPresentValid), _lastPresentNs(other._lastPresentNs),
@@ -186,6 +188,8 @@ class SdlRenderMetrics final
 			_enabled = other._enabled;
 			_memoryOnly = other._memoryOnly;
 			_totalRedrawNs = other._totalRedrawNs;
+            _frameIntervalWallNs=other._frameIntervalWallNs; _frameIntervalMaxNs=other._frameIntervalMaxNs;
+            _renderStalls=other._renderStalls;
 			_intervalActive = other._intervalActive;
 			_intervalStartNs = other._intervalStartNs;
 			_frameActive = other._frameActive;
@@ -222,6 +226,10 @@ class SdlRenderMetrics final
 
 	struct MemorySnapshot {
         uint64_t frames=0, uploadedBytes=0, uploadCalls=0, drawCalls=0, presentCalls=0;
+        uint64_t frameIntervalCount=0, renderStalls=0, presentFailures=0;
+        double frameIntervalAverageMs=std::numeric_limits<double>::quiet_NaN();
+        double frameIntervalP95Ms=std::numeric_limits<double>::quiet_NaN();
+        double frameIntervalMaxMs=std::numeric_limits<double>::quiet_NaN();
         double redrawAverageMs=std::numeric_limits<double>::quiet_NaN();
         double redrawP95Ms=std::numeric_limits<double>::quiet_NaN();
         double uploadAverageMs=std::numeric_limits<double>::quiet_NaN();
@@ -236,6 +244,16 @@ class SdlRenderMetrics final
         const auto mean=[](uint64_t n,uint64_t total) {
             return n?static_cast<double>(total)/n/1e6:std::numeric_limits<double>::quiet_NaN();
         };
+        out.frameIntervalCount=_frameIntervalSamples.seen;
+        out.renderStalls=_renderStalls; out.presentFailures=_presentSkips;
+        out.frameIntervalAverageMs=mean(_frameIntervalSamples.seen,_frameIntervalWallNs);
+        if (_frameIntervalSamples.size) {
+            auto values=_frameIntervalSamples.values;
+            std::sort(values.begin(),values.begin()+_frameIntervalSamples.size);
+            const auto index=(_frameIntervalSamples.size*95+99)/100-1;
+            out.frameIntervalP95Ms=static_cast<double>(values[index])/1e6;
+            out.frameIntervalMaxMs=static_cast<double>(_frameIntervalMaxNs)/1e6;
+        }
         out.redrawAverageMs=mean(_redrawSamples.seen,_totalRedrawNs);
         out.uploadAverageMs=mean(_uploadCalls,_uploadWallNs);
         out.drawAverageMs=mean(_drawCalls,_drawWallNs);
@@ -248,6 +266,9 @@ class SdlRenderMetrics final
         }
         if (_memoryOnly) startInterval(now);
         return out;
+    }
+    void resetMemoryBaseline(uint64_t now) noexcept {
+        if (_memoryOnly) { startInterval(now); _lastPresentValid=false; _frameActive=false; }
     }
     [[nodiscard]] bool enabled() const noexcept { return _enabled; }
 	[[nodiscard]] uint64_t nowNs() const noexcept
@@ -285,7 +306,9 @@ class SdlRenderMetrics final
 			return;
 
 		const auto now = nowNs();
-		_totalRedrawNs += now >= _frameStartNs ? now - _frameStartNs : 0;
+        const auto redrawNs=now >= _frameStartNs ? now - _frameStartNs : 0;
+        _totalRedrawNs += redrawNs;
+        if (redrawNs >= 100000000ULL) ++_renderStalls;
 		_recordSample(_redrawSamples, now >= _frameStartNs ? now - _frameStartNs : 0);
 		_frameActive = false;
 	}
@@ -334,9 +357,12 @@ class SdlRenderMetrics final
 		ensureInterval(now);
 		++_presentCalls;
 		_presentWallNs += wallNs;
-		if (_lastPresentValid)
-			_recordSample(_frameIntervalSamples,
-			              now >= _lastPresentNs ? now - _lastPresentNs : 0);
+        if (_lastPresentValid) {
+            const auto spacing=now >= _lastPresentNs ? now - _lastPresentNs : 0;
+            _recordSample(_frameIntervalSamples, spacing);
+            _frameIntervalWallNs+=spacing;
+            _frameIntervalMaxNs=std::max(_frameIntervalMaxNs, spacing);
+        }
 		_lastPresentNs = now;
 		_lastPresentValid = true;
 	}
@@ -470,6 +496,7 @@ class SdlRenderMetrics final
 		_intervalStartNs = now;
 		_frames = 0;
 		_totalRedrawNs = 0;
+        _frameIntervalWallNs=0; _frameIntervalMaxNs=0; _renderStalls=0;
 		_attemptedDirtyPixels = 0;
 		_uploadPixels = 0;
 		_uploadBytes = 0;
@@ -590,6 +617,7 @@ class SdlRenderMetrics final
 	bool _enabled = false;
 	bool _memoryOnly = false;
 	uint64_t _totalRedrawNs = 0;
+    uint64_t _frameIntervalWallNs=0, _frameIntervalMaxNs=0, _renderStalls=0;
 	bool _intervalActive = false;
 	uint64_t _intervalStartNs = 0;
 	bool _frameActive = false;

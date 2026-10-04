@@ -56,6 +56,7 @@ class SdlWindow
     SdlRenderMetrics::MemorySnapshot takeLiveSnapshot(uint64_t now) {
         auto out=_liveMetrics.takeMemorySnapshot(now); out.frames=_livePresents;_livePresents=0;return out;
     }
+    void resetLiveMetrics(uint64_t now) { _liveMetrics.resetMemoryBaseline(now); _livePresents=0; }
     void setPerformanceOverlay(bool visible,const std::string& text) {
         if(!_performanceOverlay) _performanceOverlay=std::make_unique<SdlPerformanceOverlay>(_renderer);
         _performanceOverlay->set(visible,text);

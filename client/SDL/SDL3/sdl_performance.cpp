@@ -55,12 +55,12 @@ void SdlContext::servicePerformance()
 			std::ignore = freerdp_performance_get_snapshot(context(), &_performancePrevious);
 			_performanceQueue = {};
 			for (auto& entry : _windows)
-				std::ignore = entry.second.takeLiveSnapshot(now);
+				entry.second.resetLiveMetrics(now);
 		}
 		for (auto& entry : _windows)
 			entry.second.setPerformanceOverlay(
 			    _performanceOverlayVisible,
-			    "Performance\nStarting…\n\n\nDetails                       Hide");
+			    "Performance\nStarting…\n\n\n\nDetails                       Hide");
 		std::ignore = redrawWindows();
 	}
 	if (!_performanceEnabled || now - _performanceLastNs < 1000000000ULL)
@@ -117,10 +117,57 @@ void SdlContext::servicePerformance()
 	  network.rttValid && network.rttSource == FREERDP_PERFORMANCE_RTT_RDP
 	      ? network.rttAgeMilliseconds / 1000.0
 	      : std::numeric_limits<double>::quiet_NaN());
+	auto bandwidth = WINPR_JSON_AddObjectToObject(data, "bandwidth");
+	const bool bandwidthValid = connected && network.bandwidthValid;
+	n(bandwidth, "kilobitsPerSecond", bandwidthValid ? network.bandwidthKilobitsPerSecond
+	                                               : std::numeric_limits<double>::quiet_NaN());
+	txt(bandwidth, "source", !bandwidthValid ? "unavailable"
+		: network.bandwidthSource == FREERDP_PERFORMANCE_BANDWIDTH_RDP_ESTIMATE
+			? "rdp_estimate" : "rdp_measurement");
+	txt(bandwidth, "transport", !bandwidthValid ? "none"
+		: network.bandwidthTransport == FREERDP_PERFORMANCE_UDP ? "udp" : "tcp");
+	n(bandwidth, "ageSeconds", bandwidthValid ? network.bandwidthAgeMilliseconds / 1000.0
+	                                          : std::numeric_limits<double>::quiet_NaN());
+	std::ignore = WINPR_JSON_AddBoolToObject(bandwidth, "stale", bandwidthValid && network.bandwidthStale);
+	char capacity[160];
+	if (bandwidthValid)
+		std::snprintf(capacity, sizeof(capacity), "BW (RDP %s): %.2f Mbps%s",
+	                  network.bandwidthTransport == FREERDP_PERFORMANCE_UDP ? "UDP" : "TCP",
+	                  network.bandwidthKilobitsPerSecond / 1000.0,
+	                  network.bandwidthStale ? " (stale)" : "");
+	else
+		std::snprintf(capacity, sizeof(capacity), "BW estimate: unavailable");
+    const auto change=[&](UINT64 value, UINT64 previous) {
+        return !reset && connected && value >= previous ? static_cast<double>(value-previous)
+            : std::numeric_limits<double>::quiet_NaN();
+    };
+    const auto calls=change(network.decodeCalls,_performancePrevious.decodeCalls);
+    const auto decodeAverage=calls > 0 ? change(network.decodeWallNs,_performancePrevious.decodeWallNs)/calls/1e6
+        : std::numeric_limits<double>::quiet_NaN();
+    auto decode=WINPR_JSON_AddObjectToObject(data,"decode");
+    n(decode,"averageMs",decodeAverage);
+    n(decode,"recentP95Ms",calls > 0 ? network.decodeRecentP95Milliseconds : std::numeric_limits<double>::quiet_NaN());
+    n(decode,"callsPerSecond",calls/elapsed);
+    n(decode,"failures",change(network.decodeFailures,_performancePrevious.decodeFailures));
+    n(decode,"samplesSkipped",change(network.decodeSamplesSkipped,_performancePrevious.decodeSamplesSkipped));
+    n(decode,"recentSampleCount",network.decodeRecentSampleCount);
+    txt(decode,"codec",network.decodeCodec[0] ? network.decodeCodec : "Unavailable");
+    txt(decode,"source","codec_wall_time");
+    const bool udpAvailable=connected && (network.connectedTransports & FREERDP_PERFORMANCE_UDP);
+    const auto unavailable=std::numeric_limits<double>::quiet_NaN();
+    auto reliability=WINPR_JSON_AddObjectToObject(data,"udpReliability");
+    std::ignore=WINPR_JSON_AddBoolToObject(reliability,"available",udpAvailable);
+    n(reliability,"sentDatagramsPerSecond",delta(network.udpSentDatagrams,_performancePrevious.udpSentDatagrams));
+    n(reliability,"receivedDatagramsPerSecond",delta(network.udpReceivedDatagrams,_performancePrevious.udpReceivedDatagrams));
+    n(reliability,"retransmissionsPerSecond",udpAvailable ? delta(network.udpRetransmissions,_performancePrevious.udpRetransmissions) : unavailable);
+    n(reliability,"lossReportsPerSecond",udpAvailable ? delta(network.udpLossReports,_performancePrevious.udpLossReports) : unavailable);
+    n(reliability,"retransmissionsTotal",network.udpRetransmissions);
+    n(reliability,"lossReportsTotal",network.udpLossReports);
 	auto displays = WINPR_JSON_AddArrayToObject(data, "displays");
 	for (auto& entry : _windows)
 	{
 		auto& window = entry.second;
+		if (reset || !connected) window.resetLiveMetrics(now);
 		auto frame = window.takeLiveSnapshot(now);
 		auto pixels = window.pixelViewport();
 		if (pixels.w <= 0 || pixels.h <= 0 ||
@@ -132,8 +179,10 @@ void SdlContext::servicePerformance()
 		txt(display, "name", SDL_GetDisplayName(window.monitor(false).orig_screen));
 		n(display, "width", pixels.w);
 		n(display, "height", pixels.h);
-		n(display, "updatesPerSecond",
-		  connected && !reset ? frame.frames / elapsed : std::numeric_limits<double>::quiet_NaN());
+		const double fps = connected && !reset ? frame.frames / elapsed
+	                                          : std::numeric_limits<double>::quiet_NaN();
+		n(display, "updatesPerSecond", fps);
+		n(display, "framesPerSecond", fps);
 		auto render = WINPR_JSON_AddObjectToObject(display, "render");
 		n(render, "redrawAverageMs", frame.redrawAverageMs);
 		n(render, "redrawP95Ms", frame.redrawP95Ms);
@@ -142,6 +191,13 @@ void SdlContext::servicePerformance()
 		n(render, "presentAverageMs", frame.presentAverageMs);
 		n(render, "uploadedBytes", frame.uploadedBytes);
 		n(render, "presentCount", frame.frames);
+        auto pacing=WINPR_JSON_AddObjectToObject(display,"pacing");
+        n(pacing,"averageIntervalMs",frame.frameIntervalAverageMs);
+        n(pacing,"p95IntervalMs",frame.frameIntervalP95Ms);
+        n(pacing,"maximumIntervalMs",frame.frameIntervalMaxMs);
+        n(pacing,"intervalCount",frame.frameIntervalCount);
+        n(pacing,"renderStalls",frame.renderStalls);
+        n(pacing,"presentFailures",frame.presentFailures);
 		WINPR_JSON_AddItemToArray(displays, display);
 		char update[64], latency[96];
 		if (!connected)
@@ -149,7 +205,7 @@ void SdlContext::servicePerformance()
 		else if (reset)
 			std::snprintf(update, sizeof(update), "Starting…");
 		else
-			std::snprintf(update, sizeof(update), "Updates/s: %.1f%s", frame.frames / elapsed,
+			std::snprintf(update, sizeof(update), "FPS (remote): %.1f%s", frame.frames / elapsed,
 			              frame.frames ? "" : " (idle)");
 		if (network.rttValid && connected)
 			std::snprintf(latency, sizeof(latency), "RTT%s: %u ms",
@@ -163,7 +219,10 @@ void SdlContext::servicePerformance()
 		window.setPerformanceOverlay(_performanceOverlayVisible,
 		                             std::string("Performance — drag to move\n") + update + "\n↓ " +
 		                                 rate(tcpRx + udpRx) + "   ↑ " + rate(tcpTx + udpTx) +
-		                                 "\n" + latency + "\n\nDetails                       Hide");
+		                                 "\n" + latency + "\n" + capacity +
+                                     "\nDecode: " + (std::isfinite(decodeAverage) ? std::to_string(decodeAverage).substr(0,4)+" ms" : "unavailable") +
+                                     "   ReTx: " + (udpAvailable && !reset ? std::to_string(network.udpRetransmissions-_performancePrevious.udpRetransmissions) : "—") +
+                                     "\n\nDetails                       Hide");
 	}
 	flushQueueMetrics(false);
 	auto queue = WINPR_JSON_AddObjectToObject(data, "queue");

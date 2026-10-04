@@ -450,6 +450,8 @@ static BOOL autodetect_send_bandwidth_measure_results(rdpAutoDetect* autodetect,
 	Stream_Write_UINT16(s, responseType);                          /* responseType (1 byte) */
 	Stream_Write_UINT32(s, (UINT32)MIN(timeDelta, UINT32_MAX));    /* timeDelta (4 bytes) */
 	Stream_Write_UINT32(s, byteCount);                             /* byteCount (4 bytes) */
+	performance_bandwidth_measurement(autodetect->context, transport != RDP_TRANSPORT_TCP,
+	                                  (UINT32)MIN(timeDelta, UINT32_MAX), byteCount);
 	IFCALLRET(autodetect->ClientBandwidthMeasureResult, success, autodetect, transport,
 	          responseType, sequenceNumber, (UINT32)MIN(timeDelta, UINT32_MAX), byteCount);
 
@@ -889,7 +891,10 @@ static BOOL autodetect_recv_netchar_request(rdpAutoDetect* autodetect, RDP_TRANS
 	           ", bandwidth=%" PRIu32 ", averageRTT=%" PRIu32 "",
 	           result.baseRTT, result.bandwidth, result.averageRTT);
 
-	performance_rtt(autodetect->context, transport == RDP_TRANSPORT_UDP_R, result.averageRTT);
+	performance_rtt(autodetect->context, transport != RDP_TRANSPORT_TCP, result.averageRTT);
+	if (result.type == RDP_NETCHAR_RESULT_TYPE_BW_AVG_RTT ||
+		result.type == RDP_NETCHAR_RESULT_TYPE_BASE_RTT_BW_AVG_RTT)
+		performance_bandwidth(autodetect->context, transport != RDP_TRANSPORT_TCP, result.bandwidth);
 	IFCALLRET(autodetect->NetworkCharacteristicsResult, success, autodetect, transport,
 	          autodetectReqPdu->sequenceNumber, &result);
 	if (!success)
