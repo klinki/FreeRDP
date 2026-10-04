@@ -126,13 +126,9 @@ static bool run()
 		return false;
 	// Replug/layout changes refresh cached multimon dimensions and restore DPI.
 	const auto physical = window->monitor(false).orig_screen;
-	const std::vector<SDL_DisplayID> selected{ physical };
-	const auto scale = std::to_string(physical) + "=175/180";
-	if (!freerdp_settings_set_pointer_len(settings, FreeRDP_MonitorIds, selected.data(),
-	                                      selected.size()) ||
-	    !sdl.parseMonitorScaleOverrides(scale.c_str()))
+	SdlMonitorScaleOverrides scales{ { physical, { physical, 175, 180 } } };
+	if (!sdl.setHotplugMonitorSelection({ physical }, scales))
 		return false;
-	sdl.setMonitorIds(selected);
 	SDL_DisplayEvent changed{};
 	changed.type = SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED;
 	changed.displayID = physical;

@@ -9,6 +9,7 @@
 
 #include "sdl_context.hpp"
 #include "sdl_monitor.hpp"
+#include "sdl_monitor_selection.hpp"
 #include "sdl_types.hpp"
 #include "dialogs/sdl_dialogs.hpp"
 
@@ -188,6 +189,39 @@ static bool primarySelection(SdlContext& sdl)
 	return true;
 }
 
+static bool stableSelections()
+{
+	const std::vector<SdlMonitorSelection> wanted = {
+		{ "4k-uuid", SdlMonitorScaleOverride{ 11, 175, 180 } }, { "fhd-uuid", std::nullopt }
+	};
+	auto mapped = sdl_resolve_monitor_selection(
+	    wanted, { { "4K-UUID", 11 }, { "FHD-UUID", 22 }, { "laptop", 1 } }, 1);
+	if (!expect(mapped.ids == std::vector<SDL_DisplayID>{ 11, 22 } &&
+	                mapped.scales.at(11).desktopScaleFactor == 175,
+	            "saved monitor order and explicit DPI are resolved case-insensitively"))
+		return false;
+	mapped = sdl_resolve_monitor_selection(wanted, { { "laptop", 1 } }, 1);
+	if (!expect(mapped.ids == std::vector<SDL_DisplayID>{ 1 } && mapped.scales.empty(),
+	            "all selected displays missing uses laptop without external DPI overrides"))
+		return false;
+	mapped = sdl_resolve_monitor_selection(wanted, { { "FHD-UUID", 44 }, { "laptop", 1 } }, 1);
+	if (!expect(mapped.ids == std::vector<SDL_DisplayID>{ 44 } && mapped.scales.empty(),
+	            "returning selected display replaces laptop fallback"))
+		return false;
+	mapped = sdl_resolve_monitor_selection(
+	    wanted, { { "FHD-UUID", 44 }, { "laptop", 1 }, { "4K-UUID", 55 } }, 1);
+	if (!expect(mapped.ids == std::vector<SDL_DisplayID>{ 55, 44 } &&
+	                mapped.scales.count(11) == 0 && mapped.scales.at(55).displayId == 55 &&
+	                mapped.scales.at(55).desktopScaleFactor == 175 &&
+	                mapped.scales.at(55).deviceScaleFactor == 180,
+	            "replugged SDL IDs restore original primary ordering and DPI by physical UUID"))
+		return false;
+	mapped = sdl_resolve_monitor_selection(
+	    wanted, { { "4k-uuid", 55 }, { "4K-UUID", 66 }, { "laptop", 1 } }, 1);
+	return expect(mapped.ids == std::vector<SDL_DisplayID>{ 1 } && mapped.scales.empty(),
+	              "ambiguous identity cannot apply scaling to an unrelated display");
+}
+
 static bool run()
 {
 	std::unique_ptr<freerdp, decltype(&freerdp_free)> instance(freerdp_new(), freerdp_free);
@@ -226,7 +260,7 @@ static bool run()
 			return false;
 	}
 
-	if (!hotplug(sdl, displays.front()) || !primarySelection(sdl))
+	if (!stableSelections() || !hotplug(sdl, displays.front()) || !primarySelection(sdl))
 		return false;
 
 	const UINT32 selected = displays.front();

@@ -45,6 +45,7 @@ set(SRCS
     sdl_monitor.hpp
     sdl_monitor_scale.cpp
     sdl_monitor_scale.hpp
+    sdl_monitor_selection.hpp
     sdl_freerdp.hpp
     sdl_freerdp.cpp
     sdl_channels.hpp

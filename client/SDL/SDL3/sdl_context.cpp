@@ -1282,6 +1282,20 @@ bool SdlContext::detectDisplays()
 	return true;
 }
 
+bool SdlContext::setHotplugMonitorSelection(const std::vector<SDL_DisplayID>& ids,
+                                            const SdlMonitorScaleOverrides& scales)
+{
+	if (ids.empty())
+		return false;
+	if (!freerdp_settings_set_pointer_len(context()->settings, FreeRDP_MonitorIds, ids.data(),
+	                                      ids.size()))
+		return false;
+	setMonitorIds(ids);
+	_monitorScaleOverrides = scales;
+	_monitorScaleOverridesConfigured = true;
+	return true;
+}
+
 bool SdlContext::refreshDisplayWindows()
 {
 	if (!detectDisplays())
@@ -1302,6 +1316,11 @@ bool SdlContext::refreshDisplayWindows()
 		}
 		return updateWindowList();
 	}
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active(); bridge && bridge->hasDisplaySelection())
+		if (!bridge->refreshDisplaySelection(*this))
+			return false;
+#endif
 	auto desired = getDisplayIds();
 	if (freerdp_settings_get_uint32(settings, FreeRDP_NumMonitorIds) > 0)
 	{

@@ -3,6 +3,7 @@
  * Copyright 2026 FreeRDP contributors. Licensed under Apache-2.0.
  */
 #include "sdl_launcher.hpp"
+#include "sdl_context.hpp"
 #include "sdl_utils.hpp"
 #include <CoreGraphics/CoreGraphics.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -791,6 +792,7 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 	}
 	const auto current = displays(nullptr); // Resolve again immediately before connection.
 	std::vector<UINT32> selected;
+	std::vector<SdlMonitorSelection> savedSelections;
 	std::string monitorArg, scaleArg;
 	for (size_t i = 0; i < WINPR_JSON_GetArraySize(selections); i++)
 	{
@@ -812,6 +814,7 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 			return false;
 		}
 		const auto id = match->second;
+		SdlMonitorSelection saved{ uuid, std::nullopt };
 		selected.push_back(id);
 		if (!monitorArg.empty())
 			monitorArg += ",";
@@ -826,11 +829,14 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 				error = "Unsupported per-monitor scale";
 				return false;
 			}
+			saved.scale =
+			    SdlMonitorScaleOverride{ id, static_cast<UINT32>(d), static_cast<UINT32>(v) };
 			if (!scaleArg.empty())
 				scaleArg += ",";
 			scaleArg += std::to_string(id) + "=" + std::to_string(static_cast<int>(d)) + "/" +
 			            std::to_string(static_cast<int>(v));
 		}
+		savedSelections.push_back(std::move(saved));
 	}
 	if (!monitorArg.empty())
 		arguments.push_back("/monitors:" + monitorArg);
@@ -850,7 +856,16 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 		}
 		arguments.push_back("/sdl-monitor-scale:" + scaleArg);
 	}
+	_displaySelections = std::move(savedSelections);
 	return true;
+}
+bool SdlLauncher::refreshDisplaySelection(SdlContext& sdl)
+{
+	if (_displaySelections.empty())
+		return true;
+	const auto mapped = sdl_resolve_monitor_selection(_displaySelections, displays(nullptr),
+	                                                  SDL_GetPrimaryDisplay());
+	return sdl.setHotplugMonitorSelection(mapped.ids, mapped.scales);
 }
 bool SdlLauncher::applyTlsSecretsFile(rdpSettings* settings, std::string& error) const
 {

@@ -12,6 +12,9 @@
 #include <vector>
 #include <freerdp/freerdp.h>
 #include <winpr/json.h>
+#include "sdl_monitor_selection.hpp"
+
+class SdlContext;
 
 class SdlLauncher
 {
@@ -26,6 +29,11 @@ class SdlLauncher
 	static Json capabilities();
 	static bool useAccessoryActivationPolicy(); // macOS main thread, after SDL_Init.
 	bool prepare(std::vector<std::string>& arguments, std::string& error);
+	bool hasDisplaySelection() const
+	{
+		return !_displaySelections.empty();
+	}
+	bool refreshDisplaySelection(SdlContext& sdl); // SDL main thread only
 	bool applyTlsSecretsFile(rdpSettings* settings, std::string& error) const;
 	bool authenticate(char** username, char** password, char** domain, rdp_auth_reason reason,
 	                  bool rejected = false);
@@ -63,6 +71,7 @@ class SdlLauncher
 	int _fd;
 	std::string _sessionId;
 	std::string _tlsSecretsFile;
+	std::vector<SdlMonitorSelection> _displaySelections;
 	rdpContext* _context;
 	std::mutex _mutex;
 	std::condition_variable _condition;

@@ -150,6 +150,8 @@ class SdlContext
 	[[nodiscard]] bool removeDisplayWindow(SDL_DisplayID id);
 	[[nodiscard]] bool detectDisplays();
 	[[nodiscard]] bool refreshDisplayWindows();
+	[[nodiscard]] bool setHotplugMonitorSelection(const std::vector<SDL_DisplayID>& ids,
+	                                              const SdlMonitorScaleOverrides& scales);
 	[[nodiscard]] rdpMonitor getDisplay(SDL_DisplayID id) const;
 	[[nodiscard]] std::vector<SDL_DisplayID> getDisplayIds() const;
 	[[nodiscard]] bool parseMonitorScaleOverrides(const char* value);
