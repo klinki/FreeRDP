@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <memory>
+#include <winpr/sysinfo.h>
 
 #include "sdl_context.hpp"
 #include "sdl_monitor.hpp"
@@ -95,6 +96,9 @@ static bool hotplug(SdlContext& sdl, SDL_DisplayID display)
 	removal.display.displayID = removed;
 	if (!expect(sdl.handleEvent(removal), "remove migrated windows through display channel"))
 		return false;
+	const auto now = GetTickCount64();
+	sdl.getDisplayChannelContext().service(now);
+	sdl.getDisplayChannelContext().service(now + 500);
 	for (const auto id : oldWindows)
 	{
 		if (!expect(sdl.getWindowForId(id) == nullptr, "all windows owned by removed monitor released"))

@@ -4,6 +4,7 @@
  */
 #include <cstdio>
 #include <memory>
+#include <winpr/sysinfo.h>
 #include <vector>
 
 #include "sdl_context.hpp"
@@ -23,6 +24,8 @@ static bool expect(bool condition, const char* message)
 static UINT captureLayout(DispClientContext*, UINT32 count,
                           DISPLAY_CONTROL_MONITOR_LAYOUT* layouts)
 {
+	if (!expect(SDL_IsMainThread(), "Display Control sends stay on SDL main thread"))
+		return CHANNEL_RC_BAD_CHANNEL_HANDLE;
 	layoutCalls++;
 	sentLayouts.assign(layouts, layouts + count);
 	return CHANNEL_RC_OK;
@@ -96,6 +99,7 @@ static bool run()
 	            channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
 	            "delayed fullscreen display-channel activation succeeds"))
 		return false;
+	disp.service();
 	if (!expect(sentLayouts.size() == 1 && sentLayouts.front().Width == static_cast<UINT32>(pixels.w) &&
 	            sentLayouts.front().Height == static_cast<UINT32>(pixels.h),
 	            "activation sends the corrected fullscreen layout without another resize") ||
@@ -119,6 +123,45 @@ static bool run()
 	            window->monitor(true).width == monitor.width &&
 	            window->monitor(true).height == monitor.height,
 	            "multimon retains cached physical display geometry"))
+		return false;
+	// Replug/layout changes refresh cached multimon dimensions and restore DPI.
+	const auto physical = window->monitor(false).orig_screen;
+	const std::vector<SDL_DisplayID> selected{ physical };
+	const auto scale = std::to_string(physical) + "=175/180";
+	if (!freerdp_settings_set_pointer_len(settings, FreeRDP_MonitorIds, selected.data(),
+	                                      selected.size()) ||
+	    !sdl.parseMonitorScaleOverrides(scale.c_str()))
+		return false;
+	sdl.setMonitorIds(selected);
+	SDL_DisplayEvent changed{};
+	changed.type = SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED;
+	changed.displayID = physical;
+	const auto before = layoutCalls;
+	const UINT64 now = GetTickCount64();
+	if (!disp.handleEvent(changed))
+		return false;
+	disp.service(now);
+	if (!expect(layoutCalls == before, "dock event bursts wait for stable geometry"))
+		return false;
+	disp.service(now + 500);
+	const auto fresh = SdlWindow::query(physical, false);
+	if (!expect(layoutCalls == before + 1 &&
+	                sentLayouts.front().Width == static_cast<UINT32>(fresh.width) &&
+	                sentLayouts.front().Height == static_cast<UINT32>(fresh.height) &&
+	                sentLayouts.front().DesktopScaleFactor == 175 &&
+	                sentLayouts.front().DeviceScaleFactor == 180,
+	            "settled hotplug resends fresh dimensions with saved scaling"))
+		return false;
+	disp.service(now + 1500);
+	if (!expect(layoutCalls == before + 1, "settling retries deduplicate unchanged layouts"))
+		return false;
+	changed.type = SDL_EVENT_DISPLAY_ADDED;
+	if (!disp.handleEvent(changed))
+		return false;
+	disp.service(now + 1600);
+	disp.service(now + 2100);
+	if (!expect(layoutCalls == before + 2,
+	            "reconnection triggers rescaling even when final layout matches the previous one"))
 		return false;
 	return disp.uninit(&channel);
 }

@@ -179,6 +179,7 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 	{
 		while (!sdl->shallAbort())
 		{
+			sdl->getDisplayChannelContext().service();
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 			if (auto bridge = SdlLauncher::active())
 				bridge->serviceFocus();
@@ -186,6 +187,7 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 			SDL_Event windowEvent = {};
 			while (!sdl->shallAbort() && SDL_WaitEventTimeout(nullptr, 1000))
 			{
+				sdl->getDisplayChannelContext().service();
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 				if (auto bridge = SdlLauncher::active())
 					bridge->serviceFocus();
