@@ -44,7 +44,7 @@ namespace
 	constexpr const char* bridgeCapabilities[] = {
 		"auth", "certificate", "focus", "retry", "display_uuid", "per_monitor_scaling",
 		"dynamic_resolution", "multimon", "close_confirmation", "session_thumbnail",
-		"dock_accessory", "primary_monitor", "reverse_mouse_wheel", "performance_monitoring"
+		"dock_accessory", "primary_monitor", "reverse_mouse_wheel", "performance_monitoring", "performance_overlay_styles"
 	};
 	// The nonconnecting query and the live handshake must advertise the same features.
 	bool addCapabilities(WINPR_JSON* message)
@@ -445,7 +445,10 @@ bool SdlLauncher::receive(Json event)
         if(generation && (!WINPR_JSON_IsNumber(generation) || WINPR_JSON_GetNumberValue(generation)<0 ||
             !std::isfinite(WINPR_JSON_GetNumberValue(generation)) || std::floor(WINPR_JSON_GetNumberValue(generation))!=WINPR_JSON_GetNumberValue(generation) ||
             WINPR_JSON_GetNumberValue(generation)>9007199254740991.0)) return false;
-        _performanceMask=(on?1U:0U)|(show?2U:0U);
+        const auto style=item(event.get(),"performanceOverlayStyle");
+        if(style && (!WINPR_JSON_IsString(style) ||
+            (str(event.get(),"performanceOverlayStyle")!="panel" && str(event.get(),"performanceOverlayStyle")!="quake"))) return false;
+        _performanceMask=(on?1U:0U)|(show?2U:0U)|(style && str(event.get(),"performanceOverlayStyle")=="quake" ? 4U:0U);
         _performanceGeneration=generation?static_cast<uint64_t>(WINPR_JSON_GetNumberValue(generation)):0;
         return true;
     }
@@ -1096,7 +1099,7 @@ bool SdlLauncher::sendPerformance(Json event) {
 }
 void SdlLauncher::requestPerformanceOverlay(bool visible) {
     if(!_performanceAvailable) return;
-    _performanceMask=visible?3U:(_performanceMask.load()&1U);
+    if(visible) _performanceMask.fetch_or(3U); else _performanceMask.fetch_and(~2U);
     auto event=message("performance_overlay_requested");
     WINPR_JSON_AddBoolToObject(event.get(),"performanceOverlayVisible",visible);
     std::ignore=send(std::move(event));
