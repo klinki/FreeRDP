@@ -462,6 +462,10 @@ typedef struct
 	UINT64 ackSent;
 	UINT64 ackvecSent;
 } RdpUdpStats;
+/* Socketless telemetry regressions; bind before feeding any packets. */
+FREERDP_API void rdpeudp_test_set_context(rdpUdpTransport* udp, rdpContext* context);
+FREERDP_API BOOL rdpeudp_test_seed_sent(rdpUdpTransport* udp, UINT16 dataSeq, UINT16 channelSeq);
+FREERDP_API BOOL rdpeudp_test_get_stats(const rdpUdpTransport* udp, RdpUdpStats* stats);
 
 FREERDP_LOCAL BOOL rdpeudp_send_keepalive(rdpUdpTransport* udp);
 FREERDP_LOCAL BOOL rdpeudp_check_keepalive(rdpUdpTransport* udp, DWORD idleMs);
