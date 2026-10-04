@@ -691,7 +691,9 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 {
 	/* In fullscreen the monitor kept the size measured with the probe window at startup and was
 	 * never updated, so a session the server started at another size stayed that way. Only the
-	 * window knows its real size, so ask it in fullscreen as well. */
+	 * window knows its real size, so ask it in fullscreen as well. On notched Macs the
+	 * fullscreen content is also shorter than the display bounds. Multimon retains each
+	 * physical display's geometry during window migration. */
 	if (freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon))
 		return true;
 
