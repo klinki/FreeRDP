@@ -443,8 +443,7 @@ UINT sdlDispContext::DisplayControlCaps(UINT32 maxNumMonitors, UINT32 maxMonitor
 	{
 		/* Window events have long passed by the time the channel comes up, and a fullscreen
 		 * window produces no further ones, so send the layout now. */
-		std::ignore = addTimer();
-		return CHANNEL_RC_OK;
+		return addTimer() ? CHANNEL_RC_OK : CHANNEL_RC_NO_MEMORY;
 	}
 
 	WLog_DBG(TAG, "DisplayControlCapsPdu: setting the window as resizable");
