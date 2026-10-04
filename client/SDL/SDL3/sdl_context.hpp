@@ -150,6 +150,7 @@ class SdlContext
 	[[nodiscard]] bool addDisplayWindow(SDL_DisplayID id);
 	[[nodiscard]] bool removeDisplayWindow(SDL_DisplayID id);
 	[[nodiscard]] bool detectDisplays();
+	[[nodiscard]] bool refreshDisplayWindows();
 	[[nodiscard]] rdpMonitor getDisplay(SDL_DisplayID id) const;
 	[[nodiscard]] std::vector<SDL_DisplayID> getDisplayIds() const;
 	[[nodiscard]] bool parseMonitorScaleOverrides(const char* value);
@@ -243,8 +244,7 @@ class SdlContext
 	[[nodiscard]] bool hasTopBarCapture(bool local) const;
 	[[nodiscard]] bool redrawWindows();
 
-	void addOrUpdateDisplay(SDL_DisplayID id);
-	void deleteDisplay(SDL_DisplayID id);
+	void updateDisplayOffsets();
 
 	[[nodiscard]] bool createPrimary();
 	[[nodiscard]] std::string windowTitle() const;
