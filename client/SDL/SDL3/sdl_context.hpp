@@ -17,6 +17,7 @@
  * limitations under the License.
  */
 #pragma once
+#include <freerdp/performance.h>
 
 #include <array>
 #include <map>
@@ -129,11 +130,12 @@ class SdlContext
 	[[nodiscard]] bool shallAbort(bool ignoreDialogs = false);
 
 	[[nodiscard]] bool createWindows();
+	void servicePerformance();
 	[[nodiscard]] bool updateWindowList();
 	[[nodiscard]] bool updateWindow(SDL_WindowID id);
 
-	[[nodiscard]] bool drawToWindows(const std::vector<SDL_Rect>& rects = {});
-	[[nodiscard]] bool drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& rects = {});
+	[[nodiscard]] bool drawToWindows(const std::vector<SDL_Rect>& rects = {}, bool remoteContent = false);
+	[[nodiscard]] bool drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& rects = {}, bool remoteContent = false);
 	[[nodiscard]] bool minimizeAllWindows();
 	[[nodiscard]] int exitCode() const;
 	[[nodiscard]] const std::string& exitDetail() const
@@ -241,6 +243,8 @@ class SdlContext
 	[[nodiscard]] const TopBarPointerCapture* topBarCapture(Uint8 button) const;
 	[[nodiscard]] bool hasTopBarCapture(bool local) const;
 	[[nodiscard]] bool redrawWindows();
+	bool performanceButton(const SDL_MouseButtonEvent& event);
+	bool performanceMotion(const SDL_MouseMotionEvent& event);
 
 	void updateDisplayOffsets();
 
@@ -295,6 +299,14 @@ class SdlContext
 		}
 	};
 	QueueAccum _queueAccum;
+    QueueAccum _performanceQueue;
+    bool _performanceEnabled=false,_performanceOverlayVisible=false;
+    unsigned _performanceAppliedMask=0;
+    uint64_t _performanceAppliedGeneration=0;
+    uint64_t _performanceLastNs=0,_performanceSequence=0;
+    rdpPerformanceSnapshot _performancePrevious{};
+    SDL_WindowID _performanceCapture=0;
+    bool _performanceOrphanCapture=false;
 	uint64_t _queueIntervalStartNs = 0;
 	uint32_t _yuvLastTiles = 0;
 	uint32_t _yuvLastCreated = 0;

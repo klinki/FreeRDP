@@ -44,7 +44,7 @@ namespace
 	constexpr const char* bridgeCapabilities[] = {
 		"auth", "certificate", "focus", "retry", "display_uuid", "per_monitor_scaling",
 		"dynamic_resolution", "multimon", "close_confirmation", "session_thumbnail",
-		"dock_accessory", "primary_monitor", "reverse_mouse_wheel"
+		"dock_accessory", "primary_monitor", "reverse_mouse_wheel", "performance_monitoring", "performance_overlay_styles"
 	};
 	// The nonconnecting query and the live handshake must advertise the same features.
 	bool addCapabilities(WINPR_JSON* message)
@@ -324,24 +324,42 @@ void SdlLauncher::writeLoop()
 	while (!_closing)
 	{
 		std::string frame;
+		bool telemetry=false;
 		{
 			std::unique_lock lock(_mutex);
-			_condition.wait(lock, [&] { return _closing || !_outbound.empty(); });
+			_condition.wait(lock, [&] { return _closing || !_outbound.empty() || _performancePending != nullptr; });
 			if (_closing)
 				break;
-			frame = std::move(_outbound.front());
-			_outbound.pop_front();
+            if(!_outbound.empty()) {
+                frame = std::move(_outbound.front()); _outbound.pop_front();
+            } else {
+                telemetry=true;
+                auto event=std::move(_performancePending);
+                lock.unlock();
+                std::unique_ptr<char,decltype(&free)> encoded(WINPR_JSON_PrintUnformatted(event.get()),free);
+                if(!encoded) continue;
+                frame=std::string(encoded.get())+"\n"; lock.lock();
+            }
 			_writing = true;
 		}
 		size_t offset = 0;
 		auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
 		while (!_closing && offset < frame.size())
 		{
+            if(telemetry && offset==0) {
+                std::lock_guard lock(_mutex);
+                if(!_outbound.empty()) break;
+            }
 			pollfd fd{ _fd, POLLOUT, 0 };
 			const int ready = poll(&fd, 1, 100);
 			if (ready < 0 && errno == EINTR)
 				continue;
-			if (ready < 0 || std::chrono::steady_clock::now() > deadline)
+            if(telemetry && std::chrono::steady_clock::now()>deadline) {
+                if(offset==0) break;
+                // Finish an already-started frame without holding producer locks.
+                deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
+            }
+			if (ready < 0 || (!telemetry && std::chrono::steady_clock::now() > deadline))
 			{
 				cancel();
 				break;
@@ -417,6 +435,23 @@ bool SdlLauncher::receive(Json event)
 	if (str(event.get(), "sessionId") != _sessionId)
 		return true;
 	const auto type = str(event.get(), "type");
+    if(type == "performance_control") {
+        const auto enabled=item(event.get(),"performanceEnabled");
+        const auto overlay=item(event.get(),"performanceOverlayVisible");
+        if(!_performanceAvailable || !WINPR_JSON_IsBool(enabled) || !WINPR_JSON_IsBool(overlay)) return false;
+        const bool on=WINPR_JSON_IsTrue(enabled),show=WINPR_JSON_IsTrue(overlay);
+        if(show && !on) return false;
+        const auto generation=item(event.get(),"performanceGeneration");
+        if(generation && (!WINPR_JSON_IsNumber(generation) || WINPR_JSON_GetNumberValue(generation)<0 ||
+            !std::isfinite(WINPR_JSON_GetNumberValue(generation)) || std::floor(WINPR_JSON_GetNumberValue(generation))!=WINPR_JSON_GetNumberValue(generation) ||
+            WINPR_JSON_GetNumberValue(generation)>9007199254740991.0)) return false;
+        const auto style=item(event.get(),"performanceOverlayStyle");
+        if(style && (!WINPR_JSON_IsString(style) ||
+            (str(event.get(),"performanceOverlayStyle")!="panel" && str(event.get(),"performanceOverlayStyle")!="quake"))) return false;
+        _performanceMask=(on?1U:0U)|(show?2U:0U)|(style && str(event.get(),"performanceOverlayStyle")=="quake" ? 4U:0U);
+        _performanceGeneration=generation?static_cast<uint64_t>(WINPR_JSON_GetNumberValue(generation)):0;
+        return true;
+    }
 	if (type == "cancel")
 	{
 		cancel();
@@ -472,6 +507,9 @@ bool SdlLauncher::receive(Json event)
 	std::lock_guard lock(_mutex);
 	if (type == "start")
 	{
+        const auto supported=item(event.get(),"performanceSupported");
+        if(supported && !WINPR_JSON_IsBool(supported)) return false;
+        _performanceAvailable=WINPR_JSON_IsTrue(supported);
 		if (_started)
 			return false;
 		const auto confirm = item(event.get(), "confirmSessionClose");
@@ -1051,4 +1089,21 @@ void SdlLauncher::serviceFocus()
 		std::ignore = SDL_RaiseWindow(windows[i]);
 	}
 	SDL_free(windows);
+}
+
+
+bool SdlLauncher::sendPerformance(Json event) {
+    std::lock_guard lock(_mutex);
+    if(_closing || _terminal || !_performanceAvailable) return false;
+    _performancePending=std::move(event); _condition.notify_all(); return true;
+}
+void SdlLauncher::requestPerformanceOverlay(bool visible) {
+    if(!_performanceAvailable) return;
+    if(visible) _performanceMask.fetch_or(3U); else _performanceMask.fetch_and(~2U);
+    auto event=message("performance_overlay_requested");
+    WINPR_JSON_AddBoolToObject(event.get(),"performanceOverlayVisible",visible);
+    std::ignore=send(std::move(event));
+}
+void SdlLauncher::requestPerformanceDetails() {
+    if(_performanceAvailable) std::ignore=send(message("performance_details_requested"));
 }

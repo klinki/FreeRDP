@@ -20,6 +20,7 @@
  */
 
 #include <freerdp/config.h>
+#include "../core/performance.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1149,10 +1150,13 @@ static BOOL gdi_surface_bits(rdpContext* context, const SURFACE_BITS_COMMAND* cm
 	{
 		case RDP_CODEC_ID_REMOTEFX:
 		case RDP_CODEC_ID_IMAGE_REMOTEFX:
-			if (!rfx_process_message(context->codecs->rfx, cmd->bmp.bitmapData,
+			const performanceDecodeToken rfxTiming = performance_decode_begin(context);
+			const BOOL rfxDecoded = rfx_process_message(context->codecs->rfx, cmd->bmp.bitmapData,
 			                         cmd->bmp.bitmapDataLength, cmdRect.left, cmdRect.top,
 			                         gdi->primary_buffer, gdi->dstFormat, gdi->stride,
-			                         WINPR_ASSERTING_INT_CAST(uint32_t, gdi->height), &region))
+			                         WINPR_ASSERTING_INT_CAST(uint32_t, gdi->height), &region);
+			performance_decode_end(context, rfxTiming, rfxDecoded, "RemoteFX (legacy)");
+			if (!rfxDecoded)
 			{
 				WLog_ERR(TAG, "Failed to process RemoteFX message");
 				goto out;
@@ -1163,12 +1167,15 @@ static BOOL gdi_surface_bits(rdpContext* context, const SURFACE_BITS_COMMAND* cm
 		case RDP_CODEC_ID_NSCODEC:
 			format = gdi->dstFormat;
 
-			if (!nsc_process_message(
+			const performanceDecodeToken nscTiming = performance_decode_begin(context);
+			const BOOL nscDecoded = nsc_process_message(
 			        context->codecs->nsc, cmd->bmp.bpp, cmd->bmp.width, cmd->bmp.height,
 			        cmd->bmp.bitmapData, cmd->bmp.bitmapDataLength, gdi->primary_buffer, format,
 			        gdi->stride, cmdRect.left, cmdRect.top,
 			        WINPR_ASSERTING_INT_CAST(UINT32, gdi->width),
-			        WINPR_ASSERTING_INT_CAST(UINT32, gdi->height), FREERDP_FLIP_VERTICAL))
+			        WINPR_ASSERTING_INT_CAST(UINT32, gdi->height), FREERDP_FLIP_VERTICAL);
+			performance_decode_end(context, nscTiming, nscDecoded, "NSCodec");
+			if (!nscDecoded)
 			{
 				WLog_ERR(TAG, "Failed to process NSCodec message");
 				goto out;

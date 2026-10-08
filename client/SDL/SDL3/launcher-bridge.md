@@ -14,7 +14,7 @@ file, or any other argument exits nonzero with no stdout. In a bridge-enabled
 build it writes exactly one JSON object and a newline to stdout, then exits 0:
 
 ```json
-{"schemaVersion":1,"client":"sdl3","engineVersion":"3.31.2-dev0","bridgeProtocolVersion":1,"capabilities":["auth","certificate","focus","retry","display_uuid","per_monitor_scaling","dynamic_resolution","multimon","close_confirmation","session_thumbnail","dock_accessory","primary_monitor","reverse_mouse_wheel","tls_keylog"]}
+{"schemaVersion":1,"client":"sdl3","engineVersion":"3.31.2-dev0","bridgeProtocolVersion":1,"capabilities":["auth","certificate","focus","retry","display_uuid","per_monitor_scaling","dynamic_resolution","multimon","close_confirmation","session_thumbnail","dock_accessory","primary_monitor","reverse_mouse_wheel","performance_monitoring","performance_overlay_styles","tls_keylog"]}
 ```
 
 `engineVersion` is the build's actual `freerdp_get_version_string()` value. The
@@ -109,6 +109,24 @@ windows already migrated by macOS, fallback to a remaining display, and a
 shutdown request surviving the abort-event reset performed by reconnect.
 Physical external-display disconnection was also verified with a live
 multimonitor session on macOS 26.7 on 2026-09-28.
+
+## Performance overlay styles
+
+The optional `performance_overlay_styles` capability extends monitoring controls
+with `performanceOverlayStyle: "panel" | "quake"`. Missing means Panel; malformed
+values are rejected. Collection/visibility/generation still use the existing
+`performance_control` fields. Switching only style retains metric baselines and
+cached readings, and applies to all session displays without reconnecting.
+Quake renders smaller outlined white text with a transparent background. Both
+styles retain local first-line/header dragging and Details/Hide actions; their
+repaints are not counted as newly displayed remote frames. Overlay style is
+in-memory session state controlled by Sheltie; older launchers keep Panel.
+
+`TestSDLPerformance --overlay-fixtures <existing-directory>` writes deterministic
+software-rendered Panel/Quake BMP fixtures for review. The normal regression
+covers transparency, glyph outlining, local actions, capture during style changes,
+position retention, density changes and clamping. `--benchmark` reports Off, Panel
+and Quake modes using the existing render workload.
 
 ## Monitor reconnection and rescaling
 

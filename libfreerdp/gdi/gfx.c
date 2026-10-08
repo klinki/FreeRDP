@@ -20,6 +20,7 @@
  */
 
 #include <freerdp/config.h>
+#include "../core/performance.h"
 
 #include "../core/update.h"
 
@@ -466,9 +467,11 @@ static UINT gdi_SurfaceCommand_AV1(rdpGdi* gdi, RdpgfxClientContext* context,
 		return ERROR_INTERNAL_ERROR;
 
 	meta = &(bs->meta);
+	const performanceDecodeToken timing = performance_decode_begin(gdi->context);
 	rc = freerdp_av1_decompress(surface->av1, bs->data, bs->length, surface->data, surface->format,
 	                            surface->scanline, surface->width, surface->height,
 	                            meta->regionRects, meta->numRegionRects);
+	performance_decode_end(gdi->context, timing, rc >= 0, "AV1");
 
 	if (rc < 0)
 	{
@@ -530,9 +533,12 @@ static UINT gdi_SurfaceCommand_RemoteFX(rdpGdi* gdi, RdpgfxClientContext* contex
 	rfx_context_set_pixel_format(surface->codecs->rfx, cmd->format);
 	region16_init(&invalidRegion);
 
-	if (!rfx_process_message(surface->codecs->rfx, cmd->data, cmd->length, cmd->left, cmd->top,
+	const performanceDecodeToken timing = performance_decode_begin(gdi->context);
+	const BOOL decoded = rfx_process_message(surface->codecs->rfx, cmd->data, cmd->length, cmd->left, cmd->top,
 	                         surface->data, surface->format, surface->scanline, surface->height,
-	                         &invalidRegion))
+	                         &invalidRegion);
+	performance_decode_end(gdi->context, timing, decoded, "RemoteFX");
+	if (!decoded)
 	{
 		WLog_ERR(TAG, "Failed to process RemoteFX message");
 		goto fail;
@@ -588,9 +594,11 @@ static UINT gdi_SurfaceCommand_ClearCodec(rdpGdi* gdi, RdpgfxClientContext* cont
 		return ERROR_INVALID_DATA;
 
 	WINPR_ASSERT(surface->codecs);
+	const performanceDecodeToken timing = performance_decode_begin(gdi->context);
 	rc = clear_decompress(surface->codecs->clear, cmd->data, cmd->length, cmd->width, cmd->height,
 	                      surface->data, surface->format, surface->scanline, cmd->left, cmd->top,
 	                      surface->width, surface->height, &gdi->palette);
+	performance_decode_end(gdi->context, timing, rc >= 0, "ClearCodec");
 
 	if (rc < 0)
 	{
@@ -647,10 +655,13 @@ static UINT gdi_SurfaceCommand_Planar(rdpGdi* gdi, RdpgfxClientContext* context,
 	if (!is_within_surface(surface, cmd))
 		return ERROR_INVALID_DATA;
 
-	if (!freerdp_bitmap_decompress_planar(surface->codecs->planar, cmd->data, cmd->length,
+	const performanceDecodeToken timing = performance_decode_begin(gdi->context);
+	const BOOL decoded = freerdp_bitmap_decompress_planar(surface->codecs->planar, cmd->data, cmd->length,
 	                                      cmd->width, cmd->height, DstData, surface->format,
 	                                      surface->scanline, cmd->left, cmd->top, cmd->width,
-	                                      cmd->height, FALSE))
+	                                      cmd->height, FALSE);
+	performance_decode_end(gdi->context, timing, decoded, "Planar");
+	if (!decoded)
 		return ERROR_INTERNAL_ERROR;
 
 	invalidRect.left = (UINT16)MIN(UINT16_MAX, cmd->left);
@@ -725,9 +736,11 @@ static UINT gdi_SurfaceCommand_AVC420(rdpGdi* gdi, RdpgfxClientContext* context,
 		return ERROR_INTERNAL_ERROR;
 
 	meta = &(bs->meta);
+	const performanceDecodeToken timing = performance_decode_begin(gdi->context);
 	rc = avc420_decompress(surface->h264, bs->data, bs->length, surface->data, surface->format,
 	                       surface->scanline, surface->width, surface->height, meta->regionRects,
 	                       meta->numRegionRects);
+	performance_decode_end(gdi->context, timing, rc >= 0, "H.264 AVC420");
 
 	if (rc < 0)
 	{
@@ -817,10 +830,12 @@ static UINT gdi_SurfaceCommand_AVC444(rdpGdi* gdi, RdpgfxClientContext* context,
 	avc2 = &bs->bitstream[1];
 	meta1 = &avc1->meta;
 	meta2 = &avc2->meta;
+	const performanceDecodeToken timing = performance_decode_begin(gdi->context);
 	rc = avc444_decompress(surface->h264, bs->LC, meta1->regionRects, meta1->numRegionRects,
 	                       avc1->data, avc1->length, meta2->regionRects, meta2->numRegionRects,
 	                       avc2->data, avc2->length, surface->data, surface->format,
 	                       surface->scanline, surface->width, surface->height, cmd->codecId);
+	performance_decode_end(gdi->context, timing, rc >= 0, "H.264 AVC444");
 
 	if (rc < 0)
 	{
@@ -1113,9 +1128,11 @@ static UINT gdi_SurfaceCommand_Progressive(rdpGdi* gdi, RdpgfxClientContext* con
 
 	region16_init(&invalidRegion);
 
+	const performanceDecodeToken timing = performance_decode_begin(gdi->context);
 	rc = progressive_decompress(surface->codecs->progressive, cmd->data, cmd->length, surface->data,
 	                            surface->format, surface->scanline, cmd->left, cmd->top,
 	                            &invalidRegion, surfaceId, gdi->frameId);
+	performance_decode_end(gdi->context, timing, rc >= 0, "RemoteFX Progressive");
 
 	if (rc < 0)
 	{
