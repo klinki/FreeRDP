@@ -37,6 +37,7 @@
 
 #include "udp.h"
 #include "rdpeudp.h"
+#include "performance.h"
 #include "tcp.h"
 #include "multitransport.h"
 #include "../crypto/tls.h"
@@ -948,6 +949,7 @@ typedef struct
 {
 	UINT16 dataSeq;
 	UINT16 channelSeq;
+	BOOL lossReported;
 	BYTE* data;
 	size_t len;
 	UINT64 sentTs;
@@ -1290,6 +1292,7 @@ rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port
 
 void rdpeudp_free(rdpUdpTransport* udp)
 {
+	if (udp && udp->connected) performance_udp_connected(udp->context, FALSE);
 	if (!udp)
 		return;
 
@@ -1701,12 +1704,29 @@ static BOOL rdpeudp_udp_send_stream(rdpUdpTransport* udp, wStream* s)
 		return FALSE;
 	const SSIZE_T sent = udp->testSend ? udp->testSend(udp->testSendContext, data, len)
 	                                   : freerdp_udp_send(udp->sockfd, data, len);
+	if (sent > 0) performance_account(udp->context, TRUE, TRUE, (size_t)sent);
 	if (sent != (SSIZE_T)len)
 		return FALSE;
+	performance_udp_stats(udp->context, 1, 0, 0, 0);
 	udp->lastSendTs = udp_now_ms();
 	return TRUE;
 }
 
+static void rdpeudp_note_loss_report_locked(rdpUdpTransport* udp, UINT16 dseq)
+{
+    // A negative ACK is an observation, not proof of permanent packet loss.
+    // Count it once per outstanding transmission, including across repeated ACK vectors.
+    for (size_t i = 0; i < ARRAYSIZE(udp->sent); i++)
+    {
+        if (udp->sent[i].data && udp->sent[i].dataSeq == dseq && !udp->sent[i].lossReported)
+        {
+            udp->sent[i].lossReported = TRUE;
+            udp->stats.lostDetected++;
+            performance_udp_stats(udp->context, 0, 0, 0, 1);
+            break;
+        }
+    }
+}
 static void rdpeudp_ack_single_locked(rdpUdpTransport* udp, UINT16 dseq)
 {
 	/* Find ChannelSeq for this DataSeq, then free all attempts with same ChannelSeq
@@ -2033,10 +2053,9 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 				{
 					if (received[si])
 						rdpeudp_ack_single_locked(udp, (UINT16)(base + si));
-					else if (count > 7)
-						udp->stats.lostDetected += 0; /* counted per-run below */
+					else
+                        rdpeudp_note_loss_report_locked(udp, (UINT16)(base + si));
 				}
-				/* Count loss runs for stats (RLE not expanded here in detail). */
 				free(received);
 			}
 			else
@@ -2198,6 +2217,7 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 {
 	BYTE buf[FREERDP_UDP_MAX_DATAGRAM] = { 0 };
 	const SSIZE_T r = freerdp_udp_recv(udp->sockfd, buf, sizeof(buf), timeoutMs);
+	if (r > 0) { performance_account(udp->context, TRUE, FALSE, (size_t)r); performance_udp_stats(udp->context, 0, 1, 0, 0); }
 	if (r <= 0)
 		return FALSE;
 	udp->lastRecvTs = udp_now_ms();
@@ -2498,7 +2518,8 @@ BOOL rdpeudp_connect(rdpUdpTransport* udp, DWORD timeoutMs)
 		 * handshake. The accept path tolerates a missing final ACK
 		 * symmetrically (it also completes on first v2 DATA). */
 
-		udp->connected = TRUE;
+		if (!udp->connected) performance_udp_connected(udp->context, TRUE);
+	udp->connected = TRUE;
 		udp->useUdp2 = TRUE;
 		udp->lastRecvTs = udp_now_ms();
 		udp->lastSendTs = udp->lastRecvTs;
@@ -2577,6 +2598,7 @@ static BOOL rdpeudp2_wait_acked(rdpUdpTransport* udp, UINT16 channelSeq, DWORD t
 					udp->sent[freeSlot].data = copy;
 					udp->sent[freeSlot].len = udp->sent[i].len;
 					udp->sent[freeSlot].dataSeq = newDseq;
+					udp->sent[freeSlot].lossReported = FALSE;
 					udp->sent[freeSlot].channelSeq = channelSeq;
 					udp->sent[freeSlot].sentTs = now;
 					udp->sent[freeSlot].retries = udp->sent[i].retries + 1;
@@ -2609,7 +2631,8 @@ static BOOL rdpeudp2_wait_acked(rdpUdpTransport* udp, UINT16 channelSeq, DWORD t
 					    FALSE);
 					if (rs)
 					{
-						(void)rdpeudp_udp_send_stream(udp, rs);
+                        if (rdpeudp_udp_send_stream(udp, rs))
+                            performance_udp_stats(udp->context, 0, 0, 1, 0);
 						Stream_Release(rs);
 					}
 					EnterCriticalSection(&udp->lock);
@@ -2707,6 +2730,7 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 		memcpy(udp->sent[slot].data, data + off, chunk);
 		udp->sent[slot].len = chunk;
 		udp->sent[slot].dataSeq = dseq;
+		udp->sent[slot].lossReported = FALSE;
 		udp->sent[slot].channelSeq = cseq;
 		udp->sent[slot].sentTs = udp_now_ms();
 		udp->sent[slot].retries = 0;
@@ -3424,6 +3448,37 @@ BOOL rdpeudp_get_stats(const rdpUdpTransport* udp, RdpUdpStats* stats)
 	return TRUE;
 }
 
+void rdpeudp_test_set_context(rdpUdpTransport* udp, rdpContext* context)
+{
+    if (udp && context) udp->context = context;
+}
+BOOL rdpeudp_test_seed_sent(rdpUdpTransport* udp, UINT16 dataSeq, UINT16 channelSeq)
+{
+    if (!udp) return FALSE;
+    EnterCriticalSection(&udp->lock);
+    for (size_t i = 0; i < ARRAYSIZE(udp->sent); i++)
+    {
+        if (!udp->sent[i].data)
+        {
+            BYTE* data = calloc(1, 1);
+            if (!data) { LeaveCriticalSection(&udp->lock); return FALSE; }
+            memset(&udp->sent[i], 0, sizeof(udp->sent[i]));
+            udp->sent[i].data = data;
+            udp->sent[i].len = 1;
+            udp->sent[i].dataSeq = dataSeq;
+            udp->sent[i].channelSeq = channelSeq;
+            udp->sentCount++;
+            LeaveCriticalSection(&udp->lock);
+            return TRUE;
+        }
+    }
+    LeaveCriticalSection(&udp->lock);
+    return FALSE;
+}
+BOOL rdpeudp_test_get_stats(const rdpUdpTransport* udp, RdpUdpStats* stats)
+{
+    return rdpeudp_get_stats(udp, stats);
+}
 int rdpeudp_get_sockfd(const rdpUdpTransport* udp)
 {
 	return udp ? udp->sockfd : -1;
@@ -3862,6 +3917,7 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 
 	udp->peerInitialSeq = peerSeq;
 	udp->negotiatedVer = RDPUDP_PROTOCOL_VERSION_3;
+	if (!udp->connected) performance_udp_connected(udp->context, TRUE);
 	udp->connected = TRUE;
 	udp->useUdp2 = TRUE;
 	udp->lastRecvTs = udp_now_ms();

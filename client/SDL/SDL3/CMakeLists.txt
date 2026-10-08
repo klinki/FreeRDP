@@ -66,6 +66,7 @@ set(SRCS
     sdl_wayland.cpp
     sdl_x11.hpp
     sdl_x11.cpp
+    sdl_performance.cpp
 )
 
 # Native X11 helpers for RAIL (_NET_WM_MOVERESIZE, compositor detection); no-op stubs without libX11.
@@ -260,6 +261,12 @@ if(SDL_LAUNCHER_TEST AND APPLE)
 
   set(SDL_MONITOR_TEST_SRCS ${SRCS})
   list(REMOVE_ITEM SDL_MONITOR_TEST_SRCS sdl_freerdp.cpp)
+  add_executable(TestSDLPerformance test/TestSDLPerformance.cpp ${SDL_MONITOR_TEST_SRCS} ../../../libfreerdp/core/performance.c)
+  target_include_directories(TestSDLPerformance PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(TestSDLPerformance PRIVATE ${LIBS})
+  add_test(NAME TestSDLPerformance COMMAND TestSDLPerformance)
+  set_tests_properties(TestSDLPerformance PROPERTIES TIMEOUT 30)
+
   add_executable(TestSDLMonitorDetection test/TestSDLMonitorDetection.cpp ${SDL_MONITOR_TEST_SRCS})
   target_include_directories(TestSDLMonitorDetection PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
   target_link_libraries(TestSDLMonitorDetection PRIVATE ${LIBS})
