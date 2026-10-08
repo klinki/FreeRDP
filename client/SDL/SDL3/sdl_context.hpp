@@ -62,6 +62,10 @@ class SdlContext
 	SdlContext& operator=(SdlContext&& other) = delete;
 
 	[[nodiscard]] bool redraw(bool suppress = false) const;
+	/* SDL thread: repaint cached pixels and queue a coalesced server refresh. */
+	void requestScreenRefresh();
+	/* RDP thread: send queued refreshes using the current desktop dimensions. */
+	void serviceScreenRefresh();
 
 	void setConnected(bool val);
 	[[nodiscard]] bool isConnected() const;
@@ -198,6 +202,7 @@ class SdlContext
 	void setCredentialsRead();
 
   private:
+	friend struct SdlScreenRefreshFixture; // Inject completed pixels in the rendering regression.
 	[[nodiscard]] bool resizeToScale(SdlWindow* window);
 	[[nodiscard]] bool useLocalScale() const;
 
@@ -363,6 +368,7 @@ class SdlContext
 	uint32_t _windowWidth = 0;
 	uint32_t _windowHeight = 0;
 	WinPREvent _windowsCreatedEvent;
+	WinPREvent _screenRefreshEvent;
 	std::thread _thread;
 	std::vector<COMMAND_LINE_ARGUMENT_A> _args;
 	std::vector<rdpPointer*> _valid_pointers;

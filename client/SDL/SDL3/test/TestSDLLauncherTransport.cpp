@@ -201,6 +201,34 @@ namespace
 		}
 		SDL_Quit();
 	}
+    void screenRefresh()
+    {
+        Connection c;
+        c.command("start", ",\"arguments\":[],\"displaySelections\":[],\"performanceSupported\":true");
+        eventually([&] { return c.bridge->performanceAvailable(); }, "Start not applied");
+        unsigned generation = 0;
+        const auto barrier = [&] {
+            ++generation;
+            c.command("performance_control", ",\"performanceEnabled\":false,\"performanceOverlayVisible\":false,\"performanceGeneration\":" + std::to_string(generation));
+            eventually([&] { return c.bridge->performanceGeneration() == generation; }, "Reader barrier not applied");
+        };
+        c.command("refresh_screen"); barrier();
+        require(!c.bridge->takeScreenRefreshRequest(), "Refresh accepted before connected");
+        c.bridge->state("connected"); std::ignore = c.next();
+        c.write("{\"v\":1,\"type\":\"refresh_screen\",\"sessionId\":\"stale\"}\n"); barrier();
+        require(!c.bridge->takeScreenRefreshRequest(), "Stale session refresh accepted");
+        c.command("refresh_screen"); c.command("refresh_screen"); barrier();
+        require(c.bridge->takeScreenRefreshRequest() && !c.bridge->takeScreenRefreshRequest(), "Refresh requests did not coalesce");
+        c.command("refresh_screen"); barrier();
+        c.bridge->state("reconnecting"); std::ignore = c.next();
+        require(!c.bridge->takeScreenRefreshRequest(), "Pending refresh survived reconnect");
+        c.command("refresh_screen"); barrier();
+        c.bridge->state("connected"); std::ignore = c.next();
+        require(!c.bridge->takeScreenRefreshRequest(), "Reconnecting refresh replayed after recovery");
+        c.command("refresh_screen"); barrier(); c.command("cancel");
+        eventually([&] { return c.bridge->cancelled(); }, "Cancel not applied");
+        require(!c.bridge->takeScreenRefreshRequest(), "Cancelled refresh was delivered");
+    }
 	void closeConfirmation()
 	{
 		Connection c;
@@ -666,6 +694,7 @@ int main()
 		reconnectPolicyExclusions();
 		performanceOverlayStyles();
 		windowGeometryOptions();
+		screenRefresh();
 		closeConfirmation();
 		closeCancellationAndEOF();
 		thumbnailBoundsAndDisable();
