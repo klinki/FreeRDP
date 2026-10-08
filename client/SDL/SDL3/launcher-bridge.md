@@ -151,3 +151,22 @@ scale preservation, ambiguity and fallback selection. `TestSDLFullscreenResize`
 checks deferred refresh, fresh dimensions, saved DPI, layout deduplication, forced
 same-layout rescaling and main-thread sends. Physical dock/cable unplug and replug
 still requires verification on a real multimonitor Windows session.
+
+## Manual screen refresh
+
+The additive `screen_refresh` capability advertises the launcher-to-engine
+`refresh_screen` message (version 1, matching session ID, no additional fields).
+Only connected sessions accept it. Reader requests coalesce in an atomic flag;
+the SDL thread consumes the flag and re-uploads cached pixels for every session
+window. The same operation is available directly from the circular-arrow top-bar
+button, with a Refresh screen hover label, even without a launcher bridge.
+
+A dedicated event wakes the RDP connection thread to send a Refresh Rect PDU
+covering `(0, 0)` through `(desktopWidth - 1, desktopHeight - 1)`. Dimensions are
+read at send time; server capability and 16-bit bounds are checked. Disconnected,
+reconnecting, and cancelled requests are discarded. Local repaint is still useful
+when the server does not support Refresh Rect. Failures log warnings without
+directly ending the session; normal transport recovery remains in charge. No
+remote input, resolution change, output suppression, codec reset, or reconnect is
+performed. Recovery of intermittent real-server black regions remains to be
+validated during an occurrence.

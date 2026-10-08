@@ -183,6 +183,12 @@ if(SDL_LAUNCHER_TEST AND APPLE)
 
   set(SDL_MONITOR_TEST_SRCS ${SRCS})
   list(REMOVE_ITEM SDL_MONITOR_TEST_SRCS sdl_freerdp.cpp)
+  add_executable(TestSDLScreenRefresh test/TestSDLScreenRefresh.cpp ${SDL_MONITOR_TEST_SRCS})
+  target_include_directories(TestSDLScreenRefresh PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(TestSDLScreenRefresh PRIVATE ${LIBS})
+  add_test(NAME TestSDLScreenRefresh COMMAND TestSDLScreenRefresh)
+  set_tests_properties(TestSDLScreenRefresh PROPERTIES TIMEOUT 30)
+
   add_executable(TestSDLPerformance test/TestSDLPerformance.cpp ${SDL_MONITOR_TEST_SRCS} ../../../libfreerdp/core/performance.c)
   target_include_directories(TestSDLPerformance PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
   target_link_libraries(TestSDLPerformance PRIVATE ${LIBS})

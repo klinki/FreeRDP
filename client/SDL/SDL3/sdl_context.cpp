@@ -890,14 +890,15 @@ int SdlContext::sdl_client_thread_run(std::string& error_msg)
 			    }
 		    }
 		    HANDLE handles[MAXIMUM_WAIT_OBJECTS] = {};
-		    const DWORD count = freerdp_get_event_handles(context(), handles, ARRAYSIZE(handles));
+		    const DWORD count = freerdp_get_event_handles(context(), handles, ARRAYSIZE(handles) - 1);
 		    if (count == 0)
 		    {
 			    WLog_Print(getWLog(), WLOG_ERROR, "freerdp_get_event_handles failed");
 			    return freerdp_get_last_error(context()) == FREERDP_ERROR_CONNECT_TRANSPORT_FAILED
 			               ? SdlSessionStep::TransportFailure : SdlSessionStep::LocalFailure;
 		    }
-		    if (WaitForMultipleObjects(count, handles, FALSE, INFINITE) == WAIT_FAILED)
+		    handles[count] = _screenRefreshEvent.handle();
+		    if (WaitForMultipleObjects(count + 1, handles, FALSE, INFINITE) == WAIT_FAILED)
 		    {
 			    WLog_Print(getWLog(), WLOG_ERROR, "WaitForMultipleObjects WAIT_FAILED");
 			    return SdlSessionStep::LocalFailure;
@@ -909,6 +910,7 @@ int SdlContext::sdl_client_thread_run(std::string& error_msg)
 			    WLog_Print(getWLog(), WLOG_DEBUG, "Reconnect checkpoint: event processing failed");
 			    return SdlSessionStep::TransportFailure;
 		    }
+		    serviceScreenRefresh();
 		    return SdlSessionStep::Continue;
 	    },
 	    [this, instance, &stopped]() {
@@ -1770,6 +1772,9 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
                 if(auto bridge=SdlLauncher::active()) bridge->requestPerformanceOverlay((bridge->performanceMask()&2)==0);
 #endif
                 break;
+			case SdlTopBarButton::Refresh:
+				requestScreenRefresh();
+				break;
 			case SdlTopBarButton::Compact:
 			{
 				/* Test toggle between the normal (3/4) and compact (1/2)
@@ -2451,9 +2456,45 @@ bool SdlContext::redraw(bool suppress) const
 	return gdi_send_suppress_output(gdi, suppress);
 }
 
+void SdlContext::requestScreenRefresh()
+{
+	if (!isConnected() || isReconnecting() || _stopRequested)
+		return;
+	/* Wake the RDP thread even if the local repaint fails. Repainting cannot
+	 * replace black/stale pixels already present in the desktop buffer. */
+	_screenRefreshEvent.set();
+	if (!redrawWindows())
+		WLog_Print(_log, WLOG_WARN, "Unable to repaint the session during screen refresh");
+}
+
+void SdlContext::serviceScreenRefresh()
+{
+	if (!_screenRefreshEvent.isSet())
+		return;
+	_screenRefreshEvent.clear();
+	if (!isConnected() || isReconnecting() || _stopRequested)
+		return;
+	const auto settings = context()->settings;
+	if (!freerdp_settings_get_bool(settings, FreeRDP_RefreshRect))
+		return;
+	const auto width = freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth);
+	const auto height = freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight);
+	if (width == 0 || height == 0 || width - 1 > UINT16_MAX || height - 1 > UINT16_MAX)
+		return;
+	/* Refresh Rect uses inclusive coordinates in the composed RDP desktop,
+	 * not the Mac window geometry or individual monitor offsets. */
+	const RECTANGLE_16 area{ 0, 0, static_cast<UINT16>(width - 1),
+	                         static_cast<UINT16>(height - 1) };
+	const auto update = context()->update;
+	if (!update->RefreshRect || !update->RefreshRect(context(), 1, &area))
+		WLog_Print(_log, WLOG_WARN, "Unable to request a server screen refresh");
+}
+
 void SdlContext::setConnected(bool val)
 {
 	_connected = val;
+	if (!val)
+		_screenRefreshEvent.clear();
 }
 
 bool SdlContext::isConnected() const
@@ -2463,6 +2504,8 @@ bool SdlContext::isConnected() const
 
 void SdlContext::setReconnecting(bool val)
 {
+	if (val)
+		_screenRefreshEvent.clear();
 	if (_reconnecting.exchange(val) == val)
 		return;
 #ifdef WITH_SDL_LAUNCHER_BRIDGE

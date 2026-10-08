@@ -27,6 +27,7 @@ enum class SdlTopBarButton
 {
 	None,
 	Performance,
+	Refresh,
 	Compact,
 	Pin,
 	Minimize,

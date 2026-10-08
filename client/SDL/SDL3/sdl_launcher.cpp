@@ -44,7 +44,7 @@ namespace
 	constexpr const char* bridgeCapabilities[] = {
 		"auth", "certificate", "focus", "retry", "display_uuid", "per_monitor_scaling",
 		"dynamic_resolution", "multimon", "close_confirmation", "session_thumbnail",
-		"dock_accessory", "primary_monitor", "reverse_mouse_wheel", "performance_monitoring", "performance_overlay_styles"
+		"dock_accessory", "primary_monitor", "reverse_mouse_wheel", "performance_monitoring", "performance_overlay_styles", "screen_refresh"
 	};
 	// The nonconnecting query and the live handshake must advertise the same features.
 	bool addCapabilities(WINPR_JSON* message)
@@ -455,6 +455,12 @@ bool SdlLauncher::receive(Json event)
 	if (type == "cancel")
 	{
 		cancel();
+		return true;
+	}
+	if (type == "refresh_screen")
+	{
+		if (_connected && !_cancelled && !_terminal)
+			_screenRefresh = true;
 		return true;
 	}
 	if (type == "focus")
@@ -1009,6 +1015,8 @@ SSIZE_T SdlLauncher::retry(size_t current, const char* module)
 void SdlLauncher::state(const char* phase)
 {
 	_connected = strcmp(phase, "connected") == 0;
+	if (!_connected)
+		_screenRefresh = false;
 	if (strcmp(phase, "connected") == 0)
 	{
 		_hadConnected = true;

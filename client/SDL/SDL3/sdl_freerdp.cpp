@@ -182,7 +182,12 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 			sdl->getDisplayChannelContext().service();
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 			if (auto bridge = SdlLauncher::active())
-				{bridge->serviceFocus(); sdl->servicePerformance();}
+			{
+				bridge->serviceFocus();
+				if (bridge->takeScreenRefreshRequest())
+					sdl->requestScreenRefresh();
+				sdl->servicePerformance();
+			}
 #endif
 			SDL_Event windowEvent = {};
 			while (!sdl->shallAbort() && SDL_WaitEventTimeout(nullptr, 1000))
@@ -190,7 +195,12 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 				sdl->getDisplayChannelContext().service();
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 				if (auto bridge = SdlLauncher::active())
-					{bridge->serviceFocus(); sdl->servicePerformance();}
+				{
+					bridge->serviceFocus();
+					if (bridge->takeScreenRefreshRequest())
+						sdl->requestScreenRefresh();
+					sdl->servicePerformance();
+				}
 #endif
 				/* Only poll standard SDL events and SDL_EVENT_USERS meant to create
 				 * dialogs. do not process the dialog return value events here.
