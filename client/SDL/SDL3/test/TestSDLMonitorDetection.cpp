@@ -31,6 +31,7 @@ static bool hotplug(SdlContext& sdl, SDL_DisplayID display)
 	auto settings = sdl.context()->settings;
 	if (!freerdp_settings_set_string(settings, FreeRDP_ServerHostname,
 	                                "monitor-regression.invalid") ||
+	    !freerdp_settings_set_bool(settings, FreeRDP_Fullscreen, TRUE) ||
 	    !freerdp_settings_set_bool(settings, FreeRDP_DynamicResolutionUpdate, TRUE))
 		return false;
 	// These changes can already be queued when SDL removes the display.
@@ -111,11 +112,30 @@ static bool hotplug(SdlContext& sdl, SDL_DisplayID display)
 		return false;
 	if (!expect(sdl.updateWindowList(), "fallback monitor layout"))
 		return false;
+	auto fallback = sdl.getFirstWindow();
+	std::ignore = SDL_SyncWindow(fallback->window());
+	// Showing the new fullscreen window can complete after topology refresh.
+	// Its later drawable-size notification must refine the fallback definition.
+	SDL_WindowEvent resized{};
+	resized.type = SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED;
+	resized.windowID = fallback->id();
+	if (!sdl.getDisplayChannelContext().handleEvent(resized))
+		return false;
 	auto monitor = static_cast<const rdpMonitor*>(
 	    freerdp_settings_get_pointer(settings, FreeRDP_MonitorDefArray));
+	const auto pixels = fallback->rect();
+	printf("Fallback drawable: %dx%d pixels\n", pixels.w, pixels.h);
+	printf("Fallback window display: %u; physical owner: %u; fullscreen: %d\n",
+	       fallback->displayIndex(), fallback->monitor(false).orig_screen,
+	       (SDL_GetWindowFlags(fallback->window()) & SDL_WINDOW_FULLSCREEN) != 0);
+	printf("Fallback layout: %dx%d pixels\n", monitor->width, monitor->height);
 	return expect(freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount) == 1 &&
 	              monitor && monitor->is_primary && monitor->x == 0 && monitor->y == 0,
-	              "fallback layout has one primary monitor at the origin");
+	              "fallback layout has one primary monitor at the origin") &&
+	       expect(monitor->width == pixels.w && monitor->height == pixels.h &&
+	                  monitor->attributes.physicalWidth == static_cast<UINT32>(pixels.w) &&
+	                  monitor->attributes.physicalHeight == static_cast<UINT32>(pixels.h),
+	              "two removed-monitor windows produce a fallback layout matching drawable pixels");
 }
 
 static bool primarySelection(SdlContext& sdl)
@@ -260,7 +280,16 @@ static bool run()
 			return false;
 	}
 
-	if (!stableSelections() || !hotplug(sdl, displays.front()) || !primarySelection(sdl))
+	auto display = displays.front();
+	for (const auto id : displays)
+	{
+		const auto name = SDL_GetDisplayName(id);
+		if (name && SDL_strstr(name, "Built-in"))
+			display = id;
+	}
+	printf("Fallback display: %s\n", SDL_GetDisplayName(display));
+	if (!sdl.setHotplugMonitorSelection({ display }, {}) || !stableSelections() ||
+	    !hotplug(sdl, display) || !primarySelection(sdl))
 		return false;
 
 	const UINT32 selected = displays.front();
@@ -279,9 +308,10 @@ static bool run()
 	return true;
 }
 
-int main()
+int main(int argc, char**)
 {
-	SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
+	if (argc == 1)
+		SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
 	{
 		fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
