@@ -36,6 +36,7 @@ typedef struct
 {
 	UINT16 dataSeq;
 	UINT16 channelSeq;
+	BYTE logWindow;
 	UINT64 time;
 	size_t len;
 	BYTE payload[RDPUDP2_MAX_PAYLOAD];
@@ -85,6 +86,7 @@ static SSIZE_T send_capture(void* context, const BYTE* data, size_t len)
 	SendPacket* saved = &fixture->packets[fixture->count++];
 	saved->dataSeq = layout.dataSeq;
 	saved->channelSeq = layout.channelSeq;
+	saved->logWindow = layout.logWindow;
 	saved->time = fixture->now;
 	saved->len = layout.dataBodyLen;
 	memcpy(saved->payload, layout.dataBody, layout.dataBodyLen);
@@ -396,9 +398,11 @@ static BOOL test_send_window_shrink_with_loss(void)
 static BOOL test_send_window_storage_cap(void)
 {
 	BYTE bytes[80] = { 0 };
-	SendFixture* fixture = send_fixture_new(1, 10, 10, 1, 1);
+	SendFixture* fixture = send_fixture_new(1, 10, 15, 1, 1);
 	RdpUdpTestSendState state = { 0 };
 	SEND_CHECK(fixture);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) &&
+	           state.localLogWindow == 10 && state.peerLogWindow == 15 && state.sendWindow == 63);
 	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, sizeof(bytes)) ==
 	           (SSIZE_T)sizeof(bytes));
 	SEND_CHECK(fixture->count == 63);
@@ -409,6 +413,83 @@ static BOOL test_send_window_storage_cap(void)
 	SEND_CHECK(send_ack(fixture, 80));
 	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 0 &&
 	           state.aliasCount == 0 && state.queuedBytes == 0);
+	SEND_CHECK(!fixture->callbackFailed);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+
+static BOOL test_send_peer_window_tracking(void)
+{
+	/* The existing Microsoft wire fixture, with its payload replaced by
+	 * AA BB: LogWindow=15, DATA|AOA|DELAYACK (plus its reserved flag),
+	 * initial DataSeq=100, ChannelSeq=1, delayed-ACK allowance 1/20 ms.
+	 * Feeding wire bytes avoids testing only our own encoder's output. */
+	static const BYTE msWire[] = {
+		0x00, 0x14, 0xF3, 0x01, 0x14, 0x00, 0x64, 0xE0, 0x64, 0x00, 0x01, 0x00,
+		0xAA, 0xBB
+	};
+	BYTE bytes[40] = { 0 };
+	SendFixture* fixture = send_fixture_new(1, 5, 5, 1, 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture);
+	/* The untouched receiver exposes production defaults independently of
+	 * the sender's test configuration. A peer advertisement cannot enlarge
+	 * either endpoint's local advertisement or packet-storage capacity. */
+	SEND_CHECK(rdpeudp_test_send_state(fixture->receiver, &state) &&
+	           state.localLogWindow == 5 && state.peerLogWindow == 5 && state.sendWindow == 31);
+	SEND_CHECK(rdpeudp_test_feed(fixture->receiver, msWire, sizeof(msWire)));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->receiver, &state) &&
+	           state.localLogWindow == 5 && state.peerLogWindow == 15 && state.sendWindow == 31);
+	SEND_CHECK(!rdpeudp_test_configure_send(fixture->sender, 1, 5, 0, 1, 1));
+	SEND_CHECK(!rdpeudp_test_configure_send(fixture->sender, 1, 5, 1, 1, 1));
+	SEND_CHECK(!rdpeudp_test_configure_send(fixture->sender, 1, 5, 16, 1, 1));
+	SEND_CHECK(!rdpeudp_test_configure_send(fixture->sender, 1, 11, 15, 1, 1));
+	SEND_CHECK(!rdpeudp_test_configure_send(fixture->sender, 1, 15, 15, 1, 1));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) &&
+	           state.localLogWindow == 5 && state.peerLogWindow == 5 && state.sendWindow == 31);
+	SEND_CHECK(rdpeudp_test_feed(fixture->sender, msWire, sizeof(msWire)));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) &&
+	           state.localLogWindow == 5 && state.peerLogWindow == 15 && state.sendWindow == 31);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, sizeof(bytes)) ==
+	           (SSIZE_T)sizeof(bytes));
+	SEND_CHECK(fixture->count == 31);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 31);
+	/* All protocol-valid peer windows must be retained, including 11..15,
+	 * while local capacity bounds the effective sender window. */
+	for (BYTE peer = 2; peer <= 15; peer++)
+	{
+		fixture->peerLogWindow = peer;
+		SEND_CHECK(send_ack(fixture, 0));
+		const size_t expected = peer < 5 ? ((size_t)1 << peer) - 1 : 31;
+		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) &&
+		           state.localLogWindow == 5 && state.peerLogWindow == peer &&
+		           state.sendWindow == expected && state.inFlight == 31);
+	}
+	/* Invalid advertisements do not erase the last valid peer capacity. */
+	for (BYTE peer = 0; peer < 2; peer++)
+	{
+		fixture->peerLogWindow = peer;
+		SEND_CHECK(send_ack(fixture, 0));
+		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) &&
+		           state.peerLogWindow == 15 && state.sendWindow == 31);
+	}
+	/* Shrink and recover from a Windows-sized advertisement while bytes are
+	 * queued: the peer limit must govern admission without changing ours. */
+	fixture->peerLogWindow = 2;
+	SEND_CHECK(send_ack(fixture, 28));
+	SEND_CHECK(send_tick(fixture, 0) && fixture->count == 31);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 3 &&
+	           state.peerLogWindow == 2 && state.sendWindow == 3);
+	fixture->peerLogWindow = 15;
+	SEND_CHECK(send_ack(fixture, 28));
+	SEND_CHECK(send_tick(fixture, 0) && fixture->count == 40);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 12 &&
+	           state.peerLogWindow == 15 && state.sendWindow == 31);
+	for (size_t i = 0; i < fixture->count; i++)
+		SEND_CHECK(fixture->packets[i].logWindow == 5);
+	SEND_CHECK(send_ack(fixture, 40));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 0 &&
+	           state.queuedBytes == 0 && !state.sendFailed);
 	SEND_CHECK(!fixture->callbackFailed);
 	send_fixture_free(fixture);
 	return TRUE;
@@ -850,7 +931,7 @@ int TestRdpeUdpSend(int argc, char* argv[])
 	WINPR_UNUSED(argv);
 	if (!test_send_pipeline() || !test_send_window_and_selective_ack() ||
 	    !test_send_window_shrink() || !test_send_window_shrink_with_loss() ||
-	    !test_send_window_storage_cap() ||
+	    !test_send_window_storage_cap() || !test_send_peer_window_tracking() ||
 	    !test_send_atomic_queue_and_owned_payload() || !test_send_late_original_ack() ||
 	    !test_send_lost_data() || !test_send_idle_health_pump() || !test_send_repeated_loss() ||
 	    !test_send_ack_wrap() || !test_send_alias_wrap() ||

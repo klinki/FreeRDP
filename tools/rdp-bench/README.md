@@ -131,6 +131,82 @@ each cap. Both retain failed and invalid trials and expose valid-only subsets.
 The [Mac queue sweep record](docs/QUEUE-SWEEP-20261011.md) includes the measured
 tradeoffs and every scheduling/timing failure.
 
+`ack_timing_sweep.py` repeats the 48/64 KiB comparison with the same 128 KiB
+peer and both 10 Mbit/s profiles. Baseline has five seeds and 5/30/10-second
+warmup/measurement/drain phases for upload and outgoing bulk-plus-probes. ACK
+diagnostics have three seeds and 3/15/10-second phases for outgoing
+bulk-plus-probes at 0, 5, 10 and 20 ms additional S→C feedback delay. For example:
+
+```sh
+python3 -B tools/rdp-bench/ack_timing_sweep.py \
+  --library /absolute/path/to/frozen/libfreerdp3.dylib \
+  --build-metadata /absolute/path/to/rdp-bench-build.json \
+  --output build/ack-timing-new
+```
+
+The default serial sequence runs 8 smoke, 40 baseline and 48 ACK diagnostic
+trials. `--prepare-only` writes the complete machine-readable plan, variants,
+fixed peer environment, source/binary/profile fingerprints and phase suites.
+`--phase smoke`, `baseline` or `ack-timing` permits separate invocations;
+`--phase control` adds 12 unloaded-probe controls. Existing phases and changed
+provenance are rejected. Each completed phase generates audited queue reports
+with 48/64 KiB pairs and all failures. No acceptance receipt is invented.
+
+`ack_timing_report.py` audits completed phases and independently reconciles
+every ACK dispatch ledger with the requested offsets, delivery counts and
+timing summaries. It exports portable JSON/CSV/Markdown and protects source,
+binary and campaign inputs from output overwrites:
+
+```sh
+python3 -B tools/rdp-bench/ack_timing_report.py \
+  --root build/ack-timing-new --output build/ack-timing-new/report
+```
+
+The [peer-window and ACK timing record](docs/PEER-WINDOW-ACK-20261011.md)
+contains the measured results, calibration limits and failures; committed
+[JSON](results/peer-ack-20261011.json) and [CSV](results/peer-ack-20261011.csv)
+retain per-trial metrics, subset counts and strict paired comparisons.
+
+This is a controlled feedback-delay experiment, not Windows ACK batching.
+The case-level `ack_feedback` object accepts `c2s_delay_ms` and
+`s2c_delay_ms`. The relay reverses the UDP2 prefix protection and validates the
+visible header layout; only ACK/ACKVEC packets without DATA get a monotonic
+deadline offset. DATA with piggybacked ACKs, control, dummy and unknown packets
+receive none. Datagram bytes, network serialization, queue/drop rules and
+seeded impairment decisions are unchanged. Delayed feedback can arrive after
+DATA whose original network deadline was later; this is an intentional effect
+of the treatment. The treatment enters each comparison key and is rejected for
+direct sockets, Linux netem and calibration-only endpoints.
+
+Baseline omits classification. Every ACK diagnostic, including 0 ms, collects
+the same classification/timing observations. `shaper.json` records requested
+delay, classifications, delivered counts, actual extra delivery delay above
+the original network deadline, and overshoot above the treated deadline.
+Overshoot remains subject to the normal relay timing validity threshold.
+`ack-feedback.jsonl` records every selected delivered packet's direction, kind,
+length, original deadline, treated deadline and actual dispatch timestamp.
+Records are buffered during the trial and written after the relay stops; ledger
+overflow or any unclassified native datagrams invalidates the experiment.
+These timestamps describe local relay dispatch, not receiver ACK-generation
+delay or physical NIC departure. Trials preserve CRC/hash/order verification,
+scheduled/injected/observed probe counts and the existing integrity drain.
+
+Both native lab endpoints retain their genuine default LogWindow 5 and a
+31-packet effective window. Production-path regression fixtures cover tracking
+the Windows-advertised LogWindow 15; this small lab peer does not advertise a
+capacity it lacks. Neither a larger peer window nor an ACK delay changes the
+normal production 32 KiB queue default. A short zero-ms diagnostic and the
+longer baseline provide descriptive observer evidence; their different
+measurement durations prevent a strict cross-phase paired claim.
+
+The classifier also has an optional test against actual native ACK and DATA
+wire bytes, rather than only hand-encoded layouts:
+
+```sh
+RDP_BENCH_TEST_LIBRARY=/absolute/path/to/frozen/libfreerdp3.dylib \
+  python3 -B -m unittest discover -s tools/rdp-bench/tests -p test_ack_feedback.py
+```
+
 Each trial contains `manifest.json`, phase clocks, endpoint JSONL traces,
 endpoint result JSON, stderr logs, `shaper.json`, `summary.json`, and
 `SHA256SUMS.json`. The campaign also writes `campaign.json`. Successful transfers

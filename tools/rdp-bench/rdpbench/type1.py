@@ -3,6 +3,7 @@ import json,math,os,random,re,select,socket,subprocess,sys,time,uuid
 from pathlib import Path
 from .common import *
 from .link import Relay
+from .feedback import validate_feedback
 ROOT=Path(__file__).resolve().parents[1]
 
 def effective_environment(overlay):
@@ -33,13 +34,16 @@ def identifier(value):
 def one_trial(variant,case,profile,config,seed,folder,driver='native',calibration=None,netns=None,direct=False):
     identifier(case['id']);identifier(variant['id'])
     validate_profile(profile)
+    ack_feedback=validate_feedback(case.get('ack_feedback'))
+    if ack_feedback is not None and (netns or direct or driver!='native'):
+        raise ValueError('ack_feedback requires native endpoints and the Python relay')
     if direct and any(profile[d].get(k,0) for d in ('c2s','s2c') for k in ('one_way_ms','jitter_ms','rate_mbps','loss','reorder','duplicate')):raise ValueError('direct mode requires the unshaped loopback profile')
     if direct and any(profile[d].get('blackouts_ms') for d in ('c2s','s2c')):raise ValueError('direct mode cannot apply blackouts')
     folder=Path(folder).resolve();folder.mkdir(parents=True,exist_ok=False)
     env=environment(); lib=variant.get('library','')
     invariants={'profile':profile,'case':case,'warmup_s':config['warmup_s'],'measure_s':config['measure_s'],
         'drain_s':config['drain_s'],'payload_bytes':config['payload_bytes'],'probe_hz':config['probe_hz'],
-        'offered_mbps':config.get('offered_mbps',0),'driver':driver,
+        'offered_mbps':config.get('offered_mbps',0),'driver':driver,'ack_feedback':ack_feedback,
         'peer_sha256':sha256(variant['peer_library']) if variant.get('peer_library') and Path(variant['peer_library']).is_file() else None,
         'peer_environment':effective_environment(variant.get('peer_env',{})),
         'engine':'netns' if netns else 'direct' if direct else 'python-relay','python':env['python'],'system':env['system'],
@@ -69,7 +73,8 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
             bind=[netns['left_ip'],netns['right_ip']];peer=list(reversed(bind));peer_ports=[right,left]
         elif direct:peer_ports=[right,left];shape={'engine':'direct-loopback'}
         else:
-            relay=Relay(left,right,profile,seed);peer_ports=relay.ports
+            relay=Relay(left,right,profile,seed,ack_feedback,
+                        folder/'ack-feedback.jsonl' if ack_feedback is not None else None);peer_ports=relay.ports
         if netns:
             write_json(folder/'resolved-profiles.json',{'profiles':{case['profile']:profile}})
             applied=subprocess.check_output([sys.executable,str(ROOT/'linux/ns_lab.py'),'profile','--state',netns['state_file'],
@@ -143,6 +148,12 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
             tolerance=max(.5,profile[d]['one_way_ms']*.1)
             if p99 is not None and p99>tolerance:reasons.append(f'{d} relay p99 lateness {p99:.3f}ms exceeds {tolerance:.3f}ms')
             if x.get('socket_send_errors'):reasons.append(f'{d} relay socket send failure')
+            feedback=x.get('ack_feedback')
+            if feedback is not None:
+                if feedback.get('classification',{}).get('unclassified'):
+                    reasons.append(f'{d} ACK feedback has unclassified native datagrams')
+                if feedback.get('ledger_overflow_datagrams'):
+                    reasons.append(f'{d} ACK feedback ledger capacity exceeded')
     from .calibration import accepted
     pps=sum(shape.get(d,{}).get('received_datagrams',0) for d in ('c2s','s2c'))/max(.1,config['warmup_s']+config['measure_s']) if shape else 0
     if driver=='native' and (netns or direct):
@@ -182,6 +193,16 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
         metrics[prefix+'.queue_clock_offset_drift_ns']=alignment.get('offset_drift_ns')
         metrics[prefix+'.queue_clock_combined_uncertainty_ns']=alignment.get('combined_uncertainty_ns')
     integrity_verified=driver=='native' and not integrity_failures
+    for direction in ('c2s','s2c'):
+        feedback=shape.get(direction,{}).get('ack_feedback') if shape else None
+        if feedback is not None:
+            for name in ('requested_delay_ms','classified_datagrams','selected_datagrams','scheduled_datagrams','delivered_datagrams','ledger_events','ledger_overflow_datagrams'):
+                metrics[direction+'.ack_feedback.'+name]=feedback.get(name)
+            for kind,count in feedback.get('classification',{}).items():
+                metrics[direction+'.ack_feedback.classification.'+kind]=count
+            for name in ('added_delivery_ms','scheduler_overshoot_ms'):
+                for q in ('count','p50','p95','p99','max','sample_count','delivered_count'):
+                    metrics[direction+'.ack_feedback.'+name+'.'+q]=feedback.get(name,{}).get(q)
     metrics['c2s.verified_goodput_mbps']=results[1].get('goodput_mbps') if integrity_verified else None
     metrics['s2c.verified_goodput_mbps']=results[0].get('goodput_mbps') if integrity_verified else None
     summary={'version':1,'suite':'type1','trial_id':manifest['trial_id'],'case_id':case['id'],'variant':variant['id'],
@@ -234,6 +255,9 @@ def run_suite(args):
     if not cases:raise ValueError('no matching cases')
     for case in cases:
         validate_profile(profiles[case['profile']])
+        treatment=validate_feedback(case.get('ack_feedback'))
+        if treatment is not None and (args.netns or args.direct or args.driver!='native'):
+            raise ValueError('ack_feedback requires native endpoints and the Python relay')
         if case['workload'] not in ('upload','download','duplex','probe','mixed','upload_mixed'):raise ValueError('unknown workload')
     if args.driver=='udp-calibration':config=dict(config,payload_bytes=1024,offered_mbps=args.offered_mbps)
     if not isinstance(config.get('offered_mbps',0),(int,float)) or not math.isfinite(config.get('offered_mbps',0)) or config.get('offered_mbps',0)<0:raise ValueError('invalid offered rate')

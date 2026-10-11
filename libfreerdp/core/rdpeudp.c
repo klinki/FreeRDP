@@ -2058,7 +2058,10 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 
 		EnterCriticalSection(&udp->lock);
 		udp->stats.recvPackets++;
-		if ((L.logWindow <= RDPUDP2_MAX_LOGWINDOW) && (L.logWindow >= 2))
+		/* A peer's receive capacity is independent of our local storage bound.
+		 * Windows advertises the full protocol LogWindow of 15. Retain it;
+		 * the sender still clamps the effective window to local capacity. */
+		if ((L.logWindow <= RDPUDP2_PROTOCOL_MAX_LOGWINDOW) && (L.logWindow >= 2))
 			udp->peerLogWindow = L.logWindow;
 
 		if (L.hasAoa)
@@ -2615,8 +2618,8 @@ BOOL rdpeudp_connect(rdpUdpTransport* udp, DWORD timeoutMs)
 static size_t rdpeudp2_send_window_locked(const rdpUdpTransport* udp)
 {
 	BYTE logWindow = udp->logWindow < udp->peerLogWindow ? udp->logWindow : udp->peerLogWindow;
-	if (logWindow > RDPUDP2_MAX_LOGWINDOW)
-		logWindow = RDPUDP2_MAX_LOGWINDOW;
+	if (logWindow > RDPUDP2_LOCAL_MAX_LOGWINDOW)
+		logWindow = RDPUDP2_LOCAL_MAX_LOGWINDOW;
 	const size_t limit = ((size_t)1 << logWindow) - 1;
 	return limit < ARRAYSIZE(udp->sent) ? limit : ARRAYSIZE(udp->sent) - 1;
 }
@@ -2662,7 +2665,7 @@ static BOOL rdpeudp2_can_allocate_seq_locked(const rdpUdpTransport* udp, size_t 
 		 * can drain it; never admit new channel bytes using this allowance. */
 		const UINT16 activeBase = rdpeudp2_send_base_locked(udp, ARRAYSIZE(udp->sent));
 		const size_t activeSpan = (UINT16)(udp->nextDataSeq - activeBase);
-		const BYTE logWindow = udp->logWindow < RDPUDP2_MAX_LOGWINDOW ? udp->logWindow : RDPUDP2_MAX_LOGWINDOW;
+		const BYTE logWindow = udp->logWindow < RDPUDP2_LOCAL_MAX_LOGWINDOW ? udp->logWindow : RDPUDP2_LOCAL_MAX_LOGWINDOW;
 		const size_t advertised = ((size_t)1 << logWindow) - 1;
 		const size_t localLimit = advertised < ARRAYSIZE(udp->sent) ? advertised : ARRAYSIZE(udp->sent) - 1;
 		if (activeSpan > limit)
@@ -2936,7 +2939,8 @@ BOOL rdpeudp_test_configure_send(rdpUdpTransport* udp, UINT16 payload, BYTE logW
                                  BYTE peerLogWindow, UINT16 nextDataSeq, UINT16 nextChannelSeq)
 {
 	if (!udp || !payload || payload > RDPUDP2_MAX_PAYLOAD || logWindow < 2 ||
-	    logWindow > RDPUDP2_MAX_LOGWINDOW || peerLogWindow < 2 || peerLogWindow > RDPUDP2_MAX_LOGWINDOW)
+	    logWindow > RDPUDP2_LOCAL_MAX_LOGWINDOW || peerLogWindow < 2 ||
+	    peerLogWindow > RDPUDP2_PROTOCOL_MAX_LOGWINDOW)
 		return FALSE;
 	EnterCriticalSection(&udp->lock);
 	const BOOL empty = !udp->sendBytes && !udp->sentCount;
@@ -3051,6 +3055,9 @@ BOOL rdpeudp_test_send_state(rdpUdpTransport* udp, RdpUdpTestSendState* state)
 	state->nextChannelSeq = udp->nextChannelSeq;
 	state->aoa = udp->sendAoa;
 	state->sendFailed = udp->sendFailed;
+	state->localLogWindow = udp->logWindow;
+	state->peerLogWindow = udp->peerLogWindow;
+	state->sendWindow = rdpeudp2_send_window_locked(udp);
 	for (size_t i = 0; i < ARRAYSIZE(udp->sent); i++)
 	{
 		if (!udp->sent[i].data)

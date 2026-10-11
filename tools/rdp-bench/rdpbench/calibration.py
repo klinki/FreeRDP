@@ -5,7 +5,7 @@ from .common import sha256
 
 def engine_sources(root):
     root=Path(root).resolve()
-    names=['rdpbench/link.py','rdpbench/endpoint.py','rdpbench/type1.py',
+    names=['rdpbench/link.py','rdpbench/feedback.py','rdpbench/endpoint.py','rdpbench/type1.py',
            'rdpbench/native.py','rdpbench/common.py','rdpbench/calibration.py','linux/ns_lab.py',
            '../../libfreerdp/core/rdp_bench_private.inc']
     return {name:(root/name).resolve() for name in names}

@@ -301,7 +301,7 @@ static BOOL rdp_bench_queue_stats_locked(rdpUdpTransport* udp, UINT64* out, size
 	out[33] = udp->peerLogWindow;
 	out[34] = udp->maxPayload;
 	const BYTE logWindow = udp->logWindow < udp->peerLogWindow ? udp->logWindow : udp->peerLogWindow;
-	const size_t window = ((size_t)1 << (logWindow < RDPUDP2_MAX_LOGWINDOW ? logWindow : RDPUDP2_MAX_LOGWINDOW)) - 1;
+	const size_t window = ((size_t)1 << (logWindow < RDPUDP2_LOCAL_MAX_LOGWINDOW ? logWindow : RDPUDP2_LOCAL_MAX_LOGWINDOW)) - 1;
 	out[35] = window < ARRAYSIZE(udp->sent) ? window : ARRAYSIZE(udp->sent) - 1;
 	out[36] = o ? 1 : 0;
 	if (!o)

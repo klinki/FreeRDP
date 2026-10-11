@@ -44,6 +44,7 @@ NOTES = [
     "Timing-valid COMPLETE comparisons can remain provisional. INVALID_HARNESS and SUT-failed trials remain diagnostic; INVALID_ARTIFACT metrics are withheld from paired calculations.",
     "Native retransmission/drop/peak telemetry is whole-trial unless the recorded observer scope explicitly states otherwise. Network injected loss counts are separate from native negative ACKVEC observations.",
     "No TLS, RDP setup, Windows, rendering, or end-to-end desktop latency result is implied.",
+    "When present, case-level ack_feedback is an additional relay deadline offset on parsed ACK/ACKVEC-only packets; DATA piggybacked ACKs remain unchanged. It is not receiver ACK batching. The treatment is included in comparison invariants.",
 ]
 
 
@@ -143,7 +144,7 @@ def metric_names(rows):
     names = set(CORE_METRICS)
     for row in rows:
         names.update(name for name in row["metrics"] if any(token in name for token in (
-            "queue", "admission", "send_call", "retransmission", "loss_reports", "drop", "lateness", "window", "retry", "probes_", "probe_timeouts")))
+            "queue", "admission", "send_call", "retransmission", "loss_reports", "drop", "lateness", "window", "retry", "probes_", "probe_timeouts", "ack_feedback")))
     return sorted(names)
 
 

@@ -5,13 +5,16 @@ Network serialization is computed in ns. OS scheduling is real and must be calib
 Not suitable for uncalibrated high packet-rate CPU/syscall performance claims.
 """
 from __future__ import annotations
-import collections,hashlib,heapq,selectors,socket,threading,time
+import collections,hashlib,heapq,json,selectors,socket,threading,time
+from pathlib import Path
 from .common import timing_summary
+from .feedback import FeedbackTiming, SELECTED_KINDS, validate_feedback
 
 class Link:
-    def __init__(self,profile,seed,direction):
+    def __init__(self,profile,seed,direction,feedback_delay_ms=None):
         self.p=dict(profile);self.seed=seed;self.direction=direction;self.next_free=0
         self.n=0;self.start_ns=0;self.count=collections.Counter();self.lateness=[]
+        self.feedback=FeedbackTiming(feedback_delay_ms) if feedback_delay_ms is not None else None
     def uniform(self,index,lane):
         b=f'{self.seed}:{self.direction}:{index}:{lane}'.encode()
         return int.from_bytes(hashlib.blake2b(b,digest_size=8).digest(),'big')/2**64
@@ -38,7 +41,12 @@ class Link:
             self.count['duplicates']+=1
             self.next_free+=service;out.append((due+service,data))
         return out
-    def delivered(self,due,actual,length):
+    def schedule(self,now,data):
+        kind=self.feedback.classify(data) if self.feedback else None
+        selected=kind in SELECTED_KINDS
+        return [(self.feedback.schedule(due) if selected else due,payload,(due,kind) if selected else None)
+                for due,payload in self.offer(now,data)]
+    def delivered(self,due,actual,length,feedback_base_due=None):
         self.count['delivered_datagrams']+=1;self.count['delivered_udp_bytes']+=length
         # Bounded reservoir with stable sampling. Counts/maxima include every delivery.
         lag=max(0,actual-due)/1e6
@@ -48,14 +56,24 @@ class Link:
         else:
             j=int(self.uniform(self.count['delivered_datagrams'],7)*self.count['delivered_datagrams'])
             if j<len(self.lateness):self.lateness[j]=lag
+        if feedback_base_due is not None:
+            # Stable reservoir lane separate from network impairment decisions.
+            index=int(self.uniform(self.feedback.delivered+1,8)*(self.feedback.delivered+1))
+            base_due,kind=feedback_base_due
+            self.feedback.observe(base_due,actual,index,length,kind)
     def summary(self):
-        return dict(self.count,lateness_ms=timing_summary(self.lateness),reservoir_capacity=200000,
+        result=dict(self.count,lateness_ms=timing_summary(self.lateness),reservoir_capacity=200000,
                     lateness_sampled=self.count['delivered_datagrams']>len(self.lateness))
+        if self.feedback:result['ack_feedback']=self.feedback.summary()
+        return result
 
 class Relay:
-    def __init__(self,left_port,right_port,profile,seed):
+    def __init__(self,left_port,right_port,profile,seed,ack_feedback=None,feedback_ledger=None):
         self.sel=selectors.DefaultSelector();self.sockets=[];self.heap=[];self.serial=0
-        self.links=[Link(profile['c2s'],seed,'c2s'),Link(profile['s2c'],seed+1000003,'s2c')]
+        treatment=validate_feedback(ack_feedback)
+        self.feedback_ledger=feedback_ledger
+        self.links=[Link(profile['c2s'],seed,'c2s',treatment['c2s_delay_ms'] if treatment else None),
+                    Link(profile['s2c'],seed+1000003,'s2c',treatment['s2c_delay_ms'] if treatment else None)]
         self.peers=[('127.0.0.1',left_port),('127.0.0.1',right_port)]
         for i in range(2):
             s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.bind(('127.0.0.1',0))
@@ -81,16 +99,16 @@ class Relay:
                         except BlockingIOError:break
                         if addr!=self.peers[direction]:
                             self.links[direction].count['unexpected_peer']+=1;continue
-                        for due,payload in self.links[direction].offer(time.monotonic_ns(),data):
+                        for due,payload,feedback_base_due in self.links[direction].schedule(time.monotonic_ns(),data):
                             if len(self.heap)>=65536:raise RuntimeError('relay capacity exceeded; invalid harness')
                             self.serial+=1
-                            heapq.heappush(self.heap,(due,self.serial,direction,payload))
+                            heapq.heappush(self.heap,(due,self.serial,direction,payload,feedback_base_due))
                 now=time.monotonic_ns()
                 while self.heap and self.heap[0][0]<=now:
-                    due,_,d,data=heapq.heappop(self.heap)
+                    due,_,d,data,feedback_base_due=heapq.heappop(self.heap)
                     try:
                         self.sockets[1-d].sendto(data,self.peers[1-d])
-                        self.links[d].delivered(due,time.monotonic_ns(),len(data))
+                        self.links[d].delivered(due,time.monotonic_ns(),len(data),feedback_base_due)
                     except (BlockingIOError,OSError):self.links[d].count['socket_send_errors']+=1
                     now=time.monotonic_ns()
         except BaseException as e:self.error=repr(e)
@@ -100,5 +118,11 @@ class Relay:
         pending=len(self.heap)
         self.sel.close()
         for s in self.sockets:s.close()
+        if self.feedback_ledger:
+            records=[dict(record,direction=link.direction) for link in self.links if link.feedback
+                     for record in link.feedback.records]
+            with Path(self.feedback_ledger).open('w',encoding='utf-8') as stream:
+                for record in sorted(records,key=lambda x:x['actual_dispatch_ns']):
+                    stream.write(json.dumps(record,separators=(',',':'))+'\n')
         return {'engine':'python_udp_relay_v1','c2s':self.links[0].summary(),'s2c':self.links[1].summary(),
                 'pending_on_close':pending,'error':self.error,'kernel_drop_counter':None}

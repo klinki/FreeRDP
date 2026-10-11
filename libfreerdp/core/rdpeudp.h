@@ -91,7 +91,8 @@
 #define RDPUDP2_FLAGS_MASK 0xFFF
 
 #define RDPUDP2_DEFAULT_LOGWINDOW 5 /* At most 31 active DATA sequence numbers. */
-#define RDPUDP2_MAX_LOGWINDOW 10
+#define RDPUDP2_LOCAL_MAX_LOGWINDOW 10 /* Local implementation/configuration limit. */
+#define RDPUDP2_PROTOCOL_MAX_LOGWINDOW 15 /* Full 4-bit peer advertisement. */
 #define RDPUDP2_MTU 1232
 #define RDPUDP2_MAX_PAYLOAD 1150 /* MTU minus worst-case headers */
 
@@ -453,6 +454,9 @@ typedef struct
 	UINT16 aoa;
 	UINT32 maxRetries;
 	BOOL sendFailed;
+	BYTE localLogWindow;
+	BYTE peerLogWindow;
+	size_t sendWindow; /* Effective bound after local, peer and storage limits. */
 } RdpUdpTestSendState;
 FREERDP_API BOOL rdpeudp_test_configure_send(rdpUdpTransport* udp, UINT16 payload,
                                            BYTE logWindow, BYTE peerLogWindow,
