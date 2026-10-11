@@ -90,7 +90,7 @@
 #define RDPUDP2_FLAG_DELAYACK 0x100
 #define RDPUDP2_FLAGS_MASK 0xFFF
 
-#define RDPUDP2_DEFAULT_LOGWINDOW 5 /* 32 * MTU window */
+#define RDPUDP2_DEFAULT_LOGWINDOW 5 /* At most 31 active DATA sequence numbers. */
 #define RDPUDP2_MAX_LOGWINDOW 10
 #define RDPUDP2_MTU 1232
 #define RDPUDP2_MAX_PAYLOAD 1150 /* MTU minus worst-case headers */
@@ -442,8 +442,39 @@ FREERDP_API void rdpeudp_test_set_send(rdpUdpTransport* udp, RdpUdpTestSendCallb
 FREERDP_API void rdpeudp_test_set_time(rdpUdpTransport* udp, UINT64 now);
 FREERDP_API BOOL rdpeudp_test_check_health(rdpUdpTransport* udp);
 
+/* Deterministic drivers for the production send queue/timer state machine. */
+typedef struct
+{
+	size_t queuedBytes; /* All owned payload, including logical in-flight chunks. */
+	size_t inFlight;
+	size_t aliasCount;
+	UINT16 nextDataSeq;
+	UINT16 nextChannelSeq;
+	UINT16 aoa;
+	UINT32 maxRetries;
+	BOOL sendFailed;
+} RdpUdpTestSendState;
+FREERDP_API BOOL rdpeudp_test_configure_send(rdpUdpTransport* udp, UINT16 payload,
+                                           BYTE logWindow, BYTE peerLogWindow,
+                                           UINT16 nextDataSeq, UINT16 nextChannelSeq);
+/* Atomic production enqueue/service: -2 is capacity refusal before acceptance. */
+FREERDP_API SSIZE_T rdpeudp_test_send_data(rdpUdpTransport* udp, const BYTE* data, size_t len);
+/* Actual established-write wake path; attach_socket takes fd ownership. */
+FREERDP_API SSIZE_T rdpeudp_test_write_data(rdpUdpTransport* udp, const BYTE* data, size_t len);
+FREERDP_API BOOL rdpeudp_test_attach_socket(rdpUdpTransport* udp, int fd);
+FREERDP_API void rdpeudp_test_get_events(rdpUdpTransport* udp, HANDLE* socketEvent, HANDLE* stateEvent);
+FREERDP_API void rdpeudp_test_update_event(rdpUdpTransport* udp);
+FREERDP_API BOOL rdpeudp_test_send_snapshot(rdpUdpTransport* udp, UINT64* generation);
+FREERDP_API void rdpeudp_test_consume_send_wake(rdpUdpTransport* udp, UINT64 generation);
+FREERDP_API BOOL rdpeudp_test_service_send(rdpUdpTransport* udp);
+FREERDP_API BOOL rdpeudp_test_send_state(rdpUdpTransport* udp, RdpUdpTestSendState* state);
+FREERDP_API void rdpeudp_test_set_abort(rdpUdpTransport* udp, HANDLE event);
+
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL rdpeudp_check_health(rdpUdpTransport* udp);
+FREERDP_LOCAL BOOL rdpeudp_has_pending_send(rdpUdpTransport* udp);
+FREERDP_LOCAL BOOL rdpeudp_send_snapshot(rdpUdpTransport* udp, UINT64* generation);
+FREERDP_LOCAL void rdpeudp_consume_send_wake(rdpUdpTransport* udp, UINT64 generation);
 
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL rdpeudp_is_connected(const rdpUdpTransport* udp);
@@ -472,12 +503,17 @@ FREERDP_LOCAL BOOL rdpeudp_check_keepalive(rdpUdpTransport* udp, DWORD idleMs);
 FREERDP_LOCAL BOOL rdpeudp_get_stats(const rdpUdpTransport* udp, RdpUdpStats* stats);
 FREERDP_LOCAL int rdpeudp_get_sockfd(const rdpUdpTransport* udp);
 FREERDP_LOCAL HANDLE rdpeudp_get_event(rdpUdpTransport* udp);
+FREERDP_LOCAL HANDLE rdpeudp_get_state_event(rdpUdpTransport* udp);
 /* Non-owning cancel signal; checked by blocking establishment and I/O loops. */
 FREERDP_LOCAL void rdpeudp_set_abort_event(rdpUdpTransport* udp, HANDLE abortEvent);
 /* Drain-safe re-arm of the readiness event (reset + recheck). */
 FREERDP_LOCAL void rdpeudp_update_event(rdpUdpTransport* udp);
 
-/** BIO wrapping the reliable RDPEUDP2 stream (for TLS). */
+/** BIO wrapping the reliable RDPEUDP2 stream (for TLS).
+ * Established writes copy all bytes into a bounded pipeline before returning;
+ * success means acceptance, not peer delivery. Capacity waits service ACKs and
+ * retries. Setup writes drain synchronously before normal timer maintenance.
+ * Failure is terminal so TLS must not retry an already accepted byte range. */
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BIO_METHOD* BIO_s_rdpeudp(void);
 

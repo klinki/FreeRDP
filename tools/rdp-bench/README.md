@@ -83,9 +83,10 @@ Upload/download continuously send seeded payload records without waiting for
 application echoes. Duplex sends bulk both ways. Probe generates scheduled
 64-byte probes, and mixed combines outgoing probes with incoming bulk. Probes
 are scheduled independently of replies. Driver backpressure, missed deadlines,
-timeouts and duplicate responses remain visible. The current production sender
-is synchronous: probes and application echoes can block behind reliable writes.
-That behavior is measured rather than replaced with a faster benchmark sender.
+timeouts and duplicate responses remain visible. Each binary's production write
+policy and byte order are preserved: probes and application echoes can wait
+behind accepted reliable bytes. The harness records that backpressure and adds
+no alternate sender or parallel application writer.
 
 ## Results and history
 

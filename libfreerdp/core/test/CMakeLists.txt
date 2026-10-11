@@ -7,7 +7,11 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 set(DRIVER ${MODULE_NAME}.c)
 
-set(TESTS TestVersion.c TestSettings.c TestUtils.c TestRdpeUdp.c)
+set(TESTS TestVersion.c TestSettings.c TestUtils.c TestRdpeUdp.c TestRdpeUdpSend.c)
+
+if(NOT WIN32)
+  list(APPEND TESTS TestRdpeUdpEvent.c)
+endif()
 
 if(BUILD_TESTING_INTERNAL)
   list(APPEND TESTS TestStreamDump.c TestRdstls.c TestServerChannels.c)

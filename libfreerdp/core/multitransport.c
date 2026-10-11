@@ -66,6 +66,7 @@ struct rdp_multitransport
 	BOOL closing;
 	BOOL threadRunning;
 	FreeRDP_TimerID maintenanceTimer;
+	uint64_t maintenanceInterval;
 	/* Soft-Sync migration state (MS-RDPEDYC 3.1.5.3): DVC stays on TCP until
 	 * migration is authorized, even when the tunnel is up. */
 	BOOL softSyncNegotiated;
@@ -1138,6 +1139,16 @@ HANDLE multitransport_get_event(rdpMultitransport* multi)
 	return ev;
 }
 
+HANDLE multitransport_get_state_event(rdpMultitransport* multi)
+{
+	if (!multi)
+		return nullptr;
+	EnterCriticalSection(&multi->lock);
+	HANDLE ev = multi->udp ? rdpeudp_get_state_event(multi->udp) : nullptr;
+	LeaveCriticalSection(&multi->lock);
+	return ev;
+}
+
 BOOL multitransport_send_autodetect(rdpMultitransport* multi, BOOL isRequest, UINT16 secFlags,
                                      const BYTE* pdu, size_t pduLen)
 {
@@ -1170,6 +1181,8 @@ static uint64_t multitransport_maintenance(WINPR_ATTR_UNUSED rdpContext* context
 	EnterCriticalSection(&multi->lock);
 	if (multi->udp)
 		(void)rdpeudp_check_health(multi->udp);
+	interval = multi->udp && rdpeudp_has_pending_send(multi->udp) ? 20000000 : 1000000000;
+	multi->maintenanceInterval = interval;
 	LeaveCriticalSection(&multi->lock);
 	return interval;
 }
@@ -1184,11 +1197,20 @@ int multitransport_check_fds(rdpMultitransport* multi)
 	LeaveCriticalSection(&multi->lock);
 	if (!connected)
 		return 0;
-	/* The timer's mainloop event wakes even if the peer stops sending.
-	 * Socket readiness and TCP heartbeats cannot enforce a gap deadline. */
+	/* Queued sends need timer progress without inbound feedback. Re-arm a
+	 * previously idle watchdog after the writer's explicit event wakeup;
+	 * the callback returns to 1 s once all accepted bytes drain. */
+	UINT64 sendGeneration = 0;
+	const uint64_t wantedInterval = rdpeudp_send_snapshot(udp, &sendGeneration) ? 20000000 : 1000000000;
+	if (multi->maintenanceTimer && wantedInterval < multi->maintenanceInterval && multi->rdp->timer)
+	{
+		(void)freerdp_timer_remove(multi->rdp->context, multi->maintenanceTimer);
+		multi->maintenanceTimer = 0;
+	}
 	if (!multi->maintenanceTimer && multi->rdp->context && multi->rdp->timer)
 	{
-		multi->maintenanceTimer = freerdp_timer_add(multi->rdp->context, 1000000000,
+		multi->maintenanceInterval = wantedInterval;
+		multi->maintenanceTimer = freerdp_timer_add(multi->rdp->context, wantedInterval,
 		                                            multitransport_maintenance, multi, true);
 		if (!multi->maintenanceTimer)
 		{
@@ -1196,6 +1218,9 @@ int multitransport_check_fds(rdpMultitransport* multi)
 			return MULTITRANSPORT_TRANSPORT_FAILED;
 		}
 	}
+	/* A concurrent writer after the snapshot keeps a different generation,
+	 * so rdpeudp_update_event re-signals after reset instead of losing it. */
+	rdpeudp_consume_send_wake(udp, sendGeneration);
 	if (!rdpeudp_check_health(udp))
 		return MULTITRANSPORT_TRANSPORT_FAILED;
 

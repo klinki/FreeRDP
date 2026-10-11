@@ -3247,9 +3247,24 @@ size_t rdp_get_event_handles(rdpRdp* rdp, HANDLE* handles, uint32_t count)
 
 	if (rdp->multitransport)
 	{
-		HANDLE uev = multitransport_get_event(rdp->multitransport);
-		if (uev && (nCount < count))
-			handles[nCount++] = uev;
+		/* Socket readiness and synthetic transport wakes use independent
+		 * handles: a POSIX socket-attached event cannot be SetEvent'ed. */
+		const HANDLE udpEvents[] = { multitransport_get_event(rdp->multitransport),
+		                            multitransport_get_state_event(rdp->multitransport) };
+		for (size_t i = 0; i < ARRAYSIZE(udpEvents); i++)
+		{
+			const HANDLE ev = udpEvents[i];
+			if (!ev || (ev == INVALID_HANDLE_VALUE))
+				continue;
+			BOOL duplicate = FALSE;
+			for (size_t j = 0; j < nCount; j++)
+				duplicate |= handles[j] == ev;
+			if (duplicate)
+				continue;
+			if (nCount >= count)
+				return 0;
+			handles[nCount++] = ev;
+		}
 	}
 
 	if (count < nCount + 2UL)

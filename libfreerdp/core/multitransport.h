@@ -123,6 +123,9 @@ FREERDP_LOCAL int multitransport_check_fds(rdpMultitransport* multi);
 
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL HANDLE multitransport_get_event(rdpMultitransport* multi);
+/* Independent manual wake for queued sends and buffered receive bytes. */
+WINPR_ATTR_NODISCARD
+FREERDP_LOCAL HANDLE multitransport_get_state_event(rdpMultitransport* multi);
 
 WINPR_ATTR_MALLOC(multitransport_free, 1)
 WINPR_ATTR_NODISCARD
@@ -135,7 +138,7 @@ FREERDP_LOCAL rdpMultitransport* multitransport_new(rdpRdp* rdp, UINT16 protocol
  * reassembly allocations: n >= 0 fails the (n+1)-th wrapped allocation (0 =
  * fail next), negative disables. Single-threaded test use only. */
 FREERDP_API void multitransport_test_free(rdpMultitransport* multi);
-/** Attach a socketless established tunnel to a real context; takes ownership on success. */
+/** Attach an established test tunnel to a real context; takes ownership on success. */
 FREERDP_API BOOL multitransport_test_attach_udp(rdpContext* context, rdpUdpTransport* udp);
 
 WINPR_ATTR_MALLOC(multitransport_test_free, 1)

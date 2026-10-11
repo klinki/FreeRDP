@@ -46,6 +46,8 @@ FREERDP_API void* freerdp_bench_v1_open(const char* bindAddress, UINT16 port,
         (void)setsockopt(b->udp->sockfd, SOL_SOCKET, SO_SNDBUF, (const void*)&n, sizeof(n));
     }
     b->udp->connected = TRUE;
+    /* Raw associations exercise steady-state queued writes without TLS setup. */
+    b->udp->tunnelEstablished = TRUE;
     b->udp->useUdp2 = TRUE;
     b->udp->negotiatedVer = RDPUDP_PROTOCOL_VERSION_3;
     b->udp->negotiatedUpMtu = RDPUDP2_MTU;
