@@ -54,7 +54,18 @@ static bool run()
 	    !sdl.detectDisplays())
 		return false;
 	const auto displays = sdl.getDisplayIds();
-	if (displays.empty() || !sdl.addDisplayWindow(displays.front()))
+	if (displays.empty())
+		return false;
+	// Prefer the laptop for native runs even when external displays are attached.
+	auto display = displays.front();
+	for (const auto id : displays)
+	{
+		const auto name = SDL_GetDisplayName(id);
+		if (name && SDL_strstr(name, "Built-in"))
+			display = id;
+	}
+	printf("Fullscreen display: %s\n", SDL_GetDisplayName(display));
+	if (!sdl.addDisplayWindow(display))
 		return false;
 	auto window = sdl.getFirstWindow();
 	if (!window || !window->window())
@@ -113,19 +124,64 @@ static bool run()
 	            "repeated same-size events do not resend the layout"))
 		return false;
 
-	// Multimon keeps physical display ownership and geometry during migration.
+	// A removed display's window may already have migrated to the laptop. Do not
+	// replace its physical ownership/geometry until topology reconciliation.
 	if (!freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, TRUE))
 		return false;
+	const auto physical = window->monitor(false).orig_screen;
+	constexpr SDL_DisplayID removed = 0xfffffff0;
 	monitor.width = pixels.w + 64;
 	monitor.height = pixels.h + 66;
+	monitor.orig_screen = removed;
 	window->setMonitor(monitor);
 	if (!expect(sdl.updateWindow(window->id()) &&
-	            window->monitor(true).width == monitor.width &&
-	            window->monitor(true).height == monitor.height,
-	            "multimon retains cached physical display geometry"))
+	            window->monitor(false).orig_screen == removed &&
+	            window->monitor(false).width == monitor.width &&
+	            window->monitor(false).height == monitor.height,
+	            "migrated multimon window retains removed display ownership and geometry"))
+		return false;
+
+	// Two windows can coexist on the remaining display during a removal burst.
+	// Even the live display's window retains physical geometry until only one remains.
+	if (!sdl.addDisplayWindow(physical))
+		return false;
+	int count = 0;
+	auto windows = SDL_GetWindows(&count);
+	SDL_WindowID second = 0;
+	for (int x = 0; x < count; x++)
+	{
+		const auto id = SDL_GetWindowID(windows[x]);
+		if (id != window->id() && sdl.getWindowForId(id))
+			second = id;
+	}
+	SDL_free(windows);
+	if (!expect(second != 0, "second multimon window created"))
+		return false;
+	monitor.orig_screen = physical;
+	window->setMonitor(monitor);
+	auto secondMonitor = sdl.getWindowForId(second)->monitor(false);
+	secondMonitor.orig_screen = removed;
+	sdl.getWindowForId(second)->setMonitor(secondMonitor);
+	if (!expect(sdl.updateWindow(window->id()) &&
+	            window->monitor(false).width == monitor.width &&
+	            window->monitor(false).height == monitor.height,
+	            "multiple multimon windows retain physical display geometry") ||
+	    !expect(sdl.removeDisplayWindow(removed) && sdl.getWindowForId(second) == nullptr,
+	            "removed display window released before fallback sizing"))
+		return false;
+
+	std::ignore = SDL_SyncWindow(window->window());
+	const auto fallbackPixels = window->rect();
+	if (!expect(sdl.updateWindow(window->id()) &&
+	            window->monitor(false).width == fallbackPixels.w &&
+	            window->monitor(false).height == fallbackPixels.h &&
+	            window->monitor(false).attributes.physicalWidth == static_cast<UINT32>(fallbackPixels.w) &&
+	            window->monitor(false).attributes.physicalHeight == static_cast<UINT32>(fallbackPixels.h) &&
+	            window->monitor(false).attributes.desktopScaleFactor == 175 &&
+	            window->monitor(false).attributes.deviceScaleFactor == 140,
+	            "single remaining fullscreen multimon window uses drawable pixels and retains DPI"))
 		return false;
 	// Replug/layout changes refresh cached multimon dimensions and restore DPI.
-	const auto physical = window->monitor(false).orig_screen;
 	SdlMonitorScaleOverrides scales{ { physical, { physical, 175, 180 } } };
 	if (!sdl.setHotplugMonitorSelection({ physical }, scales))
 		return false;
@@ -140,13 +196,13 @@ static bool run()
 	if (!expect(layoutCalls == before, "dock event bursts wait for stable geometry"))
 		return false;
 	disp.service(now + 500);
-	const auto fresh = SdlWindow::query(physical, false);
+	const auto fresh = window->rect();
 	if (!expect(layoutCalls == before + 1 &&
-	                sentLayouts.front().Width == static_cast<UINT32>(fresh.width) &&
-	                sentLayouts.front().Height == static_cast<UINT32>(fresh.height) &&
+	                sentLayouts.front().Width == static_cast<UINT32>(fresh.w) &&
+	                sentLayouts.front().Height == static_cast<UINT32>(fresh.h) &&
 	                sentLayouts.front().DesktopScaleFactor == 175 &&
 	                sentLayouts.front().DeviceScaleFactor == 180,
-	            "settled hotplug resends fresh dimensions with saved scaling"))
+	            "settled hotplug sends fullscreen fallback drawable dimensions with saved scaling"))
 		return false;
 	disp.service(now + 1500);
 	if (!expect(layoutCalls == before + 1, "settling retries deduplicate unchanged layouts"))
@@ -173,6 +229,6 @@ int main(int argc, char**)
 	sdl_dialogs_uninit();
 	SDL_Quit();
 	if (success)
-		puts("PASS fullscreen drawable dimensions, delayed activation, scale preservation, and multimon geometry");
+		puts("PASS fullscreen drawable dimensions, delayed activation, multimon fallback, scale preservation, and migration geometry");
 	return success ? 0 : 1;
 }
