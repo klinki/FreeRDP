@@ -691,16 +691,23 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 {
 	/* In fullscreen the monitor kept the size measured with the probe window at startup and was
 	 * never updated, so a session the server started at another size stayed that way. Only the
-	 * window knows its real size, so ask it in fullscreen as well. On notched Macs the
-	 * fullscreen content is also shorter than the display bounds. Multimon retains each
-	 * physical display's geometry during window migration. */
-	if (freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon))
-		return true;
-
+	 * window knows its real size, so ask it in fullscreen as well. */
 	auto& w = _windows.at(id);
+	if (freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon))
+	{
+		// Keep physical geometry/ownership while multiple windows or migrated
+		// windows remain. A sole window on its owning display uses its drawable,
+		// including while fullscreen settles; on a notched MacBook this can be
+		// shorter than the physical display bounds.
+		if ((_windows.size() != 1) || (w.displayIndex() != w.monitor(false).orig_screen))
+			return true;
+	}
+
+	auto r = w.rect();
+	if ((r.w <= 0) || (r.h <= 0))
+		return true; // Retain the last valid geometry until the window settles.
 	auto m = w.monitor(true);
 	applyMonitorScaleOverride(m);
-	auto r = w.rect();
 	m.width = r.w;
 	m.height = r.h;
 	w.setMonitor(m);
@@ -1483,6 +1490,12 @@ bool SdlContext::refreshDisplayWindows()
 	}
 	for (const auto id : desired)
 		if (!addDisplayWindow(id))
+			return false;
+	// A fallback window may be created after its size event has already fired.
+	// Refresh drawable geometry before sending this topology's monitor layout;
+	// subsequent pixel-size events and settling retries refine it as needed.
+	for (const auto& entry : _windows)
+		if (!updateWindow(entry.first))
 			return false;
 	if (_topBarWindowId == 0 && !_windows.empty())
 		_topBarWindowId = _windows.begin()->first;
