@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "warmup_s": 0.5,
+  "measure_s": 3,
+  "drain_s": 2,
+  "payload_bytes": 16384,
+  "probe_hz": 20,
+  "seeds": [
+    11
+  ],
+  "cases": [
+    {
+      "id": "lan-up",
+      "profile": "lan",
+      "workload": "upload"
+    },
+    {
+      "id": "ten-clean-up",
+      "profile": "ten_mbit_clean",
+      "workload": "upload"
+    },
+    {
+      "id": "remote-probe",
+      "profile": "remote",
+      "workload": "probe"
+    },
+    {
+      "id": "ten-mixed",
+      "profile": "ten_mbit",
+      "workload": "mixed"
+    },
+    {
+      "id": "ten-clean-down",
+      "profile": "ten_mbit_clean",
+      "workload": "download"
+    }
+  ],
+  "notes": "Quick diagnostic; use >=5 paired repetitions and 30+ seconds for a release decision."
+}

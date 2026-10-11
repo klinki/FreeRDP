@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "warmup_s": 2,
+  "measure_s": 10,
+  "drain_s": 12,
+  "payload_bytes": 16384,
+  "probe_hz": 20,
+  "seeds": [
+    11,
+    29,
+    47
+  ],
+  "cases": [
+    {
+      "id": "lan-up",
+      "profile": "lan",
+      "workload": "upload"
+    },
+    {
+      "id": "office-mixed",
+      "profile": "office",
+      "workload": "mixed"
+    },
+    {
+      "id": "home-down",
+      "profile": "home",
+      "workload": "download"
+    },
+    {
+      "id": "ten-up",
+      "profile": "ten_mbit",
+      "workload": "upload"
+    },
+    {
+      "id": "ten-down",
+      "profile": "ten_mbit",
+      "workload": "download"
+    },
+    {
+      "id": "ten-clean-up",
+      "profile": "ten_mbit_clean",
+      "workload": "upload"
+    },
+    {
+      "id": "remote-probe",
+      "profile": "remote",
+      "workload": "probe"
+    },
+    {
+      "id": "ten-clean-down",
+      "profile": "ten_mbit_clean",
+      "workload": "download"
+    },
+    {
+      "id": "ten-mixed",
+      "profile": "ten_mbit",
+      "workload": "mixed"
+    }
+  ],
+  "notes": "Quick diagnostic; use >=5 paired repetitions and 30+ seconds for a release decision."
+}

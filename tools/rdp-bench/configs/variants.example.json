@@ -1,0 +1,20 @@
+{
+  "variants": [
+    {
+      "id": "baseline",
+      "library": "/ABS/build-baseline/libfreerdp/libfreerdp3.dylib",
+      "commit": "SET_REAL_COMMIT",
+      "build_options": {},
+      "env": {}
+    },
+    {
+      "id": "candidate",
+      "library": "/ABS/build-candidate/libfreerdp/libfreerdp3.dylib",
+      "commit": "SET_REAL_COMMIT",
+      "build_options": {
+        "description": "packet batching candidate"
+      },
+      "env": {}
+    }
+  ]
+}

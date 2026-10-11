@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "warmup_s": 5,
+  "measure_s": 30,
+  "drain_s": 15,
+  "payload_bytes": 16384,
+  "probe_hz": 60,
+  "seeds": [
+    11,
+    29,
+    47,
+    71,
+    101
+  ],
+  "cases": [
+    {
+      "id": "lan-up",
+      "profile": "lan",
+      "workload": "upload"
+    },
+    {
+      "id": "office-mixed",
+      "profile": "office",
+      "workload": "mixed"
+    },
+    {
+      "id": "home-down",
+      "profile": "home",
+      "workload": "download"
+    },
+    {
+      "id": "ten-up",
+      "profile": "ten_mbit",
+      "workload": "upload"
+    },
+    {
+      "id": "ten-down",
+      "profile": "ten_mbit",
+      "workload": "download"
+    },
+    {
+      "id": "ten-clean-up",
+      "profile": "ten_mbit_clean",
+      "workload": "upload"
+    },
+    {
+      "id": "remote-probe",
+      "profile": "remote",
+      "workload": "probe"
+    },
+    {
+      "id": "ten-mixed",
+      "profile": "ten_mbit",
+      "workload": "mixed"
+    },
+    {
+      "id": "symmetric-duplex",
+      "profile": "office",
+      "workload": "duplex"
+    },
+    {
+      "id": "ten-clean-down",
+      "profile": "ten_mbit_clean",
+      "workload": "download"
+    }
+  ]
+}

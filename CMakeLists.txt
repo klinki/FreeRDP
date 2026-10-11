@@ -561,6 +561,11 @@ endif()
 # used in libfreerdp subfolder as well
 setfreerdpcmakeinstalldir(FREERDP_CMAKE_INSTALL_DIR "FreeRDP${FREERDP_VERSION_MAJOR}")
 
+option(WITH_RDP_BENCH "Build the private raw UDP2 benchmark adapter (development only)" OFF)
+if(WITH_RDP_BENCH AND (NOT UNIX OR NOT BUILD_SHARED_LIBS))
+  message(FATAL_ERROR "WITH_RDP_BENCH requires a POSIX shared-library build")
+endif()
+
 add_subdirectory(libfreerdp)
 
 if(WITH_CHANNELS)

@@ -4006,3 +4006,8 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 	WLog_INFO(TAG, "RDP-UDP accepted tunnel %u on :%d", expectedReqId, port);
 	return udp;
 }
+
+/* Private adapter shares the production sender, receiver and socket path. */
+#if defined(WITH_RDP_BENCH)
+#include "rdp_bench_private.inc"
+#endif

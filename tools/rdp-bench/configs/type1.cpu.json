@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "warmup_s": 5,
+  "measure_s": 30,
+  "drain_s": 2,
+  "payload_bytes": 16384,
+  "probe_hz": 20,
+  "seeds": [
+    11,
+    29,
+    47,
+    71,
+    101
+  ],
+  "cases": [
+    {
+      "id": "direct-up",
+      "profile": "loopback",
+      "workload": "upload"
+    },
+    {
+      "id": "direct-duplex",
+      "profile": "loopback",
+      "workload": "duplex"
+    }
+  ],
+  "notes": "Use --direct. Real sockets, no relay/netem. Measures process-level performance including driver overhead, not application experience."
+}
