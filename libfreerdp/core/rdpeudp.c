@@ -946,6 +946,10 @@ BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer, size_t*
 #define RDPEUDP2_RECV_MAP 256
 #define RDPEUDP2_SEND_QUEUE_BYTES 32768
 
+#if defined(WITH_RDP_BENCH)
+typedef struct RdpBenchQueueObserver RdpBenchQueueObserver;
+#endif
+
 typedef struct
 {
 	UINT16 dataSeq;
@@ -1051,6 +1055,11 @@ struct rdp_udp_transport
 	BOOL sendAoaValid;
 	UINT64 sendWakeGeneration;
 	UINT64 sendWakeConsumed;
+#if defined(WITH_RDP_BENCH)
+	/* Private experiments never alter the normal-build queue bound. */
+	size_t benchSendQueueBytes;
+	RdpBenchQueueObserver* benchQueueObserver;
+#endif
 
 	UdpRecvSlot recvMap[RDPEUDP2_RECV_MAP];
 	wStream* recvStream; /* reassembled byte stream for TLS */
@@ -1105,6 +1114,19 @@ static UINT64 udp_now_ms(void)
 static UINT64 rdpeudp_recv_now(const rdpUdpTransport* udp)
 {
 	return udp->testClockEnabled ? udp->testClockMs : udp_now_ms();
+}
+
+#include "rdp_bench_queue_private.inc"
+
+static size_t rdpeudp2_send_queue_limit(const rdpUdpTransport* udp)
+{
+#if defined(WITH_RDP_BENCH)
+	if (udp->benchSendQueueBytes)
+		return udp->benchSendQueueBytes;
+#else
+	WINPR_UNUSED(udp);
+#endif
+	return RDPEUDP2_SEND_QUEUE_BYTES;
 }
 
 static BOOL rdpeudp2_service_send(rdpUdpTransport* udp);
@@ -1334,6 +1356,10 @@ void rdpeudp_free(rdpUdpTransport* udp)
 		free(udp->sent[i].data);
 	if (udp->sendQueue)
 		Stream_Release(udp->sendQueue);
+#if defined(WITH_RDP_BENCH)
+	free(udp->benchQueueObserver);
+	udp->benchQueueObserver = nullptr;
+#endif
 	for (size_t i = 0; i < ARRAYSIZE(udp->recvMap); i++)
 		free(udp->recvMap[i].data);
 	Stream_Release(udp->recvStream);
@@ -2646,7 +2672,8 @@ static BOOL rdpeudp2_can_allocate_seq_locked(const rdpUdpTransport* udp, size_t 
 	return (size_t)(UINT16)(udp->nextDataSeq - base) < limit;
 }
 
-static BOOL rdpeudp2_emit_sent_locked(rdpUdpTransport* udp, UdpSentEntry* entry)
+static BOOL rdpeudp2_emit_sent_locked(rdpUdpTransport* udp, UdpSentEntry* entry,
+	                                  UINT64* firstSentNs)
 {
 	rdpeudp2_update_send_aoa_locked(udp);
 	UINT16 flags = RDPUDP2_FLAG_DATA;
@@ -2659,6 +2686,11 @@ static BOOL rdpeudp2_emit_sent_locked(rdpUdpTransport* udp, UdpSentEntry* entry)
 		return FALSE;
 	/* packet owns its encoded bytes before a socketless callback can ACK and
 	 * free entry. Never dereference entry after invoking that callback. */
+	if (firstSentNs)
+	{
+		*firstSentNs = rdp_bench_queue_now_locked(udp);
+		rdp_bench_queue_peak_locked(udp, *firstSentNs);
+	}
 	const BOOL result = rdpeudp_udp_send_stream(udp, packet);
 	Stream_Release(packet);
 	return result;
@@ -2679,6 +2711,7 @@ static BOOL rdpeudp2_service_send(rdpUdpTransport* udp)
 	if (udp_aborted(udp))
 		goto fail;
 	udp->sendPumpActive = TRUE;
+	rdp_bench_queue_peak_locked(udp, rdp_bench_queue_now_locked(udp));
 	/* Consume available feedback before deciding a timer expired. No blocking
 	 * socket wait occurs while holding the transport lock. */
 	if (udp->sockfd >= 0)
@@ -2714,7 +2747,7 @@ static BOOL rdpeudp2_service_send(rdpUdpTransport* udp)
 		entry->lossReported = FALSE;
 		udp->needAoa = TRUE;
 		udp->stats.retransmits++;
-		if (!rdpeudp2_emit_sent_locked(udp, entry))
+		if (!rdpeudp2_emit_sent_locked(udp, entry, nullptr))
 			goto pump_fail;
 		performance_udp_stats(udp->context, 0, 0, 1, 0);
 	}
@@ -2751,8 +2784,10 @@ static BOOL rdpeudp2_service_send(rdpUdpTransport* udp)
 		entry->firstSentTs = entry->sentTs = now;
 		udp->sentCount++;
 		udp->sendPos += chunk;
-		if (!rdpeudp2_emit_sent_locked(udp, entry))
+		UINT64 firstSendNs = 0;
+		if (!rdpeudp2_emit_sent_locked(udp, entry, &firstSendNs))
 			goto pump_fail;
+		rdp_bench_queue_first_send_locked(udp, chunk, firstSendNs);
 	}
 	if (udp->sendQueue && (udp->sendPos == Stream_Length(udp->sendQueue)))
 	{
@@ -2775,7 +2810,8 @@ fail:
 
 /* -2 means capacity refused before accepting any bytes. An accepted write is
  * never retried by the upper layer, including after a later socket failure. */
-static SSIZE_T rdpeudp2_enqueue(rdpUdpTransport* udp, const BYTE* data, size_t len)
+static SSIZE_T rdpeudp2_enqueue(rdpUdpTransport* udp, const BYTE* data, size_t len,
+	                           UINT64* admittedNs)
 {
 	if (!udp || !data || !len || len > 60000)
 		return -1;
@@ -2786,9 +2822,10 @@ static SSIZE_T rdpeudp2_enqueue(rdpUdpTransport* udp, const BYTE* data, size_t l
 		LeaveCriticalSection(&udp->lock);
 		return -1;
 	}
-	/* Normal queued writes own at most 32 KiB. A single larger valid BIO
+	/* Normal builds own at most 32 KiB. A single larger valid BIO
 	 * write can be accepted atomically only after preceding bytes drain. */
-	const size_t limit = len > RDPEUDP2_SEND_QUEUE_BYTES ? len : RDPEUDP2_SEND_QUEUE_BYTES;
+	const size_t queueLimit = rdpeudp2_send_queue_limit(udp);
+	const size_t limit = len > queueLimit ? len : queueLimit;
 	if (udp->sendBytes > limit - len)
 	{
 		LeaveCriticalSection(&udp->lock);
@@ -2821,6 +2858,11 @@ static SSIZE_T rdpeudp2_enqueue(rdpUdpTransport* udp, const BYTE* data, size_t l
 	Stream_SealLength(udp->sendQueue);
 	udp->sendBytes += len;
 	udp->sendWakeGeneration++;
+	const UINT64 accepted = rdp_bench_queue_now_locked(udp);
+	rdp_bench_queue_accepted_locked(udp, len, accepted);
+	rdp_bench_queue_peak_locked(udp, accepted);
+	if (admittedNs)
+		*admittedNs = accepted;
 	LeaveCriticalSection(&udp->lock);
 	return (SSIZE_T)len;
 }
@@ -2830,14 +2872,32 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 	if (!udp || !data || !len || len > 60000)
 		return -1;
 	const UINT64 start = rdpeudp_recv_now(udp);
+	UINT64 admittedNs = 0;
+#if defined(WITH_RDP_BENCH)
+	EnterCriticalSection(&udp->lock);
+	const UINT64 callStartNs = rdp_bench_queue_now_locked(udp);
+	LeaveCriticalSection(&udp->lock);
+	BOOL capacityBlocked = FALSE;
+#endif
 	SSIZE_T result = -2;
-	while ((result = rdpeudp2_enqueue(udp, data, len)) == -2)
+	while ((result = rdpeudp2_enqueue(udp, data, len, &admittedNs)) == -2)
 	{
+#if defined(WITH_RDP_BENCH)
+		capacityBlocked = TRUE;
+#endif
 		if (!rdpeudp2_service_send(udp) ||
 		    (rdpeudp_recv_now(udp) - start >= RDPEUDP_SEND_TIMEOUT_MS))
 			goto fail;
 		(void)rdpeudp_recv_one(udp, 10, nullptr, nullptr, nullptr, nullptr);
 	}
+#if defined(WITH_RDP_BENCH)
+	if (result > 0)
+	{
+		EnterCriticalSection(&udp->lock);
+		rdp_bench_queue_admission_locked(udp, callStartNs, admittedNs, capacityBlocked);
+		LeaveCriticalSection(&udp->lock);
+	}
+#endif
 	if (result < 0 || !rdpeudp2_service_send(udp))
 		goto fail;
 	/* TLS handshake waits on socket readiness before the steady-state timer
@@ -2897,9 +2957,16 @@ BOOL rdpeudp_test_configure_send(rdpUdpTransport* udp, UINT16 payload, BYTE logW
 
 SSIZE_T rdpeudp_test_send_data(rdpUdpTransport* udp, const BYTE* data, size_t len)
 {
-	const SSIZE_T result = rdpeudp2_enqueue(udp, data, len);
+	const SSIZE_T result = rdpeudp2_enqueue(udp, data, len, nullptr);
 	return result > 0 && !rdpeudp2_service_send(udp) ? -1 : result;
 }
+
+#if defined(WITH_RDP_BENCH)
+SSIZE_T rdpeudp_test_queue_enqueue(rdpUdpTransport* udp, const BYTE* data, size_t len)
+{
+	return rdpeudp2_enqueue(udp, data, len, nullptr);
+}
+#endif
 
 SSIZE_T rdpeudp_test_write_data(rdpUdpTransport* udp, const BYTE* data, size_t len)
 {

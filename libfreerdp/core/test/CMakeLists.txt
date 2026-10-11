@@ -13,6 +13,10 @@ if(NOT WIN32)
   list(APPEND TESTS TestRdpeUdpEvent.c)
 endif()
 
+if(WITH_RDP_BENCH)
+  list(APPEND TESTS TestRdpeUdpQueueObserver.c)
+endif()
+
 if(BUILD_TESTING_INTERNAL)
   list(APPEND TESTS TestStreamDump.c TestRdstls.c TestServerChannels.c)
 endif()
@@ -35,6 +39,10 @@ endif()
 create_test_sourcelist(SRCS ${DRIVER} ${TESTS})
 
 add_executable(${MODULE_NAME} ${SRCS})
+
+if(WITH_RDP_BENCH)
+  target_compile_definitions(${MODULE_NAME} PRIVATE WITH_RDP_BENCH)
+endif()
 
 if(WITH_RESOURCE_VERSIONING)
   target_compile_definitions(${MODULE_NAME} PRIVATE WITH_RESOURCE_VERSIONING)

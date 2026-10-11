@@ -47,6 +47,8 @@ class PlainUDP:
         try:return self.s.recv(65535)
         except BlockingIOError:return b''
     def stats(self):return None
+    def configure_queue_measurement(self,measure_ns,stop_ns):pass
+    def queue_stats(self):return None
     def close(self):self.s.close()
 
 def run(c):
@@ -69,8 +71,9 @@ def run(c):
         print(json.dumps({'type':'ready','pid':os.getpid()}),flush=True)
         control=json.loads(sys.stdin.readline())
         start=control['start_ns'];measure=control['measure_ns'];stop=control['stop_ns'];end=control['end_ns']
+        driver.configure_queue_measurement(measure,stop)
         interval=int(1e9/c['probe_hz']) if c['probe_hz'] else 0
-        sends_bulk=c['role'] in ('bulk','duplex');probes=c['role'] in ('probe','mixed_probe')
+        sends_bulk=c['role'] in ('bulk','duplex','bulk_probe');probes=c['role'] in ('probe','mixed_probe','bulk_probe')
         counters['probes_expected']=max(0,(stop-start+interval-1)//interval) if probes else 0
         next_bulk=start;next_sample=start;next_probe=start
         cpu_start=time.process_time_ns();sleep_until(start)
@@ -150,7 +153,7 @@ def run(c):
                 'probe_rtt_ms':timing_summary(probe_delays),'probe_scheduled_ms':timing_summary(scheduled_delays),
                 'send_call_ms':timing_summary(send_block),'delivery_gap_ms':timing_summary(gaps),
                 'probe_timeouts':len(pending),'cpu_total_s':(time.process_time_ns()-cpu_start)/1e9,
-                'measurement_s':(stop-measure)/1e9,'native_stats':driver.stats(),'completed':True}
+                'measurement_s':(stop-measure)/1e9,'native_stats':driver.stats(),'queue_stats':driver.queue_stats(),'completed':True}
     except BaseException as e:
         error=repr(e);out.emit('endpoint_error',error=error)
         result={'version':1,'driver':c['driver'],'completed':False,'error':error,'counters':counters}

@@ -6,7 +6,8 @@ from .link import Relay
 ROOT=Path(__file__).resolve().parents[1]
 
 def effective_environment(overlay):
-    keys={'RDPEUDP_TRACE','RDP_BENCH_COUNTERS','RDP_BENCH_OBSERVER','WLOG_LEVEL','WLOG_FILTER','WLOG_APPENDER'}|set(overlay)
+    keys={'RDPEUDP_TRACE','RDP_BENCH_COUNTERS','RDP_BENCH_OBSERVER','RDP_BENCH_QUEUE_OBSERVER',
+          'RDP_BENCH_SEND_QUEUE_BYTES','WLOG_LEVEL','WLOG_FILTER','WLOG_APPENDER'}|set(overlay)
     return {key:overlay.get(key,os.environ.get(key)) for key in sorted(keys)}
 
 def free_port():
@@ -43,7 +44,9 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
         'peer_environment':effective_environment(variant.get('peer_env',{})),
         'engine':'netns' if netns else 'direct' if direct else 'python-relay','python':env['python'],'system':env['system'],
         'host':env['host'],'suite_source_hash':digest({str(p.relative_to(ROOT)):sha256(p) for p in sorted((ROOT/'rdpbench').glob('*.py'))}),
-        'native_adapter_hash':sha256(ROOT/'../../libfreerdp/core/rdp_bench_private.inc'),
+        'native_adapter_hash':digest({name:sha256(ROOT/'../../libfreerdp/core'/name)
+                                     for name in ('rdp_bench_private.inc','rdp_bench_queue_private.inc')
+                                     if (ROOT/'../../libfreerdp/core'/name).is_file()}),
         'kernel_adapter_hash':sha256(ROOT/'linux/ns_lab.py') if netns else None}
     manifest={'version':1,'suite':'type1','trial_id':folder.name,'case_id':case['id'],'variant':variant['id'],
         'seed':seed,'profile_id':case['profile'],'started_utc':env['utc'],'environment':env,'configuration':config,
@@ -55,7 +58,8 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
     write_json(folder/'manifest.json',manifest)
     log=Journal(folder/'timeline.jsonl'); processes=[];fds=[];relay=None;shape=None;error=None;interrupted=False
     roles={'upload':('bulk','sink'),'download':('sink','bulk'),'duplex':('duplex','duplex'),
-           'probe':('probe','echo'),'mixed':('mixed_probe','bulk')}
+           'probe':('probe','echo'),'mixed':('mixed_probe','bulk'),
+           'upload_mixed':('bulk_probe','sink')}
     if case['workload'] not in roles:raise ValueError('unknown workload')
     try:
         left,right=free_port(),free_port()
@@ -123,6 +127,8 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
     if error:reasons.append(error)
     for r in results:
         if not r.get('completed'):integrity_failures.append(r.get('error','incomplete endpoint'))
+        if r.get('queue_stats') and not r['queue_stats'].get('valid'):
+            reasons.extend('queue telemetry: '+note for note in r['queue_stats'].get('reasons',['invalid observation']))
     for a,b in [(results[0],results[1]),(results[1],results[0])]:
         ac=a.get('counters',{});bc=b.get('counters',{})
         if driver=='native' and a.get('completed') and b.get('completed'):
@@ -158,6 +164,23 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
         for name in ['probe_rtt_ms','probe_scheduled_ms','send_call_ms','delivery_gap_ms']:
             for q in ['p50','p95','p99','max']:metrics[prefix+'.'+name+'.'+q]=r.get(name,{}).get(q)
             metrics[prefix+'.'+name+'.count']=r.get(name,{}).get('count')
+        queue=r.get('queue_stats') or {}
+        for name in ('residence_ms','admission_ms','blocked_admission_ms'):
+            observed=queue.get('summaries',{}).get(name,{})
+            for q in ('p50','p95','p99','max','weight','overflow_weight','bin_width_ms'):
+                metrics[prefix+'.queue_'+name+'.'+q]=observed.get(q)
+            for q in ('p50','p95','p99'):
+                bounds=observed.get(q+'_bounds')
+                metrics[prefix+'.queue_'+name+'.'+q+'_lower_ms']=bounds[0] if bounds else None
+                metrics[prefix+'.queue_'+name+'.'+q+'_upper_ms']=bounds[1] if bounds else None
+        for name in ('queue_limit_bytes','peak_owned_bytes','peak_unsent_bytes','peak_inflight_bytes','peak_inflight_packets',
+                     'accepted_cohort_bytes','first_sent_cohort_bytes','pending_segment_count','pending_segment_bytes',
+                     'admission_calls','capacity_blocked_calls','clock_error_count','segment_overflow_count','counter_overflow_count',
+                     'own_log_window','peer_log_window','max_payload_bytes','effective_window_packets','observer_enabled'):
+            metrics[prefix+'.queue_'+name]=queue.get('fields',{}).get(name)
+        alignment=queue.get('clock_alignment') or {}
+        metrics[prefix+'.queue_clock_offset_drift_ns']=alignment.get('offset_drift_ns')
+        metrics[prefix+'.queue_clock_combined_uncertainty_ns']=alignment.get('combined_uncertainty_ns')
     integrity_verified=driver=='native' and not integrity_failures
     metrics['c2s.verified_goodput_mbps']=results[1].get('goodput_mbps') if integrity_verified else None
     metrics['s2c.verified_goodput_mbps']=results[0].get('goodput_mbps') if integrity_verified else None
@@ -211,7 +234,7 @@ def run_suite(args):
     if not cases:raise ValueError('no matching cases')
     for case in cases:
         validate_profile(profiles[case['profile']])
-        if case['workload'] not in ('upload','download','duplex','probe','mixed'):raise ValueError('unknown workload')
+        if case['workload'] not in ('upload','download','duplex','probe','mixed','upload_mixed'):raise ValueError('unknown workload')
     if args.driver=='udp-calibration':config=dict(config,payload_bytes=1024,offered_mbps=args.offered_mbps)
     if not isinstance(config.get('offered_mbps',0),(int,float)) or not math.isfinite(config.get('offered_mbps',0)) or config.get('offered_mbps',0)<0:raise ValueError('invalid offered rate')
     base=Path(args.output).resolve();base.mkdir(parents=True,exist_ok=True)

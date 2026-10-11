@@ -31,6 +31,7 @@ FREERDP_API void* freerdp_bench_v1_open(const char* bindAddress, UINT16 port,
     b->udp = rdpeudp_new(b->instance->context, peerAddress, peerPort, 1,
                         INITIATE_REQUEST_PROTOCOL_UDPFECR, cookie);
     if (!b->udp) goto fail;
+    if (!rdp_bench_queue_configure_env(b->udp)) goto fail;
     b->udp->sockfd = (int)socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (b->udp->sockfd < 0) goto fail;
     local.sin_family = AF_INET; local.sin_port = htons(port);
@@ -98,6 +99,37 @@ FREERDP_API int freerdp_bench_v1_stats(void* handle, UINT64* out, size_t count)
     out[5] = Stream_Length(b->udp->recvStream) - b->udp->recvPos;
     out[6] = b->udp->sendFailed; out[7] = b->udp->recvFailed;
     return 1;
+}
+FREERDP_API UINT64 freerdp_bench_v1_clock_ns(void)
+{
+    return winpr_GetTickCount64NS();
+}
+FREERDP_API int freerdp_bench_v1_queue_measure(void* handle, UINT64 startNs, UINT64 stopNs)
+{
+    FreeRdpBenchV1* b = handle;
+    if (!b || !b->udp) return 0;
+    EnterCriticalSection(&b->udp->lock);
+    const BOOL result = rdp_bench_queue_measure_locked(b->udp, startNs, stopNs);
+    LeaveCriticalSection(&b->udp->lock);
+    return result;
+}
+FREERDP_API int freerdp_bench_v1_queue_stats(void* handle, UINT64* out, size_t count)
+{
+    FreeRdpBenchV1* b = handle;
+    if (!b || !b->udp) return 0;
+    EnterCriticalSection(&b->udp->lock);
+    const BOOL result = rdp_bench_queue_stats_locked(b->udp, out, count);
+    LeaveCriticalSection(&b->udp->lock);
+    return result;
+}
+FREERDP_API int freerdp_bench_v1_queue_hist(void* handle, UINT32 kind, UINT64* out, size_t count)
+{
+    FreeRdpBenchV1* b = handle;
+    if (!b || !b->udp) return 0;
+    EnterCriticalSection(&b->udp->lock);
+    const BOOL result = rdpeudp_test_queue_hist(b->udp, kind, out, count);
+    LeaveCriticalSection(&b->udp->lock);
+    return result;
 }
 FREERDP_API void freerdp_bench_v1_close(void* handle)
 {

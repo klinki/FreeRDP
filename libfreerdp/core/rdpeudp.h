@@ -470,6 +470,16 @@ FREERDP_API BOOL rdpeudp_test_service_send(rdpUdpTransport* udp);
 FREERDP_API BOOL rdpeudp_test_send_state(rdpUdpTransport* udp, RdpUdpTestSendState* state);
 FREERDP_API void rdpeudp_test_set_abort(rdpUdpTransport* udp, HANDLE event);
 
+#if defined(WITH_RDP_BENCH)
+/* Private deterministic ownership-observer fixtures, never in a normal build. */
+FREERDP_API BOOL rdpeudp_test_queue_enable(rdpUdpTransport* udp, size_t capacity);
+FREERDP_API BOOL rdpeudp_test_queue_configure_env(rdpUdpTransport* udp);
+FREERDP_API BOOL rdpeudp_test_queue_measure(rdpUdpTransport* udp, UINT64 start, UINT64 stop);
+FREERDP_API BOOL rdpeudp_test_queue_stats(rdpUdpTransport* udp, UINT64* out, size_t count);
+FREERDP_API BOOL rdpeudp_test_queue_hist(rdpUdpTransport* udp, UINT32 kind, UINT64* out, size_t count);
+FREERDP_API SSIZE_T rdpeudp_test_queue_enqueue(rdpUdpTransport* udp, const BYTE* data, size_t len);
+#endif
+
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL rdpeudp_check_health(rdpUdpTransport* udp);
 FREERDP_LOCAL BOOL rdpeudp_has_pending_send(rdpUdpTransport* udp);

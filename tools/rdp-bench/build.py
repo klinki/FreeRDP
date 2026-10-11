@@ -46,6 +46,12 @@ def main():
         "commit": commit, "tracked_changes_sha256": hashlib.sha256(diff).hexdigest(),
         "tracked_dirty": bool(diff), "library": str(library), "binary_sha256": sha256(library),
         "native_adapter_sha256": sha256(ROOT / "libfreerdp/core/rdp_bench_private.inc"),
+        "native_source_sha256": {
+            str(path.relative_to(ROOT)): sha256(path)
+            for path in (ROOT / "libfreerdp/core/rdpeudp.c", ROOT / "libfreerdp/core/rdpeudp.h",
+                         ROOT / "libfreerdp/core/rdp_bench_private.inc",
+                         ROOT / "libfreerdp/core/rdp_bench_queue_private.inc") if path.is_file()
+        },
         "build_options": options,
     })
     print("Benchmark library:", library)

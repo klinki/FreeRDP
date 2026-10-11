@@ -90,6 +90,47 @@ no alternate sender or parallel application writer.
 
 ## Results and history
 
+Queue-cap experiments use `queue_sweep.py` with a frozen library built by
+`build.py`. The runner generates 32/48/64/128 KiB variants, fixes the reference
+peer at 128 KiB, and preserves the default 31-packet window. Its main campaign
+runs upload and outgoing bulk-plus-probes (`upload_mixed`) on both 10 Mbit/s
+profiles, with five seeds and 30-second measurements. Separate shorter campaigns
+check unloaded probes and queue-observer overhead. For example:
+
+```sh
+python3 -B tools/rdp-bench/queue_sweep.py \
+  --library /absolute/path/to/frozen/libfreerdp3.dylib \
+  --build-metadata /absolute/path/to/rdp-bench-build.json \
+  --output build/queue-sweep-new
+```
+
+The private adapter validates `RDP_BENCH_SEND_QUEUE_BYTES` as one of 32768,
+49152, 65536 or 131072. `RDP_BENCH_QUEUE_OBSERVER=0` disables only queue
+observation; unavailable measurements remain missing. These options exist only
+in `WITH_RDP_BENCH` builds. Normal builds retain the 32 KiB queue bound.
+
+Queue residence measures transport bytes from successful ownership acceptance
+to the first successful send invocation. Its timestamp precedes the nonblocking
+send call and is counted only after success; kernel completion and wire departure
+are outside this interval. Retransmissions add no residence weight.
+Bytes accepted during the measurement phase are followed through drain.
+Admission timing separately measures calls started during measurement until
+acceptance, including capacity waiting. Histograms provide 0.125 ms percentile
+intervals; scalar percentiles are their upper bounds and maxima are exact.
+Overflow, clock misalignment or incomplete cohort accounting invalidates queue
+telemetry. Scheduled probe RTT/deadline accounting remains separate because
+byte-weighted residence is dominated by bulk data. Histograms are collected only
+after the endpoint loop ends. Probe injection is timestamped before send
+admission, so its RTT includes admission blocking; scheduled RTT also includes
+owner scheduling delay.
+
+`queue_report.py --root build/your-sweep` audits the main campaign and exports
+JSON, per-trial CSV, grouped CSV and a report with strict paired comparisons.
+`queue_observer_report.py --root build/your-sweep` compares observer on/off at
+each cap. Both retain failed and invalid trials and expose valid-only subsets.
+The [Mac queue sweep record](docs/QUEUE-SWEEP-20261011.md) includes the measured
+tradeoffs and every scheduling/timing failure.
+
 Each trial contains `manifest.json`, phase clocks, endpoint JSONL traces,
 endpoint result JSON, stderr logs, `shaper.json`, `summary.json`, and
 `SHA256SUMS.json`. The campaign also writes `campaign.json`. Successful transfers
