@@ -29,6 +29,13 @@ def main():
     engine.add_argument("--netns", help="JSON state created by linux/ns_lab.py on Linux")
     run.add_argument("--offered-mbps", type=float, default=8, help="Raw UDP calibration load only")
     run.add_argument("--calibration", help="Evidence-backed lab acceptance receipt")
+    live = commands.add_parser("type2", help="Run a live Windows RDP campaign with numbered input probes")
+    live.add_argument("--suite", default=str(ROOT / "configs/type2.smoke.json"))
+    live.add_argument("--profiles", default=str(ROOT / "configs/profiles.json"))
+    live.add_argument("--lab", required=True, help="Provisioned Windows/observer/network adapter JSON")
+    live.add_argument("--variants", required=True, help="Frozen SDL client binaries and build metadata")
+    live.add_argument("--case", help="Run one live case ID")
+    live.add_argument("--output", required=True, help="New private campaign directory")
     replay = commands.add_parser("replay", help="Independent production receiver fixtures")
     replay.add_argument("--library", required=True)
     replay.add_argument("--output", required=True)
@@ -50,6 +57,9 @@ def main():
         if args.driver == "native" and not (args.variants or args.library):
             parser.error("native mode requires --library or --variants")
         from rdpbench.type1 import run_suite
+        return run_suite(args)
+    if args.op == "type2":
+        from rdpbench.live import run_suite
         return run_suite(args)
     if args.op == "replay":
         from rdpbench.replay import run

@@ -1,0 +1,1222 @@
+{
+  "version": 1,
+  "scope": "Actual Mac\u2194Windows VM CRC UDP echo; not RDP goodput or input/render latency",
+  "accepted_calibration_receipt": false,
+  "strict_pass": false,
+  "strict_passed": 6,
+  "sample_count": 12,
+  "cleanup_verified": true,
+  "source_hashes": {
+    "live_calibrate.py": "6e51f6f58219fcfd8bae80eaedccf4f19a43884fb2efc1d07ef41f3bea90acf6",
+    "live_relay.py": "b5f46bfc3885a08ba7aa1047fe4eb9850ee2db5b6fa6ef00e0954d33c00b5e50",
+    "rdpbench/link.py": "effd658120bf9fe5ddf02aeac9933a6998d389a948dcab474faa1175b80601e2",
+    "windows/udp_calibration.py": "cef60dc56e39725d52a5dd56bb3c82d5f716ce2d02429677ceccad3d2eec7464"
+  },
+  "calibration_sha256": "3e9b92e901795cf46fa27f1e4dd36e62c6c4c615cfeae0445b894085b486acae",
+  "samples": [
+    {
+      "profile_id": "ten_mbit_clean",
+      "seed": 11,
+      "mode": "unloaded",
+      "packet_bytes": 64,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 100,
+        "sent_udp_bytes": 6400,
+        "received_datagrams": 100,
+        "received_udp_bytes": 6400,
+        "measurement_echo_udp_bytes": 6272
+      },
+      "sender_wire_mbps": 0.01472,
+      "verified_echo_payload_mbps": 0.01024,
+      "measurement_echo_payload_mbps": 0.010035200000000001,
+      "measurement_echo_wire_mbps": 0.0144256,
+      "rtt_ms": {
+        "count": 100,
+        "p50": 33.230041,
+        "p95": 36.686959,
+        "p99": 85.704333,
+        "max": 143.426083
+      },
+      "receiver_counts": {
+        "datagrams": 100,
+        "unique": 100,
+        "crc_failures": 0,
+        "echoed": 100
+      },
+      "receiver_echo_service_ms": {
+        "count": 100,
+        "p50": 0.200125,
+        "p95": 0.39425,
+        "p99": 0.92,
+        "max": 1.994125
+      },
+      "pass": false,
+      "evidence": "ten_mbit_clean-unloaded-s11",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 100,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 100,
+            "p50": 0.84,
+            "p95": 1.32,
+            "p99": 1.4,
+            "max": 33.18265
+          }
+        },
+        "s2c": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 100,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 100,
+            "p50": 0.88,
+            "p95": 1.38,
+            "p99": 1.5,
+            "max": 2.196275
+          }
+        }
+      },
+      "failed_criteria": [
+        {
+          "criterion": "unloaded RTT envelope including VM echo service",
+          "pass": false,
+          "detail": {
+            "expected_base_ms": 30.1472,
+            "jitter_ms": 0,
+            "measured_ms": {
+              "count": 100,
+              "p50": 33.230041,
+              "p95": 36.686959,
+              "p99": 85.704333,
+              "max": 143.426083
+            },
+            "note": "No subtraction of Windows echo scheduling or unaligned one-way timestamps"
+          }
+        }
+      ],
+      "relay_scheduling_gaps": {
+        "count": 302,
+        "max_select_overshoot_ms": 37.821917,
+        "max_io_handler_ms": 0.0,
+        "queue_drop_evidence": [],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit_clean",
+      "seed": 11,
+      "mode": "paced",
+      "packet_bytes": 1232,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 4465,
+        "sent_udp_bytes": 5500880,
+        "received_datagrams": 4451,
+        "received_udp_bytes": 5483632,
+        "measurement_echo_udp_bytes": 5445440
+      },
+      "sender_wire_mbps": 9.00144,
+      "verified_echo_payload_mbps": 8.773811199999999,
+      "measurement_echo_payload_mbps": 8.712704,
+      "measurement_echo_wire_mbps": 8.91072,
+      "rtt_ms": {
+        "count": 4451,
+        "p50": 33.430917,
+        "p95": 55.834458,
+        "p99": 86.932083,
+        "max": 92.378416
+      },
+      "receiver_counts": {
+        "datagrams": 4465,
+        "unique": 4465,
+        "crc_failures": 0,
+        "echoed": 4465
+      },
+      "receiver_echo_service_ms": {
+        "count": 4465,
+        "p50": 0.116709,
+        "p95": 0.332708,
+        "p99": 0.730333,
+        "max": 4.589167
+      },
+      "pass": false,
+      "evidence": "ten_mbit_clean-paced-s11",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 4465,
+          "delivered_datagrams": 4465,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4465,
+            "p50": 0.1,
+            "p95": 0.28,
+            "p99": 0.99,
+            "max": 3.475208
+          }
+        },
+        "s2c": {
+          "received_datagrams": 4465,
+          "delivered_datagrams": 4451,
+          "random_drops": 0,
+          "queue_drops": 14,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4451,
+            "p50": 0.1,
+            "p95": 0.29,
+            "p99": 0.91,
+            "max": 3.287333
+          }
+        }
+      },
+      "failed_criteria": [
+        {
+          "criterion": "s2c no unintended queue drops",
+          "pass": false,
+          "detail": 14
+        }
+      ],
+      "relay_scheduling_gaps": {
+        "count": 47,
+        "max_select_overshoot_ms": 2.575584,
+        "max_io_handler_ms": 2.230584,
+        "queue_drop_evidence": [
+          {
+            "direction": "s2c",
+            "packet_id": 2364,
+            "offered_ns": 204875984621083,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2367,
+            "offered_ns": 204875986437666,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2369,
+            "offered_ns": 204875987502625,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2371,
+            "offered_ns": 204875988424666,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2373,
+            "offered_ns": 204875989330333,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2375,
+            "offered_ns": 204875990086208,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2378,
+            "offered_ns": 204875992146291,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2380,
+            "offered_ns": 204875993355250,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2381,
+            "offered_ns": 204875993673375,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2387,
+            "offered_ns": 204875998649208,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2390,
+            "offered_ns": 204876000073875,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2391,
+            "offered_ns": 204876000503541,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2393,
+            "offered_ns": 204876001208583,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 2394,
+            "offered_ns": 204876001703708,
+            "previous_60ms_max_dispatch_lateness_ms": 1.864334,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          }
+        ],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit_clean",
+      "seed": 29,
+      "mode": "unloaded",
+      "packet_bytes": 64,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 100,
+        "sent_udp_bytes": 6400,
+        "received_datagrams": 100,
+        "received_udp_bytes": 6400,
+        "measurement_echo_udp_bytes": 6400
+      },
+      "sender_wire_mbps": 0.01472,
+      "verified_echo_payload_mbps": 0.01024,
+      "measurement_echo_payload_mbps": 0.01024,
+      "measurement_echo_wire_mbps": 0.01472,
+      "rtt_ms": {
+        "count": 100,
+        "p50": 32.756042,
+        "p95": 33.479291,
+        "p99": 34.319166,
+        "max": 34.491458
+      },
+      "receiver_counts": {
+        "datagrams": 100,
+        "unique": 100,
+        "crc_failures": 0,
+        "echoed": 100
+      },
+      "receiver_echo_service_ms": {
+        "count": 100,
+        "p50": 0.223458,
+        "p95": 0.346834,
+        "p99": 0.430916,
+        "max": 0.567084
+      },
+      "pass": true,
+      "evidence": "ten_mbit_clean-unloaded-s29",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 100,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 100,
+            "p50": 0.58,
+            "p95": 0.68,
+            "p99": 0.69,
+            "max": 0.736566
+          }
+        },
+        "s2c": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 100,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 100,
+            "p50": 0.62,
+            "p95": 0.74,
+            "p99": 0.77,
+            "max": 0.766566
+          }
+        }
+      },
+      "failed_criteria": [],
+      "relay_scheduling_gaps": {
+        "count": 260,
+        "max_select_overshoot_ms": 1.174959,
+        "max_io_handler_ms": 0.0,
+        "queue_drop_evidence": [],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit_clean",
+      "seed": 29,
+      "mode": "paced",
+      "packet_bytes": 1232,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 4465,
+        "sent_udp_bytes": 5500880,
+        "received_datagrams": 4465,
+        "received_udp_bytes": 5500880,
+        "measurement_echo_udp_bytes": 5463920
+      },
+      "sender_wire_mbps": 9.00144,
+      "verified_echo_payload_mbps": 8.801408,
+      "measurement_echo_payload_mbps": 8.742272,
+      "measurement_echo_wire_mbps": 8.94096,
+      "rtt_ms": {
+        "count": 4465,
+        "p50": 32.762167,
+        "p95": 34.640792,
+        "p99": 37.063125,
+        "max": 39.160375
+      },
+      "receiver_counts": {
+        "datagrams": 4465,
+        "unique": 4465,
+        "crc_failures": 0,
+        "echoed": 4465
+      },
+      "receiver_echo_service_ms": {
+        "count": 4465,
+        "p50": 0.098,
+        "p95": 0.169125,
+        "p99": 0.264208,
+        "max": 1.655708
+      },
+      "pass": true,
+      "evidence": "ten_mbit_clean-paced-s29",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 4465,
+          "delivered_datagrams": 4465,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4465,
+            "p50": 0.05,
+            "p95": 0.1,
+            "p99": 0.16,
+            "max": 3.99775
+          }
+        },
+        "s2c": {
+          "received_datagrams": 4465,
+          "delivered_datagrams": 4465,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4465,
+            "p50": 0.05,
+            "p95": 0.11,
+            "p99": 0.17,
+            "max": 3.224084
+          }
+        }
+      },
+      "failed_criteria": [],
+      "relay_scheduling_gaps": {
+        "count": 35,
+        "max_select_overshoot_ms": 1.077209,
+        "max_io_handler_ms": 3.813791,
+        "queue_drop_evidence": [],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit_clean",
+      "seed": 47,
+      "mode": "unloaded",
+      "packet_bytes": 64,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 100,
+        "sent_udp_bytes": 6400,
+        "received_datagrams": 100,
+        "received_udp_bytes": 6400,
+        "measurement_echo_udp_bytes": 6400
+      },
+      "sender_wire_mbps": 0.01472,
+      "verified_echo_payload_mbps": 0.01024,
+      "measurement_echo_payload_mbps": 0.01024,
+      "measurement_echo_wire_mbps": 0.01472,
+      "rtt_ms": {
+        "count": 100,
+        "p50": 32.851708,
+        "p95": 39.620417,
+        "p99": 79.637334,
+        "max": 116.809209
+      },
+      "receiver_counts": {
+        "datagrams": 100,
+        "unique": 100,
+        "crc_failures": 0,
+        "echoed": 100
+      },
+      "receiver_echo_service_ms": {
+        "count": 100,
+        "p50": 0.222791,
+        "p95": 0.40175,
+        "p99": 0.560167,
+        "max": 0.671542
+      },
+      "pass": false,
+      "evidence": "ten_mbit_clean-unloaded-s47",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 100,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 100,
+            "p50": 0.59,
+            "p95": 0.78,
+            "p99": 24.0,
+            "max": 40.289608
+          }
+        },
+        "s2c": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 100,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 100,
+            "p50": 0.62,
+            "p95": 0.76,
+            "p99": 2.0,
+            "max": 42.4764
+          }
+        }
+      },
+      "failed_criteria": [
+        {
+          "criterion": "c2s relay p99 dispatch lateness",
+          "pass": false,
+          "detail": {
+            "p99_ms": 24.0,
+            "budget_ms": 1.5,
+            "max_ms": 40.289608
+          }
+        },
+        {
+          "criterion": "s2c relay p99 dispatch lateness",
+          "pass": false,
+          "detail": {
+            "p99_ms": 2.0,
+            "budget_ms": 1.5,
+            "max_ms": 42.4764
+          }
+        },
+        {
+          "criterion": "unloaded RTT envelope including VM echo service",
+          "pass": false,
+          "detail": {
+            "expected_base_ms": 30.1472,
+            "jitter_ms": 0,
+            "measured_ms": {
+              "count": 100,
+              "p50": 32.851708,
+              "p95": 39.620417,
+              "p99": 79.637334,
+              "max": 116.809209
+            },
+            "note": "No subtraction of Windows echo scheduling or unaligned one-way timestamps"
+          }
+        }
+      ],
+      "relay_scheduling_gaps": {
+        "count": 265,
+        "max_select_overshoot_ms": 41.964209,
+        "max_io_handler_ms": 5.704041,
+        "queue_drop_evidence": [],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit_clean",
+      "seed": 47,
+      "mode": "paced",
+      "packet_bytes": 1232,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 4465,
+        "sent_udp_bytes": 5500880,
+        "received_datagrams": 4463,
+        "received_udp_bytes": 5498416,
+        "measurement_echo_udp_bytes": 5461456
+      },
+      "sender_wire_mbps": 9.00144,
+      "verified_echo_payload_mbps": 8.797465599999999,
+      "measurement_echo_payload_mbps": 8.7383296,
+      "measurement_echo_wire_mbps": 8.936928,
+      "rtt_ms": {
+        "count": 4463,
+        "p50": 32.95475,
+        "p95": 59.398042,
+        "p99": 69.810375,
+        "max": 74.826708
+      },
+      "receiver_counts": {
+        "datagrams": 4465,
+        "unique": 4465,
+        "crc_failures": 0,
+        "echoed": 4465
+      },
+      "receiver_echo_service_ms": {
+        "count": 4465,
+        "p50": 0.093625,
+        "p95": 0.290209,
+        "p99": 0.680834,
+        "max": 8.664375
+      },
+      "pass": false,
+      "evidence": "ten_mbit_clean-paced-s47",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 4465,
+          "delivered_datagrams": 4465,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4465,
+            "p50": 0.07,
+            "p95": 0.18,
+            "p99": 0.8,
+            "max": 27.829125
+          }
+        },
+        "s2c": {
+          "received_datagrams": 4465,
+          "delivered_datagrams": 4463,
+          "random_drops": 0,
+          "queue_drops": 2,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4463,
+            "p50": 0.07,
+            "p95": 0.19,
+            "p99": 0.7,
+            "max": 28.597292
+          }
+        }
+      },
+      "failed_criteria": [
+        {
+          "criterion": "s2c no unintended queue drops",
+          "pass": false,
+          "detail": 2
+        }
+      ],
+      "relay_scheduling_gaps": {
+        "count": 41,
+        "max_select_overshoot_ms": 28.473292,
+        "max_io_handler_ms": 3.723417,
+        "queue_drop_evidence": [
+          {
+            "direction": "s2c",
+            "packet_id": 1115,
+            "offered_ns": 204897214585041,
+            "previous_60ms_max_dispatch_lateness_ms": 0.30225,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          },
+          {
+            "direction": "s2c",
+            "packet_id": 1116,
+            "offered_ns": 204897214957583,
+            "previous_60ms_max_dispatch_lateness_ms": 0.30225,
+            "overlapping_scheduler_gaps": [],
+            "attribution": "Reverse queue drop is verified; antecedent Windows/socket/host backlog is not uniquely attributable from unaligned clocks."
+          }
+        ],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit",
+      "seed": 11,
+      "mode": "unloaded",
+      "packet_bytes": 64,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 100,
+        "sent_udp_bytes": 6400,
+        "received_datagrams": 100,
+        "received_udp_bytes": 6400,
+        "measurement_echo_udp_bytes": 6400
+      },
+      "sender_wire_mbps": 0.01472,
+      "verified_echo_payload_mbps": 0.01024,
+      "measurement_echo_payload_mbps": 0.01024,
+      "measurement_echo_wire_mbps": 0.01472,
+      "rtt_ms": {
+        "count": 100,
+        "p50": 32.525375,
+        "p95": 35.18075,
+        "p99": 37.462709,
+        "max": 38.723667
+      },
+      "receiver_counts": {
+        "datagrams": 100,
+        "unique": 100,
+        "crc_failures": 0,
+        "echoed": 100
+      },
+      "receiver_echo_service_ms": {
+        "count": 100,
+        "p50": 0.220208,
+        "p95": 0.392333,
+        "p99": 0.487375,
+        "max": 0.501459
+      },
+      "pass": false,
+      "evidence": "ten_mbit-unloaded-s11",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 100,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 100,
+            "p50": 0.56,
+            "p95": 0.74,
+            "p99": 0.83,
+            "max": 3.642225
+          }
+        },
+        "s2c": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 100,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 100,
+            "p50": 0.61,
+            "p95": 0.75,
+            "p99": 0.8,
+            "max": 0.847587
+          }
+        }
+      },
+      "failed_criteria": [
+        {
+          "criterion": "unloaded RTT envelope including VM echo service",
+          "pass": false,
+          "detail": {
+            "expected_base_ms": 30.1472,
+            "jitter_ms": 2,
+            "measured_ms": {
+              "count": 100,
+              "p50": 32.525375,
+              "p95": 35.18075,
+              "p99": 37.462709,
+              "max": 38.723667
+            },
+            "note": "No subtraction of Windows echo scheduling or unaligned one-way timestamps"
+          }
+        }
+      ],
+      "relay_scheduling_gaps": {
+        "count": 266,
+        "max_select_overshoot_ms": 3.499558,
+        "max_io_handler_ms": 0.0,
+        "queue_drop_evidence": [],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit",
+      "seed": 11,
+      "mode": "paced",
+      "packet_bytes": 1232,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 4465,
+        "sent_udp_bytes": 5500880,
+        "received_datagrams": 4462,
+        "received_udp_bytes": 5497184,
+        "measurement_echo_udp_bytes": 5458992,
+        "reordered": 774
+      },
+      "sender_wire_mbps": 9.00144,
+      "verified_echo_payload_mbps": 8.7954944,
+      "measurement_echo_payload_mbps": 8.734387199999999,
+      "measurement_echo_wire_mbps": 8.932896,
+      "rtt_ms": {
+        "count": 4462,
+        "p50": 33.536792,
+        "p95": 35.562917,
+        "p99": 38.55175,
+        "max": 42.531
+      },
+      "receiver_counts": {
+        "datagrams": 4463,
+        "unique": 4463,
+        "crc_failures": 0,
+        "echoed": 4463
+      },
+      "receiver_echo_service_ms": {
+        "count": 4463,
+        "p50": 0.102791,
+        "p95": 0.25825,
+        "p99": 0.477792,
+        "max": 3.064042
+      },
+      "pass": true,
+      "evidence": "ten_mbit-paced-s11",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 4465,
+          "delivered_datagrams": 4463,
+          "random_drops": 2,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4463,
+            "p50": 0.06,
+            "p95": 0.14,
+            "p99": 0.19,
+            "max": 0.562052
+          }
+        },
+        "s2c": {
+          "received_datagrams": 4463,
+          "delivered_datagrams": 4462,
+          "random_drops": 1,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4462,
+            "p50": 0.05,
+            "p95": 0.13,
+            "p99": 0.19,
+            "max": 0.3939
+          }
+        }
+      },
+      "failed_criteria": [],
+      "relay_scheduling_gaps": {
+        "count": 27,
+        "max_select_overshoot_ms": 1.184875,
+        "max_io_handler_ms": 0.0,
+        "queue_drop_evidence": [],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit",
+      "seed": 29,
+      "mode": "unloaded",
+      "packet_bytes": 64,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 100,
+        "sent_udp_bytes": 6400,
+        "received_datagrams": 99,
+        "received_udp_bytes": 6336,
+        "measurement_echo_udp_bytes": 6336
+      },
+      "sender_wire_mbps": 0.01472,
+      "verified_echo_payload_mbps": 0.0101376,
+      "measurement_echo_payload_mbps": 0.0101376,
+      "measurement_echo_wire_mbps": 0.014572799999999999,
+      "rtt_ms": {
+        "count": 99,
+        "p50": 32.790833,
+        "p95": 39.064208,
+        "p99": 75.292583,
+        "max": 75.292583
+      },
+      "receiver_counts": {
+        "datagrams": 99,
+        "unique": 99,
+        "crc_failures": 0,
+        "echoed": 99
+      },
+      "receiver_echo_service_ms": {
+        "count": 99,
+        "p50": 0.213583,
+        "p95": 0.409458,
+        "p99": 2.833125,
+        "max": 2.833125
+      },
+      "pass": false,
+      "evidence": "ten_mbit-unloaded-s29",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 99,
+          "random_drops": 1,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 99,
+            "p50": 0.58,
+            "p95": 0.97,
+            "p99": 3.57,
+            "max": 3.564653
+          }
+        },
+        "s2c": {
+          "received_datagrams": 99,
+          "delivered_datagrams": 99,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 99,
+            "p50": 0.64,
+            "p95": 1.02,
+            "p99": 4.7,
+            "max": 4.699179
+          }
+        }
+      },
+      "failed_criteria": [
+        {
+          "criterion": "c2s relay p99 dispatch lateness",
+          "pass": false,
+          "detail": {
+            "p99_ms": 3.57,
+            "budget_ms": 1.5,
+            "max_ms": 3.564653
+          }
+        },
+        {
+          "criterion": "s2c relay p99 dispatch lateness",
+          "pass": false,
+          "detail": {
+            "p99_ms": 4.7,
+            "budget_ms": 1.5,
+            "max_ms": 4.699179
+          }
+        },
+        {
+          "criterion": "unloaded RTT envelope including VM echo service",
+          "pass": false,
+          "detail": {
+            "expected_base_ms": 30.1472,
+            "jitter_ms": 2,
+            "measured_ms": {
+              "count": 99,
+              "p50": 32.790833,
+              "p95": 39.064208,
+              "p99": 75.292583,
+              "max": 75.292583
+            },
+            "note": "No subtraction of Windows echo scheduling or unaligned one-way timestamps"
+          }
+        }
+      ],
+      "relay_scheduling_gaps": {
+        "count": 250,
+        "max_select_overshoot_ms": 11.443042,
+        "max_io_handler_ms": 4.482375,
+        "queue_drop_evidence": [],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit",
+      "seed": 29,
+      "mode": "paced",
+      "packet_bytes": 1232,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 4465,
+        "sent_udp_bytes": 5500880,
+        "received_datagrams": 4461,
+        "received_udp_bytes": 5495952,
+        "measurement_echo_udp_bytes": 5460224,
+        "reordered": 782
+      },
+      "sender_wire_mbps": 9.00144,
+      "verified_echo_payload_mbps": 8.7935232,
+      "measurement_echo_payload_mbps": 8.7363584,
+      "measurement_echo_wire_mbps": 8.934912,
+      "rtt_ms": {
+        "count": 4461,
+        "p50": 33.495292,
+        "p95": 35.36,
+        "p99": 38.028667,
+        "max": 42.441541
+      },
+      "receiver_counts": {
+        "datagrams": 4463,
+        "unique": 4463,
+        "crc_failures": 0,
+        "echoed": 4463
+      },
+      "receiver_echo_service_ms": {
+        "count": 4463,
+        "p50": 0.100334,
+        "p95": 0.2465,
+        "p99": 0.457417,
+        "max": 2.71275
+      },
+      "pass": true,
+      "evidence": "ten_mbit-paced-s29",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 4465,
+          "delivered_datagrams": 4463,
+          "random_drops": 2,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4463,
+            "p50": 0.06,
+            "p95": 0.15,
+            "p99": 0.21,
+            "max": 2.892671
+          }
+        },
+        "s2c": {
+          "received_datagrams": 4463,
+          "delivered_datagrams": 4461,
+          "random_drops": 2,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4461,
+            "p50": 0.06,
+            "p95": 0.15,
+            "p99": 0.23,
+            "max": 2.54818
+          }
+        }
+      },
+      "failed_criteria": [],
+      "relay_scheduling_gaps": {
+        "count": 32,
+        "max_select_overshoot_ms": 2.786713,
+        "max_io_handler_ms": 0.0,
+        "queue_drop_evidence": [],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit",
+      "seed": 47,
+      "mode": "unloaded",
+      "packet_bytes": 64,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 100,
+        "sent_udp_bytes": 6400,
+        "received_datagrams": 100,
+        "received_udp_bytes": 6400,
+        "measurement_echo_udp_bytes": 6400
+      },
+      "sender_wire_mbps": 0.01472,
+      "verified_echo_payload_mbps": 0.01024,
+      "measurement_echo_payload_mbps": 0.01024,
+      "measurement_echo_wire_mbps": 0.01472,
+      "rtt_ms": {
+        "count": 100,
+        "p50": 32.801541,
+        "p95": 34.458042,
+        "p99": 34.755583,
+        "max": 35.308167
+      },
+      "receiver_counts": {
+        "datagrams": 100,
+        "unique": 100,
+        "crc_failures": 0,
+        "echoed": 100
+      },
+      "receiver_echo_service_ms": {
+        "count": 100,
+        "p50": 0.225958,
+        "p95": 0.332458,
+        "p99": 0.38025,
+        "max": 0.381917
+      },
+      "pass": true,
+      "evidence": "ten_mbit-unloaded-s47",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 100,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 100,
+            "p50": 0.57,
+            "p95": 0.72,
+            "p99": 0.8,
+            "max": 0.893987
+          }
+        },
+        "s2c": {
+          "received_datagrams": 100,
+          "delivered_datagrams": 100,
+          "random_drops": 0,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 100,
+            "p50": 0.62,
+            "p95": 0.79,
+            "p99": 0.81,
+            "max": 0.93766
+          }
+        }
+      },
+      "failed_criteria": [],
+      "relay_scheduling_gaps": {
+        "count": 267,
+        "max_select_overshoot_ms": 1.1285,
+        "max_io_handler_ms": 0.0,
+        "queue_drop_evidence": [],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    },
+    {
+      "profile_id": "ten_mbit",
+      "seed": 47,
+      "mode": "paced",
+      "packet_bytes": 1232,
+      "seconds": 5.0,
+      "counts": {
+        "sent_datagrams": 4465,
+        "sent_udp_bytes": 5500880,
+        "received_datagrams": 4459,
+        "received_udp_bytes": 5493488,
+        "measurement_echo_udp_bytes": 5456528,
+        "reordered": 759
+      },
+      "sender_wire_mbps": 9.00144,
+      "verified_echo_payload_mbps": 8.789580800000001,
+      "measurement_echo_payload_mbps": 8.7304448,
+      "measurement_echo_wire_mbps": 8.928864,
+      "rtt_ms": {
+        "count": 4459,
+        "p50": 33.551125,
+        "p95": 35.086875,
+        "p99": 36.034792,
+        "max": 38.108833
+      },
+      "receiver_counts": {
+        "datagrams": 4462,
+        "unique": 4462,
+        "crc_failures": 0,
+        "echoed": 4462
+      },
+      "receiver_echo_service_ms": {
+        "count": 4462,
+        "p50": 0.100125,
+        "p95": 0.223375,
+        "p99": 0.396291,
+        "max": 1.197791
+      },
+      "pass": true,
+      "evidence": "ten_mbit-paced-s47",
+      "relay": {
+        "c2s": {
+          "received_datagrams": 4465,
+          "delivered_datagrams": 4462,
+          "random_drops": 3,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4462,
+            "p50": 0.06,
+            "p95": 0.14,
+            "p99": 0.2,
+            "max": 0.659242
+          }
+        },
+        "s2c": {
+          "received_datagrams": 4462,
+          "delivered_datagrams": 4459,
+          "random_drops": 3,
+          "queue_drops": 0,
+          "socket_send_errors": 0,
+          "lateness_ms": {
+            "count": 4459,
+            "p50": 0.06,
+            "p95": 0.15,
+            "p99": 0.22,
+            "max": 0.509055
+          }
+        }
+      },
+      "failed_criteria": [],
+      "relay_scheduling_gaps": {
+        "count": 30,
+        "max_select_overshoot_ms": 1.095875,
+        "max_io_handler_ms": 0.0,
+        "queue_drop_evidence": [],
+        "scope": "Mac relay intervals include unmeasured host scheduling; VM clocks unaligned"
+      }
+    }
+  ],
+  "original_evidence_preserved": "../relay-vm-calibration",
+  "limitations": [
+    "Raw UDP echo is not RDP application goodput or protocol latency.",
+    "Windows and Mac monotonic clocks are unaligned; one-way VM latency is unknown.",
+    "Short seeded samples audit exact model decisions, not a population estimate of 0.05% loss.",
+    "No saturation, 2\u00d7 packet-rate headroom or observer-overhead certification was performed."
+  ],
+  "totals": {
+    "c2s_received_datagrams": 27390,
+    "c2s_delivered_datagrams": 27382,
+    "c2s_random_drops": 8,
+    "c2s_queue_drops": 0,
+    "c2s_socket_send_errors": 0,
+    "s2c_received_datagrams": 27382,
+    "s2c_delivered_datagrams": 27360,
+    "s2c_random_drops": 6,
+    "s2c_queue_drops": 16,
+    "s2c_socket_send_errors": 0
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "lab_id": "local-utm-windows",
+  "ssh_target": "david@192.168.64.2",
+  "ssh_control_path": "/private/tmp/owned-ssh-control.sock",
+  "windows_root": "C:\\RdpBench",
+  "windows_task": "RdpBenchAgent",
+  "username": "david",
+  "domain": "",
+  "password_env": "RDP_BENCH_PASSWORD",
+  "certificate_sha256": "REPLACE_WITH_VERIFIED_64_HEX_SHA256",
+  "rdp_arguments": ["/v:127.0.0.1:43389", "/u:david", "/size:1920x1080", "/gfx:AVC444:on", "+multitransport"],
+  "display_selections": [],
+  "connect_timeout_s": 60,
+  "tls_keylog": true,
+  "agent_config": {"browser_channel": "msedge", "expected_session_id": null},
+  "observer": {"command": [], "calibration": null},
+  "network": {"apply_command": [], "status_command": [], "restore_command": []},
+  "calibration": {"status": "provisional", "notes": ["Populate commands and observer calibration before running."]}
+}

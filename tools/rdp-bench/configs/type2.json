@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "phase": "main",
+  "warmup_s": 5,
+  "measure_s": 60,
+  "response_timeout_s": 3,
+  "seeds": [11,29,47,71,101],
+  "source_fps": 60,
+  "scroll_px_s": 400,
+  "probe_hz": 2,
+  "injection_budget_ms": 50,
+  "cases": [
+    {"id": "canvas-ten-clean", "scene": "canvas-motion", "profile": "ten_mbit_clean"},
+    {"id": "canvas-ten-impaired", "scene": "canvas-motion", "profile": "ten_mbit"},
+    {"id": "text-ten-clean", "scene": "text-scroll", "profile": "ten_mbit_clean"},
+    {"id": "text-ten-impaired", "scene": "text-scroll", "profile": "ten_mbit"}
+  ]
+}

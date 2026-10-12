@@ -1,0 +1,27 @@
+{
+  "status": "unavailable",
+  "available": false,
+  "required": true,
+  "checked_ns": 208767197680958,
+  "observed": {
+    "screen_locked": null,
+    "console_session": true,
+    "login_complete": true,
+    "login_window_foreground": false,
+    "capture_allowed": true,
+    "accessibility_allowed": true,
+    "available": true,
+    "display_inventory_valid": true,
+    "active_displays": [
+      {
+        "display_id": 1,
+        "uuid": "37D8832A-2D66-02CA-B9F7-8F30A301B230"
+      }
+    ]
+  },
+  "reasons": [
+    "required physical display UUID is not active: 11e5fac6-8014-438b-bc29-90d76bc99e6a",
+    "calibrated observer display ID is not active: 2"
+  ],
+  "returncode": 0
+}

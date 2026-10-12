@@ -400,3 +400,13 @@ lab admission. Use the normal enabled defaults for the baseline.
 aggregates all repeats and retains failures. Case tables report medians of
 per-trial goodput/percentile values, rather than incorrectly pooling percentiles.
 Calibrated and uncalibrated subsets remain explicit.
+
+## Live Windows desktop campaigns
+
+`bench.py type2` runs a provisioned Windows browser fixture through the actual
+SDL3 client, records numbered input-to-capture probes, source progress, render
+samples and transport traffic, and retains missing responses and failures.
+It requires a verified network adapter and an observer preflight; live traffic
+rates remain separate from transport-only verified goodput. See
+[LIVE-WINDOWS.md](docs/LIVE-WINDOWS.md) for provisioning, both 10 Mbit/s profiles,
+credential handling, metric boundaries and the machine-readable campaign format.
