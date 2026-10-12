@@ -457,6 +457,7 @@ typedef struct
 	BYTE localLogWindow;
 	BYTE peerLogWindow;
 	size_t sendWindow; /* Effective bound after local, peer and storage limits. */
+	UINT64 lossReports;
 } RdpUdpTestSendState;
 FREERDP_API BOOL rdpeudp_test_configure_send(rdpUdpTransport* udp, UINT16 payload,
                                            BYTE logWindow, BYTE peerLogWindow,

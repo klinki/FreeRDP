@@ -7,7 +7,8 @@ def engine_sources(root):
     root=Path(root).resolve()
     names=['rdpbench/link.py','rdpbench/feedback.py','rdpbench/endpoint.py','rdpbench/type1.py',
            'rdpbench/native.py','rdpbench/common.py','rdpbench/calibration.py','linux/ns_lab.py',
-           '../../libfreerdp/core/rdp_bench_private.inc']
+           '../../libfreerdp/core/rdp_bench_private.inc','../../libfreerdp/core/rdp_bench_queue_private.inc',
+           '../../libfreerdp/core/rdp_bench_loss_private.inc']
     return {name:(root/name).resolve() for name in names}
 
 def accepted(receipt,host,engine,root,rate,observed_pps,peer_sha256=None):

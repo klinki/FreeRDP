@@ -8,7 +8,8 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def effective_environment(overlay):
     keys={'RDPEUDP_TRACE','RDP_BENCH_COUNTERS','RDP_BENCH_OBSERVER','RDP_BENCH_QUEUE_OBSERVER',
-          'RDP_BENCH_SEND_QUEUE_BYTES','WLOG_LEVEL','WLOG_FILTER','WLOG_APPENDER'}|set(overlay)
+          'RDP_BENCH_SEND_QUEUE_BYTES','RDP_BENCH_LOSS_TRACE','RDP_BENCH_LOSS_RECOVERY_MODE',
+          'WLOG_LEVEL','WLOG_FILTER','WLOG_APPENDER'}|set(overlay)
     return {key:overlay.get(key,os.environ.get(key)) for key in sorted(keys)}
 
 def free_port():
@@ -35,28 +36,32 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
     identifier(case['id']);identifier(variant['id'])
     validate_profile(profile)
     ack_feedback=validate_feedback(case.get('ack_feedback'))
+    loss_trace=case.get('loss_trace',False)
+    if not isinstance(loss_trace,bool):raise ValueError('loss_trace must be a boolean')
+    if loss_trace and (netns or direct or driver!='native'):raise ValueError('loss_trace requires native endpoints and the Python relay')
     if ack_feedback is not None and (netns or direct or driver!='native'):
         raise ValueError('ack_feedback requires native endpoints and the Python relay')
     if direct and any(profile[d].get(k,0) for d in ('c2s','s2c') for k in ('one_way_ms','jitter_ms','rate_mbps','loss','reorder','duplicate')):raise ValueError('direct mode requires the unshaped loopback profile')
     if direct and any(profile[d].get('blackouts_ms') for d in ('c2s','s2c')):raise ValueError('direct mode cannot apply blackouts')
     folder=Path(folder).resolve();folder.mkdir(parents=True,exist_ok=False)
     env=environment(); lib=variant.get('library','')
+    forced_trace={'RDP_BENCH_LOSS_TRACE':'1' if loss_trace else '0'}
     invariants={'profile':profile,'case':case,'warmup_s':config['warmup_s'],'measure_s':config['measure_s'],
         'drain_s':config['drain_s'],'payload_bytes':config['payload_bytes'],'probe_hz':config['probe_hz'],
-        'offered_mbps':config.get('offered_mbps',0),'driver':driver,'ack_feedback':ack_feedback,
+        'offered_mbps':config.get('offered_mbps',0),'driver':driver,'ack_feedback':ack_feedback,'loss_trace':loss_trace,
         'peer_sha256':sha256(variant['peer_library']) if variant.get('peer_library') and Path(variant['peer_library']).is_file() else None,
-        'peer_environment':effective_environment(variant.get('peer_env',{})),
+        'peer_environment':effective_environment(dict(variant.get('peer_env',{}),**forced_trace)),
         'engine':'netns' if netns else 'direct' if direct else 'python-relay','python':env['python'],'system':env['system'],
         'host':env['host'],'suite_source_hash':digest({str(p.relative_to(ROOT)):sha256(p) for p in sorted((ROOT/'rdpbench').glob('*.py'))}),
         'native_adapter_hash':digest({name:sha256(ROOT/'../../libfreerdp/core'/name)
-                                     for name in ('rdp_bench_private.inc','rdp_bench_queue_private.inc')
+                                     for name in ('rdp_bench_private.inc','rdp_bench_queue_private.inc','rdp_bench_loss_private.inc')
                                      if (ROOT/'../../libfreerdp/core'/name).is_file()}),
         'kernel_adapter_hash':sha256(ROOT/'linux/ns_lab.py') if netns else None}
     manifest={'version':1,'suite':'type1','trial_id':folder.name,'case_id':case['id'],'variant':variant['id'],
         'seed':seed,'profile_id':case['profile'],'started_utc':env['utc'],'environment':env,'configuration':config,
         'profile':profile,'source_commit':variant.get('commit'),'build_options':variant.get('build_options'),
         'build_metadata':variant.get('build_metadata'),'variant_environment':variant.get('env',{}),
-        'effective_variant_environment':effective_environment(variant.get('env',{})),
+        'effective_variant_environment':effective_environment(dict(variant.get('env',{}),**forced_trace)),
         'binary_sha256':sha256(lib) if lib and Path(lib).is_file() else None,'invariants':invariants,
         'comparison_key':digest(invariants),'calibration':calibration,'scope':'raw-udp2-steady-state-no-TLS-no-handshake' if driver=='native' else 'HARNESS_CALIBRATION_ONLY'}
     write_json(folder/'manifest.json',manifest)
@@ -74,7 +79,8 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
         elif direct:peer_ports=[right,left];shape={'engine':'direct-loopback'}
         else:
             relay=Relay(left,right,profile,seed,ack_feedback,
-                        folder/'ack-feedback.jsonl' if ack_feedback is not None else None);peer_ports=relay.ports
+                        folder/'ack-feedback.jsonl' if ack_feedback is not None else None,
+                        folder/'relay-loss.jsonl' if loss_trace else None);peer_ports=relay.ports
         if netns:
             write_json(folder/'resolved-profiles.json',{'profiles':{case['profile']:profile}})
             applied=subprocess.check_output([sys.executable,str(ROOT/'linux/ns_lab.py'),'profile','--state',netns['state_file'],
@@ -89,6 +95,7 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
             args=[sys.executable,'-m','rdpbench.endpoint',str(folder/f'endpoint-{i}.config.json')]
             if netns:args=['ip','netns','exec',netns['left_ns' if i==0 else 'right_ns']]+args
             e=os.environ.copy();e.update(variant.get('env',{}) if i==0 else variant.get('peer_env',{}));e['PYTHONPATH']=str(ROOT)+os.pathsep+e.get('PYTHONPATH','')
+            e['RDP_BENCH_LOSS_TRACE']='1' if loss_trace else '0'
             stderr=open(folder/f'endpoint-{i}.stderr','w');fds.append(stderr)
             p=subprocess.Popen(args,cwd=ROOT,env=e,stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=stderr,text=True)
             processes.append(p)
@@ -134,6 +141,11 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
         if not r.get('completed'):integrity_failures.append(r.get('error','incomplete endpoint'))
         if r.get('queue_stats') and not r['queue_stats'].get('valid'):
             reasons.extend('queue telemetry: '+note for note in r['queue_stats'].get('reasons',['invalid observation']))
+        if r.get('loss_trace') and not r['loss_trace'].get('valid'):
+            reasons.append('application loss trace overflow')
+    if loss_trace and results[0].get('completed'):
+        native=results[0].get('loss_trace',{}).get('native',{})
+        if not native.get('valid'):reasons.extend('native loss trace: '+note for note in native.get('reasons',['unavailable']))
     for a,b in [(results[0],results[1]),(results[1],results[0])]:
         ac=a.get('counters',{});bc=b.get('counters',{})
         if driver=='native' and a.get('completed') and b.get('completed'):
@@ -143,6 +155,8 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
     sut_failures.extend(integrity_failures)
     if shape and shape.get('engine')=='python_udp_relay_v1':
         if shape['error']:reasons.append('relay error')
+        if loss_trace and not shape.get('loss_trace',{}).get('valid'):
+            reasons.append('relay loss trace unavailable, unclassified or overflowed')
         for d in ['c2s','s2c']:
             x=shape[d];p99=x['lateness_ms']['p99']
             tolerance=max(.5,profile[d]['one_way_ms']*.1)

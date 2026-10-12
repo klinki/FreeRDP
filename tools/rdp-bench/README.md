@@ -207,6 +207,46 @@ RDP_BENCH_TEST_LIBRARY=/absolute/path/to/frozen/libfreerdp3.dylib \
   python3 -B -m unittest discover -s tools/rdp-bench/tests -p test_ack_feedback.py
 ```
 
+`loss_stall_sweep.py` compares frozen reference/candidate libraries at 48/64 KiB
+on both 10 Mbit/s profiles, using the same old 128 KiB peer. Its 40-trial main
+campaign is outgoing bulk-plus-probes with five seeds and 5/30/10-second phases.
+Separate traced timer/fast controls use the same candidate binary, and separate
+trace-on/off controls measure instrumentation cost. The complete plan has 56
+trials. `--prepare-only` records provenance; `--phase` permits resumable phases
+without replacing existing evidence.
+
+```sh
+python3 -B tools/rdp-bench/loss_stall_sweep.py \
+  --candidate /absolute/path/to/candidate/libfreerdp3.dylib \
+  --reference /absolute/path/to/reference/libfreerdp3.dylib \
+  --candidate-metadata /absolute/path/to/candidate-build.json \
+  --reference-metadata /absolute/path/to/reference-build.json \
+  --output build/loss-stalls-new
+python3 -B tools/rdp-bench/loss_stall_report.py \
+  --root build/loss-stalls-new --output build/loss-stalls-new/report
+python3 -B tools/rdp-bench/loss_stall_compact.py \
+  --input build/loss-stalls-new/report/aggregate.json \
+  --output tools/rdp-bench/results/loss-stalls-new
+```
+
+`RDP_BENCH_LOSS_TRACE=1` enables bounded, buffered native/application/relay
+ledgers; logs are written after endpoint and relay loops stop. Overflow, clock
+alignment or incomplete ledger accounting invalidates the trace. Visible UDP2
+header identifiers link actual drops to native gap evidence, retry timing and
+blocked admission. `RDP_BENCH_LOSS_RECOVERY_MODE=timer` disables early recovery
+only in the benchmark adapter. Normal builds contain neither option nor trace
+hooks. The runner pins treatment and trace settings; the main comparison omits
+loss tracing. Reporters retain native evidence, relay-confounded waits, unknown
+intervals and every failure. The compact exporter consumes an already audited
+aggregate; it does not repeat or replace the artifact audits.
+
+The [loss-stall record](docs/LOSS-STALLS-20261012.md) explains the conservative
+three-receipt/25 ms recovery rule, both profile reruns, calibration limits and
+failed preflight. Committed [JSON](results/loss-stalls-20261012.json) and
+[CSV](results/loss-stalls-20261012.csv) preserve strict pair counts, all-observed
+diagnostics, missed probes and sparse causal evidence. The production 32 KiB
+queue and 31-packet default effective window are unchanged.
+
 Each trial contains `manifest.json`, phase clocks, endpoint JSONL traces,
 endpoint result JSON, stderr logs, `shaper.json`, `summary.json`, and
 `SHA256SUMS.json`. The campaign also writes `campaign.json`. Successful transfers

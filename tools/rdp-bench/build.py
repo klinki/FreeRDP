@@ -50,7 +50,8 @@ def main():
             str(path.relative_to(ROOT)): sha256(path)
             for path in (ROOT / "libfreerdp/core/rdpeudp.c", ROOT / "libfreerdp/core/rdpeudp.h",
                          ROOT / "libfreerdp/core/rdp_bench_private.inc",
-                         ROOT / "libfreerdp/core/rdp_bench_queue_private.inc") if path.is_file()
+                         ROOT / "libfreerdp/core/rdp_bench_queue_private.inc",
+                         ROOT / "libfreerdp/core/rdp_bench_loss_private.inc") if path.is_file()
         },
         "build_options": options,
     })

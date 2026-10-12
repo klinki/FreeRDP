@@ -945,9 +945,12 @@ BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer, size_t*
 #define RDPEUDP2_WINDOW_MAX 64
 #define RDPEUDP2_RECV_MAP 256
 #define RDPEUDP2_SEND_QUEUE_BYTES 32768
+#define RDPEUDP2_FAST_LOSS_EVIDENCE 3
+#define RDPEUDP2_REORDER_GRACE_MS 25
 
 #if defined(WITH_RDP_BENCH)
 typedef struct RdpBenchQueueObserver RdpBenchQueueObserver;
+typedef struct RdpBenchLossTrace RdpBenchLossTrace;
 #endif
 
 typedef struct
@@ -962,6 +965,13 @@ typedef struct
 	UINT16 aliases[RDPEUDP_MAX_RETRIES + 1];
 	size_t aliasCount;
 	UINT64 firstSentTs;
+	/* Evidence belongs to the latest transmission attempt, not its aliases.
+	 * Three distinct later receipts and a reorder grace distinguish a hole
+	 * from the trailing bitmap padding and ordinary reordered arrivals. */
+	BOOL gapActive;
+	UINT64 gapSince;
+	UINT16 gapPositiveSeq[RDPEUDP2_FAST_LOSS_EVIDENCE];
+	BYTE gapPositiveCount;
 } UdpSentEntry;
 
 typedef struct
@@ -1059,6 +1069,8 @@ struct rdp_udp_transport
 	/* Private experiments never alter the normal-build queue bound. */
 	size_t benchSendQueueBytes;
 	RdpBenchQueueObserver* benchQueueObserver;
+	RdpBenchLossTrace* benchLossTrace;
+	BOOL benchTimerRecovery;
 #endif
 
 	UdpRecvSlot recvMap[RDPEUDP2_RECV_MAP];
@@ -1117,6 +1129,7 @@ static UINT64 rdpeudp_recv_now(const rdpUdpTransport* udp)
 }
 
 #include "rdp_bench_queue_private.inc"
+#include "rdp_bench_loss_private.inc"
 
 static size_t rdpeudp2_send_queue_limit(const rdpUdpTransport* udp)
 {
@@ -1359,6 +1372,7 @@ void rdpeudp_free(rdpUdpTransport* udp)
 #if defined(WITH_RDP_BENCH)
 	free(udp->benchQueueObserver);
 	udp->benchQueueObserver = nullptr;
+	rdp_bench_loss_free(udp);
 #endif
 	for (size_t i = 0; i < ARRAYSIZE(udp->recvMap); i++)
 		free(udp->recvMap[i].data);
@@ -1786,6 +1800,55 @@ static void rdpeudp_note_loss_report_locked(rdpUdpTransport* udp, UINT16 dseq)
         }
     }
 }
+
+static void rdpeudp_note_ackvec_gaps_locked(rdpUdpTransport* udp, UINT16 base,
+	                                      const BOOL* received, size_t count)
+{
+	for (size_t i = 0; i < ARRAYSIZE(udp->sent); i++)
+	{
+		UdpSentEntry* entry = &udp->sent[i];
+		if (!entry->data)
+			continue;
+		const size_t index = (UINT16)(entry->dataSeq - base);
+		if ((index >= count) || received[index])
+			continue;
+		const UINT16 generated = (UINT16)(udp->nextDataSeq - entry->dataSeq);
+		const BYTE previous = entry->gapPositiveCount;
+		BOOL laterReceipt = FALSE;
+		for (size_t j = index + 1; j < count; j++)
+		{
+			if (!received[j])
+				continue;
+			const UINT16 seq = (UINT16)(base + j);
+			const UINT16 distance = (UINT16)(seq - entry->dataSeq);
+			/* Only generated, later attempts inside the active sequence span
+			 * can supply evidence. A future or old-wrap bit cannot do so. */
+			if (!distance || (distance >= generated) || (distance >= 0x8000))
+				continue;
+			laterReceipt = TRUE;
+			BOOL duplicate = FALSE;
+			for (size_t k = 0; k < entry->gapPositiveCount; k++)
+				duplicate |= entry->gapPositiveSeq[k] == seq;
+			if (!duplicate && (entry->gapPositiveCount < RDPEUDP2_FAST_LOSS_EVIDENCE))
+				entry->gapPositiveSeq[entry->gapPositiveCount++] = seq;
+		}
+		/* A bitmap's padded FALSE bits are not evidence of packet loss.
+		 * Require an actual later receipt before starting either the grace
+		 * timer or the diagnostic loss observation. */
+		if (!laterReceipt)
+			continue;
+		if (!entry->gapActive)
+		{
+			entry->gapActive = TRUE;
+			entry->gapSince = rdpeudp_recv_now(udp);
+			rdpeudp_note_loss_report_locked(udp, entry->dataSeq);
+		}
+		if (previous != entry->gapPositiveCount)
+			rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_NACK_GAP, entry->dataSeq,
+			                            entry->channelSeq, entry->gapPositiveCount,
+			                            entry->retries);
+	}
+}
 /* ACKVEC bits are selective; an ACK payload is cumulative. */
 static BOOL rdpeudp_sent_alias(const UdpSentEntry* entry, UINT16 seq)
 {
@@ -1803,6 +1866,8 @@ static void rdpeudp_retire_sent_locked(rdpUdpTransport* udp, UdpSentEntry* entry
 {
 	if (!entry->data)
 		return;
+	rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_RETIRE, entry->dataSeq,
+	                            entry->channelSeq, entry->len, entry->retries);
 	if (udp->sendBytes >= entry->len)
 		udp->sendBytes -= entry->len;
 	free(entry->data);
@@ -1817,7 +1882,11 @@ static void rdpeudp_ack_single_locked(rdpUdpTransport* udp, UINT16 dseq)
 	{
 		UdpSentEntry* entry = &udp->sent[i];
 		if (entry->data && rdpeudp_sent_alias(entry, dseq))
+		{
+			rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_ACK_POSITIVE, dseq,
+			                            entry->channelSeq, entry->dataSeq, entry->retries);
 			rdpeudp_retire_sent_locked(udp, entry);
+		}
 	}
 }
 
@@ -1838,7 +1907,11 @@ static void rdpeudp_ack_cumulative_locked(rdpUdpTransport* udp, UINT16 base)
 		 * explicit positive ACKVEC bits may still acknowledge older aliases. */
 		const BOOL received = (INT16)(base - entry->dataSeq) >= 0;
 		if (received)
+		{
+			rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_ACK_POSITIVE, entry->dataSeq,
+			                            entry->channelSeq, base, entry->retries);
 			rdpeudp_retire_sent_locked(udp, entry);
+		}
 	}
 }
 
@@ -2058,6 +2131,9 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 
 		EnterCriticalSection(&udp->lock);
 		udp->stats.recvPackets++;
+		rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_RECEIVE,
+		                            L.hasDataHeader ? L.dataSeq : 0,
+		                            L.hasDataBody ? L.channelSeq : 0, L.flags, 0);
 		/* A peer's receive capacity is independent of our local storage bound.
 		 * Windows advertises the full protocol LogWindow of 15. Retain it;
 		 * the sender still clamps the effective window to local capacity. */
@@ -2130,12 +2206,11 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 			{
 				udp->lastAckReceived = base;
 				udp->needAoa = TRUE;
+				rdpeudp_note_ackvec_gaps_locked(udp, base, received, count);
 				for (size_t si = 0; si < count; si++)
 				{
 					if (received[si])
 						rdpeudp_ack_single_locked(udp, (UINT16)(base + si));
-					else
-                        rdpeudp_note_loss_report_locked(udp, (UINT16)(base + si));
 				}
 				free(received);
 			}
@@ -2694,7 +2769,14 @@ static BOOL rdpeudp2_emit_sent_locked(rdpUdpTransport* udp, UdpSentEntry* entry,
 		*firstSentNs = rdp_bench_queue_now_locked(udp);
 		rdp_bench_queue_peak_locked(udp, *firstSentNs);
 	}
+	const UINT16 traceDataSeq = entry->dataSeq;
+	const UINT16 traceChannelSeq = entry->channelSeq;
+	const size_t traceBytes = entry->len;
+	const UINT32 traceRetries = entry->retries;
 	const BOOL result = rdpeudp_udp_send_stream(udp, packet);
+	if (result)
+		rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_DATA_SEND, traceDataSeq,
+		                            traceChannelSeq, traceBytes, traceRetries);
 	Stream_Release(packet);
 	return result;
 }
@@ -2714,6 +2796,7 @@ static BOOL rdpeudp2_service_send(rdpUdpTransport* udp)
 	if (udp_aborted(udp))
 		goto fail;
 	udp->sendPumpActive = TRUE;
+	rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_PUMP_ENTER, 0, 0, udp->sendBytes, 0);
 	rdp_bench_queue_peak_locked(udp, rdp_bench_queue_now_locked(udp));
 	/* Consume available feedback before deciding a timer expired. No blocking
 	 * socket wait occurs while holding the transport lock. */
@@ -2735,7 +2818,11 @@ static BOOL rdpeudp2_service_send(rdpUdpTransport* udp)
 		UINT64 rto = (UINT64)RDPEUDP_ACK_TIMEOUT_MS * (entry->retries + 1);
 		if (rto > 1000)
 			rto = 1000;
-		if (now - entry->sentTs < rto)
+		const BOOL timerDue = now - entry->sentTs >= rto;
+		const BOOL fastDue = rdp_bench_loss_fast_recovery(udp) && entry->gapActive &&
+		                     (entry->gapPositiveCount >= RDPEUDP2_FAST_LOSS_EVIDENCE) &&
+		                     (now - entry->gapSince >= RDPEUDP2_REORDER_GRACE_MS);
+		if (!timerDue && !fastDue)
 			continue;
 		if (entry->retries >= RDPEUDP_MAX_RETRIES)
 			goto pump_fail;
@@ -2743,11 +2830,19 @@ static BOOL rdpeudp2_service_send(rdpUdpTransport* udp)
 	 * channel slot. Aliases still allow its delayed positive ACK. */
 		if (!rdpeudp2_can_allocate_seq_locked(udp, i, TRUE))
 			continue;
+		rdp_bench_loss_event_locked(udp, timerDue ? RDP_BENCH_LOSS_RETRY_TIMER
+		                                        : RDP_BENCH_LOSS_RETRY_FAST,
+		                            entry->dataSeq, entry->channelSeq,
+		                            now - entry->sentTs, entry->retries + 1);
 		entry->retries++;
 		entry->dataSeq = udp->nextDataSeq++;
 		entry->aliases[entry->aliasCount++] = entry->dataSeq;
 		entry->sentTs = now;
 		entry->lossReported = FALSE;
+		entry->gapActive = FALSE;
+		entry->gapSince = 0;
+		entry->gapPositiveCount = 0;
+		memset(entry->gapPositiveSeq, 0, sizeof(entry->gapPositiveSeq));
 		udp->needAoa = TRUE;
 		udp->stats.retransmits++;
 		if (!rdpeudp2_emit_sent_locked(udp, entry, nullptr))
@@ -2800,11 +2895,13 @@ static BOOL rdpeudp2_service_send(rdpUdpTransport* udp)
 	}
 	rdpeudp2_update_send_aoa_locked(udp);
 	udp->sendPumpActive = FALSE;
+	rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_PUMP_EXIT, 0, 0, udp->sendBytes, 0);
 	LeaveCriticalSection(&udp->lock);
 	return TRUE;
 
 pump_fail:
 	udp->sendPumpActive = FALSE;
+	rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_PUMP_EXIT, 0, 0, udp->sendBytes, 0);
 fail:
 	udp->sendFailed = TRUE;
 	LeaveCriticalSection(&udp->lock);
@@ -2831,6 +2928,7 @@ static SSIZE_T rdpeudp2_enqueue(rdpUdpTransport* udp, const BYTE* data, size_t l
 	const size_t limit = len > queueLimit ? len : queueLimit;
 	if (udp->sendBytes > limit - len)
 	{
+		rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_ENQUEUE_BLOCK, 0, 0, len, 0);
 		LeaveCriticalSection(&udp->lock);
 		return -2;
 	}
@@ -2860,6 +2958,7 @@ static SSIZE_T rdpeudp2_enqueue(rdpUdpTransport* udp, const BYTE* data, size_t l
 	Stream_Write(udp->sendQueue, data, len);
 	Stream_SealLength(udp->sendQueue);
 	udp->sendBytes += len;
+	rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_ENQUEUE_ACCEPT, 0, 0, len, 0);
 	udp->sendWakeGeneration++;
 	const UINT64 accepted = rdp_bench_queue_now_locked(udp);
 	rdp_bench_queue_accepted_locked(udp, len, accepted);
@@ -2875,6 +2974,7 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 	if (!udp || !data || !len || len > 60000)
 		return -1;
 	const UINT64 start = rdpeudp_recv_now(udp);
+	rdp_bench_loss_event(udp, RDP_BENCH_LOSS_ADMISSION_BEGIN, 0, 0, len, 0);
 	UINT64 admittedNs = 0;
 #if defined(WITH_RDP_BENCH)
 	EnterCriticalSection(&udp->lock);
@@ -2891,7 +2991,9 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 		if (!rdpeudp2_service_send(udp) ||
 		    (rdpeudp_recv_now(udp) - start >= RDPEUDP_SEND_TIMEOUT_MS))
 			goto fail;
+		rdp_bench_loss_event(udp, RDP_BENCH_LOSS_WAIT_BEGIN, 0, 0, 10, 0);
 		(void)rdpeudp_recv_one(udp, 10, nullptr, nullptr, nullptr, nullptr);
+		rdp_bench_loss_event(udp, RDP_BENCH_LOSS_WAIT_END, 0, 0, 10, 0);
 	}
 #if defined(WITH_RDP_BENCH)
 	if (result > 0)
@@ -2903,6 +3005,7 @@ static SSIZE_T rdpeudp2_send_reliable(rdpUdpTransport* udp, const BYTE* data, si
 #endif
 	if (result < 0 || !rdpeudp2_service_send(udp))
 		goto fail;
+	rdp_bench_loss_event(udp, RDP_BENCH_LOSS_ADMISSION_END, 0, 0, len, 0);
 	/* TLS handshake waits on socket readiness before the steady-state timer
 	 * exists. Drain setup writes synchronously, but with the same pipeline. */
 	if (!udp->tunnelEstablished)
@@ -3058,6 +3161,7 @@ BOOL rdpeudp_test_send_state(rdpUdpTransport* udp, RdpUdpTestSendState* state)
 	state->localLogWindow = udp->logWindow;
 	state->peerLogWindow = udp->peerLogWindow;
 	state->sendWindow = rdpeudp2_send_window_locked(udp);
+	state->lossReports = udp->stats.lostDetected;
 	for (size_t i = 0; i < ARRAYSIZE(udp->sent); i++)
 	{
 		if (!udp->sent[i].data)

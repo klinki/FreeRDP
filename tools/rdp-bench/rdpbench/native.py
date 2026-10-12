@@ -19,6 +19,31 @@ QUEUE_CONFIG_FIELDS = ('queue_limit_bytes','own_log_window','peer_log_window','m
                        'effective_window_packets','observer_enabled')
 QUEUE_BINS = 16384
 QUEUE_WIDTH_NS = 125000
+LOSS_TRACE_FIELDS = ('time_ns','event','data_seq','channel_seq','detail','owned_bytes',
+                     'unsent_bytes','inflight_packets','active_span','retries')
+LOSS_TRACE_STATS = ('enabled','valid','count','capacity','overflow','recovery_timer')
+LOSS_TRACE_EVENTS = ('none','enqueue_block','enqueue_accept','data_send','retry_timer',
+                     'retry_fast','ack_positive','nack_gap','retire','receive','pump_enter',
+                     'pump_exit','admission_begin','admission_end','wait_begin','wait_end')
+LOSS_TRACE_MAX_ROWS = 524288
+LOSS_TRACE_READ_ROWS = 4096
+LOSS_TRACE_DETAILS = {
+    'enqueue_block':'requested application write bytes',
+    'enqueue_accept':'accepted application write bytes',
+    'data_send':'payload bytes in emitted logical chunk',
+    'retry_timer':'milliseconds since the latest transmission attempt',
+    'retry_fast':'milliseconds since the latest transmission attempt',
+    'nack_gap':'distinct higher positive acknowledgements establishing a gap',
+    'ack_positive':'latest transmission sequence or cumulative acknowledgement base',
+    'retire':'retired logical payload bytes',
+    'receive':'received wire flags',
+    'pump_enter':'owned payload bytes',
+    'pump_exit':'owned payload bytes',
+    'admission_begin':'requested application write bytes',
+    'admission_end':'requested application write bytes',
+    'wait_begin':'requested wait milliseconds',
+    'wait_end':'requested wait milliseconds',
+}
 
 def histogram_summary(bins, width_ns, maximum_ns, *, overflow=0):
     """Nearest-rank bounds. Scalars are upper bounds, never guessed midpoints."""
@@ -67,9 +92,20 @@ class Native:
             self.lib.freerdp_bench_v1_queue_stats.restype=C.c_int
             self.lib.freerdp_bench_v1_queue_hist.argtypes=[C.c_void_p,C.c_uint32,C.POINTER(C.c_uint64),C.c_size_t]
             self.lib.freerdp_bench_v1_queue_hist.restype=C.c_int
+        self.loss_trace_available=all(hasattr(self.lib,'freerdp_bench_v1_'+name)
+                                      for name in ('loss_trace_stats','loss_trace_read','clock_ns'))
+        self.loss_alignment=None
+        if self.loss_trace_available:
+            self.lib.freerdp_bench_v1_loss_trace_stats.argtypes=[C.c_void_p,C.POINTER(C.c_uint64),C.c_size_t]
+            self.lib.freerdp_bench_v1_loss_trace_stats.restype=C.c_int
+            self.lib.freerdp_bench_v1_loss_trace_read.argtypes=[C.c_void_p,C.c_size_t,C.POINTER(C.c_uint64),C.c_size_t]
+            self.lib.freerdp_bench_v1_loss_trace_read.restype=C.c_size_t
+            self.lib.freerdp_bench_v1_clock_ns.argtypes=[]
+            self.lib.freerdp_bench_v1_clock_ns.restype=C.c_uint64
         self.h=self.lib.freerdp_bench_v1_open(bind.encode(),port,peer.encode(),peer_port)
         if not self.h:raise RuntimeError('private FreeRDP endpoint creation failed')
         self.buf=C.create_string_buffer(65536)
+        self.configure_loss_trace()
     def send(self,data):
         b=C.create_string_buffer(data)
         n=self.lib.freerdp_bench_v1_send(self.h,b,len(data))
@@ -95,6 +131,8 @@ class Native:
         initial=self._queue_clock_sample()
         self.queue_alignment={'initial':initial,'python_measure_ns':measure_ns,'python_stop_ns':stop_ns,
                               'drift_allowance_ns':250000}
+        if getattr(self,'loss_trace_available',False):
+            self.loss_alignment=dict(self.queue_alignment)
         if not self.lib.freerdp_bench_v1_queue_measure(self.h,measure_ns+initial['offset_ns'],stop_ns+initial['offset_ns']):
             raise RuntimeError('native queue measurement configuration failed')
     def queue_stats(self):
@@ -140,5 +178,76 @@ class Native:
         return {'version':1,'scope':'residence accepted during measurement, first transmission through drain; admission calls started during measurement','observer_enabled':True,
                 'valid':not reasons,'reasons':reasons,'clock_alignment':alignment,'fields':fields,
                 'summaries':summaries,'histograms':histograms}
+    def configure_loss_trace(self):
+        """Bracket the native clock before workload, including with queue observer off."""
+        if not getattr(self,'loss_trace_available',False) or os.environ.get('RDP_BENCH_LOSS_TRACE')!='1':
+            return
+        self.loss_alignment={'initial':self._queue_clock_sample(),'drift_allowance_ns':250000}
+    def loss_trace(self):
+        """Export only after endpoint workload/drain stop, before closing its handle.
+
+        Bounded dense rows retain all native evidence. Conversion to JSON/JSONL
+        happens outside the transport, and incomplete traces remain invalid.
+        """
+        result={'version':1,'available':getattr(self,'loss_trace_available',False),
+                'enabled':False,'valid':False,'reasons':[],
+                'fields':list(LOSS_TRACE_FIELDS),'rows':[],
+                'event_names':list(LOSS_TRACE_EVENTS),'event_detail_units':dict(LOSS_TRACE_DETAILS),
+                'clock_alignment':None,'metadata':None}
+        if not result['available']:
+            result['reasons']=['native loss trace API unavailable'];return result
+        def snapshot():
+            values=(C.c_uint64*len(LOSS_TRACE_STATS))()
+            if not self.lib.freerdp_bench_v1_loss_trace_stats(self.h,values,len(values)):
+                return None
+            return dict(zip(LOSS_TRACE_STATS,map(int,values)))
+        stats=snapshot()
+        if stats is None:
+            result['reasons']=['native loss trace stats unavailable'];return result
+        result['enabled']=bool(stats['enabled'])
+        result['metadata']=dict(stats,recovery_mode='timer' if stats['recovery_timer'] else 'fast',
+                                timestamp_clock='native_monotonic_ns')
+        reasons=result['reasons']
+        if not stats['enabled']:
+            reasons.append('native loss trace disabled; observations unknown');return result
+        if not stats['valid']:reasons.append('native loss trace invalid')
+        if stats['overflow']:reasons.append('native loss trace buffer overflow; events missing')
+        if not 0<stats['capacity']<=LOSS_TRACE_MAX_ROWS or stats['count']>stats['capacity']:
+            reasons.append('unsupported native loss trace geometry');return result
+        alignment=getattr(self,'loss_alignment',None)
+        offset=0
+        if alignment is None:
+            reasons.append('native loss trace clock alignment unavailable')
+        else:
+            final=self._queue_clock_sample();alignment=dict(alignment,final=final)
+            drift=abs(final['offset_ns']-alignment['initial']['offset_ns'])
+            uncertainty=final['uncertainty_ns']+alignment['initial']['uncertainty_ns']
+            alignment.update(offset_drift_ns=drift,combined_uncertainty_ns=uncertainty)
+            result['clock_alignment']=alignment
+            if drift>uncertainty+alignment['drift_allowance_ns']:
+                reasons.append('native/Python loss trace clock alignment drift exceeds uncertainty plus 0.25 ms')
+            offset=alignment['initial']['offset_ns']
+            result['metadata']['timestamp_clock']='python_monotonic_ns'
+        start=0;previous_ns=None
+        while start<stats['count']:
+            requested=min(LOSS_TRACE_READ_ROWS,stats['count']-start)
+            values=(C.c_uint64*(requested*len(LOSS_TRACE_FIELDS)))()
+            copied=self.lib.freerdp_bench_v1_loss_trace_read(self.h,start,values,requested)
+            if copied!=requested:
+                reasons.append('native loss trace read incomplete');break
+            for row_index in range(copied):
+                row=list(values[row_index*len(LOSS_TRACE_FIELDS):(row_index+1)*len(LOSS_TRACE_FIELDS)])
+                row[0]-=offset
+                if previous_ns is not None and row[0]<previous_ns:
+                    if 'native loss trace timestamps moved backwards' not in reasons:
+                        reasons.append('native loss trace timestamps moved backwards')
+                previous_ns=row[0]
+                if row[1]>=len(LOSS_TRACE_EVENTS) and 'unknown native loss trace event' not in reasons:
+                    reasons.append('unknown native loss trace event')
+                result['rows'].append(row)
+            start+=copied
+        if snapshot()!=stats:reasons.append('native loss trace changed during export; endpoint still active')
+        result['valid']=not reasons
+        return result
     def close(self):
         if self.h:self.lib.freerdp_bench_v1_close(self.h);self.h=None

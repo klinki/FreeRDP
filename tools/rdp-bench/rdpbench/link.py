@@ -8,7 +8,41 @@ from __future__ import annotations
 import collections,hashlib,heapq,json,selectors,socket,threading,time
 from pathlib import Path
 from .common import timing_summary
-from .feedback import FeedbackTiming, SELECTED_KINDS, validate_feedback
+from .feedback import FeedbackTiming, SELECTED_KINDS, validate_feedback, packet_kind, ACK, DATA, ACKVEC, OVERHEAD, DELAYACK, AOA
+
+def packet_metadata(data):
+    """Visible protected UDP2 headers only; never retain application payload."""
+    kind=packet_kind(data)
+    result={'kind':kind,'udp_bytes':len(data)}
+    if kind=='unclassified':return result
+    restored=bytearray(data);restored[0],restored[7]=restored[7],restored[0]
+    layout=restored[1:];header=int.from_bytes(layout[:2],'little');flags=header&0xFFF
+    result['log_window']=header>>12;cursor=2
+    if flags&ACK:
+        result['ack_base']=int.from_bytes(layout[cursor:cursor+2],'little')
+        cursor+=7+(layout[cursor+6]&15)
+    for flag,size in ((OVERHEAD,1),(DELAYACK,3),(AOA,2)):
+        if flags&flag:
+            if flag==AOA:result['aoa']=int.from_bytes(layout[cursor:cursor+2],'little')
+            cursor+=size
+    if flags&DATA:
+        result['data_seq']=int.from_bytes(layout[cursor:cursor+2],'little');cursor+=2
+    if flags&ACKVEC:
+        result['ackvec_base']=int.from_bytes(layout[cursor:cursor+2],'little')
+        v=layout[cursor+2];cursor+=3+(4 if v&128 else 0)+(v&127)
+    if flags&DATA:result['channel_seq']=int.from_bytes(layout[cursor:cursor+2],'little')
+    return result
+
+class RelayTrace:
+    CAPACITY=250000
+    def __init__(self):self.records=[];self.overflow=0;self.unclassified=0
+    def add(self,event_type,**fields):
+        if len(self.records)<self.CAPACITY:self.records.append(dict(type=event_type,**fields))
+        else:self.overflow+=1
+    def summary(self):
+        return {'version':1,'enabled':True,'valid':not(self.overflow or self.unclassified),
+                'count':len(self.records),'capacity':self.CAPACITY,'overflow':self.overflow,
+                'unclassified':self.unclassified,'scope':'visible UDP2 header, offer/drop and delivery deadlines; no payload'}
 
 class Link:
     def __init__(self,profile,seed,direction,feedback_delay_ms=None):
@@ -68,10 +102,11 @@ class Link:
         return result
 
 class Relay:
-    def __init__(self,left_port,right_port,profile,seed,ack_feedback=None,feedback_ledger=None):
+    def __init__(self,left_port,right_port,profile,seed,ack_feedback=None,feedback_ledger=None,loss_ledger=None):
         self.sel=selectors.DefaultSelector();self.sockets=[];self.heap=[];self.serial=0
         treatment=validate_feedback(ack_feedback)
         self.feedback_ledger=feedback_ledger
+        self.loss_ledger=loss_ledger;self.loss_trace=RelayTrace() if loss_ledger else None
         self.links=[Link(profile['c2s'],seed,'c2s',treatment['c2s_delay_ms'] if treatment else None),
                     Link(profile['s2c'],seed+1000003,'s2c',treatment['s2c_delay_ms'] if treatment else None)]
         self.peers=[('127.0.0.1',left_port),('127.0.0.1',right_port)]
@@ -99,17 +134,39 @@ class Relay:
                         except BlockingIOError:break
                         if addr!=self.peers[direction]:
                             self.links[direction].count['unexpected_peer']+=1;continue
-                        for due,payload,feedback_base_due in self.links[direction].schedule(time.monotonic_ns(),data):
+                        offered=time.monotonic_ns();link=self.links[direction]
+                        before={key:link.count[key] for key in ('blackout_drops','queue_drops','random_drops')} if self.loss_trace else None
+                        scheduled=link.schedule(offered,data)
+                        metadata=packet_metadata(data) if self.loss_trace else None
+                        if self.loss_trace:
+                            self.loss_trace.unclassified+=metadata['kind']=='unclassified'
+                            self.loss_trace.add('offer',direction=link.direction,packet_id=link.n,offered_ns=offered,
+                                                scheduled_copies=len(scheduled),**metadata)
+                            if not scheduled:
+                                reason=next((key for key in before if link.count[key]>before[key]),'unknown_drop')
+                                self.loss_trace.add('drop',direction=link.direction,packet_id=link.n,offered_ns=offered,
+                                                    reason=reason,**metadata)
+                        for due,payload,feedback_base_due in scheduled:
                             if len(self.heap)>=65536:raise RuntimeError('relay capacity exceeded; invalid harness')
                             self.serial+=1
-                            heapq.heappush(self.heap,(due,self.serial,direction,payload,feedback_base_due))
+                            heapq.heappush(self.heap,(due,self.serial,direction,payload,feedback_base_due,
+                                                     (link.n,offered,metadata) if self.loss_trace else None))
                 now=time.monotonic_ns()
                 while self.heap and self.heap[0][0]<=now:
-                    due,_,d,data,feedback_base_due=heapq.heappop(self.heap)
+                    due,serial,d,data,feedback_base_due,loss_info=heapq.heappop(self.heap)
                     try:
                         self.sockets[1-d].sendto(data,self.peers[1-d])
-                        self.links[d].delivered(due,time.monotonic_ns(),len(data),feedback_base_due)
-                    except (BlockingIOError,OSError):self.links[d].count['socket_send_errors']+=1
+                        actual=time.monotonic_ns();self.links[d].delivered(due,actual,len(data),feedback_base_due)
+                        if self.loss_trace:
+                            packet_id,offered,metadata=loss_info
+                            self.loss_trace.add('dispatch',direction=self.links[d].direction,packet_id=packet_id,
+                                                copy_id=serial,offered_ns=offered,due_ns=due,
+                                                network_due_ns=feedback_base_due[0] if feedback_base_due else due,
+                                                actual_dispatch_ns=actual,lateness_ns=max(0,actual-due),**metadata)
+                    except (BlockingIOError,OSError):
+                        self.links[d].count['socket_send_errors']+=1
+                        if self.loss_trace:
+                            self.loss_trace.add('send_error',direction=self.links[d].direction,copy_id=serial,due_ns=due)
                     now=time.monotonic_ns()
         except BaseException as e:self.error=repr(e)
     def close(self):
@@ -124,5 +181,10 @@ class Relay:
             with Path(self.feedback_ledger).open('w',encoding='utf-8') as stream:
                 for record in sorted(records,key=lambda x:x['actual_dispatch_ns']):
                     stream.write(json.dumps(record,separators=(',',':'))+'\n')
-        return {'engine':'python_udp_relay_v1','c2s':self.links[0].summary(),'s2c':self.links[1].summary(),
+        result={'engine':'python_udp_relay_v1','c2s':self.links[0].summary(),'s2c':self.links[1].summary(),
                 'pending_on_close':pending,'error':self.error,'kernel_drop_counter':None}
+        if self.loss_trace:
+            with Path(self.loss_ledger).open('w',encoding='utf-8') as stream:
+                for record in self.loss_trace.records:stream.write(json.dumps(record,separators=(',',':'))+'\n')
+            result['loss_trace']=dict(self.loss_trace.summary(),ledger=Path(self.loss_ledger).name)
+        return result

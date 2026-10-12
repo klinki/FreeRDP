@@ -597,6 +597,162 @@ static BOOL test_send_lost_data(void)
 	return TRUE;
 }
 
+static BOOL test_send_fast_loss_evidence(void)
+{
+	static const BYTE bytes[] = "ABCDEFGH";
+	static const BOOL first[] = { FALSE, TRUE };
+	static const BOOL second[] = { FALSE, FALSE, TRUE };
+	static const BOOL third[] = { FALSE, FALSE, FALSE, TRUE };
+	static const BOOL positive[] = { TRUE };
+	static const BOOL future[] = { FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
+	                              FALSE, FALSE, TRUE, TRUE, TRUE };
+	SendFixture* fixture = send_fixture_new(1, 5, 5, 1, 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 8) == 8 && fixture->count == 8);
+	/* Forged future positives cannot create evidence for a generated gap. */
+	SEND_CHECK(send_ackvec(fixture, 1, future, ARRAYSIZE(future)));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.lossReports == 0);
+	SEND_CHECK(send_tick(fixture, 30));
+	SEND_CHECK(send_ackvec(fixture, 1, first, ARRAYSIZE(first)));
+	/* The final bitmap's padded negatives must not label packets 3..7 lost.
+	 * Repeated vectors with one later positive cannot count as three. */
+	for (size_t i = 0; i < 5; i++)
+		SEND_CHECK(send_ackvec(fixture, 1, first, ARRAYSIZE(first)));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.lossReports == 1);
+	SEND_CHECK(send_tick(fixture, 54) && fixture->count == 8);
+	SEND_CHECK(send_ackvec(fixture, 1, second, ARRAYSIZE(second)));
+	SEND_CHECK(send_tick(fixture, 54) && fixture->count == 8);
+	SEND_CHECK(send_ackvec(fixture, 1, third, ARRAYSIZE(third)));
+	/* Three distinct receipts permit a retry only once the 25 ms grace
+	 * since the first meaningful gap expires, rather than since bit three. */
+	SEND_CHECK(send_tick(fixture, 54) && fixture->count == 8);
+	SEND_CHECK(send_tick(fixture, 55) && fixture->count == 9);
+	SEND_CHECK(fixture->packets[8].dataSeq == 9 && fixture->packets[8].channelSeq == 1 &&
+	           fixture->packets[8].time == SEND_TEST_TIME + 55 &&
+	           fixture->packets[8].payload[0] == bytes[0]);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 5 &&
+	           state.aliasCount == 6 && state.maxRetries == 1);
+	/* A delayed positive receipt of the original remains valid after its
+	 * fast retry, and releases both aliases as one logical payload. */
+	SEND_CHECK(send_ackvec(fixture, 1, positive, ARRAYSIZE(positive)));
+	SEND_CHECK(send_ack(fixture, 9));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && !state.inFlight &&
+	           !state.queuedBytes && !state.aliasCount);
+	SEND_CHECK(send_tick(fixture, 5000) && fixture->count == 9 && !fixture->callbackFailed);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+
+static BOOL test_send_fast_loss_reordered_receipt(void)
+{
+	static const BYTE bytes[] = "ABCD";
+	static const BOOL gap[] = { FALSE, TRUE, TRUE, TRUE };
+	static const BOOL original[] = { TRUE };
+	SendFixture* fixture = send_fixture_new(1, 5, 5, 1, 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+	SEND_CHECK(send_tick(fixture, 30));
+	SEND_CHECK(send_ackvec(fixture, 1, gap, ARRAYSIZE(gap)));
+	SEND_CHECK(send_tick(fixture, 45) && fixture->count == 4);
+	/* Reordering for 15 ms after the first gap closes inside the grace. */
+	SEND_CHECK(send_ackvec(fixture, 1, original, ARRAYSIZE(original)));
+	SEND_CHECK(send_tick(fixture, 55) && fixture->count == 4);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && !state.inFlight &&
+	           !state.queuedBytes && !state.maxRetries);
+	SEND_CHECK(send_tick(fixture, 1000) && fixture->count == 4 && !fixture->callbackFailed);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+
+static BOOL test_send_fast_loss_delivers_ordered_bytes(void)
+{
+	static const BYTE bytes[] = "ABCD";
+	static const BOOL gap[] = { FALSE, TRUE, TRUE, TRUE };
+	SendFixture* fixture = send_fixture_new(1, 5, 5, 1, 1);
+	RdpUdpTestSendState state = { 0 };
+	RdpUdpTestRecvState received = { 0 };
+	SEND_CHECK(fixture);
+	fixture->deliver = TRUE;
+	fixture->dropPackets = 1;
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+	SEND_CHECK(send_received(fixture, bytes, 0));
+	SEND_CHECK(send_tick(fixture, 30) && send_ackvec(fixture, 1, gap, ARRAYSIZE(gap)));
+	SEND_CHECK(send_tick(fixture, 55) && fixture->count == 5);
+	/* Recovering the first channel under a new DataSeq must close the byte
+	 * stream gap and deliver all four bytes once, in their original order. */
+	SEND_CHECK(send_received(fixture, bytes, 4));
+	SEND_CHECK(rdpeudp_test_recv_state(fixture->receiver, &received) &&
+	           received.expectedChannelSeq == 5 && received.recvDataBase == 6);
+	SEND_CHECK(send_ack(fixture, 5));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && !state.inFlight &&
+	           !state.aliasCount && !state.queuedBytes && !state.sendFailed);
+	SEND_CHECK(send_tick(fixture, 5000) && fixture->count == 5 &&
+	           send_received(fixture, bytes, 4) && !fixture->callbackFailed);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+
+static BOOL test_send_fast_loss_attempt_reset(void)
+{
+	static const BYTE bytes[] = "ABCDEFG";
+	static const BOOL gap[] = { FALSE, TRUE, TRUE, TRUE };
+	static const BOOL resetGap[] = { FALSE, TRUE, TRUE, TRUE };
+	SendFixture* fixture = send_fixture_new(1, 5, 5, 1, 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+	SEND_CHECK(send_tick(fixture, 30) && send_ackvec(fixture, 1, gap, ARRAYSIZE(gap)));
+	SEND_CHECK(send_tick(fixture, 55) && fixture->count == 5);
+	SEND_CHECK(fixture->packets[4].dataSeq == 5 && fixture->packets[4].channelSeq == 1);
+	/* Old alias negatives plus old positive evidence cannot arm the retry.
+	 * The latest attempt needs fresh later receipts and its own grace. */
+	SEND_CHECK(send_ackvec(fixture, 1, gap, ARRAYSIZE(gap)));
+	SEND_CHECK(send_tick(fixture, 100) && fixture->count == 5);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes + 4, 3) == 3 && fixture->count == 8);
+	SEND_CHECK(send_ackvec(fixture, 5, resetGap, ARRAYSIZE(resetGap)));
+	SEND_CHECK(send_tick(fixture, 124) && fixture->count == 8);
+	SEND_CHECK(send_tick(fixture, 125) && fixture->count == 9);
+	SEND_CHECK(fixture->packets[8].dataSeq == 9 && fixture->packets[8].channelSeq == 1);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 1 &&
+	           state.maxRetries == 2 && state.aliasCount == 3);
+	SEND_CHECK(send_ack(fixture, 9));
+	SEND_CHECK(send_tick(fixture, 5000) && fixture->count == 9 && !fixture->callbackFailed);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+
+static BOOL test_send_fast_loss_wrap_shrink_and_multiple_gaps(void)
+{
+	static const BYTE bytes[] = "ABCDEFGH";
+	static const BOOL gap[] = { FALSE, FALSE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE };
+	SendFixture* fixture = send_fixture_new(1, 5, 5, UINT16_MAX - 1, UINT16_MAX - 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 8) == 8);
+	fixture->peerLogWindow = 2;
+	SEND_CHECK(send_tick(fixture, 30));
+	SEND_CHECK(send_ackvec(fixture, UINT16_MAX - 1, gap, ARRAYSIZE(gap)));
+	SEND_CHECK(send_tick(fixture, 54) && fixture->count == 8);
+	/* Two missing originals span the sequence wrap while the peer shrinks
+	 * to three active packets. Recovery may replace them, never add channels. */
+	SEND_CHECK(send_tick(fixture, 55) && fixture->count == 10);
+	SEND_CHECK(fixture->packets[8].dataSeq == 6 &&
+	           fixture->packets[8].channelSeq == UINT16_MAX - 1 &&
+	           fixture->packets[9].dataSeq == 7 &&
+	           fixture->packets[9].channelSeq == UINT16_MAX);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 2 &&
+	           state.sendWindow == 3 && state.peerLogWindow == 2 && state.maxRetries == 1 &&
+	           state.nextChannelSeq == 6 && state.aliasCount == 4);
+	SEND_CHECK(send_ack(fixture, 7));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && !state.queuedBytes &&
+	           !state.inFlight && !state.aliasCount && !state.sendFailed);
+	SEND_CHECK(send_tick(fixture, 5000) && fixture->count == 10 && !fixture->callbackFailed);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+
 static BOOL test_send_idle_health_pump(void)
 {
 	static const BYTE bytes[] = "ABCD";
@@ -934,6 +1090,10 @@ int TestRdpeUdpSend(int argc, char* argv[])
 	    !test_send_window_storage_cap() || !test_send_peer_window_tracking() ||
 	    !test_send_atomic_queue_and_owned_payload() || !test_send_late_original_ack() ||
 	    !test_send_lost_data() || !test_send_idle_health_pump() || !test_send_repeated_loss() ||
+	    !test_send_fast_loss_evidence() || !test_send_fast_loss_reordered_receipt() ||
+	    !test_send_fast_loss_delivers_ordered_bytes() ||
+	    !test_send_fast_loss_attempt_reset() ||
+	    !test_send_fast_loss_wrap_shrink_and_multiple_gaps() ||
 	    !test_send_ack_wrap() || !test_send_alias_wrap() ||
 	    !test_send_cumulative_ack_after_aoa_retirement() || !test_send_ack_aoa_epoch() ||
 	    !test_send_ack_aoa_monotonic() || !test_send_ack_aoa_wrap() || !test_send_dummy_ack() ||
