@@ -34,6 +34,23 @@ The controller communicates with the task through atomic command/status files
 over SSH. A provisioned SSH ControlMaster may be reused through the lab's
 `ssh_control_path`; both SSH and SCP use BatchMode and strict host-key checking.
 Normal password-authenticated SSH must be established outside the timed run.
+Command publication uses .NET `File.Replace` for an existing destination and
+`File.Move` only for initial creation; status publication uses `os.replace`.
+Each writes a unique closed temporary file before replacement. Explicit Windows
+sharing/lock errors 32 and 33 retry, up to 24 attempts with 25–100 ms sleeps
+(2.15 seconds of prescribed delay). Other path, permission, malformed-input
+and existence errors fail immediately. There is no target delete/copy fallback
+and a failed temporary file remains available for diagnosis. A command retains
+one request ID and one payload throughout retries, so publication never replays
+the agent operation. Python's `MoveFileEx` can report error 5 for a missing
+DELETE-sharing permission on an open target. In that case a non-mutating
+DELETE-access handle probe must report kernel sharing/lock error 32 or 33
+before retrying; actual ACL/read-only access denial still fails immediately.
+The probe never deletes the target or uses DELETE_ON_CLOSE. PowerShell passes
+`[NullString]::Value` to `File.Replace`, preserving a real null backup path
+instead of the empty string produced by its `$null` string binding. The agent
+acknowledgement timeout remains 40 seconds; existing SSH-call timeouts remain
+unchanged, and the bounded publication retry is separate.
 
 ## Build and preflight the observer
 
@@ -51,6 +68,13 @@ posting input. The rectangle encloses the fixture's
 112×64 marker, including its border, in display-relative points. Screen
 Recording and Accessibility access, correct foreground client focus and the
 US keyboard mapping must work for the actual helper process.
+The helper's correlated `foreground_status` stdin operation reads only target
+and frontmost PIDs plus existence/termination/activation flags. After requesting
+focus, the controller confirms the exact owned live foreground PID within
+three seconds before warmup, the keyboard preflight and measured injection.
+It may repeat focus requests during those unmeasured checks. There is no
+automatic refocusing during measurement: focus loss stops injection and keeps
+the PID diagnostics in `probe_error` and the retained failed trial.
 
 The helper emits CRC-valid markers and numbered `probe_injected` records using
 macOS monotonic timestamps. A requested 120 Hz capture rate is not proof of
@@ -219,3 +243,15 @@ planned trial. Display-availability fixtures cover missing UUIDs, stale or
 substituted observer IDs, ambiguous inventory and a display disappearing
 between trials without further launches. They do not substitute for a live VM
 run or an actual permission/observer preflight.
+
+`tests/windows_ipc_atomic.py --root C:\Path\To\NewOwnedRegressionDirectory`
+checks actual Windows file sharing and delayed lock release for both publishers.
+Run it only after the current campaign has stopped. Use an isolated copy of
+`rdpbench/live.py`, `bridge.py`, `common.py`, `windows/agent.py` and this tests
+directory, preserving the running agent's attested sources until its campaign
+ends. It creates only the supplied new directory, never the real command/status
+paths, and retains its JSON evidence. Unit fixtures separately cover bounded
+exhaustion, permanent-error rejection and malformed status serialization. The
+2026-10-12 VM validation passed both delayed-lock releases, bounded lock failure
+and read-only error-5 rejection. An ACL-only denial could not be reproduced
+under that test token; its result is explicitly unsupported, without a PASS.

@@ -1,0 +1,49 @@
+{
+  "scope": "Ten user-requested candidate seed/profile conditions, observed across retained baseline and focus-retry phases; helper versions differ; provisional",
+  "selected_trial_ids": [
+    "text-ten-clean-candidate-s11-e94c5fcd",
+    "text-ten-clean-candidate-s71-7f061968",
+    "text-ten-impaired-candidate-s29-f295476c",
+    "text-ten-impaired-candidate-s47-9bc50cfc",
+    "text-ten-impaired-candidate-s71-a06e9946",
+    "text-ten-impaired-candidate-s101-271ce27c",
+    "text-ten-clean-candidate-s29-7b314559",
+    "text-ten-clean-candidate-s47-ea85d42d",
+    "text-ten-clean-candidate-s101-de9c4dbe",
+    "text-ten-impaired-candidate-s11-e246d010"
+  ],
+  "observed": 1200,
+  "expected": 1200,
+  "timeouts": 0,
+  "missed_injections": 0,
+  "complete": 9,
+  "incomplete": 1,
+  "groups": [
+    {
+      "profile": "ten_mbit_clean",
+      "seeds": [
+        11,
+        29,
+        47,
+        71,
+        101
+      ],
+      "N": 5,
+      "median_trial_p95_ms": 97.766708,
+      "median_trial_p99_ms": 113.006708
+    },
+    {
+      "profile": "ten_mbit",
+      "seeds": [
+        11,
+        29,
+        47,
+        71,
+        101
+      ],
+      "N": 5,
+      "median_trial_p95_ms": 97.138958,
+      "median_trial_p99_ms": 130.135292
+    }
+  ]
+}

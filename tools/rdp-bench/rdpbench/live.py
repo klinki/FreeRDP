@@ -50,16 +50,36 @@ def same_identity(before, after):
     return all(before.get(key) is not None and before.get(key) == after.get(key) for key in keys)
 
 
+def ipc_publish_script(path, payload, request_id, attempts=24):
+    """Publish one fixed request through atomic NTFS replacement, never delete/copy."""
+    if not isinstance(request_id, str) or not re.fullmatch(r"[0-9a-f]{32}", request_id):
+        raise ValueError("invalid IPC request ID")
+    if isinstance(attempts, bool) or not isinstance(attempts, int) or not 1 <= attempts <= 24:
+        raise ValueError("invalid bounded IPC publish attempts")
+    temporary = path + "." + request_id + ".tmp"
+    encoded = base64.b64encode(payload).decode()
+    return (f"$ipcSource={ps_quote(temporary)};$ipcTarget={ps_quote(path)};"
+            f"$ipcBytes=[Convert]::FromBase64String('{encoded}');"
+            "[IO.File]::WriteAllBytes($ipcSource,$ipcBytes);"
+            f"for($ipcAttempt=0;$ipcAttempt -lt {attempts};$ipcAttempt++){{"
+            "try{if([IO.File]::Exists($ipcTarget)){[IO.File]::Replace($ipcSource,$ipcTarget,[NullString]::Value)}"
+            "else{[IO.File]::Move($ipcSource,$ipcTarget)};break}"
+            "catch{$ipcError=$_.Exception;while($ipcError.InnerException){$ipcError=$ipcError.InnerException};"
+            "$ipcCode=$ipcError.HResult -band 65535;"
+            "if(($ipcError -isnot [IO.IOException]) -or ($ipcCode -notin @(32,33))){throw};"
+            f"if($ipcAttempt -eq {attempts - 1}){{$ipcMessage="
+            f"'Atomic IPC replacement remained blocked after {attempts} attempts; Windows sharing/lock error '+$ipcCode;"
+            "throw [IO.IOException]::new($ipcMessage,$ipcError)};"
+            "Start-Sleep -Milliseconds ([Math]::Min(100,25*($ipcAttempt+1)))}};")
+
+
 def agent(lab, op, run_id, trigger=False, timeout=40, **data):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", run_id):
         raise ValueError("unsafe Windows run ID")
     request = {"request_id": uuid.uuid4().hex, "run_id": run_id, "op": op, **data}
     root = lab["windows_root"].rstrip("\\/")
-    payload = base64.b64encode(canonical(request)).decode()
     path = root + "\\command.json"
-    script = (f"$b=[Convert]::FromBase64String('{payload}');"
-              f"[IO.File]::WriteAllBytes({ps_quote(path + '.tmp')},$b);"
-              f"Move-Item -Force -LiteralPath {ps_quote(path + '.tmp')} -Destination {ps_quote(path)};")
+    script = ipc_publish_script(path, canonical(request), request["request_id"])
     if trigger:
         script += f"Start-ScheduledTask -TaskName {ps_quote(lab['windows_task'])};"
     ps(lab, script)
@@ -502,6 +522,7 @@ class Observer:
 
     def __init__(self, command, folder, lab=None):
         self.events = []
+        self.foreground_replies = {}
         self.lock = threading.Lock()
         self.log = Journal(Path(folder) / "observer.jsonl")
         self.failed = None
@@ -533,6 +554,10 @@ class Observer:
                         self.events.append(event)
                     else:
                         self.overflow += 1
+                    if event.get("type") == "foreground_status" and isinstance(event.get("request_id"), str):
+                        self.foreground_replies[event["request_id"]] = event
+                        if len(self.foreground_replies) > 32:
+                            self.foreground_replies.pop(next(iter(self.foreground_replies)))
                 if event.get("type") == "observer_ready":
                     self.ready.set()
                 if event.get("type") in ("observer_error", "probe_error"):
@@ -556,6 +581,21 @@ class Observer:
         self.proc.stdin.write(json.dumps({"op": "probe", "probe_id": probe_id, "scheduled_ns": scheduled_ns}) + "\n")
         self.proc.stdin.flush()
 
+    def foreground_status(self, timeout=.3):
+        request_id = uuid.uuid4().hex
+        self.proc.stdin.write(json.dumps({"op": "foreground_status", "request_id": request_id}) + "\n")
+        self.proc.stdin.flush()
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            self.check_live()
+            with self.lock:
+                event = self.foreground_replies.pop(request_id, None)
+            if event is not None:
+                return event
+            time.sleep(.01)
+        return {"type": "foreground_status_timeout", "request_id": request_id,
+                "target_foreground": None, "error": "observer did not acknowledge foreground status"}
+
     def snapshot(self):
         with self.lock:
             return list(self.events)
@@ -573,6 +613,33 @@ class Observer:
         self.proc.stdout.close()
         self.log.close()
         self.stderr.close()
+
+
+def confirmed_owned_foreground(status, expected_pid):
+    return (status.get("type") == "foreground_status"
+            and integer_number(status.get("target_pid")) == expected_pid
+            and integer_number(status.get("frontmost_pid")) == expected_pid
+            and status.get("target_exists") is True and status.get("target_terminated") is False
+            and status.get("target_active") is True and status.get("target_foreground") is True)
+
+
+def wait_owned_foreground(client, observer, timeline, stage, timeout=3):
+    """Confirm exact owned PID; focus requests are allowed only before measurement."""
+    deadline = time.monotonic() + timeout
+    last = None
+    while time.monotonic() < deadline:
+        client.check_live()
+        observer.check_live()
+        client.send("focus")
+        status = observer.foreground_status(timeout=min(.3, max(.001, deadline - time.monotonic())))
+        last = status
+        timeline.emit("foreground_status", stage=stage, expected_pid=client.proc.pid, status=status)
+        if confirmed_owned_foreground(status, client.proc.pid):
+            timeline.emit("owned_foreground_confirmed", stage=stage, target_pid=client.proc.pid)
+            return status
+        time.sleep(min(.1, max(0, deadline - time.monotonic())))
+    raise RuntimeError("owned RDP client foreground was not confirmed within 3 seconds: " +
+                       json.dumps(last, sort_keys=True, allow_nan=False))
 
 
 class ProbeSchedule:
@@ -954,6 +1021,8 @@ def trial(variant, case, profile, cfg, lab, seed, folder, expected_provenance=No
 
         start(1)
         client.send("focus")
+        if observer:
+            wait_owned_foreground(client, observer, timeline, "warmup")
         timeline.emit("warmup_begin", run_tag=tag, phase_id=1)
         observe_for(cfg["warmup_s"], cfg["probe_hz"], observer, client, timeline,
                     base_probe=100000, inject=False)
@@ -963,6 +1032,7 @@ def trial(variant, case, profile, cfg, lab, seed, folder, expected_provenance=No
         if observer and case["scene"] != "static-idle" and not any(event.get("type") == "marker" and event.get("run_tag") == tag and event.get("phase_id") == 1 for event in observer.snapshot()):
             raise RuntimeError("no CRC-valid warmup marker; ROI/source must be calibrated before measurement")
         if observer and case["scene"] != "static-idle":
+            wait_owned_foreground(client, observer, timeline, "input_preflight")
             preflight_id = 0x10000000
             scheduled = time.monotonic_ns()
             observer.probe(preflight_id, scheduled)
@@ -982,6 +1052,8 @@ def trial(variant, case, profile, cfg, lab, seed, folder, expected_provenance=No
         measure_network_before = network(lab, "status", run_id, timeline, profile_id=case["profile"])
         receipts.append(measure_network_before)
         issues.extend("measurement start network: " + error for error in receipt_errors(measure_network_before, "status", profile, seed, network_budget))
+        if observer:
+            wait_owned_foreground(client, observer, timeline, "measurement")
         timeline.emit("measurement_begin", run_tag=tag, phase_id=2)
         interval = observe_for(cfg["measure_s"], cfg["probe_hz"], observer, client, timeline,
                                budget_ms=cfg.get("injection_budget_ms", 50), inject=case["scene"] != "static-idle")

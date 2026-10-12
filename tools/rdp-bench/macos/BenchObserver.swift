@@ -71,11 +71,36 @@ func shiftKey(_ down: Bool) {
     event.flags = down ? .maskShift : []
     if let pid = observerTargetPID {event.postToPid(pid)}
 }
+func foregroundFields() -> [String: Any] {
+    let target = observerTargetPID
+    // Keep one foreground snapshot. A second Launch Services lookup can briefly
+    // return nil even while that exact PID is the foreground application.
+    let frontApp = NSWorkspace.shared.frontmostApplication
+    let front = frontApp?.processIdentifier
+    let app = target.flatMap {pid in
+        frontApp?.processIdentifier == pid ? frontApp : NSRunningApplication(processIdentifier: pid)
+    }
+    let foreground = target != nil && front == target && app != nil && app?.isTerminated == false && app?.isActive == true
+    return ["target_pid":target.map{$0 as Any} ?? NSNull(),
+            "frontmost_pid":front.map{$0 as Any} ?? NSNull(),
+            "target_exists":app != nil,
+            "target_terminated":app.map{$0.isTerminated as Any} ?? NSNull(),
+            "target_active":app.map{$0.isActive as Any} ?? NSNull(),
+            "target_foreground":foreground]
+}
+func replyForegroundStatus(_ request: String) {
+    var status = foregroundFields()
+    status["type"] = "foreground_status"
+    status["request_id"] = request
+    emit(status)
+}
 func probe(_ id:UInt32,_ scheduled:UInt64?) {
-    guard let pid = observerTargetPID,
-          NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
-          NSRunningApplication(processIdentifier:pid)?.isTerminated == false else {
-        emit(["type":"probe_error","probe_id":id,"error":"Owned RDP client is not foreground; input was not posted"])
+    var focus = foregroundFields()
+    guard focus["target_foreground"] as? Bool == true else {
+        focus["type"] = "probe_error"
+        focus["probe_id"] = id
+        focus["error"] = "Owned RDP client is not foreground; input was not posted"
+        emit(focus)
         return
     }
     let codes:[Character:CGKeyCode]=["0":29,"1":18,"2":19,"3":20,"4":21,"5":23,"6":22,"7":26,"8":28,"9":25,"a":0,"b":11,"c":8,"d":2,"e":14,"f":3]
@@ -95,6 +120,17 @@ func probe(_ id:UInt32,_ scheduled:UInt64?) {
         let args=CommandLine.arguments
         func arg(_ key:String,_ fallback:String) -> String {
             guard let i=args.firstIndex(of:key),i+1<args.count else{return fallback};return args[i+1]
+        }
+        // Diagnostic mode exercises the same stdin RPC without screen capture
+        // or input, so its namespace/timeout contract can be checked safely.
+        if args.contains("--foreground-status-only") {
+            if let line = readLine(), let data = line.data(using: .utf8),
+               let command = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+               command["op"] as? String == "foreground_status",
+               let request = command["request_id"] as? String, !request.isEmpty && request.count <= 64 {
+                replyForegroundStatus(request)
+            }
+            return
         }
         if args.contains("--check-environment") {
             var activeIDs = [CGDirectDisplayID](repeating: 0, count: 128)
@@ -151,6 +187,10 @@ func probe(_ id:UInt32,_ scheduled:UInt64?) {
         DispatchQueue.global(qos:.userInitiated).async {
             while let line=readLine() {
                 guard let data=line.data(using:.utf8),let x=(try? JSONSerialization.jsonObject(with:data)) as? [String:Any] else {continue}
+                if x["op"] as? String == "foreground_status", let request = x["request_id"] as? String,
+                   !request.isEmpty && request.count <= 64 {
+                    replyForegroundStatus(request)
+                }
                 if x["op"] as? String == "probe",let n=x["probe_id"] as? NSNumber {probe(n.uint32Value,(x["scheduled_ns"] as? NSNumber)?.uint64Value)}
                 if x["op"] as? String == "stop" {exit(0)}
             }

@@ -2,6 +2,7 @@ import json
 import contextlib
 import io
 import errno
+import importlib.util
 import os
 import re
 from pathlib import Path
@@ -20,7 +21,12 @@ from rdpbench.live import (ProbeSchedule, aggregate, bridge_metrics, measured_pr
                            network, render_metrics, same_identity, source_evidence,
                            ssh_options, trial, validate_inputs, receipt_errors, udp_activity_delta,
                            ledger_evidence, actual_conditions, provenance_errors, runtime_provenance,
-                           environment_preflight, run_suite, begin_owned_teardown, configured_display_errors)
+                           environment_preflight, run_suite, begin_owned_teardown, configured_display_errors,
+                           ipc_publish_script, Observer, confirmed_owned_foreground, wait_owned_foreground)
+
+WINDOWS_AGENT_SPEC = importlib.util.spec_from_file_location("benchmark_windows_agent_fixture", ROOT / "windows/agent.py")
+WINDOWS_AGENT = importlib.util.module_from_spec(WINDOWS_AGENT_SPEC)
+WINDOWS_AGENT_SPEC.loader.exec_module(WINDOWS_AGENT)
 
 
 class LiveTests(unittest.TestCase):
@@ -568,6 +574,143 @@ class LiveTests(unittest.TestCase):
                 entries[-1][field] = value
                 self.assertTrue(inspect(), field)
                 entries[-1][field] = original
+
+    def sharing_error(self, code):
+        error = OSError("fixture Windows error")
+        error.winerror = code
+        return error
+
+    def test_windows_atomic_status_replace_retries_only_sharing_and_lock_errors(self):
+        with patch.object(WINDOWS_AGENT.os, "replace", side_effect=[self.sharing_error(32), self.sharing_error(33), None]) as replace, \
+             patch.object(WINDOWS_AGENT.time, "sleep") as sleep:
+            WINDOWS_AGENT.atomic_replace("source.tmp", "status.json", attempts=3)
+        self.assertEqual(replace.call_count, 3)
+        self.assertEqual([item.args[0] for item in sleep.call_args_list], [.025,.05])
+        for code in (2,5,80,87,183):
+            with patch.object(WINDOWS_AGENT.os, "replace", side_effect=self.sharing_error(code)) as replace, \
+                 patch.object(WINDOWS_AGENT.time, "sleep") as sleep:
+                with self.assertRaises(OSError):
+                    WINDOWS_AGENT.atomic_replace("source.tmp", "status.json")
+            self.assertEqual(replace.call_count, 1)
+            sleep.assert_not_called()
+
+    def test_windows_atomic_status_replace_is_bounded_and_keeps_previous_target(self):
+        with tempfile.TemporaryDirectory() as name:
+            destination = Path(name) / "status.json"
+            destination.write_text('{"previous":true}')
+            with patch.object(WINDOWS_AGENT.os, "replace", side_effect=self.sharing_error(32)) as replace, \
+                 patch.object(WINDOWS_AGENT.time, "sleep") as sleep:
+                with self.assertRaisesRegex(TimeoutError, "after 3 attempts"):
+                    WINDOWS_AGENT.atomic_replace(Path(name) / "new.tmp", destination, attempts=3)
+            self.assertEqual(replace.call_count, 3)
+            self.assertEqual(sleep.call_count, 2)
+            self.assertEqual(destination.read_text(), '{"previous":true}')
+
+    def test_ambiguous_windows_access_denied_retries_only_kernel_confirmed_sharing(self):
+        with patch.object(WINDOWS_AGENT.os, "replace", side_effect=[self.sharing_error(5), None]) as replace, \
+             patch.object(WINDOWS_AGENT, "target_sharing_violation", return_value=True) as probe, \
+             patch.object(WINDOWS_AGENT.time, "sleep") as sleep:
+            WINDOWS_AGENT.atomic_replace("source.tmp", "status.json")
+        self.assertEqual(replace.call_count, 2)
+        probe.assert_called_once_with("status.json")
+        self.assertEqual(sleep.call_count, 1)
+        with patch.object(WINDOWS_AGENT.os, "replace", side_effect=self.sharing_error(5)) as replace, \
+             patch.object(WINDOWS_AGENT, "target_sharing_violation", return_value=False), \
+             patch.object(WINDOWS_AGENT.time, "sleep") as sleep:
+            with self.assertRaises(OSError):
+                WINDOWS_AGENT.atomic_replace("source.tmp", "status.json")
+        self.assertEqual(replace.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_status_writer_creates_unique_closed_json_before_atomic_replacement(self):
+        with tempfile.TemporaryDirectory() as name:
+            destination = Path(name) / "status.json"
+            destination.write_text('{"previous":true}')
+            temporary_paths = []
+            real_replace = WINDOWS_AGENT.os.replace
+            def inspect(source, target):
+                self.assertEqual(destination.read_text(), '{"previous":true}')
+                self.assertEqual(json.loads(source.read_text()), dict(next=True))
+                temporary_paths.append(source)
+                real_replace(source, target)
+            with patch.object(WINDOWS_AGENT.os, "replace", side_effect=inspect):
+                WINDOWS_AGENT.write(destination, dict(next=True))
+            self.assertEqual(json.loads(destination.read_text()), dict(next=True))
+            self.assertTrue(re.fullmatch(r"status\.json\.[0-9a-f]{32}\.tmp", temporary_paths[0].name))
+            self.assertFalse(temporary_paths[0].exists())
+            with patch.object(WINDOWS_AGENT, "atomic_replace") as replace:
+                with self.assertRaises(ValueError):
+                    WINDOWS_AGENT.write(destination, dict(next=float("nan")))
+            replace.assert_not_called()
+
+    def test_controller_publication_uses_atomic_replace_and_sharing_only_budget(self):
+        script = ipc_publish_script("C:\\Owned IPC\\command.json", b'{"one":true}', "ab" * 16, attempts=3)
+        self.assertIn("[IO.File]::Replace($ipcSource,$ipcTarget,[NullString]::Value)", script)
+        self.assertIn("[IO.File]::Move($ipcSource,$ipcTarget)", script)
+        self.assertIn("$ipcCode -notin @(32,33)", script)
+        self.assertIn("$ipcAttempt -lt 3", script)
+        self.assertIn("after 3 attempts", script)
+        self.assertNotIn("Move-Item", script)
+        self.assertNotIn("Remove-Item", script)
+        self.assertNotIn("Copy-Item", script)
+        self.assertIn("command.json." + "ab" * 16 + ".tmp", script)
+        for attempts in (0,25,True):
+            with self.assertRaises(ValueError):
+                ipc_publish_script("C:\\Owned IPC\\command.json", b"{}", "ab" * 16, attempts)
+
+    def foreground(self, front=42, target=42, **changes):
+        return dict(type="foreground_status", target_pid=target, frontmost_pid=front,
+                    target_exists=True, target_terminated=False, target_active=True,
+                    target_foreground=True, **changes)
+
+    def test_foreground_confirmation_requires_exact_live_owned_pid(self):
+        self.assertTrue(confirmed_owned_foreground(self.foreground(), 42))
+        for name, value in (("target_pid", None), ("target_pid", 43), ("frontmost_pid", None),
+                            ("frontmost_pid", 43), ("target_exists", False), ("target_terminated", True),
+                            ("target_active", False), ("target_foreground", None)):
+            event = self.foreground()
+            event[name] = value
+            self.assertFalse(confirmed_owned_foreground(event, 42), name)
+
+    def test_foreground_wait_retries_before_measurement_and_preserves_status_diagnostics(self):
+        client = Mock()
+        client.proc.pid = 42
+        observer = Mock()
+        observer.foreground_status.side_effect = [dict(type="foreground_status_timeout", target_foreground=None),
+                                                 self.foreground(front=43), self.foreground()]
+        timeline = Mock()
+        with patch("rdpbench.live.time.sleep"):
+            result = wait_owned_foreground(client, observer, timeline, "preflight")
+        self.assertEqual(result["frontmost_pid"], 42)
+        self.assertEqual(client.send.call_count, 3)
+        self.assertTrue(all(call.args == ("focus",) for call in client.send.call_args_list))
+        statuses = [call.kwargs["status"] for call in timeline.emit.call_args_list if call.args[0] == "foreground_status"]
+        self.assertEqual(statuses[1]["frontmost_pid"], 43)
+
+    def test_foreground_wait_fails_bounded_with_last_exact_pid_evidence(self):
+        client, observer, timeline = Mock(), Mock(), Mock()
+        client.proc.pid = 42
+        observer.foreground_status.return_value = self.foreground(front=43)
+        with patch("rdpbench.live.time.sleep"), patch("rdpbench.live.time.monotonic", side_effect=[0,0,.01,.02,4]):
+            with self.assertRaisesRegex(RuntimeError, '"frontmost_pid": 43'):
+                wait_owned_foreground(client, observer, timeline, "measurement")
+        self.assertEqual(client.send.call_count, 1)
+
+    def test_foreground_rpc_matches_request_id_and_unknown_timeout_cannot_pass(self):
+        observer = object.__new__(Observer)
+        observer.foreground_replies = {"unrelated": self.foreground()}
+        observer.lock = threading.Lock()
+        observer.check_live = Mock()
+        sink = io.StringIO()
+        observer.proc = SimpleNamespace(stdin=sink)
+        with patch("rdpbench.live.time.sleep"), patch("rdpbench.live.time.monotonic", side_effect=[0,0,.4]):
+            status = observer.foreground_status(timeout=.3)
+        self.assertEqual(status["type"], "foreground_status_timeout")
+        self.assertIsNone(status["target_foreground"])
+        self.assertIn("unrelated", observer.foreground_replies)
+        request = json.loads(sink.getvalue())
+        self.assertEqual(request["request_id"], status["request_id"])
+        self.assertEqual(request["op"], "foreground_status")
 
 
 if __name__ == "__main__":

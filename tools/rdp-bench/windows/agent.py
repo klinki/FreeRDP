@@ -7,8 +7,39 @@ import argparse,ctypes,functools,hashlib,http.server,importlib.metadata,json,os,
 from pathlib import Path
 
 def read(p):return json.loads(Path(p).read_text(encoding='utf-8-sig'))
+def target_sharing_violation(target):
+    """MoveFileEx can report error 5 for a target's missing DELETE sharing.
+
+    Request DELETE access without deleting anything. Only the kernel's explicit
+    sharing/lock result permits a retry; actual permissions/read-only failures do not.
+    """
+    if os.name!='nt':return False
+    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+    kernel.CreateFileW.argtypes=[ctypes.c_wchar_p,ctypes.c_uint32,ctypes.c_uint32,ctypes.c_void_p,ctypes.c_uint32,ctypes.c_uint32,ctypes.c_void_p]
+    kernel.CreateFileW.restype=ctypes.c_void_p
+    kernel.CloseHandle.argtypes=[ctypes.c_void_p]
+    kernel.CloseHandle.restype=ctypes.c_int
+    handle=kernel.CreateFileW(str(target),0x10000,7,None,3,0x80,None)
+    if handle==ctypes.c_void_p(-1).value:return ctypes.get_last_error() in (32,33)
+    if handle is None:return False
+    kernel.CloseHandle(handle)
+    return False
+def atomic_replace(source,target,attempts=24):
+    """Retry only Windows sharing/lock violations; keep the old JSON intact."""
+    if isinstance(attempts,bool) or not isinstance(attempts,int) or not 1<=attempts<=24:raise ValueError('invalid bounded IPC publish attempts')
+    for attempt in range(attempts):
+        try:
+            os.replace(source,target)
+            return
+        except OSError as error:
+            code=getattr(error,'winerror',None)
+            if code not in (32,33) and not (code==5 and target_sharing_violation(target)):raise
+            if attempt==attempts-1:raise TimeoutError(f'Atomic IPC replacement remained blocked after {attempts} attempts; Windows sharing/lock error {error.winerror}') from error
+            time.sleep(min(.1,.025*(attempt+1)))
 def write(p,x):
-    p=Path(p);tmp=p.with_suffix('.tmp');tmp.write_text(json.dumps(x),encoding='utf-8');os.replace(tmp,p)
+    p=Path(p);tmp=p.with_name(p.name+'.'+uuid.uuid4().hex+'.tmp')
+    tmp.write_text(json.dumps(x,allow_nan=False),encoding='utf-8')
+    atomic_replace(tmp,p)
 def source_hashes(root):
     return {str(p.relative_to(root)).replace('\\','/'):hashlib.sha256(p.read_bytes()).hexdigest()
             for p in sorted((root/'windows').glob('*')) if p.is_file() and p.suffix in ('.py','.ps1')}
