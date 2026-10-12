@@ -62,6 +62,20 @@ scope preserved. Calibration CRC echo goodput never becomes RDP goodput.
 input responses were observed. Their all-observed comparisons are diagnostic.
 Setup attempts with no numeric measurement evidence remain visible as failures
 but do not count as observed comparison pairs.
+Interrupted campaign placeholders retain their campaign phase and distinguish
+an attempt with recorded artifacts from a planned trial with no recorded start.
+The latest imported phase is the dashboard's initial selection. A candidate-only
+phase does not inherit before/after comparisons from older paired campaigns.
+
+For a completed condition set assembled from retained baseline and retry
+attempts, pass `--coverage /path/to/candidate-condition-coverage.json` to
+`live_report.py`. The sidecar supplies explicit `selected_trial_ids`; totals,
+distinct profile/case/seed conditions and any supplied median values are checked
+against those trials. All selected input cohorts must have complete observed
+probe counts. The dashboard then opens that coverage view by default, with
+profile medians of whole-trial statistics, source phases and helper-version
+limits visible. It does not duplicate records, rewrite phases, promote partial
+eligibility, pool response samples or create reference comparisons.
 Reference/candidate pair declarations can come from recorded provenance variant
 IDs; phase, case, configuration key and seed still must match. Changed profiles
 under one ID and repeated trial IDs are rejected.

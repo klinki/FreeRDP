@@ -12,6 +12,7 @@ import copy
 import csv
 import hashlib
 import json
+import math
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -65,7 +66,64 @@ def bridge_end_evidence(row):
             "scope": "Explicit terminal launcher evidence; does not replace controller or observer failure reasons"}
 
 
-def combine(paths, preflights=None, calibration=None):
+def coverage_view(trials, path):
+    """Audit an explicit condition selection without copying trials or changing phases."""
+    payload = read(path)
+    ids = payload.get("selected_trial_ids") if isinstance(payload, dict) else None
+    if not isinstance(ids, list) or not ids or not all(isinstance(ident, str) for ident in ids) or len(ids) != len(set(ids)):
+        raise ValueError("coverage requires unique explicit selected_trial_ids")
+    by_id = {row["trial_id"]: row for row in trials}
+    if any(ident not in by_id for ident in ids):
+        raise ValueError("coverage refers to a trial absent from the imported reports")
+    rows = [by_id[ident] for ident in ids]
+    conditions = {(row["profile_id"], row["case_id"], row.get("seed")) for row in rows}
+    if len(conditions) != len(rows) or any(row["variant"] != "candidate" or row.get("seed") is None for row in rows):
+        raise ValueError("coverage must select unique candidate profile/case/seed conditions")
+    for row in rows:
+        counts = row["probes"]
+        expected = counts["expected"]
+        if not row.get("measurement_evidence_available") or expected is None or expected <= 0 or counts["injected"] != expected or counts["observed"] != expected:
+            raise ValueError(f"coverage {row['trial_id']}: complete observed input cohort is required")
+        if any(counts[name] != 0 for name in ("missed", "unobserved", "timeouts")):
+            raise ValueError(f"coverage {row['trial_id']}: misses, unobserved probes or timeouts")
+    counts = {"selected_trials": len(rows), "expected": sum(row["probes"]["expected"] for row in rows),
+              "injected": sum(row["probes"]["injected"] for row in rows), "observed": sum(row["probes"]["observed"] for row in rows),
+              "missed_injections": 0, "timeouts": 0,
+              "complete": sum(row["sut_outcome"] == "COMPLETE" for row in rows),
+              "incomplete": sum(row["sut_outcome"] == "INCOMPLETE" for row in rows),
+              "strict_eligible": sum(row["strict_eligible"] for row in rows)}
+    for key in ("expected", "observed", "missed_injections", "timeouts", "complete", "incomplete"):
+        if key in payload and payload[key] != counts[key]:
+            raise ValueError(f"coverage {key} claim differs from selected trial evidence")
+    groups = []
+    for profile in sorted({row["profile_id"] for row in rows}):
+        group = [row for row in rows if row["profile_id"] == profile]
+        metrics = {name: stats([row["metrics"].get(name) for row in group])
+                   for name in ("input_visible_ms.p95", "input_visible_ms.p99", "input_scheduled_ms.p99",
+                                "progress.observed_hz", "verified_goodput_mbps")}
+        groups.append({"profile_id": profile, "N": len(group), "seeds": sorted(row["seed"] for row in group),
+                       "selected_trial_ids": [row["trial_id"] for row in group], "metrics": metrics,
+                       "source_phases": sorted({row["phase"] for row in group}),
+                       "complete": sum(row["sut_outcome"] == "COMPLETE" for row in group),
+                       "incomplete": sum(row["sut_outcome"] == "INCOMPLETE" for row in group)})
+    for supplied in payload.get("groups") or []:
+        group = next((group for group in groups if group["profile_id"] == supplied.get("profile")), None)
+        if group is None or group["N"] != supplied.get("N") or group["seeds"] != supplied.get("seeds"):
+            raise ValueError("coverage group membership differs from selected trial evidence")
+        for name, metric in (("median_trial_p95_ms", "input_visible_ms.p95"), ("median_trial_p99_ms", "input_visible_ms.p99")):
+            if name in supplied and (not finite(supplied[name]) or not math.isclose(supplied[name], group["metrics"][metric]["median"], rel_tol=1e-10, abs_tol=1e-9)):
+                raise ValueError(f"coverage {name} differs from whole-trial median")
+    return {"id": "candidate-condition-coverage", "label": "Candidate baseline · 10 conditions" if len(rows) == 10 else f"Candidate condition coverage · {len(rows)} trials",
+            "scope": payload.get("scope", "Explicit candidate condition coverage across retained phases; provisional"),
+            "source": identity(path, "explicit selected candidate conditions"), "selected_trial_ids": ids,
+            "source_phases": sorted({row["phase"] for row in rows}), "counts": counts, "groups": groups,
+            "notes": ["Coverage selects retained trial IDs; it does not create new trials or rewrite their original phase, source fingerprints or eligibility.",
+                      "Helper versions differ across the selected phases. The combined condition view is provisional and provides no causal reference comparison.",
+                      "Profile summaries are medians/ranges of whole-trial p95/p99 values; response samples are never pooled.",
+                      "Incomplete final status acknowledgement remains a recorded failure even when all input responses were observed."]}
+
+
+def combine(paths, preflights=None, calibration=None, coverage=None):
     reports = source_reports(paths)
     if not reports:
         raise ValueError("at least one live report is required")
@@ -85,7 +143,15 @@ def combine(paths, preflights=None, calibration=None):
                 raise ValueError(f"{path}: missing or duplicate trial_id {ident}")
             ids.add(ident)
             saved = copy.deepcopy(row)
+            if not saved.get("phase"):
+                saved["phase"] = source.get("campaign_id") or path.parent.name
             saved["source_report"] = source_identity
+            if "planned trial has no completed summary" in (saved.get("reasons") or []):
+                folder = path.parent / ident
+                present = {name: (folder / name).is_file() for name in ("manifest.json", "timeline.jsonl", "bridge.jsonl", "summary.json")}
+                saved["completion_evidence"] = {"summary_completed": False, "artifact_presence": present,
+                                                "status": "interrupted_attempt_without_summary" if present["bridge.jsonl"] or present["timeline.jsonl"] else "no_recorded_start",
+                                                "scope": "Planned row without completed summary; no measurements inferred"}
             bridge = bridge_end_evidence(saved)
             if bridge:
                 saved["derived_bridge_evidence"] = bridge
@@ -141,10 +207,14 @@ def combine(paths, preflights=None, calibration=None):
             declared_variants.update(variants)
     if not declarations and {"reference", "candidate"} <= declared_variants:
         names = sorted({name for row in normalized for name in row["metrics"]})
+        configurations = {(row["phase"], row["case_id"], row.get("comparison_key"))
+                          for row in normalized if row.get("comparison_key")}
+        # A candidate-only phase never inherits a comparison from older phases.
+        paired_configurations = {key for key in configurations if {"reference", "candidate"} <=
+                                 {row["variant"] for row in normalized if (row["phase"], row["case_id"], row.get("comparison_key")) == key}}
         declarations = [dict(phase=phase, case_id=case, comparison_key=config,
                              baseline_variant="reference", candidate_variant="candidate", metric_names=names)
-                        for phase, case, config in sorted({(row["phase"], row["case_id"], row.get("comparison_key"))
-                                                        for row in normalized if row.get("comparison_key")})]
+                        for phase, case, config in sorted(paired_configurations)]
         notes.append("Reference/candidate comparisons use recorded provenance variant IDs and matching phase/case/configuration/seed; all-observed values remain diagnostic.")
     elif not declarations:
         for _, source in reports:
@@ -180,12 +250,17 @@ def combine(paths, preflights=None, calibration=None):
               "preflight_statuses": len(imported_preflights)}
     counts["bridge_end_classifications"] = dict(Counter(row.get("derived_bridge_evidence", {}).get("classification", "unknown")
                                                        for row in trials if row.get("sut_outcome") == "INCOMPLETE" and row.get("derived_bridge_evidence")))
+    counts["planned_without_summary"] = sum(row.get("completion_evidence", {}).get("summary_completed") is False for row in trials)
     notes.extend(["Failed preflight statuses remain distinct phases without numeric measurement evidence.",
                   "Visible input-response percentiles describe observed probes; failures, misses, unobserved/censored IDs and timeouts stay separate.",
                   "UDP-only shaping does not certify a full-RDP 10 Mbit/s profile. TCP and graphics routing require their recorded evidence.",
                   "Network traffic and SDL texture upload bytes are not verified RDP application goodput."])
+    preferred_phase = next((row.get("phase") for row in reversed(trials) if row.get("source_report") == provenance[-1]["source"]), None)
+    selected_coverage = coverage_view(normalized, coverage) if coverage else None
     return {"schema": "freerdp.live_benchmark", "version": 1, "scope": "Live Windows RDP; UDP-only network profiles, TCP unshaped; measured graphics routing may remain unproved",
             "campaign_id": "combined-live-vm", "provenance": {"sources": sources, "phase_provenance": provenance},
+            "preferred_phase": preferred_phase,
+            "coverage": selected_coverage,
             "network_profiles": list(profiles.values()), "calibration": selected_calibration,
             "counts": counts, "phases": phases, "trials": trials,
             "comparisons": comparisons(normalized, declarations),
@@ -221,6 +296,15 @@ def report_markdown(report):
                              for name in ("input_visible_ms.p95", "input_visible_ms.p99", "verified_goodput_mbps")]
         lines.append(f"| {phase} | {profile} / {case} | {variant} | {len(rows)} | {outcomes['COMPLETE']} / {outcomes['INCOMPLETE']} / {outcomes['FAIL']} | {sum(row['strict_eligible'] for row in rows)} | {probes} | {fmt(p95)} / {fmt(p99)} | {fmt(goodput)} |")
     calibration = report["calibration"]
+    coverage = report.get("coverage")
+    if coverage:
+        lines.extend(["", "## Selected candidate condition coverage", "", coverage["scope"], "",
+                      f"Selected {coverage['counts']['selected_trials']} distinct conditions: {coverage['counts']['observed']}/{coverage['counts']['expected']} responses, {coverage['counts']['missed_injections']} misses, {coverage['counts']['timeouts']} timeouts; {coverage['counts']['complete']} COMPLETE and {coverage['counts']['incomplete']} INCOMPLETE. Source phases and helper versions remain distinct.", "",
+                      "| Profile | Selected trials | Median trial p95 ms | Median trial p99 ms | Verified RDP goodput |",
+                      "|---|---:|---:|---:|---|"])
+        for group in coverage["groups"]:
+            lines.append(f"| {group['profile_id']} | {group['N']} | {fmt(group['metrics']['input_visible_ms.p95']['median'])} | {fmt(group['metrics']['input_visible_ms.p99']['median'])} | {fmt(group['metrics']['verified_goodput_mbps']['median'])} |")
+        lines.extend(["", *["- " + note for note in coverage["notes"]], ""])
     lines.extend(["", f"Latest calibration: {calibration.get('strict_passed', 'unknown')}/{calibration.get('sample_count', 'unknown')} strict samples; accepted receipt: {calibration.get('approved') is True}.", "",
                   "## Retained failures and partial evidence", ""])
     classifications = report["counts"].get("bridge_end_classifications") or {}
@@ -259,11 +343,12 @@ def main():
     parser.add_argument("--input", type=Path, action="append", required=True, help="repeat for smoke and main phase reports")
     parser.add_argument("--preflights", type=Path, help="retained failed-live-preflights.json status sidecar")
     parser.add_argument("--calibration", type=Path, help="latest actual VM UDP calibration summary")
+    parser.add_argument("--coverage", type=Path, help="explicit selected candidate condition IDs; raw phases remain unchanged")
     parser.add_argument("--output", type=Path, required=True, help="separate derived report directory")
     args = parser.parse_args()
     try:
-        output = output_guard(args.output, args.input + [p for p in (args.preflights, args.calibration) if p])
-        report = combine(args.input, args.preflights, args.calibration)
+        output = output_guard(args.output, args.input + [p for p in (args.preflights, args.calibration, args.coverage) if p])
+        report = combine(args.input, args.preflights, args.calibration, args.coverage)
         path = export(report, output)
     except (OSError, ValueError, TypeError, KeyError) as error:
         parser.exit(1, f"live report: {error}\n")

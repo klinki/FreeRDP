@@ -228,7 +228,7 @@ def campaign(path, kind):
                              baseline_variant=variants["baseline"], candidate_variant=variants["candidate"],
                              metric_names=sorted({name for row in rows for name in row["metrics"]}))
                         for phase, case, config in sorted({(r["phase"], r["case_id"], r.get("comparison_key")) for r in rows if r.get("comparison_key")})]
-    metadata = {key: copy.deepcopy(source.get(key)) for key in ("scope", "notes", "provenance", "calibration", "network_profiles", "metric_definitions", "phases")}
+    metadata = {key: copy.deepcopy(source.get(key)) for key in ("scope", "notes", "provenance", "calibration", "network_profiles", "metric_definitions", "phases", "preferred_phase", "coverage")}
     if kind == "ack" and not metadata["calibration"]:
         metadata["calibration"] = {"approved": False, "available": False, "status": "No accepted calibration receipt in this report", "notes": ["All raw UDP2 campaigns remain provisional."]}
     return {"id": kind, "label": names[kind], "kind": kind, "campaign_id": source.get("campaign_id", Path(path).stem),
@@ -245,6 +245,7 @@ def build_data(loss, ack, live=None):
         campaigns.append({"id": "live", "label": "Windows VM", "kind": "live", "scope": "No live result supplied",
                           "trials": [], "comparisons": [], "notes": ["This dashboard contains no fabricated Windows measurements. Supply --live after a recorded VM campaign."]})
     return {"schema": "freerdp.benchmark_dashboard", "version": 1, "campaigns": campaigns,
+            "default_campaign": "live" if campaigns[-1].get("coverage") else "loss",
             "metric_info": {name: {"label": label, "unit": unit, "scope": scope} for name, (label, unit, scope) in METRIC_INFO.items()},
             "contract": ["Each plotted point is a whole trial. Summary values are medians/ranges of whole-trial values, never pooled p95/p99.",
                          "Strict pairs require matching phase, case, configuration and seed with complete service and valid timing/artifacts.",
