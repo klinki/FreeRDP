@@ -7,7 +7,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 set(DRIVER ${MODULE_NAME}.c)
 
-set(TESTS TestVersion.c TestSettings.c TestUtils.c TestRdpeUdp.c TestRdpeUdpSend.c)
+set(TESTS TestVersion.c TestSettings.c TestUtils.c TestRdpeUdp.c TestRdpeUdpSend.c TestRdpeUdpTlsDrain.c)
 
 if(NOT WIN32)
   list(APPEND TESTS TestRdpeUdpEvent.c)
@@ -59,7 +59,7 @@ add_compile_definitions(TESTING_SRC_DIRECTORY="${PROJECT_SOURCE_DIR}")
 
 # TestCore does not call winpr-tools APIs. The link was added with
 # TestFuzzServer's on-the-fly cert generation and broke -DWITH_WINPR_TOOLS=OFF.
-target_link_libraries(${MODULE_NAME} PRIVATE freerdp-client)
+target_link_libraries(${MODULE_NAME} PRIVATE freerdp-client ${OPENSSL_LIBRARIES})
 if(WITH_WINPR_TOOLS)
   set(CORE_FUZZER_LIBS "freerdp-client winpr-tools")
 else()
@@ -86,5 +86,7 @@ foreach(test ${TESTS})
   get_filename_component(TestName ${test} NAME_WE)
   add_test(${TestName} ${TESTING_OUTPUT_DIRECTORY}/${MODULE_NAME} ${TestName})
 endforeach()
+
+set_tests_properties(TestRdpeUdpTlsDrain PROPERTIES SKIP_RETURN_CODE 77)
 
 set_property(TARGET ${MODULE_NAME} PROPERTY FOLDER "FreeRDP/Core/Test")

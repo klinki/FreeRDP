@@ -1440,8 +1440,19 @@ BOOL multitransport_test_attach_udp(rdpContext* context, rdpUdpTransport* udp)
 	rdpMultitransport* multi = context->rdp->multitransport;
 	if (multi->udp)
 		return FALSE;
-	multi->udp = udp;
+	/* Raw owner-loop fixtures have no TLS peer. Supply an empty retrying
+	 * BIO so the established tunnel's nonblocking read remains meaningful. */
+	BIO* bio = BIO_new(BIO_s_mem());
+	if (!bio)
+		return FALSE;
+	BIO_set_mem_eof_return(bio, -1);
 	rdpeudp_test_set_connected(udp, TRUE);
+	if (!rdpeudp_test_attach_tls_bio(udp, bio))
+	{
+		BIO_free(bio);
+		return FALSE;
+	}
+	multi->udp = udp;
 	return TRUE;
 }
 

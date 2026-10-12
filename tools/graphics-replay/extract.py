@@ -301,10 +301,13 @@ def tshark_rows(capture, display_filter, fields):
 
 
 def extract(args):
-    hellos = list(tshark_rows(args.capture, 'udp && tls.handshake.type == 1',
-        ['udp.stream', 'tls.handshake.random']))
-    require(len(hellos) == 1, 'expected exactly one UDP ClientHello; use one complete session capture')
-    flow, client_random = hellos[0]
+    # Reliable UDP can retransmit the same ClientHello under a fresh DataSeq.
+    # Preserve its stream identity: an identical random in another flow is
+    # still another session and cannot safely share this reconstruction.
+    hellos = {tuple(row) for row in tshark_rows(args.capture, 'udp && tls.handshake.type == 1',
+        ['udp.stream', 'tls.handshake.random'])}
+    require(len(hellos) == 1, 'expected exactly one unique UDP ClientHello session; use one complete session capture')
+    flow, client_random = next(iter(hellos))
     client_random = client_random.replace(':', '').lower()
     secrets = {}
     for line in args.keys.read_text().splitlines():

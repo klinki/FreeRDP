@@ -3187,7 +3187,7 @@ static SSIZE_T rdpeudp2_recv_reliable(rdpUdpTransport* udp, BYTE* buffer, size_t
 		return -1;
 
 	const UINT64 deadline = udp_now_ms() + timeoutMs;
-	while (udp_now_ms() < deadline)
+	while (TRUE)
 	{
 		if (udp_aborted(udp) || !rdpeudp_check_health(udp))
 			return -1;
@@ -3213,7 +3213,12 @@ static SSIZE_T rdpeudp2_recv_reliable(rdpUdpTransport* udp, BYTE* buffer, size_t
 		}
 		LeaveCriticalSection(&udp->lock);
 
-		DWORD step = (DWORD)(deadline - udp_now_ms());
+		/* Even a nonblocking read must inspect bytes already reassembled.
+		 * Once empty, return WANT_READ without waiting inside the TLS lock. */
+		const UINT64 now = udp_now_ms();
+		if (now >= deadline)
+			break;
+		DWORD step = (DWORD)(deadline - now);
 		if (step > 50)
 			step = 50;
 		(void)rdpeudp_recv_one(udp, step, nullptr, nullptr, nullptr, nullptr);
@@ -3252,8 +3257,13 @@ static int rdpeudp_bio_read(BIO* bio, char* buf, int size)
 	if (!ptr || !ptr->udp || !buf || (size <= 0))
 		return 0;
 	BIO_clear_flags(bio, BIO_FLAGS_READ);
-	const SSIZE_T rc =
-	    rdpeudp2_recv_reliable(ptr->udp, (BYTE*)buf, (size_t)size, 100);
+	/* Setup retains its bounded synchronous reads. Established transport
+	 * reads are nonblocking so a pending TLS record can be drained without
+	 * waiting for another datagram while holding the TLS BIO's lock. */
+	EnterCriticalSection(&ptr->udp->lock);
+	const DWORD timeout = ptr->udp->tunnelEstablished ? 0 : 100;
+	LeaveCriticalSection(&ptr->udp->lock);
+	const SSIZE_T rc = rdpeudp2_recv_reliable(ptr->udp, (BYTE*)buf, (size_t)size, timeout);
 	if (rc < 0)
 	{
 		BIO_clear_flags(bio, BIO_FLAGS_SHOULD_RETRY);
@@ -3392,6 +3402,32 @@ BIO_METHOD* BIO_s_rdpeudp(void)
 		BIO_meth_set_destroy(meth, rdpeudp_bio_free);
 	}
 	return meth;
+}
+
+BIO* rdpeudp_test_new_bio(rdpUdpTransport* udp)
+{
+	if (!udp)
+		return nullptr;
+	BIO* bio = BIO_new(BIO_s_rdpeudp());
+	if (bio)
+	{
+		RdpUdpBio* ptr = BIO_get_data(bio);
+		ptr->udp = udp;
+	}
+	return bio;
+}
+
+BOOL rdpeudp_test_attach_tls_bio(rdpUdpTransport* udp, BIO* bio)
+{
+	if (!udp || !bio || udp->tls || !udp->connected)
+		return FALSE;
+	rdpTls* tls = calloc(1, sizeof(*tls));
+	if (!tls)
+		return FALSE;
+	tls->bio = bio;
+	udp->tls = tls;
+	udp->tlsBio = bio;
+	return TRUE;
 }
 
 /* ---- TLS + tunnel ---- */
@@ -3756,38 +3792,10 @@ int rdpeudp_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf, size_t subBufLe
 		if (udp_aborted(udp))
 			return -1;
 
-		/* 3. Fast path for non-blocking drain: if nothing is buffered in TLS
-		 * and the socket has nothing readable, avoid the BIO's internal wait
-		 * and return immediately (progress preserved in tunnelBuf). */
-		if (timeoutMs == 0)
-		{
-			BOOL tlsBuffered = FALSE;
-			BOOL sockReadable = FALSE;
-			int fd = -1;
-			EnterCriticalSection(&udp->lock);
-			if (udp->recvStream)
-				tlsBuffered = (Stream_Length(udp->recvStream) > udp->recvPos);
-			fd = udp->sockfd;
-			LeaveCriticalSection(&udp->lock);
-			if (!tlsBuffered && (buffered == 0))
-			{
-				if (fd >= 0)
-					sockReadable = freerdp_udp_wait_readable(fd, 0);
-				if (!sockReadable)
-					return 0;
-			}
-			else if (!tlsBuffered && (buffered > 0))
-			{
-				/* Partial PDU buffered but TLS has nothing new yet; still try
-				 * one read in case a record is mid-reassembly, else return. */
-				if (fd >= 0)
-					sockReadable = freerdp_udp_wait_readable(fd, 0);
-				if (!sockReadable)
-					return 0;
-			}
-		}
-
-		/* 4. Read more TLS bytes (single attempt) and append to reassembly. */
+		/* 3. Always attempt the established nonblocking BIO read. OpenSSL
+		 * may own complete records after the UDP byte stream and socket are
+		 * empty; checking only those lower layers strands batched DVC PDUs.
+		 * WANT_READ ends this drain immediately, including partial records. */
 		{
 			UINT64 now = udp_now_ms();
 			DWORD chunkWait = 0;
@@ -3795,10 +3803,8 @@ int rdpeudp_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf, size_t subBufLe
 			{
 				UINT64 left = deadline - now;
 				chunkWait = (left > 50) ? 50 : (DWORD)left;
-				WINPR_UNUSED(chunkWait);
 			}
-			/* tls_recv_some does one BIO_read (internal ~100ms max when data
-			 * is pending; returns 0 quickly-ish otherwise). */
+			/* tls_recv_some makes one nonblocking established BIO_read. */
 			const SSIZE_T got = tls_recv_some(udp, tmp, sizeof(tmp));
 			if (got < 0)
 				return -1;
@@ -3806,10 +3812,18 @@ int rdpeudp_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf, size_t subBufLe
 			{
 				if (udp_now_ms() >= deadline)
 					return 0;
-				/* No progress; poll briefly before retrying (unless non-blocking
-				 * drain, where one attempt suffices). */
+				/* Blocking callers wait outside the TLS BIO lock. The ordinary
+				 * event-loop drain returns after one WANT_READ result. */
 				if (timeoutMs == 0)
 					return 0;
+				int fd = -1;
+				EnterCriticalSection(&udp->lock);
+				fd = udp->sockfd;
+				LeaveCriticalSection(&udp->lock);
+				if (fd < 0)
+					return 0;
+				if (chunkWait > 0)
+					(void)freerdp_udp_wait_readable(fd, chunkWait);
 				continue;
 			}
 			EnterCriticalSection(&udp->lock);
@@ -3835,6 +3849,14 @@ int rdpeudp_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf, size_t subBufLe
 			LeaveCriticalSection(&udp->lock);
 		}
 	}
+}
+
+int rdpeudp_test_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf, size_t subBufLen,
+	                             size_t* subLenOut, BYTE* payloadBuf, size_t payloadBufLen,
+	                             size_t* payloadLenOut, DWORD timeoutMs)
+{
+	return rdpeudp_tunnel_recv_full(udp, subBuf, subBufLen, subLenOut, payloadBuf, payloadBufLen,
+	                               payloadLenOut, timeoutMs);
 }
 
 /* ------------------------------------------------------------------ */

@@ -1,16 +1,118 @@
 #!/usr/bin/env python3
 """Boundary and integrity checks; no captured private data required."""
 import os
+import contextlib
+import ctypes as C
+import io
 import struct
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import extract as e
 
 
 CREATE = b'\x10\x07Microsoft::Windows::RDS::Graphics\0'
+CLIENT_RANDOM = '11' * 32
+
+
+def authenticated_stream():
+    """Public TLS 1.3 fixture encrypted independently by OpenSSL."""
+    payload = b'fixture graphics bytes'
+    plaintext = (struct.pack('<BHB', 2, len(CREATE), 4) + CREATE +
+                 struct.pack('<BHB', 2, len(payload) + 2, 4) + b'\x30\x07' + payload + b'\x17')
+    header = b'\x17\x03\x03' + struct.pack('>H', len(plaintext) + 16)
+    # Fixed public vector for traffic secret bytes(range(32)), SHA-256,
+    # TLS_AES_128_GCM_SHA256, application record sequence zero.
+    key = bytes.fromhex('9c9783cf77ea32d44f369da41f19f3cc')
+    nonce = bytes.fromhex('2f41c846a431a163814bcd71')
+    lib = e.GCM(os.environ.get('REPLAY_LIBCRYPTO')).lib
+    lib.EVP_EncryptInit_ex.argtypes = [C.c_void_p] * 5
+    lib.EVP_EncryptUpdate.argtypes = [C.c_void_p, C.c_void_p, C.POINTER(C.c_int),
+                                    C.c_void_p, C.c_int]
+    lib.EVP_EncryptFinal_ex.argtypes = [C.c_void_p, C.c_void_p, C.POINTER(C.c_int)]
+    ctx = lib.EVP_CIPHER_CTX_new()
+    if not ctx:
+        raise RuntimeError('fixture GCM allocation failed')
+    encrypted, count, tail, tag = C.create_string_buffer(len(plaintext) + 16), C.c_int(), C.c_int(), C.create_string_buffer(16)
+    try:
+        for status in (lib.EVP_EncryptInit_ex(ctx, lib.EVP_aes_128_gcm(), None, None, None),
+                       lib.EVP_CIPHER_CTX_ctrl(ctx, 9, len(nonce), None),
+                       lib.EVP_EncryptInit_ex(ctx, None, None, key, nonce),
+                       lib.EVP_EncryptUpdate(ctx, None, C.byref(count), header, len(header)),
+                       lib.EVP_EncryptUpdate(ctx, encrypted, C.byref(count), plaintext, len(plaintext))):
+            if status != 1:
+                raise RuntimeError('fixture GCM encryption failed')
+        written = count.value
+        if (lib.EVP_EncryptFinal_ex(ctx, C.byref(encrypted, written), C.byref(tail)) != 1 or
+                lib.EVP_CIPHER_CTX_ctrl(ctx, 0x10, len(tag), tag) != 1):
+            raise RuntimeError('fixture GCM finalization failed')
+        ciphertext = encrypted.raw[:written + tail.value] + tag.raw
+    finally:
+        lib.EVP_CIPHER_CTX_free(ctx)
+    hello = b'\x02\x00\x00\x28\x03\x03' + bytes(32) + b'\x00\x13\x01\x00\x00\x00'
+    return b'\x16\x03\x03' + struct.pack('>H', len(hello)) + hello + header + ciphertext, payload
+
+
+def udp_packet(body):
+    packet = bytearray(b'\x00' + struct.pack('<HHH', 0x5004, 1, 1) + body)
+    packet[0], packet[7] = packet[7], packet[0]
+    return bytes(packet)
 
 
 class ExtractTests(unittest.TestCase):
+    def run_fixture_extract(self, hellos, body):
+        stream, payload = authenticated_stream()
+        raw = udp_packet(stream if body is None else body(stream))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            capture, keys, output = root / 'capture.pcapng', root / 'keys.txt', root / 'replay.bin'
+            capture.write_bytes(b'public synthetic capture fixture')
+            keys.write_text(f'SERVER_TRAFFIC_SECRET_0 {CLIENT_RANDOM} {bytes(range(32)).hex()}\n')
+            args = SimpleNamespace(capture=capture, keys=keys, output=output, port=3389,
+                                   libcrypto=os.environ.get('REPLAY_LIBCRYPTO'), max_bytes=1024)
+
+            def rows(path, display_filter, fields):
+                self.assertEqual(path, capture)
+                if display_filter == 'udp && tls.handshake.type == 1':
+                    return iter(hellos)
+                self.assertIn('udp.stream == 4 && udp.srcport == 3389', display_filter)
+                return iter([['12.5', '1', raw.hex()]])
+
+            previous_umask = os.umask(0o077)
+            try:
+                with patch.object(e, 'tshark_rows', side_effect=rows), contextlib.redirect_stdout(io.StringIO()):
+                    e.extract(args)
+                self.assertEqual(output.read_bytes(), e.MAGIC + struct.pack('<QI', 0, len(payload)) + payload)
+                self.assertEqual(capture.read_bytes(), b'public synthetic capture fixture')
+                self.assertTrue(output.with_suffix('.bin.json').is_file())
+            except ValueError:
+                self.assertFalse(output.exists())
+                self.assertFalse(output.with_suffix('.bin.partial').exists())
+                raise
+            finally:
+                os.umask(previous_umask)
+
+    def test_retransmitted_client_hello_extracts_authenticated_stream(self):
+        self.run_fixture_extract([['4', CLIENT_RANDOM]] * 3, None)
+
+    def test_multiple_unique_client_hello_sessions_are_rejected(self):
+        for hellos in ([], [['4', CLIENT_RANDOM], ['5', CLIENT_RANDOM]],
+                       [['4', CLIENT_RANDOM], ['4', '22' * 32]]):
+            with self.subTest(hellos=hellos), patch.object(e, 'tshark_rows', return_value=iter(hellos)):
+                args = SimpleNamespace(capture=Path('unused.pcapng'))
+                with self.assertRaisesRegex(ValueError, 'one unique UDP ClientHello session'):
+                    e.extract(args)
+
+    def test_retransmitted_client_hello_does_not_bypass_tls_authentication(self):
+        def corrupt(stream):
+            return stream[:-1] + bytes([stream[-1] ^ 1])
+
+        with self.assertRaisesRegex(ValueError, 'TLS authentication failed'):
+            self.run_fixture_extract([['4', CLIENT_RANDOM]] * 2, corrupt)
+
     def test_reordering_retransmission_and_timestamps(self):
         data, ends, times, stats = e.reassemble([(10, 1, b'a'), (30, 3, b'c'),
                                                 (40, 2, b'b'), (50, 1, b'a')])

@@ -442,6 +442,14 @@ FREERDP_API void rdpeudp_test_set_send(rdpUdpTransport* udp, RdpUdpTestSendCallb
                                        void* context);
 FREERDP_API void rdpeudp_test_set_time(rdpUdpTransport* udp, UINT64 now);
 FREERDP_API BOOL rdpeudp_test_check_health(rdpUdpTransport* udp);
+/* Socketless TLS fixtures use the production reliable UDP BIO; attach takes
+ * ownership of the TLS BIO only on success. */
+FREERDP_API BIO* rdpeudp_test_new_bio(rdpUdpTransport* udp);
+FREERDP_API BOOL rdpeudp_test_attach_tls_bio(rdpUdpTransport* udp, BIO* bio);
+FREERDP_API int rdpeudp_test_tunnel_recv_full(rdpUdpTransport* udp, BYTE* subBuf,
+                                           size_t subBufLen, size_t* subLenOut,
+                                           BYTE* payloadBuf, size_t payloadBufLen,
+                                           size_t* payloadLenOut, DWORD timeoutMs);
 
 /* Deterministic drivers for the production send queue/timer state machine. */
 typedef struct
