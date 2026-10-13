@@ -298,6 +298,12 @@ static int tls_drain_receive_empty(TlsDrainFixture* fixture)
 static BOOL tls_drain_no_wake(TlsDrainFixture* fixture)
 {
 	HANDLE stateEvent = nullptr;
+	UINT64 generation = 0;
+	/* The main loop has armed maintenance for the current receive/ACK work.
+	 * Consume that synthetic wake before checking that TLS needs no further
+	 * socket arrival to finish draining its buffered records. */
+	(void)rdpeudp_test_send_snapshot(fixture->udp, &generation);
+	rdpeudp_test_consume_send_wake(fixture->udp, generation);
 	rdpeudp_test_update_event(fixture->udp);
 	rdpeudp_test_get_events(fixture->udp, nullptr, &stateEvent);
 	return stateEvent && (WaitForSingleObject(stateEvent, 0) == WAIT_TIMEOUT);

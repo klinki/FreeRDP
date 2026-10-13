@@ -38,6 +38,8 @@ def endpoint_result(path):
         value=read_json(path)
         if not isinstance(value,dict) or not isinstance(value.get('completed'),bool):
             raise ValueError('endpoint result must contain a boolean completed field')
+        if 'benchmark_deadline_reached' in value and not isinstance(value['benchmark_deadline_reached'],bool):
+            raise ValueError('invalid endpoint benchmark_deadline_reached; expected boolean')
         if not isinstance(value.get('counters',{}),dict):raise ValueError('invalid endpoint counters')
         for name in ('native_stats','queue_stats'):
             if value.get(name) is not None and not isinstance(value[name],dict):raise ValueError('invalid endpoint '+name)
@@ -81,6 +83,7 @@ def endpoint_result(path):
 
 def native_transport_failed(result,driver):
     if driver!='native':return False
+    if result.get('benchmark_deadline_reached'):return False
     stats=result.get('native_stats') or {}
     error=result.get('error') or ''
     return bool(stats.get('send_failed') or stats.get('receive_failed') or
@@ -199,7 +202,8 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
         if outcome['timed_out']:reasons.append(f'endpoint {index}: SUT_OR_DRIVER_HANG (runner terminated process)')
         elif outcome['returncode']:
             detail=f"endpoint {index} exited {outcome['returncode']}: {results[index].get('error','unknown error')}"
-            if native_transport_failed(results[index],driver):sut_failures.append(detail)
+            if native_transport_failed(results[index],driver) or results[index].get('benchmark_deadline_reached'):
+                sut_failures.append(detail)
             else:reasons.append(detail)
     for i,r in enumerate(results):
         if r.get('result_read_error'):reasons.append(f"endpoint {i}: {r['error']}")
@@ -209,8 +213,9 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
         if r.get('queue_stats') and not r['queue_stats'].get('valid'):
             for note in r['queue_stats'].get('reasons',['invalid observation']):
                 message='queue telemetry: '+note
-                if native_transport_failed(r,driver) and note=='measurement cohort bytes remain unobserved after drain':
-                    telemetry_notes.append(message+' (terminal transport failure)')
+                if (native_transport_failed(r,driver) or r.get('benchmark_deadline_reached')) and note=='measurement cohort bytes remain unobserved after drain':
+                    cause='benchmark drain deadline' if r.get('benchmark_deadline_reached') else 'terminal transport failure'
+                    telemetry_notes.append(message+' ('+cause+')')
                 else:reasons.append(message)
         if r.get('loss_trace') and not r['loss_trace'].get('valid'):
             reasons.append('application loss trace overflow')
@@ -295,6 +300,7 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
              'seed':seed,'commit':manifest['source_commit'],'binary_sha256':manifest['binary_sha256'],'comparison_key':manifest['comparison_key'],'validity':validity,'sut_outcome':'FAIL' if sut_failures else 'COMPLETE',
              'integrity_verified':integrity_verified,'reasons':reasons,'calibration_notes':calibration_notes,'sut_failures':sut_failures,
              'endpoint_termination':process_outcomes,'telemetry_notes':telemetry_notes,
+             'benchmark_deadline_reached':any(r.get('benchmark_deadline_reached') for r in results),
              'metrics':metrics,'scope':manifest['scope'],'utc':env['utc']}
     write_json(folder/'summary.json',summary);seal(folder)
     if interrupted:raise KeyboardInterrupt

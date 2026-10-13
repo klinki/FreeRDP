@@ -7,6 +7,9 @@ from .common import Journal,read_json,sleep_until,write_json,timing_summary
 from .native import Native
 H=struct.Struct('!4sB3xIQQII') # magic,kind,id,scheduled_ns,injected_ns,length,crc
 MAGIC=b'RB01';MAX_RECORD=32768
+# Cancellation interrupts a stuck native call. The ordinary final 5 ms read
+# may cross end_ns; this grace must not extend the workload or drain window.
+NATIVE_DRAIN_CANCEL_GRACE_NS=100_000_000
 
 class CallTrace:
     """Optional bounded memory ledger; no disk writes inside measured calls."""
@@ -76,6 +79,7 @@ class PlainUDP:
 def run(c):
     out=Journal(c['events']);driver=None;error=None
     start=measure=stop=end=cpu_start=None;exit_ns=failure_ns=None;bounds_ready=False
+    cancel_deadline_ns=None
     operation={'operation':'initialization'};telemetry_errors=[];cleanup_errors=[]
     observer_enabled=os.environ.get('RDP_BENCH_OBSERVER','1')!='0'
     trace=CallTrace() if os.environ.get('RDP_BENCH_LOSS_TRACE')=='1' else None
@@ -112,6 +116,10 @@ def run(c):
         next_bulk=start;next_sample=start;next_probe=start;bounds_ready=True
         operation={'operation':'configure_queue_measurement'}
         driver.configure_queue_measurement(measure,stop)
+        if hasattr(driver,'configure_deadline'):
+            operation={'operation':'configure_deadline'}
+            cancel_deadline_ns=end+NATIVE_DRAIN_CANCEL_GRACE_NS
+            driver.configure_deadline(cancel_deadline_ns)
         if trace and hasattr(driver,'configure_loss_trace'):
             operation={'operation':'configure_loss_trace'};driver.configure_loss_trace()
         cpu_start=time.process_time_ns();sleep_until(start)
@@ -252,7 +260,11 @@ def run(c):
                 'measurement_observed_s':(min(stop,max(measure,exit_ns))-measure)/1e9 if bounds_ready else None,
                 'native_stats':snapshot('native_stats',driver.stats) if driver else None,
                 'queue_stats':snapshot('queue_stats',driver.queue_stats) if driver else None,
-                'telemetry_errors':telemetry_errors,'cleanup_errors':cleanup_errors,'completed':error is None}
+                'telemetry_errors':telemetry_errors,'cleanup_errors':cleanup_errors,
+                'benchmark_deadline_reached':snapshot('deadline_reached',driver.deadline_reached) if driver and hasattr(driver,'deadline_reached') else False,
+                'native_cancel_deadline_ns':cancel_deadline_ns,
+                'native_cancel_grace_ns':NATIVE_DRAIN_CANCEL_GRACE_NS if cancel_deadline_ns is not None else None,
+                'completed':error is None}
         if error:
             result['error']=error
             result['terminal']={**operation,'error':error,'failure_ns':failure_ns,

@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from rdpbench.common import audit, read_json
-from rdpbench.type1 import endpoint_result, one_trial
+from rdpbench.type1 import endpoint_result, native_transport_failed, one_trial
 
 
 class FakeEndpoint:
@@ -120,6 +120,65 @@ class Type1FailureRetentionTests(unittest.TestCase):
         self.assertIsNone(summary["metrics"]["c2s.verified_goodput_mbps"])
         self.assertIsNone(summary["metrics"]["s2c.verified_goodput_mbps"])
         self.assertEqual([process.kill_calls for process in processes], [0, 0])
+
+    def test_benchmark_deadline_retains_incomplete_drain_without_transport_failure(self):
+        deadline = dict(
+            completed=False,
+            error="benchmark deadline reached; reliable drain incomplete",
+            benchmark_deadline_reached=True,
+            native_stats=dict(send_failed=1, receive_failed=0, sent_datagrams=20),
+            queue_stats=dict(valid=False,
+                             reasons=["measurement cohort bytes remain unobserved after drain"]),
+        )
+        self.assertFalse(native_transport_failed(deadline, "native"))
+        summary, processes, _ = self.run_fixture([deadline, self.healthy()],
+                                                 [dict(returncode=1), dict(returncode=0)])
+        self.assertEqual(summary["sut_outcome"], "FAIL")
+        self.assertEqual(summary["validity"], "PROVISIONAL_UNCALIBRATED")
+        self.assertTrue(summary["benchmark_deadline_reached"])
+        self.assertEqual(summary["reasons"], [])
+        self.assertTrue(any("benchmark deadline reached" in reason
+                            for reason in summary["sut_failures"]))
+        self.assertEqual(summary["telemetry_notes"], [
+            "queue telemetry: measurement cohort bytes remain unobserved after drain "
+            "(benchmark drain deadline)"])
+        self.assertEqual(summary["metrics"]["client.native_stats.send_failed"], 1)
+        self.assertFalse(summary["integrity_verified"])
+        self.assertIsNone(summary["metrics"]["c2s.verified_goodput_mbps"])
+        self.assertEqual([process.kill_calls for process in processes], [0, 0])
+
+    def test_deadline_does_not_hide_broken_telemetry_or_artifacts(self):
+        deadline = dict(completed=False,
+                        error="benchmark deadline reached; reliable drain incomplete",
+                        benchmark_deadline_reached=True,
+                        native_stats=dict(send_failed=1),
+                        queue_stats=dict(valid=False, reasons=["native queue observer invalid"]))
+        summary, _, _ = self.run_fixture([deadline, self.healthy()],
+                                         [dict(returncode=1), dict(returncode=0)])
+        self.assertEqual(summary["validity"], "INVALID_HARNESS")
+        self.assertIn("queue telemetry: native queue observer invalid", summary["reasons"])
+        summary, _, folder = self.run_fixture([deadline, "{broken JSON"],
+                                             [dict(returncode=1), dict(returncode=0)])
+        self.assertEqual(summary["validity"], "INVALID_HARNESS")
+        self.assertTrue(any("endpoint 1: invalid endpoint result" in reason
+                            for reason in summary["reasons"]))
+        self.assertEqual((folder / "endpoint-1.result.json").read_text(), "{broken JSON")
+
+    def test_invalid_deadline_scalars_remain_harness_errors(self):
+        for value in (1, 0, "true", "false", None, [], {}):
+            with self.subTest(value=value):
+                broken = dict(completed=False, error="fixture driver failure",
+                              benchmark_deadline_reached=value,
+                              native_stats=dict(send_failed=1))
+                summary, _, folder = self.run_fixture([broken, self.healthy()],
+                                                      [dict(returncode=1), dict(returncode=0)])
+                self.assertEqual(summary["validity"], "INVALID_HARNESS")
+                self.assertEqual(summary["sut_outcome"], "FAIL")
+                self.assertFalse(summary["benchmark_deadline_reached"])
+                self.assertTrue(any("benchmark_deadline_reached; expected boolean" in reason
+                                    for reason in summary["reasons"]))
+                self.assertEqual(read_json(folder / "endpoint-0.result.json"), broken)
+                self.assertIsNone(summary["metrics"]["c2s.verified_goodput_mbps"])
 
     def test_two_malformed_result_files_still_seal_failed_row(self):
         summary, _, folder = self.run_fixture(["{broken JSON", "[]"],

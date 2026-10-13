@@ -1941,6 +1941,24 @@ static BOOL rx_decode_ack(const RxAckCapture* capture, BOOL vector, UINT16 expec
 	return ok;
 }
 
+static BOOL rx_prompt_ack_hint(rdpUdpTransport* udp)
+{
+	RdpUdp2Layout hint = { 0 };
+	hint.flags = RDPUDP2_FLAG_DELAYACK;
+	hint.logWindow = 5;
+	hint.hasDelayAck = TRUE;
+	hint.delayMax = 0;
+	hint.delayTimeout = 0;
+	wStream* packet = rdpeudp2_encode_layout(&hint);
+	if (!packet)
+		return FALSE;
+	BOOL ok = Stream_SetPosition(packet, Stream_Length(packet)) && rdpeudp2_protect(packet, FALSE);
+	if (ok)
+		ok = rdpeudp_test_feed(udp, Stream_Buffer(packet), Stream_Length(packet));
+	Stream_Release(packet);
+	return ok;
+}
+
 static int test_rx_prompt_ack(void)
 {
 	rdpUdpTransport* udp = rdpeudp_test_new();
@@ -1950,6 +1968,7 @@ static int test_rx_prompt_ack(void)
 	const BOOL gap[] = { FALSE, TRUE, TRUE };
 	RX_CHECK(udp != nullptr);
 	rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+	RX_CHECK(rx_prompt_ack_hint(udp));
 	const RxScriptPkt probe = { 0, 0, body, 1, FALSE, 0, TRUE, TRUE };
 	RX_CHECK(rx_feed(udp, &probe) == 0 && capture.count == 0);
 	const RxScriptPkt ahead = { 2, 2, body, 1, FALSE, 0, FALSE, TRUE };
@@ -1979,6 +1998,7 @@ static int test_rx_prompt_ack(void)
 	RX_CHECK(udp != nullptr);
 	ZeroMemory(&capture, sizeof(capture));
 	rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+	RX_CHECK(rx_prompt_ack_hint(udp));
 	const RxScriptPkt contiguous = { 1, 2, body, 1, FALSE, 0, FALSE, TRUE };
 	RX_CHECK(rx_feed(udp, &contiguous) == 0 && capture.count == 1);
 	RX_CHECK(rx_decode_ack(&capture, FALSE, 1, nullptr, 0));
@@ -2031,9 +2051,9 @@ static int test_rx_stall(void)
 	RX_CHECK(rx_feed(udp, &third) == 0);
 	rdpeudp_test_set_time(udp, 9000);
 	RX_CHECK(rx_feed(udp, &recover) == 0);
-	rdpeudp_test_set_time(udp, 18000);
+	rdpeudp_test_set_time(udp, 9000 + RDPEUDP_REASSEMBLY_TIMEOUT_MS - 1);
 	RX_CHECK(rdpeudp_test_check_health(udp));
-	rdpeudp_test_set_time(udp, 19000);
+	rdpeudp_test_set_time(udp, 9000 + RDPEUDP_REASSEMBLY_TIMEOUT_MS);
 	RX_CHECK(!rdpeudp_test_check_health(udp));
 	rdpeudp_test_free(udp);
 	/* Completely idle (including no real data yet) is not a reassembly gap. */

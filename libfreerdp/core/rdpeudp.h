@@ -108,18 +108,16 @@
 /* Handshake / transport timeouts (ms) */
 #define RDPEUDP_SYN_TIMEOUT_MS 1000
 #define RDPEUDP_SYN_MAX_RETRIES 5
-#define RDPEUDP_ACK_TIMEOUT_MS 200
-#define RDPEUDP_MAX_RETRIES 5
-#define RDPEUDP_KEEPALIVE_MS 30000
-/* Per-chunk reliable-send deadline. Generous on purpose: loaded peers have
- * been observed to take ~2 s before their first ACK while blasting probe
- * trains, and a 2 s deadline lost that race by milliseconds (the ACKs kept
- * arriving right after). The establishment worker is async (main session on
- * TCP is unaffected), and MS's own reference waits an order of magnitude
- * longer, so patience here is safe. */
-#define RDPEUDP_SEND_TIMEOUT_MS 10000
+#define RDPEUDP_ACK_TIMEOUT_MS 300
+#define RDPEUDP_MAX_RTO_MS 120000
+#define RDPEUDP_MAX_RETRIES 10
+#define RDPEUDP_KEEPALIVE_MS 4000
+#define RDPEUDP_PEER_TIMEOUT_MS 16000
+/* Retries may outlive 16 s when valid peer traffic continues. Only receive
+ * silence, a stalled incoming stream, the retry budget or cancellation ends
+ * the transport; an unrelated fixed send deadline would defeat backoff. */
 /* A channel gap with later bytes buffered is a stall; an idle desktop is not. */
-#define RDPEUDP_REASSEMBLY_TIMEOUT_MS 10000
+#define RDPEUDP_REASSEMBLY_TIMEOUT_MS RDPEUDP_PEER_TIMEOUT_MS
 
 typedef struct rdp_udp_transport rdpUdpTransport;
 
@@ -441,6 +439,9 @@ typedef SSIZE_T (*RdpUdpTestSendCallback)(void* context, const BYTE* data, size_
 FREERDP_API void rdpeudp_test_set_send(rdpUdpTransport* udp, RdpUdpTestSendCallback callback,
                                        void* context);
 FREERDP_API void rdpeudp_test_set_time(rdpUdpTransport* udp, UINT64 now);
+FREERDP_API void rdpeudp_test_set_time_ns(rdpUdpTransport* udp, UINT64 now);
+FREERDP_API UINT64 rdpeudp_test_maintenance_interval(rdpUdpTransport* udp);
+FREERDP_API BOOL rdpeudp_test_keepalive(rdpUdpTransport* udp);
 FREERDP_API BOOL rdpeudp_test_check_health(rdpUdpTransport* udp);
 /* Socketless TLS fixtures use the production reliable UDP BIO; attach takes
  * ownership of the TLS BIO only on success. */
@@ -466,6 +467,10 @@ typedef struct
 	BYTE peerLogWindow;
 	size_t sendWindow; /* Effective bound after local, peer and storage limits. */
 	UINT64 lossReports;
+	UINT32 srttMs;
+	UINT32 initialRtoMs;
+	UINT32 maxRtoMs;
+	UINT64 lastRecvTs;
 } RdpUdpTestSendState;
 FREERDP_API BOOL rdpeudp_test_configure_send(rdpUdpTransport* udp, UINT16 payload,
                                            BYTE logWindow, BYTE peerLogWindow,
@@ -496,6 +501,8 @@ FREERDP_API SSIZE_T rdpeudp_test_queue_enqueue(rdpUdpTransport* udp, const BYTE*
 WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL rdpeudp_check_health(rdpUdpTransport* udp);
 FREERDP_LOCAL BOOL rdpeudp_has_pending_send(rdpUdpTransport* udp);
+/** Nanoseconds until ACK/retry maintenance; includes sparse receive ACK deadlines. */
+FREERDP_LOCAL UINT64 rdpeudp_maintenance_interval(rdpUdpTransport* udp);
 FREERDP_LOCAL BOOL rdpeudp_send_snapshot(rdpUdpTransport* udp, UINT64* generation);
 FREERDP_LOCAL void rdpeudp_consume_send_wake(rdpUdpTransport* udp, UINT64 generation);
 

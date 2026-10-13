@@ -75,11 +75,11 @@ def packet_kind(data):
         if not take(3 + (4 if vector & 0x80 else 0) + (vector & 0x7F)):
             return "unclassified"
         # Match production ACKVEC decoding: bitmap bytes cover seven packets;
-        # RLE bytes cover their low-six-bit run. Empty/oversized coverage is
-        # invalid even when the encoded layout fits inside the datagram.
+        # RLE bytes cover their low-six-bit run. The seven-bit coded size and
+        # six-bit runs naturally bound decoded coverage to 127 * 63 packets.
         decoded = sum((byte & 0x3F) if byte & 0x80 else 7
                       for byte in layout[encoded_start:cursor])
-        if not 0 < decoded <= 1024:
+        if not 0 < decoded <= 127 * 63:
             return "unclassified"
     if flags & DATA:
         if not take(2):

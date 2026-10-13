@@ -224,6 +224,61 @@ class EndpointFailureEvidenceTests(unittest.TestCase):
         self.assertEqual(result['telemetry_errors'], [])
         self.assertTrue(driver.closed)
 
+    def test_final_read_can_cross_planned_end_without_false_cancellation(self):
+        clock = Clock(); driver = Driver(clock)
+        driver.cancelled = False
+        driver.configure_deadline = lambda deadline: setattr(driver, 'cancel_deadline', deadline)
+        driver.deadline_reached = lambda: driver.cancelled
+        planned_end = self.CONTROL['end_ns']
+        def receive(d):
+            if d.reads == 1:
+                d.clock.now = planned_end - 2_000_000
+                responses = b''.join(d.pending_responses)
+                d.pending_responses.clear()
+                return responses
+            d.clock.advance(5_000_000)
+            if d.clock.now >= d.cancel_deadline:
+                d.cancelled = True
+                raise RuntimeError('benchmark deadline reached; reliable drain incomplete')
+            return b''
+        driver.read_callback = receive
+        code, result, events = self.run_endpoint(driver, clock)
+        self.assertEqual(code, 0)
+        self.assertTrue(result['completed'])
+        self.assertFalse(result['benchmark_deadline_reached'])
+        self.assertEqual(driver.cancel_deadline,
+                         planned_end + endpoint.NATIVE_DRAIN_CANCEL_GRACE_NS)
+        self.assertEqual(result['native_cancel_deadline_ns'], driver.cancel_deadline)
+        self.assertEqual(result['native_cancel_grace_ns'], 100_000_000)
+        self.assertEqual(driver.reads, 2)  # The grace does not add another owner iteration.
+        self.assertEqual(result['measurement_s'], 3)
+        self.assertEqual(result['measurement_observed_s'], 3)
+        self.assertEqual([e['planned_ns'] for e in events
+                          if e['type'] == 'phase' and e['name'] == 'end'], [planned_end])
+        self.assert_probe_accounting(result, events)
+
+    def test_stuck_call_cancellation_does_not_extend_probe_or_measurement_bounds(self):
+        clock = Clock(); driver = Driver(clock)
+        driver.cancelled = False
+        driver.configure_deadline = lambda deadline: setattr(driver, 'cancel_deadline', deadline)
+        driver.deadline_reached = lambda: driver.cancelled
+        def receive(d):
+            d.clock.now = d.cancel_deadline
+            d.cancelled = True
+            raise RuntimeError('benchmark deadline reached; reliable drain incomplete')
+        driver.read_callback = receive
+        code, result, events = self.run_endpoint(driver, clock)
+        self.assertEqual(code, 1)
+        self.assertFalse(result['completed'])
+        self.assertTrue(result['benchmark_deadline_reached'])
+        self.assertEqual(result['measurement_s'], 3)
+        self.assertEqual(result['measurement_observed_s'], 3)
+        self.assertEqual(result['counters']['probes_expected'], 4)
+        self.assertEqual(result['counters']['probes_injected'], 1)
+        self.assertEqual(result['counters']['probes_not_injected'], 3)
+        self.assertEqual(result['terminal']['failure_ns'], driver.cancel_deadline)
+        self.assert_probe_accounting(result, events)
+
     def test_unobserved_probes_at_actual_drain_deadline_remain_timeouts(self):
         clock = Clock(); driver = Driver(clock)
         driver.send = lambda data: driver.sent.append(data)

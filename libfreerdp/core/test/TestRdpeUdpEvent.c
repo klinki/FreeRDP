@@ -198,7 +198,7 @@ static BOOL test_enqueue_after_snapshot_preserves_wake(void)
 	rdpeudp_test_update_event(fixture->udp);
 	EVENT_CHECK(WaitForSingleObject(fixture->stateEvent, 0) == WAIT_TIMEOUT);
 	EVENT_CHECK(fixture->dataPackets == 2);
-	rdpeudp_test_set_time(fixture->udp, EVENT_TEST_TIME + 200);
+	rdpeudp_test_set_time(fixture->udp, EVENT_TEST_TIME + RDPEUDP_ACK_TIMEOUT_MS);
 	EVENT_CHECK(rdpeudp_test_check_health(fixture->udp));
 	EVENT_CHECK(fixture->dataPackets == 4);
 	RdpUdpTestSendState state = { 0 };

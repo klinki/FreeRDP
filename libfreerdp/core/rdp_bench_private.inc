@@ -105,6 +105,19 @@ FREERDP_API UINT64 freerdp_bench_v1_clock_ns(void)
 {
     return winpr_GetTickCount64NS();
 }
+FREERDP_API int freerdp_bench_v1_deadline(void* handle, UINT64 deadlineNs)
+{
+    FreeRdpBenchV1* b = handle;
+    if (!b || !b->udp || !deadlineNs) return 0;
+    b->udp->benchDeadlineNs = deadlineNs;
+    b->udp->benchDeadlineReached = FALSE;
+    return 1;
+}
+FREERDP_API int freerdp_bench_v1_deadline_reached(void* handle)
+{
+    FreeRdpBenchV1* b = handle;
+    return b && b->udp && b->udp->benchDeadlineReached;
+}
 FREERDP_API int freerdp_bench_v1_queue_measure(void* handle, UINT64 startNs, UINT64 stopNs)
 {
     FreeRdpBenchV1* b = handle;

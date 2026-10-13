@@ -94,7 +94,7 @@ def collect(root):
                 row['endpoints'].append({key:endpoint.get(key) for key in ('role','completed','error','terminal',
                     'counters','native_stats','probe_timeouts','probes_pending_at_exit','probe_unobserved',
                     'probe_rtt_ms','probe_scheduled_ms','measurement_observed_s','latency_scope',
-                    'incomplete_record_bytes','telemetry_errors','cleanup_errors')})
+                    'incomplete_record_bytes','telemetry_errors','cleanup_errors','benchmark_deadline_reached')})
                 row['endpoints'][-1]['queue_configuration']=(endpoint.get('queue_stats') or {}).get('fields',{})
                 row['endpoints'][-1]['queue_configuration']={key:row['endpoints'][-1]['queue_configuration'].get(key)
                     for key in ('queue_limit_bytes','own_log_window','peer_log_window','effective_window_packets')}
@@ -138,8 +138,9 @@ def collect(root):
             'observed_trial_p95_ms':stats(r['metrics'].get('client.probe_rtt_ms.p95') for r in intact),
             'observed_trial_p99_ms':stats(r['metrics'].get('client.probe_rtt_ms.p99') for r in intact),
             'first_failure_ms':stats(r.get('first_failure_ms') for r in intact),
-            'native_terminal_failures':sum(any((e.get('native_stats') or {}).get(k) for e in r['endpoints']
+            'native_terminal_failures':sum(any(not e.get('benchmark_deadline_reached') and (e.get('native_stats') or {}).get(k) for e in r['endpoints']
                 for k in ('send_failed','receive_failed')) for r in intact),
+            'benchmark_deadline_stops':sum(any(e.get('benchmark_deadline_reached') for e in r['endpoints']) for r in intact),
             'realized_random_loss':{d:stats(r['network'][d]['realized_random_loss'] for r in intact) for d in ('c2s','s2c')},
             'unexpected_queue_drops':{d:sum(r['network'][d]['queue_drops'] for r in intact) for d in ('c2s','s2c')}})
     return {'schema':'freerdp.loss_stress','version':1,'scope':'raw native UDP2; independent random loss on both directions',

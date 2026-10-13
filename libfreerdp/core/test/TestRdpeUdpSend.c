@@ -177,6 +177,22 @@ static BOOL send_ack(SendFixture* fixture, UINT16 dataSeq)
 	return send_feed_layout(fixture, &layout);
 }
 
+/* The peer is alive but every DATA receipt is lost. Heartbeats must not be
+ * mistaken for progress on a logical payload or a reason to shorten its RTO. */
+static BOOL send_live_tick(SendFixture* fixture, UINT64 elapsed)
+{
+	while (SEND_TEST_TIME + elapsed - fixture->now > RDPEUDP_KEEPALIVE_MS)
+	{
+		fixture->now += RDPEUDP_KEEPALIVE_MS;
+		rdpeudp_test_set_time(fixture->sender, fixture->now);
+		if (!send_ack(fixture, 0) || !rdpeudp_test_service_send(fixture->sender))
+			return FALSE;
+	}
+	fixture->now = SEND_TEST_TIME + elapsed;
+	rdpeudp_test_set_time(fixture->sender, fixture->now);
+	return send_ack(fixture, 0) && send_tick(fixture, elapsed);
+}
+
 static BOOL send_ack_aoa(SendFixture* fixture, UINT16 dataSeq, UINT16 aoa)
 {
 	RdpUdp2Layout layout = { 0 };
@@ -334,11 +350,11 @@ static BOOL test_send_window_shrink_with_loss(void)
 	SEND_CHECK(send_ackvec(fixture, 1, missing, ARRAYSIZE(missing)));
 	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &sent) && sent.inFlight == 31 &&
 	           sent.queuedBytes == sizeof(bytes) && sent.maxRetries == 0);
-	SEND_CHECK(send_tick(fixture, 199) && fixture->count == 31);
+	SEND_CHECK(send_tick(fixture, 299) && fixture->count == 31);
 	/* Existing transmissions may replace their oldest active attempt
 	 * without expanding the grandfathered span. New channels stay blocked. */
 	fixture->deliver = TRUE;
-	SEND_CHECK(send_tick(fixture, 200) && fixture->count == 62);
+	SEND_CHECK(send_tick(fixture, 300) && fixture->count == 62);
 	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &sent) && sent.inFlight == 31 &&
 	           sent.aliasCount == 62 && sent.maxRetries == 1 && sent.nextDataSeq == 63 &&
 	           sent.nextChannelSeq == 32 && sent.queuedBytes == sizeof(bytes));
@@ -351,7 +367,7 @@ static BOOL test_send_window_shrink_with_loss(void)
 		if (i >= ARRAYSIZE(latest))
 		{
 			SEND_CHECK(packet->channelSeq == i - ARRAYSIZE(latest) + 1 &&
-			           packet->time == SEND_TEST_TIME + 200);
+			           packet->time == SEND_TEST_TIME + 300);
 		}
 		latest[packet->channelSeq - 1] = packet->dataSeq;
 		size_t span = 0;
@@ -374,7 +390,7 @@ static BOOL test_send_window_shrink_with_loss(void)
 	/* Once the retries are actually ACKed, queued originals resume under
 	 * the smaller peer limit and every accepted byte reaches the receiver. */
 	SEND_CHECK(send_ack(fixture, (UINT16)(received.recvDataBase - 1)));
-	SEND_CHECK(send_tick(fixture, 200) && fixture->count == 65);
+	SEND_CHECK(send_tick(fixture, 300) && fixture->count == 65);
 	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &sent) && sent.inFlight == 3 &&
 	           sent.nextChannelSeq == 35);
 	for (size_t i = 0; i < 8 && sent.queuedBytes; i++)
@@ -382,7 +398,7 @@ static BOOL test_send_window_shrink_with_loss(void)
 		const size_t count = fixture->count;
 		SEND_CHECK(rdpeudp_test_recv_state(fixture->receiver, &received));
 		SEND_CHECK(send_ack(fixture, (UINT16)(received.recvDataBase - 1)));
-		SEND_CHECK(send_tick(fixture, 200));
+		SEND_CHECK(send_tick(fixture, 300));
 		SEND_CHECK(fixture->count - count <= 3);
 		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &sent) && sent.inFlight <= 3);
 	}
@@ -549,8 +565,8 @@ static BOOL test_send_late_original_ack(void)
 	SEND_CHECK(fixture);
 	fixture->deliver = TRUE;
 	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
-	SEND_CHECK(send_tick(fixture, 199) && fixture->count == 1);
-	SEND_CHECK(send_tick(fixture, 200) && fixture->count == 2);
+	SEND_CHECK(send_tick(fixture, 299) && fixture->count == 1);
+	SEND_CHECK(send_tick(fixture, 300) && fixture->count == 2);
 	SEND_CHECK(fixture->packets[0].dataSeq != fixture->packets[1].dataSeq &&
 	           fixture->packets[0].channelSeq == fixture->packets[1].channelSeq &&
 	           memcmp(fixture->packets[0].payload, fixture->packets[1].payload, 4) == 0);
@@ -585,7 +601,7 @@ static BOOL test_send_lost_data(void)
 	fixture->dropPackets = 1;
 	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
 	SEND_CHECK(send_received(fixture, bytes, 0));
-	SEND_CHECK(send_tick(fixture, 200) && fixture->count == 2);
+	SEND_CHECK(send_tick(fixture, 300) && fixture->count == 2);
 	SEND_CHECK(fixture->packets[1].channelSeq == 1 && fixture->packets[1].dataSeq == 2);
 	SEND_CHECK(send_received(fixture, bytes, 4));
 	SEND_CHECK(send_ack(fixture, fixture->packets[1].dataSeq));
@@ -773,7 +789,10 @@ static BOOL test_send_idle_health_pump(void)
 static BOOL test_send_repeated_loss(void)
 {
 	static const BYTE bytes[] = "ABCD";
-	static const UINT64 deadlines[] = { 200, 600, 1200, 2000, 3000 };
+	static const UINT64 deadlines[] = { 300,   900,   2100,  4500,   9300,
+		                                18900, 38100, 76500, 153300, 273300 };
+	static const UINT32 backedOff[] = { 600,   1200,  2400,  4800,   9600,
+		                                19200, 38400, 76800, 120000, 120000 };
 	for (size_t ackLoss = 0; ackLoss < 2; ackLoss++)
 	{
 		SendFixture* fixture = send_fixture_new(4, 5, 5, 1, 1);
@@ -783,26 +802,263 @@ static BOOL test_send_repeated_loss(void)
 		SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
 		for (size_t i = 0; i < ARRAYSIZE(deadlines); i++)
 		{
-			SEND_CHECK(send_tick(fixture, deadlines[i] - 1) && fixture->count == i + 1);
-			SEND_CHECK(send_tick(fixture, deadlines[i]) && fixture->count == i + 2);
+			SEND_CHECK(send_live_tick(fixture, deadlines[i] - 1) && fixture->count == i + 1);
+			SEND_CHECK(send_live_tick(fixture, deadlines[i]) && fixture->count == i + 2);
 			SEND_CHECK(fixture->packets[i + 1].dataSeq == i + 2 &&
 			           fixture->packets[i + 1].channelSeq == 1 &&
 			           fixture->packets[i + 1].time == SEND_TEST_TIME + deadlines[i]);
 			SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) &&
 			           state.maxRetries == i + 1 && state.inFlight == 1 &&
-			           state.aliasCount == i + 2);
+			           state.aliasCount == i + 2 && state.maxRtoMs == backedOff[i] &&
+			           state.srttMs == 0);
 		}
-		SEND_CHECK(send_tick(fixture, 3999) && fixture->count == 6);
-		/* The retry limit is checked before a seventh DATA transmission. */
-		SEND_CHECK(!send_tick(fixture, 4000) && fixture->count == 6);
+		SEND_CHECK(send_live_tick(fixture, 393299) && fixture->count == 11);
+		/* A live peer permits capped 120 s timers, but never an eleventh retry. */
+		SEND_CHECK(!send_live_tick(fixture, 393300) && fixture->count == 11);
 		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.sendFailed);
 		SEND_CHECK(!rdpeudp_test_check_health(fixture->sender));
 		SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == -1);
-		SEND_CHECK(!send_tick(fixture, 10000) && fixture->count == 6);
+		SEND_CHECK(!send_tick(fixture, 400000) && fixture->count == 11);
 		SEND_CHECK(send_received(fixture, bytes, ackLoss ? 4 : 0));
 		SEND_CHECK(!fixture->callbackFailed);
 		send_fixture_free(fixture);
 	}
+	return TRUE;
+}
+
+static BOOL test_send_adaptive_rtt_and_karn(void)
+{
+	static const BYTE bytes[] = "ABCD";
+	static const BOOL positive[] = { TRUE };
+	SendFixture* fixture = send_fixture_new(4, 5, 5, 1, 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.initialRtoMs == 300 &&
+	           state.srttMs == 0);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+	SEND_CHECK(send_tick(fixture, 240) && send_ack(fixture, 1));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.srttMs == 240 &&
+	           state.initialRtoMs == 480);
+	/* The next unambiguous ACK updates SRTT as (7*240 + 160)/8. */
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+	SEND_CHECK(send_tick(fixture, 400) && send_ack(fixture, 2));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.srttMs == 230 &&
+	           state.initialRtoMs == 460);
+	SEND_CHECK(send_ack(fixture, 200)); /* impossible future ACK provides no sample */
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+	SEND_CHECK(send_tick(fixture, 859) && fixture->count == 3);
+	SEND_CHECK(send_tick(fixture, 860) && fixture->count == 4);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.maxRtoMs == 920);
+	/* A positive old alias still retires the payload, but cannot sample RTT. */
+	SEND_CHECK(send_tick(fixture, 880) && send_ackvec(fixture, 3, positive, ARRAYSIZE(positive)));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && !state.inFlight &&
+	           state.srttMs == 230 && state.initialRtoMs == 460);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+	SEND_CHECK(send_tick(fixture, 1340) && fixture->count == 6);
+	SEND_CHECK(send_tick(fixture, 1360) && send_ack(fixture, 6));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && !state.inFlight &&
+	           state.srttMs == 230 && state.initialRtoMs == 460 && !state.sendFailed);
+	SEND_CHECK(!fixture->callbackFailed);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+
+static BOOL test_send_peer_silence_and_idle(void)
+{
+	static const BYTE bytes[] = "ABCD";
+	for (size_t pending = 0; pending < 2; pending++)
+	{
+		SendFixture* fixture = send_fixture_new(4, 5, 5, 1, 1);
+		RdpUdpTestSendState state = { 0 };
+		SEND_CHECK(fixture);
+		if (pending)
+			SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+		SEND_CHECK(send_tick(fixture, RDPEUDP_PEER_TIMEOUT_MS - 1));
+		/* Invalid input at the edge cannot refresh liveness. */
+		const BYTE invalid[] = { 0xFF };
+		SEND_CHECK(rdpeudp_test_feed(fixture->sender, invalid, sizeof(invalid)));
+		SEND_CHECK(!send_tick(fixture, RDPEUDP_PEER_TIMEOUT_MS));
+		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.sendFailed);
+		SEND_CHECK(send_ack(fixture, 0)); /* terminal failure cannot revive the tunnel */
+		SEND_CHECK(!rdpeudp_test_check_health(fixture->sender));
+		send_fixture_free(fixture);
+	}
+	SendFixture* fixture = send_fixture_new(4, 5, 5, 1, 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture);
+	/* A desktop idle for minutes remains healthy when keepalives arrive;
+	 * no queued channel data means there is no incoming reassembly deadline. */
+	SEND_CHECK(send_live_tick(fixture, 300000));
+	SEND_CHECK(rdpeudp_test_check_health(fixture->sender));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && !state.sendFailed &&
+	           !state.inFlight && state.lastRecvTs == SEND_TEST_TIME + 300000);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+
+static BOOL test_send_malformed_ack_cannot_refresh_peer(void)
+{
+	static const BYTE bytes[] = "ABCD";
+	static const UINT16 flags[] = { RDPUDP2_FLAG_ACKVEC, RDPUDP2_FLAG_ACKVEC,
+		                            RDPUDP2_FLAG_ACK | RDPUDP2_FLAG_ACKVEC,
+		                            RDPUDP2_FLAG_AOA | RDPUDP2_FLAG_DELAYACK | RDPUDP2_FLAG_ACKVEC,
+		                            RDPUDP2_FLAG_DATA | RDPUDP2_FLAG_ACKVEC };
+	for (size_t test = 0; test < ARRAYSIZE(flags); test++)
+	{
+		SendFixture* fixture = send_fixture_new(4, 5, 5, 1, 1);
+		RdpUdpTestSendState sent = { 0 };
+		RdpUdpTestRecvState received = { 0 };
+		wStream* packet = nullptr;
+		SEND_CHECK(fixture);
+		SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+		SEND_CHECK(send_tick(fixture, RDPEUDP_PEER_TIMEOUT_MS - 1));
+		packet = Stream_New(nullptr, 64);
+		SEND_CHECK(packet);
+		/* Build raw layouts because the production encoder rightly refuses
+		 * ACK and ACKVEC together. Other cases are length-correct vectors that
+		 * describe no packets. */
+		Stream_Write_UINT16(packet, (UINT16)(0x5000 | flags[test]));
+		if (flags[test] & RDPUDP2_FLAG_ACK)
+		{
+			Stream_Write_UINT16(packet, 1);
+			Stream_Write_UINT32(packet, 0);
+			Stream_Write_UINT8(packet, 0);
+		}
+		if (flags[test] & RDPUDP2_FLAG_DELAYACK)
+		{
+			Stream_Write_UINT8(packet, 2);
+			Stream_Write_UINT16(packet, 20);
+		}
+		if (flags[test] & RDPUDP2_FLAG_AOA)
+			Stream_Write_UINT16(packet, 5000);
+		if (flags[test] & RDPUDP2_FLAG_DATA)
+			Stream_Write_UINT16(packet, 1);
+		Stream_Write_UINT16(packet, 1); /* ACKVEC base */
+		const BYTE codedCount = test == 1 || test == 2 ? 1 : 0;
+		Stream_Write_UINT8(packet, codedCount);
+		for (size_t i = 0; i < codedCount; i++)
+			Stream_Write_UINT8(packet, test == 2 ? 1 : 0x80);
+		if (flags[test] & RDPUDP2_FLAG_DATA)
+		{
+			Stream_Write_UINT16(packet, 1);
+			Stream_Write_UINT8(packet, 'x');
+		}
+		RdpUdp2Layout parsed = { 0 };
+		SEND_CHECK(
+		    !rdpeudp2_parse_layout(Stream_Buffer(packet), Stream_GetPosition(packet), &parsed));
+		SEND_CHECK(rdpeudp2_protect(packet, FALSE));
+		SEND_CHECK(
+		    rdpeudp_test_feed(fixture->sender, Stream_Buffer(packet), Stream_Length(packet)));
+		Stream_Release(packet);
+		packet = nullptr;
+		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &sent) &&
+		           sent.lastRecvTs == SEND_TEST_TIME && sent.inFlight == 1 &&
+		           sent.queuedBytes == 4 && !sent.sendFailed);
+		SEND_CHECK(rdpeudp_test_recv_state(fixture->sender, &received) &&
+		           received.recvDataBase == 1 && !received.haveSeenAoa && !received.haveRealData &&
+		           received.recvStreamLen == 0);
+		SEND_CHECK(!send_tick(fixture, RDPEUDP_PEER_TIMEOUT_MS));
+		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &sent) && sent.sendFailed);
+		send_fixture_free(fixture);
+	}
+	return TRUE;
+}
+
+static BOOL test_send_large_ackvec_is_valid_peer_traffic(void)
+{
+	static const BYTE bytes[] = "ABCD";
+	static const BYTE codedCounts[] = { 17, 127 };
+	for (size_t test = 0; test < ARRAYSIZE(codedCounts); test++)
+	{
+		SendFixture* fixture = send_fixture_new(4, 5, 5, 1, 1);
+		RdpUdpTestSendState state = { 0 };
+		BYTE vector[130] = { 1, 0 };
+		const BYTE coded = codedCounts[test];
+		vector[2] = coded;
+		for (size_t i = 0; i < coded; i++)
+			vector[3 + i] = 0xBF; /* Missing run of 63 packets. */
+		UINT16 base = 0;
+		BOOL* received = nullptr;
+		size_t decoded = 0;
+		SEND_CHECK(fixture);
+		SEND_CHECK(rdpeudp_parse_ackvec(vector, 3 + coded, &base, &received, &decoded));
+		const BOOL valid =
+		    base == 1 && decoded == (size_t)coded * 63 && !received[0] && !received[decoded - 1];
+		free(received);
+		SEND_CHECK(valid);
+		SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+		SEND_CHECK(send_tick(fixture, RDPEUDP_PEER_TIMEOUT_MS - 1));
+		RdpUdp2Layout layout = { 0 };
+		layout.logWindow = 5;
+		layout.flags = RDPUDP2_FLAG_ACKVEC;
+		layout.hasAckvec = TRUE;
+		layout.ackvec = vector;
+		layout.ackvecLen = 3 + coded;
+		SEND_CHECK(send_feed_layout(fixture, &layout));
+		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) &&
+		           state.lastRecvTs == SEND_TEST_TIME + RDPEUDP_PEER_TIMEOUT_MS - 1 &&
+		           state.inFlight == 1 && !state.sendFailed);
+		/* This genuine feedback keeps the peer alive but does not acknowledge
+		 * missing payload, inflate the local window, or manufacture fast-loss evidence. */
+		SEND_CHECK(send_tick(fixture, RDPEUDP_PEER_TIMEOUT_MS));
+		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && !state.sendFailed &&
+		           state.inFlight == 1 && state.sendWindow == 31);
+		send_fixture_free(fixture);
+	}
+	return TRUE;
+}
+
+static BOOL test_send_fast_retry_budget_and_abort(void)
+{
+	static const BYTE bytes[] = "ABCD";
+	static const BOOL gap[] = { FALSE, TRUE, TRUE, TRUE };
+	SendFixture* fixture = send_fixture_new(1, 5, 5, 1, 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+	UINT16 latest = 1;
+	UINT64 elapsed = 0;
+	for (size_t retry = 0; retry < RDPEUDP_MAX_RETRIES; retry++)
+	{
+		elapsed += 30;
+		SEND_CHECK(send_tick(fixture, elapsed));
+		SEND_CHECK(send_ackvec(fixture, latest, gap, ARRAYSIZE(gap)));
+		SEND_CHECK(send_tick(fixture, elapsed + 24));
+		const size_t count = fixture->count;
+		SEND_CHECK(send_tick(fixture, elapsed + 25) && fixture->count == count + 1);
+		latest = fixture->packets[fixture->count - 1].dataSeq;
+		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) &&
+		           state.maxRetries == retry + 1 && state.aliasCount == retry + 2 &&
+		           state.inFlight == 1 && !state.sendFailed);
+		elapsed += 25;
+		/* Fresh later original channels provide fresh receipt evidence. */
+		SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes + 1, 3) == 3);
+	}
+	elapsed += 30;
+	SEND_CHECK(send_tick(fixture, elapsed));
+	SEND_CHECK(send_ackvec(fixture, latest, gap, ARRAYSIZE(gap)));
+	const size_t count = fixture->count;
+	SEND_CHECK(!send_tick(fixture, elapsed + 25) && fixture->count == count);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.sendFailed &&
+	           state.maxRetries == RDPEUDP_MAX_RETRIES && state.aliasCount == 11);
+	send_fixture_free(fixture);
+
+	fixture = send_fixture_new(4, 5, 5, 1, 1);
+	SEND_CHECK(fixture);
+	fixture->abortEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
+	SEND_CHECK(fixture->abortEvent);
+	rdpeudp_test_set_abort(fixture->sender, fixture->abortEvent);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
+	static const UINT64 beforeAbortTicks[] = { 300, 900, 2100, 4500, 9300, 18900 };
+	for (size_t i = 0; i < ARRAYSIZE(beforeAbortTicks); i++)
+		SEND_CHECK(send_live_tick(fixture, beforeAbortTicks[i]));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.maxRtoMs == 19200);
+	const size_t beforeAbort = fixture->count;
+	SEND_CHECK(SetEvent(fixture->abortEvent));
+	/* Cancellation does not wait for the large backed-off timer. */
+	SEND_CHECK(!send_tick(fixture, 18901) && fixture->count == beforeAbort);
+	SEND_CHECK(rdpeudp_test_write_data(fixture->sender, bytes, 4) == -1);
+	send_fixture_free(fixture);
 	return TRUE;
 }
 
@@ -839,7 +1095,7 @@ static BOOL test_send_alias_wrap(void)
 	RdpUdpTestSendState state = { 0 };
 	SEND_CHECK(fixture);
 	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 4) == 4);
-	SEND_CHECK(send_tick(fixture, 200) && fixture->count == 2);
+	SEND_CHECK(send_tick(fixture, 300) && fixture->count == 2);
 	SEND_CHECK(fixture->packets[0].dataSeq == UINT16_MAX && fixture->packets[1].dataSeq == 0 &&
 	           fixture->packets[0].channelSeq == fixture->packets[1].channelSeq);
 	SEND_CHECK(send_ack(fixture, UINT16_MAX));
@@ -891,7 +1147,7 @@ static BOOL test_send_cumulative_ack_after_aoa_retirement(void)
 		layout.dataBodyLen = 4;
 		SEND_CHECK(send_feed_transport(fixture->receiver, &layout, FALSE));
 		SEND_CHECK(send_ackvec(fixture, 1, secondReceived, ARRAYSIZE(secondReceived)));
-		SEND_CHECK(send_tick(fixture, 200) && fixture->count == 3 &&
+		SEND_CHECK(send_tick(fixture, 300) && fixture->count == 3 &&
 		           fixture->packets[2].dataSeq == 3 && fixture->packets[2].channelSeq == 1);
 		/* An independently delivered control packet retires old DataSeqs
 		 * before the lost retry arrives. The peer can now ACK base-1 = 2,
@@ -910,7 +1166,7 @@ static BOOL test_send_cumulative_ack_after_aoa_retirement(void)
 		SEND_CHECK(send_ack(fixture, (UINT16)(received.recvDataBase - 1)));
 		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &sent) && sent.inFlight == 1 &&
 		           sent.aliasCount == 2 && sent.queuedBytes == 4);
-		SEND_CHECK(send_tick(fixture, 200) && fixture->count == 3);
+		SEND_CHECK(send_tick(fixture, 300) && fixture->count == 3);
 		if (selectiveOriginal)
 		{
 			SEND_CHECK(send_ackvec(fixture, 1, originalReceived, ARRAYSIZE(originalReceived)));
@@ -958,7 +1214,7 @@ static BOOL test_send_ack_aoa_epoch(void)
 	           received.recvDataBase == 101 && received.haveSeenAoa &&
 	           !received.haveRecvData && !received.haveRealData &&
 	           received.expectedChannelSeq == 1 && received.recvStreamLen == 0);
-	SEND_CHECK(send_tick(fixture, 200) && fixture->count == 1);
+	SEND_CHECK(send_tick(fixture, 300) && fixture->count == 1);
 	SEND_CHECK(!fixture->callbackFailed);
 	send_fixture_free(fixture);
 	return TRUE;
@@ -1072,7 +1328,7 @@ static BOOL test_send_abort(void)
 	rdpeudp_test_set_abort(fixture->sender, fixture->abortEvent);
 	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 10) == 10 && fixture->count == 3);
 	SEND_CHECK(SetEvent(fixture->abortEvent));
-	SEND_CHECK(!send_tick(fixture, 200) && fixture->count == 3);
+	SEND_CHECK(!send_tick(fixture, 300) && fixture->count == 3);
 	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.sendFailed);
 	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, 10) == -1 && fixture->count == 3);
 	SEND_CHECK(send_received(fixture, bytes, 3));
@@ -1090,14 +1346,16 @@ int TestRdpeUdpSend(int argc, char* argv[])
 	    !test_send_window_storage_cap() || !test_send_peer_window_tracking() ||
 	    !test_send_atomic_queue_and_owned_payload() || !test_send_late_original_ack() ||
 	    !test_send_lost_data() || !test_send_idle_health_pump() || !test_send_repeated_loss() ||
-	    !test_send_fast_loss_evidence() || !test_send_fast_loss_reordered_receipt() ||
-	    !test_send_fast_loss_delivers_ordered_bytes() ||
+	    !test_send_adaptive_rtt_and_karn() || !test_send_peer_silence_and_idle() ||
+	    !test_send_malformed_ack_cannot_refresh_peer() ||
+	    !test_send_large_ackvec_is_valid_peer_traffic() ||
+	    !test_send_fast_retry_budget_and_abort() || !test_send_fast_loss_evidence() ||
+	    !test_send_fast_loss_reordered_receipt() || !test_send_fast_loss_delivers_ordered_bytes() ||
 	    !test_send_fast_loss_attempt_reset() ||
-	    !test_send_fast_loss_wrap_shrink_and_multiple_gaps() ||
-	    !test_send_ack_wrap() || !test_send_alias_wrap() ||
-	    !test_send_cumulative_ack_after_aoa_retirement() || !test_send_ack_aoa_epoch() ||
-	    !test_send_ack_aoa_monotonic() || !test_send_ack_aoa_wrap() || !test_send_dummy_ack() ||
-	    !test_send_terminal_failure() || !test_send_abort())
+	    !test_send_fast_loss_wrap_shrink_and_multiple_gaps() || !test_send_ack_wrap() ||
+	    !test_send_alias_wrap() || !test_send_cumulative_ack_after_aoa_retirement() ||
+	    !test_send_ack_aoa_epoch() || !test_send_ack_aoa_monotonic() || !test_send_ack_aoa_wrap() ||
+	    !test_send_dummy_ack() || !test_send_terminal_failure() || !test_send_abort())
 		return -1;
 	(void)printf("TestRdpeUdpSend passed\n");
 	return 0;

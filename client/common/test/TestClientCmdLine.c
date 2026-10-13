@@ -119,8 +119,35 @@ typedef struct
 	} modified_arguments[8];
 } test;
 
+static BOOL check_multitransport_reliable(rdpSettings* settings)
+{
+	return freerdp_settings_get_bool(settings, FreeRDP_SupportMultitransport) &&
+	       (freerdp_settings_get_uint32(settings, FreeRDP_MultitransportFlags) ==
+	        TRANSPORT_TYPE_UDP_FECR);
+}
+
+static BOOL check_multitransport_disabled(rdpSettings* settings)
+{
+	return !freerdp_settings_get_bool(settings, FreeRDP_SupportMultitransport) &&
+	       (freerdp_settings_get_uint32(settings, FreeRDP_MultitransportFlags) == 0);
+}
+
 // NOLINTBEGIN(bugprone-suspicious-missing-comma)
 static const test tests[] = {
+	{ 0, check_multitransport_reliable,
+	  { "testfreerdp", "/v:test.freerdp.com", nullptr }, { WINPR_C_ARRAY_INIT } },
+	{ 0, check_multitransport_reliable,
+	  { "testfreerdp", "/v:test.freerdp.com", "+multitransport", nullptr }, { WINPR_C_ARRAY_INIT } },
+	{ 0, check_multitransport_reliable,
+	  { "testfreerdp", "/v:test.freerdp.com", "/multitransport", nullptr }, { WINPR_C_ARRAY_INIT } },
+	{ 0, check_multitransport_disabled,
+	  { "testfreerdp", "/v:test.freerdp.com", "-multitransport", nullptr }, { WINPR_C_ARRAY_INIT } },
+	{ 0, check_multitransport_reliable,
+	  { "testfreerdp", "/v:test.freerdp.com", "-multitransport", "+multitransport", nullptr },
+	  { WINPR_C_ARRAY_INIT } },
+	{ 0, check_multitransport_disabled,
+	  { "testfreerdp", "/v:test.freerdp.com", "+multitransport", "-multitransport", nullptr },
+	  { WINPR_C_ARRAY_INIT } },
 	{ COMMAND_LINE_STATUS_PRINT_HELP,
 	  check_settings_smartcard_no_redirection,
 	  { "testfreerdp", "--help", nullptr },

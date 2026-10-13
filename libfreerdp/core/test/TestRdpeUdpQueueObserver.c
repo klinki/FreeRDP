@@ -201,7 +201,7 @@ static BOOL test_queue_retries_and_callback(void)
 	QUEUE_CHECK(fixture && rdpeudp_test_queue_enable(fixture->udp, 32768));
 	QUEUE_CHECK(rdpeudp_test_queue_measure(fixture->udp, QUEUE_NS(1000), QUEUE_NS(2000)));
 	QUEUE_CHECK(rdpeudp_test_send_data(fixture->udp, (const BYTE*)"ABCD", 4) == 4);
-	rdpeudp_test_set_time(fixture->udp, 1200);
+	rdpeudp_test_set_time(fixture->udp, 1000 + RDPEUDP_ACK_TIMEOUT_MS);
 	QUEUE_CHECK(rdpeudp_test_service_send(fixture->udp) && fixture->packets == 2);
 	QUEUE_CHECK(rdpeudp_test_queue_stats(fixture->udp, stats, QUEUE_STATS) && stats[4] == 4);
 	QUEUE_CHECK(queue_ack(fixture, 2));
@@ -308,6 +308,8 @@ static BOOL test_queue_observer_limits(void)
 	QUEUE_CHECK(rdpeudp_test_queue_enqueue(fixture->udp, (const BYTE*)"ABCD", 4) == 4);
 	/* Product overflow is flagged independently of histogram overflow. */
 	rdpeudp_test_set_time(fixture->udp, UINT64_MAX / 1000000ULL);
+	/* The synthetic observer clock does not model a dead transport peer. */
+	QUEUE_CHECK(queue_ack(fixture, 0));
 	QUEUE_CHECK(rdpeudp_test_service_send(fixture->udp));
 	QUEUE_CHECK(rdpeudp_test_queue_stats(fixture->udp, stats, QUEUE_STATS));
 	QUEUE_CHECK(!stats[0] && stats[29] && stats[16] == 4 && stats[7] == UINT64_MAX);
@@ -317,6 +319,7 @@ static BOOL test_queue_observer_limits(void)
 	QUEUE_CHECK(rdpeudp_test_queue_measure(fixture->udp, QUEUE_NS(1000), QUEUE_NS(2000)));
 	QUEUE_CHECK(rdpeudp_test_queue_enqueue(fixture->udp, (const BYTE*)"ABCD", 4) == 4);
 	rdpeudp_test_set_time(fixture->udp, 999);
+	QUEUE_CHECK(queue_ack(fixture, 0));
 	QUEUE_CHECK(rdpeudp_test_service_send(fixture->udp));
 	QUEUE_CHECK(rdpeudp_test_queue_stats(fixture->udp, stats, QUEUE_STATS));
 	QUEUE_CHECK(!stats[0] && stats[27]);

@@ -77,13 +77,14 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(bytes(value), original)
 
     def test_ack_vector_coverage_matches_native_decoder_limits(self):
-        for encoded in (b"", b"\x80", b"\xc0\x80", b"\xbf" * 17):
+        for encoded in (b"", b"\x80", b"\xc0\x80"):
             self.assertEqual(packet_kind(packet(ACKVEC, b"\x01\0" + bytes([len(encoded)]) + encoded)),
                              "unclassified")
-        # 16 × 63 + 16 = 1024 is the largest accepted decoded coverage.
-        encoded = b"\xbf" * 16 + b"\x90"
-        self.assertEqual(packet_kind(packet(ACKVEC, b"\x01\0" + bytes([len(encoded)]) + encoded)),
-                         "ackvec_only")
+        # Larger legitimate Windows windows must remain ACKs. Coverage is
+        # bounded by the wire fields, not the former 1024-packet local cap.
+        for encoded in (b"\xbf" * 16 + b"\x90", b"\xbf" * 17, b"\xbf" * 127):
+            self.assertEqual(packet_kind(packet(ACKVEC, b"\x01\0" + bytes([len(encoded)]) + encoded)),
+                             "ackvec_only")
         self.assertEqual(packet_kind(packet(ACKVEC, b"\x01\0\x01\0")), "ackvec_only")
 
     def test_deadline_offset_preserves_data_bytes_and_network_serialization(self):
@@ -221,7 +222,24 @@ class FeedbackTests(unittest.TestCase):
                 self.assertEqual(packet_kind(actual_ack), "ack_only", actual_ack.hex())
                 native.send(b"X")
                 actual_data = peer.recv(65535)
-                self.assertEqual(packet_kind(actual_data), "data_with_ack", actual_data.hex())
+                # The receipt was already emitted above. A subsequent write must
+                # not repeat a stale ACK just because the peer once sent DATA.
+                self.assertEqual(packet_kind(actual_data), "data_without_ack", actual_data.hex())
+                # Retire X, then receive another channel byte while the peer
+                # explicitly permits a one-second, 15-addition ACK batch. This
+                # leaves a genuine pending receipt to piggyback on the next write.
+                peer.sendto(packet(ACK, b"\x01\0\0\0\0\0\0"), ("127.0.0.1", port))
+                peer.sendto(packet(DATA | DELAYACK,
+                                   b"\x0f\xe8\x03" + b"\x02\0\x02\0R"),
+                            ("127.0.0.1", port))
+                self.assertEqual(native.read(50), b"R")
+                native.send(b"Y")
+                actual_piggyback = peer.recv(65535)
+                self.assertEqual(packet_kind(actual_piggyback), "data_with_ack", actual_piggyback.hex())
+                restored = bytearray(actual_piggyback)
+                restored[0], restored[7] = restored[7], restored[0]
+                self.assertEqual(int.from_bytes(restored[3:5], "little"), 2)
+                self.assertEqual(restored[-1:], b"Y")
             finally:
                 native.close()
 

@@ -106,13 +106,32 @@ class Native:
         if not self.h:raise RuntimeError('private FreeRDP endpoint creation failed')
         self.buf=C.create_string_buffer(65536)
         self.configure_loss_trace()
+        self.deadline_available=all(hasattr(self.lib,'freerdp_bench_v1_'+name) for name in ('deadline','deadline_reached','clock_ns'))
+        if self.deadline_available:
+            self.lib.freerdp_bench_v1_clock_ns.argtypes=[]
+            self.lib.freerdp_bench_v1_clock_ns.restype=C.c_uint64
+            self.lib.freerdp_bench_v1_deadline.argtypes=[C.c_void_p,C.c_uint64]
+            self.lib.freerdp_bench_v1_deadline.restype=C.c_int
+            self.lib.freerdp_bench_v1_deadline_reached.argtypes=[C.c_void_p]
+            self.lib.freerdp_bench_v1_deadline_reached.restype=C.c_int
+    def configure_deadline(self,end_ns):
+        if not self.deadline_available:return
+        sample=self._queue_clock_sample()
+        if not self.lib.freerdp_bench_v1_deadline(self.h,end_ns+sample['offset_ns']):
+            raise RuntimeError('native benchmark deadline configuration failed')
+    def deadline_reached(self):
+        return bool(self.lib.freerdp_bench_v1_deadline_reached(self.h)) if self.deadline_available else False
     def send(self,data):
         b=C.create_string_buffer(data)
         n=self.lib.freerdp_bench_v1_send(self.h,b,len(data))
-        if n!=len(data):raise RuntimeError(f'production send failed: {n}/{len(data)}')
+        if n!=len(data):
+            if self.deadline_reached():raise RuntimeError('benchmark deadline reached; reliable drain incomplete')
+            raise RuntimeError(f'production send failed: {n}/{len(data)}')
     def read(self,timeout_ms=0):
         n=self.lib.freerdp_bench_v1_read(self.h,self.buf,len(self.buf),timeout_ms)
-        if n<0:raise RuntimeError('production receive failed / unhealthy stream')
+        if n<0:
+            if self.deadline_reached():raise RuntimeError('benchmark deadline reached; reliable drain incomplete')
+            raise RuntimeError('production receive failed / unhealthy stream')
         return self.buf.raw[:n]
     def stats(self):
         a=(C.c_uint64*8)()

@@ -1181,7 +1181,7 @@ static uint64_t multitransport_maintenance(WINPR_ATTR_UNUSED rdpContext* context
 	EnterCriticalSection(&multi->lock);
 	if (multi->udp)
 		(void)rdpeudp_check_health(multi->udp);
-	interval = multi->udp && rdpeudp_has_pending_send(multi->udp) ? 20000000 : 1000000000;
+	interval = rdpeudp_maintenance_interval(multi->udp);
 	multi->maintenanceInterval = interval;
 	LeaveCriticalSection(&multi->lock);
 	return interval;
@@ -1201,7 +1201,8 @@ int multitransport_check_fds(rdpMultitransport* multi)
 	 * previously idle watchdog after the writer's explicit event wakeup;
 	 * the callback returns to 1 s once all accepted bytes drain. */
 	UINT64 sendGeneration = 0;
-	const uint64_t wantedInterval = rdpeudp_send_snapshot(udp, &sendGeneration) ? 20000000 : 1000000000;
+	(void)rdpeudp_send_snapshot(udp, &sendGeneration);
+	const uint64_t wantedInterval = rdpeudp_maintenance_interval(udp);
 	if (multi->maintenanceTimer && wantedInterval < multi->maintenanceInterval && multi->rdp->timer)
 	{
 		(void)freerdp_timer_remove(multi->rdp->context, multi->maintenanceTimer);

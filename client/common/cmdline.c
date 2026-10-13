@@ -1295,8 +1295,10 @@ static int freerdp_client_command_line_post_filter_int(void* context, COMMAND_LI
 
 		UINT32 flags = 0;
 		if (freerdp_settings_get_bool(settings, FreeRDP_SupportMultitransport))
-			flags =
-			    (TRANSPORT_TYPE_UDP_FECR | TRANSPORT_TYPE_UDP_FECL | TRANSPORT_TYPE_UDP_PREFERRED);
+			/* Match the default reliable transport. Lossy transport and static
+			 * channel migration are not implemented; Soft-Sync ordering is a
+			 * separate capability and is not enabled by this switch. */
+			flags = TRANSPORT_TYPE_UDP_FECR;
 
 		if (!freerdp_settings_set_uint32(settings, FreeRDP_MultitransportFlags, flags))
 			return fail_at(arg, COMMAND_LINE_ERROR);
