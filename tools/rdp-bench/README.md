@@ -423,3 +423,6 @@ see [UPSTREAM-METHOD.md](docs/UPSTREAM-METHOD.md) and
 [UDP-RECOVERY-20261013.md](docs/UDP-RECOVERY-20261013.md). The latter documents
 bounded optional core tracing, the independent PCAP header audit, and the
 25%/50%/70% campaign; its server counters have separate metric boundaries.
+The matched transport rerun on both 10 Mbit/s profiles is recorded in
+[RECOVERY-TEN-MBIT-20261013.md](docs/RECOVERY-TEN-MBIT-20261013.md), including
+verified payload goodput, probe p95/p99 and retained failures.
