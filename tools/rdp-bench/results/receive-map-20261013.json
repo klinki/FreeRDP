@@ -1,0 +1,324 @@
+{
+  "schema": "freerdp.receive_map_windows_campaign",
+  "version": 1,
+  "source_commit": "90b02e86bcfcd00104a850464973bd83bfb69c67",
+  "native_tests_passed": 7,
+  "python_tests_passed": 265,
+  "planned_loss_percent": [
+    25,
+    50,
+    70
+  ],
+  "requested_seconds_per_step": 120,
+  "all_requested_levels_exercised": true,
+  "trials": [
+    {
+      "trial": "main",
+      "trial_kind": "original_stop_on_first_exit_ramp",
+      "loss_percent": 25.0,
+      "outcome": "SESSION_ENDED",
+      "client_exit_code": 147,
+      "observed_duration_s": 19.112608174999878,
+      "receiver_retention": {
+        "peak_chunks": 3252,
+        "peak_span": 3262,
+        "peak_owned_bytes": 3676913,
+        "page_allocations": 1136,
+        "buffered_chunks": 3252,
+        "buffered_bytes": 3676913,
+        "unread_stream_bytes": 0,
+        "byte_limit": 40370176,
+        "allocated_pages": 14,
+        "recv_failed": 1
+      },
+      "old_receive_map_overflow_seen": false,
+      "terminal_logs": [
+        "[12:40:46:514] [10727:000029ee] [ERROR][com.freerdp.core.rdpeudp] - [rdpeudp_check_stream_health]: UDP reassembly stalled for 16856 ms: expected channel 6297, buffered=3252, DataSeq base=7cb0; reconnect required"
+      ],
+      "metrics": {
+        "server_udp_bandwidth": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_udp_sent_rate": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_udp_rtt_ms": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_loss_percent": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_retransmission_percent": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_output_fps": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_skipped_network_fps": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "counter_samples": 0,
+      "counter_errors": [],
+      "counter_clock_boundary_exclusions": 0,
+      "network": {
+        "small": {
+          "transmitted_packets": 585,
+          "dropped_packets": 191,
+          "drop_fraction_completed_attempts": 0.24613402061855671,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; includes before-snapshot queued packets if any"
+        },
+        "large": {
+          "transmitted_packets": 6619,
+          "dropped_packets": 2149,
+          "drop_fraction_completed_attempts": 0.24509580291970803,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; includes before-snapshot queued packets if any"
+        }
+      },
+      "report_json": "receive-map-main-20261013.json",
+      "observed_workload_warmup_s": 144.252379,
+      "counter_rate_window_s": 10,
+      "counter_sampling_note": "Two-sample PDH batches yielded roughly 20-second cadence; raw intervals and missing/error rows retained."
+    },
+    {
+      "trial": "fresh50",
+      "trial_kind": "fresh_session_remaining_level",
+      "loss_percent": 50.0,
+      "outcome": "SESSION_ENDED",
+      "client_exit_code": 147,
+      "observed_duration_s": 67.18356198900005,
+      "receiver_retention": {
+        "peak_chunks": 2076,
+        "peak_span": 2077,
+        "peak_owned_bytes": 2382964,
+        "page_allocations": 656,
+        "buffered_chunks": 2076,
+        "buffered_bytes": 2382964,
+        "unread_stream_bytes": 0,
+        "byte_limit": 40370176,
+        "allocated_pages": 9,
+        "recv_failed": 1
+      },
+      "old_receive_map_overflow_seen": false,
+      "terminal_logs": [
+        "[12:47:55:010] [10887:00002a8e] [ERROR][com.freerdp.core.rdpeudp] - [rdpeudp_check_stream_health]: UDP reassembly stalled for 16061 ms: expected channel 874c, buffered=2076, DataSeq base=b2bb; reconnect required"
+      ],
+      "metrics": {
+        "server_udp_bandwidth": {
+          "n": 3,
+          "mean": 273945,
+          "median": 271305,
+          "min": 270969,
+          "max": 279561
+        },
+        "server_udp_sent_rate": {
+          "n": 3,
+          "mean": 22563861.494896166,
+          "median": 25245735.094960187,
+          "min": 16803907.756619744,
+          "max": 25641941.63310857
+        },
+        "server_udp_rtt_ms": {
+          "n": 3,
+          "mean": 0,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "server_loss_percent": {
+          "n": 3,
+          "mean": 50.01586878414213,
+          "median": 50.13460798857206,
+          "min": 49.76668475311991,
+          "max": 50.146313610734424
+        },
+        "server_retransmission_percent": {
+          "n": 3,
+          "mean": 50.11287691088732,
+          "median": 50.246235100992074,
+          "min": 49.71604268402966,
+          "max": 50.376352947640235
+        },
+        "server_output_fps": {
+          "n": 3,
+          "mean": 5.392225124528548,
+          "median": 6.386833941007734,
+          "min": 3.3993359397241747,
+          "max": 6.390505492853736
+        },
+        "server_skipped_network_fps": {
+          "n": 3,
+          "mean": 0.0333268229384723,
+          "median": 0,
+          "min": 0,
+          "max": 0.0999804688154169
+        }
+      },
+      "counter_samples": 3,
+      "counter_errors": [],
+      "counter_clock_boundary_exclusions": 0,
+      "network": {
+        "small": {
+          "transmitted_packets": 4689,
+          "dropped_packets": 4817,
+          "drop_fraction_completed_attempts": 0.5067325899431938,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; includes before-snapshot queued packets if any"
+        },
+        "large": {
+          "transmitted_packets": 68965,
+          "dropped_packets": 69055,
+          "drop_fraction_completed_attempts": 0.5003260397043907,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; includes before-snapshot queued packets if any"
+        }
+      },
+      "report_json": "receive-map-fresh50-20261013.json",
+      "observed_workload_warmup_s": 46.286912,
+      "counter_rate_window_s": 10,
+      "counter_sampling_note": "Two-sample PDH batches yielded roughly 20-second cadence; raw intervals and missing/error rows retained."
+    },
+    {
+      "trial": "fresh70",
+      "trial_kind": "fresh_session_remaining_level",
+      "loss_percent": 70.0,
+      "outcome": "SESSION_ENDED",
+      "client_exit_code": 147,
+      "observed_duration_s": 58.18292548499994,
+      "receiver_retention": {
+        "peak_chunks": 2616,
+        "peak_span": 2619,
+        "peak_owned_bytes": 3018135,
+        "page_allocations": 527,
+        "buffered_chunks": 2616,
+        "buffered_bytes": 3018135,
+        "unread_stream_bytes": 0,
+        "byte_limit": 40370176,
+        "allocated_pages": 11,
+        "recv_failed": 1
+      },
+      "old_receive_map_overflow_seen": false,
+      "terminal_logs": [
+        "[12:49:48:839] [11047:00002b2e] [ERROR][com.freerdp.core.rdpeudp] - [rdpeudp_check_stream_health]: UDP reassembly stalled for 16118 ms: expected channel 0443, buffered=2616, DataSeq base=79ad; reconnect required"
+      ],
+      "metrics": {
+        "server_udp_bandwidth": {
+          "n": 3,
+          "mean": 244266,
+          "median": 239924,
+          "min": 237817,
+          "max": 255057
+        },
+        "server_udp_sent_rate": {
+          "n": 3,
+          "mean": 18762563.755206343,
+          "median": 26996420.017175637,
+          "min": 26594.962569034105,
+          "max": 29264676.28587436
+        },
+        "server_udp_rtt_ms": {
+          "n": 3,
+          "mean": 0,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "server_loss_percent": {
+          "n": 3,
+          "mean": 76.27547369320442,
+          "median": 70.41428323799619,
+          "min": 70.17684372397002,
+          "max": 88.23529411764706
+        },
+        "server_retransmission_percent": {
+          "n": 3,
+          "mean": 79.16209971781919,
+          "median": 70.41081643265731,
+          "min": 70.01665919138847,
+          "max": 97.05882352941177
+        },
+        "server_output_fps": {
+          "n": 3,
+          "mean": 3.165585546533827,
+          "median": 4.396877740475841,
+          "min": 0,
+          "max": 5.099878899125641
+        },
+        "server_skipped_network_fps": {
+          "n": 3,
+          "mean": 0,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        }
+      },
+      "counter_samples": 3,
+      "counter_errors": [],
+      "counter_clock_boundary_exclusions": 0,
+      "network": {
+        "small": {
+          "transmitted_packets": 1662,
+          "dropped_packets": 3807,
+          "drop_fraction_completed_attempts": 0.696105320899616,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; includes before-snapshot queued packets if any"
+        },
+        "large": {
+          "transmitted_packets": 37785,
+          "dropped_packets": 88613,
+          "drop_fraction_completed_attempts": 0.7010633079637336,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; includes before-snapshot queued packets if any"
+        }
+      },
+      "report_json": "receive-map-fresh70-20261013.json",
+      "observed_workload_warmup_s": 48.051418,
+      "counter_rate_window_s": 10,
+      "counter_sampling_note": "Two-sample PDH batches yielded roughly 20-second cadence; raw intervals and missing/error rows retained."
+    }
+  ],
+  "notes": [
+    "Original ramp stops on 25% exit; 50% and70% are one fresh session each, separately labelled.",
+    "All trials retain terminal failures; no attempt was restarted to obtain a better result.",
+    "Server counters do not establish physical client FPS, application goodput or input-to-display tail latency.",
+    "Ingress applies loss to all incoming IPv4; no rate cap; large packets add1ms delay and70%reorder.",
+    "Kernel random loss and upstream coloured-noise RNG are unseeded; profile parameters are repeatable, individual logical losses are not.",
+    "Primary observer uses paired PDH queries rather than upstream continuous10s sampling; report means cover only qualified observed10s windows, not full-phase averages."
+  ]
+}

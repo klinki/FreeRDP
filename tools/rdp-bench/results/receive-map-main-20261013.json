@@ -1,0 +1,1574 @@
+{
+  "schema_version": 1,
+  "method": "OpenThinRDP server-counter loss ramp",
+  "campaign_provenance": {
+    "provenance": {
+      "client_pid": 10727,
+      "client_start_ticks": 103060,
+      "linux_epoch_s": 1791895227.3456402,
+      "kernel": "7.0.12-linuxkit",
+      "binary_sha256": "2bf4a1ec4c2427d1a65d2b204d8859b4023b4a4932079540f0eaffd4c1aec928",
+      "linux_clock_alignment": {
+        "host_start_s": 1791895227.2556689,
+        "host_end_s": 1791895227.362015,
+        "offset_linux_minus_host_s": 0.03679823875427246,
+        "uncertainty_s": 0.053173065185546875
+      },
+      "source_commit": "90b02e86bcfcd00104a850464973bd83bfb69c67",
+      "client_args": [
+        "docker",
+        "exec",
+        "-i",
+        "freerdp-recvmap-method",
+        "env",
+        "DISPLAY=:99",
+        "WLOG_LEVEL=INFO",
+        "WLOG_FILTER=com.freerdp.core.multitransport:DEBUG",
+        "stdbuf",
+        "-oL",
+        "-eL",
+        "/bench/linux-build/client/X11/xfreerdp",
+        "/v:192.168.64.2",
+        "/u:david",
+        "/d:WIN-RL37D50MR0J",
+        "/from-stdin:force",
+        "/cert:fingerprint:sha256:4f04fd907faedebb45444bfd9d118675eb24ec3fa2bacb24ac38e431d9185081",
+        "/size:1280x800",
+        "/bpp:32",
+        "/gfx:progressive",
+        "/network:auto",
+        "/timeout:20000",
+        "/client-hostname:recvmap-main",
+        "/log-level:INFO",
+        "/log-filters:com.freerdp.core.multitransport:DEBUG"
+      ],
+      "counter_instance": "RDP-Tcp 0",
+      "load_receipt": {
+        "task_name": "RdpBench-Pr13608-recvmap-main",
+        "wrapper": "C:\\RdpBenchRecv20261013\\Invoke-Workload.ps1",
+        "wrapper_sha256": "52959a4330eb3813fe6255160ad592dbf54e4787588f8c6a2ce952b9677de0cd",
+        "script_sha256": "972ff4b0d2fa01d113cec49f823868b9f306dc43bb4c915a4a5c8751fb966ca5",
+        "started_utc": "2026-10-13T12:38:02.3481940Z",
+        "session_id": 2,
+        "owner": "11cb25bc22074f588ed5e398d5055a41",
+        "script": "C:\\RdpBenchRecv20261013\\load.ps1",
+        "pid": 5256,
+        "creation_utc": "2026-10-13T12:38:01.4924960Z"
+      },
+      "clock_alignment": {
+        "method": "UTC bounds around authenticated SSH PowerShell; shortest round trip",
+        "uncertainty_ms": 148.55456352233887,
+        "samples": [
+          {
+            "host_start_unix_s": 1791895080.441735,
+            "host_end_unix_s": 1791895080.8559418,
+            "windows_utc": "2026-10-13T12:37:59.7735480Z",
+            "offset_windows_minus_host_s": -0.8752906322479248,
+            "uncertainty_s": 0.20710337162017822
+          },
+          {
+            "host_start_unix_s": 1791895080.855978,
+            "host_end_unix_s": 1791895081.162981,
+            "windows_utc": "2026-10-13T12:38:00.0810030Z",
+            "offset_windows_minus_host_s": -0.9284765720367432,
+            "uncertainty_s": 0.1535015106201172
+          },
+          {
+            "host_start_unix_s": 1791895081.163029,
+            "host_end_unix_s": 1791895081.460138,
+            "windows_utc": "2026-10-13T12:38:00.3773847Z",
+            "offset_windows_minus_host_s": -0.9341995716094971,
+            "uncertainty_s": 0.14855456352233887
+          }
+        ],
+        "selected": {
+          "host_start_unix_s": 1791895081.163029,
+          "host_end_unix_s": 1791895081.460138,
+          "windows_utc": "2026-10-13T12:38:00.3773847Z",
+          "offset_windows_minus_host_s": -0.9341995716094971,
+          "uncertainty_s": 0.14855456352233887
+        }
+      },
+      "method_source": {
+        "source_commit": "adabca69b825d7a87562a1b1e8b77179b9d45059",
+        "files": [
+          {
+            "name": "README.md",
+            "sha256": "a9bb651f7cc1fb707b282dd900e4f655d653c7f5752940081de60d237b24da78",
+            "cached_comparison": "equal except previously appended final blank line"
+          },
+          {
+            "name": "session.sh",
+            "sha256": "268f26903ec7f372e37fc6b9ee12ce80fac525fc173c71a8783e41e31ad63526",
+            "cached_comparison": "equal except previously appended final blank line"
+          },
+          {
+            "name": "line.sh",
+            "sha256": "122e76218054d11c458f5cfb43019558ea10322d4035210272bb30a76cd08daa",
+            "cached_comparison": "equal except previously appended final blank line"
+          },
+          {
+            "name": "ramp.sh",
+            "sha256": "0da5af9a40be0d8623733801a719a282b83bddd83a5d2259f9a96d33ee112541",
+            "cached_comparison": "equal except previously appended final blank line"
+          },
+          {
+            "name": "load.ps1",
+            "sha256": "972ff4b0d2fa01d113cec49f823868b9f306dc43bb4c915a4a5c8751fb966ca5",
+            "cached_comparison": "equal except previously appended final blank line"
+          },
+          {
+            "name": "counters.ps1",
+            "sha256": "2e8e65a16dd30c06c8154d14ca8ebeb07d2bd91f0c272a558bd6720df7661b46",
+            "cached_comparison": "equal except previously appended final blank line"
+          }
+        ]
+      },
+      "warmup": {
+        "minimum_requested_s": 45,
+        "observed_start_windows_utc": "2026-10-13T12:38:02.3481940Z",
+        "scope": "minimum workload warmup plus setup; actual phase start recorded"
+      },
+      "method_deviations": [
+        "veth replaces unavailable IFB",
+        "ICMP preflight omitted; ingress packet counters verify applied loss",
+        "AVC disabled in build; progressive-only CLI",
+        "credential stdin/certificate pin",
+        "line-buffered diagnostics"
+      ],
+      "resources": {
+        "client_container_cpus": 4,
+        "memory_bytes": 4294967296
+      },
+      "network": {
+        "incoming_all_ipv4": true,
+        "rate_cap_mbps": null,
+        "large_min_ip_bytes": 512,
+        "large_delay_ms": 1,
+        "large_reorder_percent": 70,
+        "loss_levels": [
+          25,
+          50,
+          70
+        ],
+        "step_s": 120
+      },
+      "shared_libraries_sha256": {
+        "linux-build/libfreerdp/libfreerdp3.so.3.31.2": "8b8d848326c41cdc2717a8ed1f3feb4429d2b4eb7335afb40e70ac9a1791695a",
+        "linux-build/client/common/libfreerdp-client3.so.3.31.2": "52b1d904cef8931c1b018308c76824f5125066ccf9a9ff5eeb780395dde78748",
+        "linux-build/winpr/libwinpr/libwinpr3.so.3.31.2": "d4871aea4baf35d087de7a91c2768a9efa82c2cf1c73419c5bfa415a850a160a"
+      }
+    },
+    "method_fidelity": "Linux ingress tc/netem via owned veth; adaptation of upstream IFB method",
+    "clock_alignment": {
+      "method": "Windows/host before+after SSH UTC brackets and Linux/host brackets; conservative boundary exclusion",
+      "windows_minus_linux_s": -0.9753518104553223,
+      "uncertainty_s": 0.2762148380279541,
+      "before": {
+        "method": "UTC bounds around authenticated SSH PowerShell; shortest round trip",
+        "uncertainty_ms": 148.55456352233887,
+        "samples": [
+          {
+            "host_start_unix_s": 1791895080.441735,
+            "host_end_unix_s": 1791895080.8559418,
+            "windows_utc": "2026-10-13T12:37:59.7735480Z",
+            "offset_windows_minus_host_s": -0.8752906322479248,
+            "uncertainty_s": 0.20710337162017822
+          },
+          {
+            "host_start_unix_s": 1791895080.855978,
+            "host_end_unix_s": 1791895081.162981,
+            "windows_utc": "2026-10-13T12:38:00.0810030Z",
+            "offset_windows_minus_host_s": -0.9284765720367432,
+            "uncertainty_s": 0.1535015106201172
+          },
+          {
+            "host_start_unix_s": 1791895081.163029,
+            "host_end_unix_s": 1791895081.460138,
+            "windows_utc": "2026-10-13T12:38:00.3773847Z",
+            "offset_windows_minus_host_s": -0.9341995716094971,
+            "uncertainty_s": 0.14855456352233887
+          }
+        ],
+        "selected": {
+          "host_start_unix_s": 1791895081.163029,
+          "host_end_unix_s": 1791895081.460138,
+          "windows_utc": "2026-10-13T12:38:00.3773847Z",
+          "offset_windows_minus_host_s": -0.9341995716094971,
+          "uncertainty_s": 0.14855456352233887
+        }
+      },
+      "after": {
+        "method": "UTC bounds around authenticated SSH PowerShell; shortest round trip",
+        "uncertainty_ms": 175.93133449554443,
+        "samples": [
+          {
+            "host_start_unix_s": 1791895656.303236,
+            "host_end_unix_s": 1791895656.800578,
+            "windows_utc": "2026-10-13T12:47:35.7032282Z",
+            "offset_windows_minus_host_s": -0.8486790657043457,
+            "uncertainty_s": 0.2486710548400879
+          },
+          {
+            "host_start_unix_s": 1791895656.8006248,
+            "host_end_unix_s": 1791895657.1663659,
+            "windows_utc": "2026-10-13T12:47:36.0729126Z",
+            "offset_windows_minus_host_s": -0.9105832576751709,
+            "uncertainty_s": 0.1828705072402954
+          },
+          {
+            "host_start_unix_s": 1791895657.1663842,
+            "host_end_unix_s": 1791895657.518247,
+            "windows_utc": "2026-10-13T12:47:36.4259850Z",
+            "offset_windows_minus_host_s": -0.9163305759429932,
+            "uncertainty_s": 0.17593133449554443
+          }
+        ],
+        "selected": {
+          "host_start_unix_s": 1791895657.1663842,
+          "host_end_unix_s": 1791895657.518247,
+          "windows_utc": "2026-10-13T12:47:36.4259850Z",
+          "offset_windows_minus_host_s": -0.9163305759429932,
+          "uncertainty_s": 0.17593133449554443
+        }
+      },
+      "linux_before": {
+        "host_start_s": 1791895227.2556689,
+        "host_end_s": 1791895227.362015,
+        "offset_linux_minus_host_s": 0.03679823875427246,
+        "uncertainty_s": 0.053173065185546875
+      },
+      "linux_after": {
+        "host_start_s": 1791896025.805099,
+        "host_end_s": 1791896025.96122,
+        "linux_epoch_s": 1791896025.9465349,
+        "offset_linux_minus_host_s": 0.06337523460388184,
+        "uncertainty_s": 0.07806050777435303
+      }
+    },
+    "counter_instance": "RDP-Tcp 0"
+  },
+  "counter_metadata": [
+    {
+      "available_sets": [
+        {
+          "paths": [
+            "\\RemoteFX Network(RDP-tcp 0)\\Total Received Bytes",
+            "\\RemoteFX Network(RDP-tcp 0)\\Total Sent Bytes",
+            "\\RemoteFX Network(RDP-tcp 0)\\Current UDP Bandwidth",
+            "\\RemoteFX Network(RDP-tcp 0)\\Current UDP RTT",
+            "\\RemoteFX Network(RDP-tcp 0)\\Base UDP RTT",
+            "\\RemoteFX Network(RDP-tcp 0)\\FEC Rate",
+            "\\RemoteFX Network(RDP-tcp 0)\\Retransmission Rate",
+            "\\RemoteFX Network(RDP-tcp 0)\\Loss Rate",
+            "\\RemoteFX Network(RDP-tcp 0)\\Sent Rate P3",
+            "\\RemoteFX Network(RDP-tcp 0)\\Sent Rate P2",
+            "\\RemoteFX Network(RDP-tcp 0)\\Sent Rate P1",
+            "\\RemoteFX Network(RDP-tcp 0)\\Sent Rate P0",
+            "\\RemoteFX Network(RDP-tcp 0)\\UDP Packets Sent/sec",
+            "\\RemoteFX Network(RDP-tcp 0)\\UDP Sent Rate",
+            "\\RemoteFX Network(RDP-tcp 0)\\TCP Sent Rate",
+            "\\RemoteFX Network(RDP-tcp 0)\\Total Sent Rate",
+            "\\RemoteFX Network(RDP-tcp 0)\\UDP Packets Received/sec",
+            "\\RemoteFX Network(RDP-tcp 0)\\UDP Received Rate",
+            "\\RemoteFX Network(RDP-tcp 0)\\TCP Received Rate",
+            "\\RemoteFX Network(RDP-tcp 0)\\Total Received Rate",
+            "\\RemoteFX Network(RDP-tcp 0)\\Current TCP Bandwidth",
+            "\\RemoteFX Network(RDP-tcp 0)\\Current TCP RTT",
+            "\\RemoteFX Network(RDP-tcp 0)\\Base TCP RTT"
+          ],
+          "description": "This is counter set for the per session RemoteFX network counters",
+          "name": "RemoteFX Network"
+        },
+        {
+          "paths": [
+            "\\RemoteFX Graphics(RDP-Tcp 0)\\Source Frames/Second",
+            "\\RemoteFX Graphics(RDP-Tcp 0)\\Average Encoding Time",
+            "\\RemoteFX Graphics(RDP-Tcp 0)\\Frame Quality",
+            "\\RemoteFX Graphics(RDP-Tcp 0)\\Frames Skipped/Second - Insufficient Server Resources",
+            "\\RemoteFX Graphics(RDP-Tcp 0)\\Frames Skipped/Second - Insufficient Network Resources",
+            "\\RemoteFX Graphics(RDP-Tcp 0)\\Frames Skipped/Second - Insufficient Client Resources",
+            "\\RemoteFX Graphics(RDP-Tcp 0)\\Output Frames/Second",
+            "\\RemoteFX Graphics(RDP-Tcp 0)\\Graphics Compression ratio",
+            "\\RemoteFX Graphics(RDP-Tcp 0)\\Input Frames/Second"
+          ],
+          "description": "The RemoteFX encoding performance object consists of counters that measure the performance of RemoteFX graphics encoding",
+          "name": "RemoteFX Graphics"
+        }
+      ],
+      "schema_version": 1,
+      "type": "metadata",
+      "utc": "2026-10-13T12:39:10.7802025Z",
+      "notes": [
+        "Server output FPS does not establish physical client display rate.",
+        "All per-instance samples are retained; the report rejects ambiguous sessions.",
+        "Raw cooked values and nonzero PDH statuses are retained."
+      ],
+      "discovery_errors": [],
+      "counter_instance": "RDP-Tcp 0",
+      "interval_s": 10,
+      "definitions": [
+        {
+          "path": "\\RemoteFX Network(RDP-Tcp 0)\\Current UDP Bandwidth",
+          "localizedObject": "RemoteFX Network",
+          "object": "RemoteFX Network",
+          "metric": "server_udp_bandwidth",
+          "counter": "Current UDP Bandwidth",
+          "localizedCounter": "Current UDP Bandwidth",
+          "unit": "upstream kbps label; raw cooked counter"
+        },
+        {
+          "path": "\\RemoteFX Network(RDP-Tcp 0)\\UDP Sent Rate",
+          "localizedObject": "RemoteFX Network",
+          "object": "RemoteFX Network",
+          "metric": "server_udp_sent_rate",
+          "counter": "UDP Sent Rate",
+          "localizedCounter": "UDP Sent Rate",
+          "unit": "raw cooked counter"
+        },
+        {
+          "path": "\\RemoteFX Network(RDP-Tcp 0)\\Current UDP RTT",
+          "localizedObject": "RemoteFX Network",
+          "object": "RemoteFX Network",
+          "metric": "server_udp_rtt_ms",
+          "counter": "Current UDP RTT",
+          "localizedCounter": "Current UDP RTT",
+          "unit": "ms"
+        },
+        {
+          "path": "\\RemoteFX Network(RDP-Tcp 0)\\Loss Rate",
+          "localizedObject": "RemoteFX Network",
+          "object": "RemoteFX Network",
+          "metric": "server_loss_percent",
+          "counter": "Loss Rate",
+          "localizedCounter": "Loss Rate",
+          "unit": "percent"
+        },
+        {
+          "path": "\\RemoteFX Network(RDP-Tcp 0)\\Retransmission Rate",
+          "localizedObject": "RemoteFX Network",
+          "object": "RemoteFX Network",
+          "metric": "server_retransmission_percent",
+          "counter": "Retransmission Rate",
+          "localizedCounter": "Retransmission Rate",
+          "unit": "percent"
+        },
+        {
+          "path": "\\RemoteFX Graphics(RDP-Tcp 0)\\Output Frames/Second",
+          "localizedObject": "RemoteFX Graphics",
+          "object": "RemoteFX Graphics",
+          "metric": "server_output_fps",
+          "counter": "Output Frames/Second",
+          "localizedCounter": "Output Frames/Second",
+          "unit": "server frames/s"
+        },
+        {
+          "path": "\\RemoteFX Graphics(RDP-Tcp 0)\\Frames Skipped/Second - Insufficient Network Resources",
+          "localizedObject": "RemoteFX Graphics",
+          "object": "RemoteFX Graphics",
+          "metric": "server_skipped_network_fps",
+          "counter": "Frames Skipped/Second - Insufficient Network Resources",
+          "localizedCounter": "Frames Skipped/Second - Insufficient Network Resources",
+          "unit": "server frames/s"
+        }
+      ]
+    }
+  ],
+  "artifact_errors": [],
+  "steps": [
+    {
+      "id": "loss25",
+      "loss_percent": 25.0,
+      "requested_s": 120.0,
+      "outcome": "SESSION_ENDED",
+      "client_exit_code": 147,
+      "network": {
+        "qdisc_before": {
+          "schema_version": 1,
+          "utc": "2026-10-13T12:40:27.569944+00:00",
+          "state": {
+            "schema_version": 1,
+            "created_utc": "2026-10-13T12:35:36.042813+00:00",
+            "netns": "net:[4026532558]",
+            "vm_ip": "192.168.64.2",
+            "interface": "eth0",
+            "ingress": "bench_ing",
+            "receive": "bench_rx",
+            "mac": "a2:bc:89:87:f2:61",
+            "pair_mtu": 1500,
+            "original_interface_mtu": 65535,
+            "ifindices": {
+              "interface": 11,
+              "ingress": 13,
+              "receive": 12
+            },
+            "owner": "freerdp-pr13608:2cdbb084cffa4b7d9e0ff7c32b3c9154",
+            "original_rp_filter": {
+              "all": "0",
+              "eth0": "0"
+            },
+            "installed_ingress": true,
+            "veth_created": true,
+            "loss_percent": 25.0,
+            "method": "upstream ingress loss via veth, not IFB",
+            "rate_cap_mbps": null,
+            "changed_utc": "2026-10-13T12:40:27.534084+00:00"
+          },
+          "links": {
+            "interface": [
+              {
+                "ifindex": 11,
+                "link_index": 17,
+                "ifname": "eth0",
+                "flags": [
+                  "BROADCAST",
+                  "MULTICAST",
+                  "UP",
+                  "LOWER_UP"
+                ],
+                "mtu": 1500,
+                "qdisc": "noqueue",
+                "operstate": "UP",
+                "linkmode": "DEFAULT",
+                "group": "default",
+                "txqlen": 1000,
+                "link_type": "ether",
+                "address": "a2:bc:89:87:f2:61",
+                "broadcast": "ff:ff:ff:ff:ff:ff",
+                "link_netnsid": 0,
+                "stats64": {
+                  "rx": {
+                    "bytes": 589352652,
+                    "packets": 295316,
+                    "errors": 0,
+                    "dropped": 0,
+                    "over_errors": 0,
+                    "multicast": 0
+                  },
+                  "tx": {
+                    "bytes": 15303962,
+                    "packets": 265886,
+                    "errors": 0,
+                    "dropped": 0,
+                    "carrier_errors": 0,
+                    "collisions": 0
+                  }
+                }
+              }
+            ],
+            "ingress": [
+              {
+                "ifindex": 13,
+                "link": "bench_rx",
+                "ifname": "bench_ing",
+                "flags": [
+                  "BROADCAST",
+                  "MULTICAST",
+                  "UP",
+                  "LOWER_UP"
+                ],
+                "mtu": 1500,
+                "qdisc": "prio",
+                "operstate": "UP",
+                "linkmode": "DEFAULT",
+                "group": "default",
+                "txqlen": 1000,
+                "link_type": "ether",
+                "address": "e2:bc:1c:75:d8:f9",
+                "broadcast": "ff:ff:ff:ff:ff:ff",
+                "ifalias": "freerdp-pr13608:2cdbb084cffa4b7d9e0ff7c32b3c9154:ingress",
+                "stats64": {
+                  "rx": {
+                    "bytes": 936,
+                    "packets": 12,
+                    "errors": 0,
+                    "dropped": 0,
+                    "over_errors": 0,
+                    "multicast": 0
+                  },
+                  "tx": {
+                    "bytes": 337873548,
+                    "packets": 285027,
+                    "errors": 0,
+                    "dropped": 0,
+                    "carrier_errors": 0,
+                    "collisions": 0
+                  }
+                }
+              }
+            ],
+            "receive": [
+              {
+                "ifindex": 12,
+                "link": "bench_ing",
+                "ifname": "bench_rx",
+                "flags": [
+                  "BROADCAST",
+                  "MULTICAST",
+                  "UP",
+                  "LOWER_UP"
+                ],
+                "mtu": 1500,
+                "qdisc": "noqueue",
+                "operstate": "UP",
+                "linkmode": "DEFAULT",
+                "group": "default",
+                "txqlen": 1000,
+                "link_type": "ether",
+                "address": "a2:bc:89:87:f2:61",
+                "broadcast": "ff:ff:ff:ff:ff:ff",
+                "ifalias": "freerdp-pr13608:2cdbb084cffa4b7d9e0ff7c32b3c9154:receive",
+                "stats64": {
+                  "rx": {
+                    "bytes": 337873548,
+                    "packets": 285027,
+                    "errors": 0,
+                    "dropped": 0,
+                    "over_errors": 0,
+                    "multicast": 0
+                  },
+                  "tx": {
+                    "bytes": 936,
+                    "packets": 12,
+                    "errors": 0,
+                    "dropped": 0,
+                    "carrier_errors": 0,
+                    "collisions": 0
+                  }
+                }
+              }
+            ]
+          },
+          "receive_addresses": [
+            {
+              "ifindex": 12,
+              "link": "bench_ing",
+              "ifname": "bench_rx",
+              "flags": [
+                "BROADCAST",
+                "MULTICAST",
+                "UP",
+                "LOWER_UP"
+              ],
+              "mtu": 1500,
+              "qdisc": "noqueue",
+              "operstate": "UP",
+              "group": "default",
+              "txqlen": 1000,
+              "link_type": "ether",
+              "address": "a2:bc:89:87:f2:61",
+              "broadcast": "ff:ff:ff:ff:ff:ff",
+              "addr_info": [
+                {
+                  "family": "inet6",
+                  "local": "fe80::a0bc:89ff:fe87:f261",
+                  "prefixlen": 64,
+                  "scope": "link",
+                  "valid_life_time": 4294967295,
+                  "preferred_life_time": 4294967295
+                }
+              ]
+            }
+          ],
+          "interface_qdiscs": [
+            {
+              "kind": "noqueue",
+              "handle": "0:",
+              "root": true,
+              "refcnt": 2,
+              "options": {},
+              "bytes": 0,
+              "packets": 0,
+              "drops": 0,
+              "overlimits": 0,
+              "requeues": 0,
+              "backlog": 0,
+              "qlen": 0
+            },
+            {
+              "kind": "ingress",
+              "handle": "ffff:",
+              "parent": "ffff:fff1",
+              "options": {},
+              "bytes": 333908551,
+              "packets": 285047,
+              "drops": 0,
+              "overlimits": 0,
+              "requeues": 0,
+              "backlog": 0,
+              "qlen": 0
+            }
+          ],
+          "ingress_filter": [
+            {
+              "protocol": "ip",
+              "pref": 100,
+              "kind": "u32",
+              "chain": 0
+            },
+            {
+              "protocol": "ip",
+              "pref": 100,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "800:",
+                "ht_divisor": 1
+              }
+            },
+            {
+              "protocol": "ip",
+              "pref": 100,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "800::800",
+                "order": 2048,
+                "key_ht": "800",
+                "bkt": "0",
+                "not_in_hw": true,
+                "rule_hit": 285037,
+                "success": 285037,
+                "match": {
+                  "value": "c0a84002",
+                  "mask": "ffffffff",
+                  "offmask": "",
+                  "off": 12
+                },
+                "actions": [
+                  {
+                    "order": 1,
+                    "kind": "mirred",
+                    "mirred_action": "redirect",
+                    "direction": "egress",
+                    "to_dev": "bench_ing",
+                    "control_action": {
+                      "type": "stolen"
+                    },
+                    "index": 1,
+                    "ref": 1,
+                    "bind": 1,
+                    "installed": 291,
+                    "first_used": 200,
+                    "stats": {
+                      "bytes": 333908271,
+                      "packets": 285037,
+                      "drops": 0,
+                      "overlimits": 0,
+                      "requeues": 0,
+                      "backlog": 0,
+                      "qlen": 0
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "classification_filters": [
+            {
+              "protocol": "ip",
+              "pref": 1,
+              "kind": "u32",
+              "chain": 0
+            },
+            {
+              "protocol": "ip",
+              "pref": 1,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "800:",
+                "ht_divisor": 1
+              }
+            },
+            {
+              "protocol": "ip",
+              "pref": 1,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "800::800",
+                "order": 2048,
+                "key_ht": "800",
+                "bkt": "0",
+                "flowid": "1:2",
+                "not_in_hw": true,
+                "rule_hit": 285037,
+                "success": 19854,
+                "match": {
+                  "value": "0",
+                  "mask": "fe00",
+                  "offmask": "",
+                  "off": 0
+                }
+              }
+            },
+            {
+              "protocol": "ip",
+              "pref": 2,
+              "kind": "u32",
+              "chain": 0
+            },
+            {
+              "protocol": "ip",
+              "pref": 2,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "801:",
+                "ht_divisor": 1
+              }
+            },
+            {
+              "protocol": "ip",
+              "pref": 2,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "801::800",
+                "order": 2048,
+                "key_ht": "801",
+                "bkt": "0",
+                "flowid": "1:1",
+                "not_in_hw": true,
+                "rule_hit": 265183,
+                "success": 265183,
+                "match": {
+                  "value": "0",
+                  "mask": "0",
+                  "offmask": "",
+                  "off": 0
+                }
+              }
+            }
+          ],
+          "netem_qdiscs": [
+            {
+              "kind": "prio",
+              "handle": "1:",
+              "root": true,
+              "refcnt": 11,
+              "options": {
+                "bands": 3,
+                "priomap": [
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2
+                ],
+                "multiqueue": false
+              },
+              "bytes": 337873458,
+              "packets": 285026,
+              "drops": 22,
+              "overlimits": 0,
+              "requeues": 0,
+              "backlog": 0,
+              "qlen": 0
+            },
+            {
+              "kind": "netem",
+              "handle": "10:",
+              "parent": "1:1",
+              "options": {
+                "limit": 100000,
+                "delay": {
+                  "delay": 0.001,
+                  "jitter": 0,
+                  "correlation": 0
+                },
+                "loss-random": {
+                  "loss": 0.25,
+                  "correlation": 0
+                },
+                "reorder": {
+                  "reorder": 0.7,
+                  "correlation": 0
+                },
+                "ecn": false,
+                "gap": 1
+              },
+              "bytes": 80756,
+              "packets": 66,
+              "drops": 21,
+              "overlimits": 0,
+              "requeues": 45,
+              "backlog": 0,
+              "qlen": 0
+            },
+            {
+              "kind": "netem",
+              "handle": "20:",
+              "parent": "1:2",
+              "options": {
+                "limit": 100000,
+                "loss-random": {
+                  "loss": 0.25,
+                  "correlation": 0
+                },
+                "ecn": false,
+                "gap": 0
+              },
+              "bytes": 1342,
+              "packets": 3,
+              "drops": 1,
+              "overlimits": 0,
+              "requeues": 0,
+              "backlog": 0,
+              "qlen": 0
+            }
+          ],
+          "netem_counters": {
+            "large": {
+              "transmitted_packets": 66,
+              "dropped_packets": 21,
+              "backlog_packets": 0,
+              "transmitted_bytes": 80756,
+              "drop_fraction_completed_attempts": 0.2413793103448276,
+              "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+            },
+            "small": {
+              "transmitted_packets": 3,
+              "dropped_packets": 1,
+              "backlog_packets": 0,
+              "transmitted_bytes": 1342,
+              "drop_fraction_completed_attempts": 0.25,
+              "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+            }
+          },
+          "rp_filter": {
+            "all": "0",
+            "eth0": "0",
+            "bench_rx": "0"
+          }
+        },
+        "ping_verification": {
+          "outcome": "NOT_PERFORMED",
+          "reason": "recorded method deviation"
+        },
+        "qdisc_after": {
+          "schema_version": 1,
+          "utc": "2026-10-13T12:40:46.723493+00:00",
+          "state": {
+            "schema_version": 1,
+            "created_utc": "2026-10-13T12:35:36.042813+00:00",
+            "netns": "net:[4026532558]",
+            "vm_ip": "192.168.64.2",
+            "interface": "eth0",
+            "ingress": "bench_ing",
+            "receive": "bench_rx",
+            "mac": "a2:bc:89:87:f2:61",
+            "pair_mtu": 1500,
+            "original_interface_mtu": 65535,
+            "ifindices": {
+              "interface": 11,
+              "ingress": 13,
+              "receive": 12
+            },
+            "owner": "freerdp-pr13608:2cdbb084cffa4b7d9e0ff7c32b3c9154",
+            "original_rp_filter": {
+              "all": "0",
+              "eth0": "0"
+            },
+            "installed_ingress": true,
+            "veth_created": true,
+            "loss_percent": 25.0,
+            "method": "upstream ingress loss via veth, not IFB",
+            "rate_cap_mbps": null,
+            "changed_utc": "2026-10-13T12:40:27.534084+00:00"
+          },
+          "links": {
+            "interface": [
+              {
+                "ifindex": 11,
+                "link_index": 17,
+                "ifname": "eth0",
+                "flags": [
+                  "BROADCAST",
+                  "MULTICAST",
+                  "UP",
+                  "LOWER_UP"
+                ],
+                "mtu": 1500,
+                "qdisc": "noqueue",
+                "operstate": "UP",
+                "linkmode": "DEFAULT",
+                "group": "default",
+                "txqlen": 1000,
+                "link_type": "ether",
+                "address": "a2:bc:89:87:f2:61",
+                "broadcast": "ff:ff:ff:ff:ff:ff",
+                "link_netnsid": 0,
+                "stats64": {
+                  "rx": {
+                    "bytes": 600602236,
+                    "packets": 304860,
+                    "errors": 0,
+                    "dropped": 0,
+                    "over_errors": 0,
+                    "multicast": 0
+                  },
+                  "tx": {
+                    "bytes": 15732586,
+                    "packets": 273083,
+                    "errors": 0,
+                    "dropped": 0,
+                    "carrier_errors": 0,
+                    "collisions": 0
+                  }
+                }
+              }
+            ],
+            "ingress": [
+              {
+                "ifindex": 13,
+                "link": "bench_rx",
+                "ifname": "bench_ing",
+                "flags": [
+                  "BROADCAST",
+                  "MULTICAST",
+                  "UP",
+                  "LOWER_UP"
+                ],
+                "mtu": 1500,
+                "qdisc": "prio",
+                "operstate": "UP",
+                "linkmode": "DEFAULT",
+                "group": "default",
+                "txqlen": 1000,
+                "link_type": "ether",
+                "address": "e2:bc:1c:75:d8:f9",
+                "broadcast": "ff:ff:ff:ff:ff:ff",
+                "ifalias": "freerdp-pr13608:2cdbb084cffa4b7d9e0ff7c32b3c9154:ingress",
+                "stats64": {
+                  "rx": {
+                    "bytes": 936,
+                    "packets": 12,
+                    "errors": 0,
+                    "dropped": 0,
+                    "over_errors": 0,
+                    "multicast": 0
+                  },
+                  "tx": {
+                    "bytes": 346363593,
+                    "packets": 292231,
+                    "errors": 0,
+                    "dropped": 0,
+                    "carrier_errors": 0,
+                    "collisions": 0
+                  }
+                }
+              }
+            ],
+            "receive": [
+              {
+                "ifindex": 12,
+                "link": "bench_ing",
+                "ifname": "bench_rx",
+                "flags": [
+                  "BROADCAST",
+                  "MULTICAST",
+                  "UP",
+                  "LOWER_UP"
+                ],
+                "mtu": 1500,
+                "qdisc": "noqueue",
+                "operstate": "UP",
+                "linkmode": "DEFAULT",
+                "group": "default",
+                "txqlen": 1000,
+                "link_type": "ether",
+                "address": "a2:bc:89:87:f2:61",
+                "broadcast": "ff:ff:ff:ff:ff:ff",
+                "ifalias": "freerdp-pr13608:2cdbb084cffa4b7d9e0ff7c32b3c9154:receive",
+                "stats64": {
+                  "rx": {
+                    "bytes": 346363593,
+                    "packets": 292231,
+                    "errors": 0,
+                    "dropped": 0,
+                    "over_errors": 0,
+                    "multicast": 0
+                  },
+                  "tx": {
+                    "bytes": 936,
+                    "packets": 12,
+                    "errors": 0,
+                    "dropped": 0,
+                    "carrier_errors": 0,
+                    "collisions": 0
+                  }
+                }
+              }
+            ]
+          },
+          "receive_addresses": [
+            {
+              "ifindex": 12,
+              "link": "bench_ing",
+              "ifname": "bench_rx",
+              "flags": [
+                "BROADCAST",
+                "MULTICAST",
+                "UP",
+                "LOWER_UP"
+              ],
+              "mtu": 1500,
+              "qdisc": "noqueue",
+              "operstate": "UP",
+              "group": "default",
+              "txqlen": 1000,
+              "link_type": "ether",
+              "address": "a2:bc:89:87:f2:61",
+              "broadcast": "ff:ff:ff:ff:ff:ff",
+              "addr_info": [
+                {
+                  "family": "inet6",
+                  "local": "fe80::a0bc:89ff:fe87:f261",
+                  "prefixlen": 64,
+                  "scope": "link",
+                  "valid_life_time": 4294967295,
+                  "preferred_life_time": 4294967295
+                }
+              ]
+            }
+          ],
+          "interface_qdiscs": [
+            {
+              "kind": "noqueue",
+              "handle": "0:",
+              "root": true,
+              "refcnt": 2,
+              "options": {},
+              "bytes": 0,
+              "packets": 0,
+              "drops": 0,
+              "overlimits": 0,
+              "requeues": 0,
+              "backlog": 0,
+              "qlen": 0
+            },
+            {
+              "kind": "ingress",
+              "handle": "ffff:",
+              "parent": "ffff:fff1",
+              "options": {},
+              "bytes": 345024519,
+              "packets": 294591,
+              "drops": 0,
+              "overlimits": 0,
+              "requeues": 0,
+              "backlog": 0,
+              "qlen": 0
+            }
+          ],
+          "ingress_filter": [
+            {
+              "protocol": "ip",
+              "pref": 100,
+              "kind": "u32",
+              "chain": 0
+            },
+            {
+              "protocol": "ip",
+              "pref": 100,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "800:",
+                "ht_divisor": 1
+              }
+            },
+            {
+              "protocol": "ip",
+              "pref": 100,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "800::800",
+                "order": 2048,
+                "key_ht": "800",
+                "bkt": "0",
+                "not_in_hw": true,
+                "rule_hit": 294581,
+                "success": 294581,
+                "match": {
+                  "value": "c0a84002",
+                  "mask": "ffffffff",
+                  "offmask": "",
+                  "off": 12
+                },
+                "actions": [
+                  {
+                    "order": 1,
+                    "kind": "mirred",
+                    "mirred_action": "redirect",
+                    "direction": "egress",
+                    "to_dev": "bench_ing",
+                    "control_action": {
+                      "type": "stolen"
+                    },
+                    "index": 1,
+                    "ref": 1,
+                    "bind": 1,
+                    "installed": 310,
+                    "last_used": 0,
+                    "first_used": 219,
+                    "stats": {
+                      "bytes": 345024239,
+                      "packets": 294581,
+                      "drops": 0,
+                      "overlimits": 0,
+                      "requeues": 0,
+                      "backlog": 0,
+                      "qlen": 0
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "classification_filters": [
+            {
+              "protocol": "ip",
+              "pref": 1,
+              "kind": "u32",
+              "chain": 0
+            },
+            {
+              "protocol": "ip",
+              "pref": 1,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "800:",
+                "ht_divisor": 1
+              }
+            },
+            {
+              "protocol": "ip",
+              "pref": 1,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "800::800",
+                "order": 2048,
+                "key_ht": "800",
+                "bkt": "0",
+                "flowid": "1:2",
+                "not_in_hw": true,
+                "rule_hit": 294581,
+                "success": 20630,
+                "match": {
+                  "value": "0",
+                  "mask": "fe00",
+                  "offmask": "",
+                  "off": 0
+                }
+              }
+            },
+            {
+              "protocol": "ip",
+              "pref": 2,
+              "kind": "u32",
+              "chain": 0
+            },
+            {
+              "protocol": "ip",
+              "pref": 2,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "801:",
+                "ht_divisor": 1
+              }
+            },
+            {
+              "protocol": "ip",
+              "pref": 2,
+              "kind": "u32",
+              "chain": 0,
+              "options": {
+                "fh": "801::800",
+                "order": 2048,
+                "key_ht": "801",
+                "bkt": "0",
+                "flowid": "1:1",
+                "not_in_hw": true,
+                "rule_hit": 273951,
+                "success": 273951,
+                "match": {
+                  "value": "0",
+                  "mask": "0",
+                  "offmask": "",
+                  "off": 0
+                }
+              }
+            }
+          ],
+          "netem_qdiscs": [
+            {
+              "kind": "prio",
+              "handle": "1:",
+              "root": true,
+              "refcnt": 11,
+              "options": {
+                "bands": 3,
+                "priomap": [
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2,
+                  2
+                ],
+                "multiqueue": false
+              },
+              "bytes": 346363503,
+              "packets": 292230,
+              "drops": 2362,
+              "overlimits": 0,
+              "requeues": 0,
+              "backlog": 0,
+              "qlen": 0
+            },
+            {
+              "kind": "netem",
+              "handle": "10:",
+              "parent": "1:1",
+              "options": {
+                "limit": 100000,
+                "delay": {
+                  "delay": 0.001,
+                  "jitter": 0,
+                  "correlation": 0
+                },
+                "loss-random": {
+                  "loss": 0.25,
+                  "correlation": 0
+                },
+                "reorder": {
+                  "reorder": 0.7,
+                  "correlation": 0
+                },
+                "ecn": false,
+                "gap": 1
+              },
+              "bytes": 8347049,
+              "packets": 6685,
+              "drops": 2170,
+              "overlimits": 0,
+              "requeues": 4646,
+              "backlog": 0,
+              "qlen": 0
+            },
+            {
+              "kind": "netem",
+              "handle": "20:",
+              "parent": "1:2",
+              "options": {
+                "limit": 100000,
+                "loss-random": {
+                  "loss": 0.25,
+                  "correlation": 0
+                },
+                "ecn": false,
+                "gap": 0
+              },
+              "bytes": 225094,
+              "packets": 588,
+              "drops": 192,
+              "overlimits": 0,
+              "requeues": 0,
+              "backlog": 0,
+              "qlen": 0
+            }
+          ],
+          "netem_counters": {
+            "large": {
+              "transmitted_packets": 6685,
+              "dropped_packets": 2170,
+              "backlog_packets": 0,
+              "transmitted_bytes": 8347049,
+              "drop_fraction_completed_attempts": 0.2450592885375494,
+              "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+            },
+            "small": {
+              "transmitted_packets": 588,
+              "dropped_packets": 192,
+              "backlog_packets": 0,
+              "transmitted_bytes": 225094,
+              "drop_fraction_completed_attempts": 0.24615384615384617,
+              "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+            }
+          },
+          "rp_filter": {
+            "all": "0",
+            "eth0": "0",
+            "bench_rx": "0"
+          }
+        },
+        "measured_phase_counters": {
+          "small": {
+            "transmitted_packets": 585,
+            "dropped_packets": 191,
+            "drop_fraction_completed_attempts": 0.24613402061855671,
+            "backlog_before_packets": 0,
+            "backlog_after_packets": 0,
+            "scope": "completed attempts after minus before; includes before-snapshot queued packets if any"
+          },
+          "large": {
+            "transmitted_packets": 6619,
+            "dropped_packets": 2149,
+            "drop_fraction_completed_attempts": 0.24509580291970803,
+            "backlog_before_packets": 0,
+            "backlog_after_packets": 0,
+            "scope": "completed attempts after minus before; includes before-snapshot queued packets if any"
+          }
+        }
+      },
+      "start_utc": "2026-10-13T12:40:27.575925+00:00",
+      "start_monotonic_s": 1231.149240937,
+      "client_alive_end": false,
+      "client_identity_changed": false,
+      "end_utc": "2026-10-13T12:40:46.688475+00:00",
+      "end_monotonic_s": 1250.261849112,
+      "observed_duration_s": 19.11255,
+      "windows_start_utc": "2026-10-13T12:40:26.600573+00:00",
+      "windows_end_utc": "2026-10-13T12:40:45.713123+00:00",
+      "receiver_retention": {
+        "peak_chunks": 3252,
+        "peak_span": 3262,
+        "peak_owned_bytes": 3676913,
+        "page_allocations": 1136,
+        "buffered_chunks": 3252,
+        "buffered_bytes": 3676913,
+        "unread_stream_bytes": 0,
+        "byte_limit": 40370176,
+        "allocated_pages": 14,
+        "recv_failed": 1
+      },
+      "terminal_logs": [
+        "[12:40:46:514] [10727:000029ee] [ERROR][com.freerdp.core.rdpeudp] - [rdpeudp_check_stream_health]: UDP reassembly stalled for 16856 ms: expected channel 6297, buffered=3252, DataSeq base=7cb0; reconnect required"
+      ],
+      "monotonic_observed_duration_s": 19.112608174999878,
+      "counter_samples": 0,
+      "cross_boundary_samples": 1,
+      "counter_errors": [],
+      "metrics": {
+        "server_udp_bandwidth": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_udp_sent_rate": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_udp_rtt_ms": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_loss_percent": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_retransmission_percent": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_output_fps": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_skipped_network_fps": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "verified_goodput_mbps": null,
+      "physical_client_fps": null
+    },
+    {
+      "id": "loss50",
+      "loss_percent": 50.0,
+      "requested_s": 120.0,
+      "outcome": "NOT_RUN",
+      "client_exit_code": null,
+      "counter_samples": 0,
+      "cross_boundary_samples": 0,
+      "counter_errors": [
+        "no measured time interval"
+      ],
+      "metrics": {
+        "server_udp_bandwidth": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_udp_sent_rate": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_udp_rtt_ms": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_loss_percent": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_retransmission_percent": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_output_fps": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_skipped_network_fps": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "verified_goodput_mbps": null,
+      "physical_client_fps": null
+    },
+    {
+      "id": "loss70",
+      "loss_percent": 70.0,
+      "requested_s": 120.0,
+      "outcome": "NOT_RUN",
+      "client_exit_code": null,
+      "counter_samples": 0,
+      "cross_boundary_samples": 0,
+      "counter_errors": [
+        "no measured time interval"
+      ],
+      "metrics": {
+        "server_udp_bandwidth": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_udp_sent_rate": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_udp_rtt_ms": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_loss_percent": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_retransmission_percent": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_output_fps": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        },
+        "server_skipped_network_fps": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "min": null,
+          "max": null
+        }
+      },
+      "verified_goodput_mbps": null,
+      "physical_client_fps": null
+    }
+  ],
+  "counter_phase_alignment": "UNKNOWN",
+  "notes": [
+    "Server output FPS is not the rate of frames physically displayed on the client.",
+    "Server UDP bandwidth is not verified goodput; that remains null.",
+    "Missing counters, ambiguous instances and PDH errors remain unknown, never zero.",
+    "Samples overlapping the beginning of a step are excluded from that step.",
+    "Cross-host phase alignment depends on campaign.clock_alignment evidence.",
+    "Client survival is separate from active UDP tunnel evidence."
+  ]
+}
