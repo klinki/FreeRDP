@@ -32,6 +32,60 @@ def validate_profile(p):
 def identifier(value):
     if not isinstance(value,str) or not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*',value):raise ValueError('invalid case/variant identifier')
 
+def endpoint_result(path):
+    """Retain a failed trial even when an endpoint cannot publish valid JSON."""
+    try:
+        value=read_json(path)
+        if not isinstance(value,dict) or not isinstance(value.get('completed'),bool):
+            raise ValueError('endpoint result must contain a boolean completed field')
+        if not isinstance(value.get('counters',{}),dict):raise ValueError('invalid endpoint counters')
+        for name in ('native_stats','queue_stats'):
+            if value.get(name) is not None and not isinstance(value[name],dict):raise ValueError('invalid endpoint '+name)
+        for name in ('probe_rtt_ms','probe_scheduled_ms','send_call_ms','delivery_gap_ms','loss_trace'):
+            if name in value and not isinstance(value[name],dict):raise ValueError('invalid endpoint '+name)
+        queue=value.get('queue_stats') or {}
+        for name in ('fields','summaries'):
+            if name in queue and not isinstance(queue[name],dict):raise ValueError('invalid queue '+name)
+        if queue.get('clock_alignment') is not None and not isinstance(queue['clock_alignment'],dict):
+            raise ValueError('invalid queue clock alignment')
+        if 'reasons' in queue and (not isinstance(queue['reasons'],list) or any(not isinstance(x,str) for x in queue['reasons'])):
+            raise ValueError('invalid queue reasons')
+        for name,summary in queue.get('summaries',{}).items():
+            if not isinstance(summary,dict):raise ValueError('invalid queue summary '+name)
+            for quantile in ('p50','p95','p99'):
+                bounds=summary.get(quantile+'_bounds')
+                if bounds is not None and (not isinstance(bounds,list) or len(bounds)!=2 or any(
+                        not isinstance(x,(int,float)) or isinstance(x,bool) or not math.isfinite(x) for x in bounds)):
+                    raise ValueError('invalid queue bounds '+name)
+        if 'loss_trace' in value and not isinstance(value['loss_trace'].get('native',{}),dict):
+            raise ValueError('invalid native loss trace')
+        if value.get('error') is not None and not isinstance(value['error'],str):raise ValueError('invalid endpoint error')
+        for name in ('telemetry_errors','cleanup_errors'):
+            if name in value and (not isinstance(value[name],list) or any(
+                    not isinstance(x,(str,dict)) for x in value[name])):
+                raise ValueError('invalid endpoint '+name)
+        if value['completed']:
+            counters=value['counters']
+            for name in ('sent_bytes','received_bytes','measured_bytes','probes_expected',
+                         'probes_injected','probes_observed','probes_not_injected'):
+                if isinstance(counters.get(name),bool) or not isinstance(counters.get(name),int) or counters[name]<0:
+                    raise ValueError('invalid endpoint counter '+name)
+            for name in ('sent_sha256','received_sha256'):
+                if not isinstance(value.get(name),str) or not re.fullmatch('[0-9a-f]{64}',value[name]):
+                    raise ValueError('invalid endpoint hash '+name)
+        return value
+    except FileNotFoundError:
+        return {'completed':False,'error':'missing endpoint result'}
+    except (ValueError,OSError,TypeError) as e:
+        return {'completed':False,'error':'invalid endpoint result: '+repr(e),'result_read_error':True}
+
+def native_transport_failed(result,driver):
+    if driver!='native':return False
+    stats=result.get('native_stats') or {}
+    error=result.get('error') or ''
+    return bool(stats.get('send_failed') or stats.get('receive_failed') or
+                'production send failed:' in error or 'production receive failed / unhealthy stream' in error)
+
 def one_trial(variant,case,profile,config,seed,folder,driver='native',calibration=None,netns=None,direct=False):
     identifier(case['id']);identifier(variant['id'])
     validate_profile(profile)
@@ -66,6 +120,7 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
         'comparison_key':digest(invariants),'calibration':calibration,'scope':'raw-udp2-steady-state-no-TLS-no-handshake' if driver=='native' else 'HARNESS_CALIBRATION_ONLY'}
     write_json(folder/'manifest.json',manifest)
     log=Journal(folder/'timeline.jsonl'); processes=[];fds=[];relay=None;shape=None;error=None;interrupted=False
+    process_outcomes=[]
     roles={'upload':('bulk','sink'),'download':('sink','bulk'),'duplex':('duplex','duplex'),
            'probe':('probe','echo'),'mixed':('mixed_probe','bulk'),
            'upload_mixed':('bulk_probe','sink')}
@@ -113,9 +168,11 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
         for p in processes:p.stdin.write(json.dumps(control)+'\n');p.stdin.flush()
         sleep_until(end)
         for i,p in enumerate(processes):
+            timed_out=False
             try:p.wait(timeout=max(0,(end+15_000_000_000-time.monotonic_ns())/1e9))
-            except subprocess.TimeoutExpired:p.kill();p.wait();error='SUT_OR_DRIVER_HANG'
-            if p.returncode:error=f'endpoint {i} exited {p.returncode}'
+            except subprocess.TimeoutExpired:p.kill();p.wait();timed_out=True
+            process_outcomes.append({'endpoint':i,'returncode':p.returncode,
+                                     'timed_out':timed_out,'terminated_by_runner':timed_out})
         if netns:
             shape={'engine':'linux-netem','note':'Read qdisc counters and independent calibration receipt; no Python relay scheduling involved.'}
             for ns,key in [(netns['router_ns'],'router')]:
@@ -134,13 +191,27 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
         log.close()
     results=[]
     for i in range(2):
-        p=folder/f'endpoint-{i}.result.json';results.append(read_json(p) if p.exists() else {'completed':False,'error':'missing endpoint result'})
-    reasons=[];sut_failures=[];integrity_failures=[]
+        results.append(endpoint_result(folder/f'endpoint-{i}.result.json'))
+    reasons=[];sut_failures=[];integrity_failures=[];telemetry_notes=[]
     if error:reasons.append(error)
-    for r in results:
+    for outcome in process_outcomes:
+        index=outcome['endpoint']
+        if outcome['timed_out']:reasons.append(f'endpoint {index}: SUT_OR_DRIVER_HANG (runner terminated process)')
+        elif outcome['returncode']:
+            detail=f"endpoint {index} exited {outcome['returncode']}: {results[index].get('error','unknown error')}"
+            if native_transport_failed(results[index],driver):sut_failures.append(detail)
+            else:reasons.append(detail)
+    for i,r in enumerate(results):
+        if r.get('result_read_error'):reasons.append(f"endpoint {i}: {r['error']}")
+        for name in ('telemetry_errors','cleanup_errors'):
+            reasons.extend(f'endpoint {i} {name}: '+str(note) for note in r.get(name,[]))
         if not r.get('completed'):integrity_failures.append(r.get('error','incomplete endpoint'))
         if r.get('queue_stats') and not r['queue_stats'].get('valid'):
-            reasons.extend('queue telemetry: '+note for note in r['queue_stats'].get('reasons',['invalid observation']))
+            for note in r['queue_stats'].get('reasons',['invalid observation']):
+                message='queue telemetry: '+note
+                if native_transport_failed(r,driver) and note=='measurement cohort bytes remain unobserved after drain':
+                    telemetry_notes.append(message+' (terminal transport failure)')
+                else:reasons.append(message)
         if r.get('loss_trace') and not r['loss_trace'].get('valid'):
             reasons.append('application loss trace overflow')
     if loss_trace and results[0].get('completed'):
@@ -181,6 +252,7 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
     metrics={}
     for i,r in enumerate(results):
         prefix='client' if i==0 else 'server'
+        for name,value in (r.get('native_stats') or {}).items():metrics[prefix+'.native_stats.'+name]=value
         metrics[prefix+'.goodput_mbps']=r.get('goodput_mbps')
         metrics[prefix+'.cpu_total_s']=r.get('cpu_total_s')
         metrics[prefix+'.probe_timeouts']=r.get('probe_timeouts')
@@ -219,9 +291,11 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
                     metrics[direction+'.ack_feedback.'+name+'.'+q]=feedback.get(name,{}).get(q)
     metrics['c2s.verified_goodput_mbps']=results[1].get('goodput_mbps') if integrity_verified else None
     metrics['s2c.verified_goodput_mbps']=results[0].get('goodput_mbps') if integrity_verified else None
-    summary={'version':1,'suite':'type1','trial_id':manifest['trial_id'],'case_id':case['id'],'variant':variant['id'],
+    summary={'version':1,'suite':'type1','trial_id':manifest['trial_id'],'case_id':case['id'],'profile_id':case['profile'],'variant':variant['id'],
              'seed':seed,'commit':manifest['source_commit'],'binary_sha256':manifest['binary_sha256'],'comparison_key':manifest['comparison_key'],'validity':validity,'sut_outcome':'FAIL' if sut_failures else 'COMPLETE',
-             'integrity_verified':integrity_verified,'reasons':reasons,'calibration_notes':calibration_notes,'sut_failures':sut_failures,'metrics':metrics,'scope':manifest['scope'],'utc':env['utc']}
+             'integrity_verified':integrity_verified,'reasons':reasons,'calibration_notes':calibration_notes,'sut_failures':sut_failures,
+             'endpoint_termination':process_outcomes,'telemetry_notes':telemetry_notes,
+             'metrics':metrics,'scope':manifest['scope'],'utc':env['utc']}
     write_json(folder/'summary.json',summary);seal(folder)
     if interrupted:raise KeyboardInterrupt
     return summary

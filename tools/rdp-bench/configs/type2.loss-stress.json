@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "phase": "main",
+  "warmup_s": 5,
+  "measure_s": 60,
+  "response_timeout_s": 3,
+  "seeds": [
+    11,
+    29,
+    47,
+    71,
+    101
+  ],
+  "source_fps": 30,
+  "scroll_px_s": 400,
+  "probe_hz": 2,
+  "injection_budget_ms": 50,
+  "cases": [
+    {
+      "id": "text-loss-control",
+      "scene": "text-scroll",
+      "profile": "ten_mbit"
+    },
+    {
+      "id": "text-loss25",
+      "scene": "text-scroll",
+      "profile": "ten_mbit_loss25"
+    },
+    {
+      "id": "text-loss50",
+      "scene": "text-scroll",
+      "profile": "ten_mbit_loss50"
+    },
+    {
+      "id": "text-loss70",
+      "scene": "text-scroll",
+      "profile": "ten_mbit_loss70"
+    }
+  ],
+  "notes": "Candidate-only live high-loss stress campaign: use a variants file containing one production-default candidate, with no queue override. UDP loss applies independently to each direction, including ACKs and retransmissions; TCP shaping depends on the configured network adapter. Retain connection/setup failures, reconnects, missed injections and response timeouts. This suite requires the same live VM, foreground and display preflight as other type2 runs."
+}

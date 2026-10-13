@@ -1,6 +1,13 @@
 # FreeRDP transport benchmark
 
 This integrates the transport-only portion of `~/Downloads/rdp_bench_suite.zip`.
+
+Severe-loss stress suites add 25%, 50% and 70% independent loss in both
+directions, with the original 10 Mbit/s profile as a control. See
+[the matrix, failure semantics and commands](docs/LOSS-STRESS-20261013.md).
+`configs/type1.loss-stress.json` runs native bulk plus probes;
+`configs/type2.loss-stress.json` prepares the corresponding live text workload.
+Use one candidate variant; production queue and retry defaults are unchanged.
 It runs the actual `rdpeudp.c` reliable UDP2 sender/receiver through real local
 sockets, in two independent processes. No Windows machine is required. Python
 3.9+ and a POSIX shared-library build are required; the Python harness uses only

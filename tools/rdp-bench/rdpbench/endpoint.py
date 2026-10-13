@@ -75,40 +75,59 @@ class PlainUDP:
 
 def run(c):
     out=Journal(c['events']);driver=None;error=None
+    start=measure=stop=end=cpu_start=None;exit_ns=failure_ns=None;bounds_ready=False
+    operation={'operation':'initialization'};telemetry_errors=[];cleanup_errors=[]
     observer_enabled=os.environ.get('RDP_BENCH_OBSERVER','1')!='0'
     trace=CallTrace() if os.environ.get('RDP_BENCH_LOSS_TRACE')=='1' else None
     def emit(kind,**data):
         if observer_enabled or kind in ('phase','endpoint_error','probe_timeout','probe_not_injected'):
             out.emit(kind,**data)
     counters={'sent_bytes':0,'received_bytes':0,'measured_bytes':0,'sent_records':0,'received_records':0,
-              'probes_expected':0,'probes_injected':0,'probes_observed':0,'probes_not_injected':0,'unexpected_order':0}
+              'probes_expected':0,'probes_injected':0,'probes_observed':0,'probes_not_injected':0,'unexpected_order':0,
+              'probes_admitted':0,'probe_send_failures':0,'probes_unserved_after_failure':0}
     parser=Parser();payload=random.Random(c['seed']).randbytes(c['payload_bytes'])
     sent_hash=hashlib.sha256();recv_hash=hashlib.sha256()
     last_rx=0;gaps=[];probe_delays=[];scheduled_delays=[];send_block=[]
     received_probes=set();pending={};seq=0;expected_seq=0;next_bulk=0;probe_index=0
+    probes=c['role'] in ('probe','mixed_probe','bulk_probe');next_probe=None;interval=0
+    def snapshot(name,method):
+        try:return method()
+        except Exception as e:
+            telemetry_errors.append({'operation':name,'error':repr(e),'observed_ns':time.monotonic_ns()})
+            return None
     try:
         cls=PlainUDP if c['driver']=='udp-calibration' else Native
         args=[c['bind'],c['port'],c['peer'],c['peer_port']]
         if cls is Native:args.insert(0,c['library'])
         driver=cls(*args)
         print(json.dumps({'type':'ready','pid':os.getpid()}),flush=True)
+        operation={'operation':'control'}
         control=json.loads(sys.stdin.readline())
         start=control['start_ns'];measure=control['measure_ns'];stop=control['stop_ns'];end=control['end_ns']
-        driver.configure_queue_measurement(measure,stop)
-        if trace and hasattr(driver,'configure_loss_trace'):driver.configure_loss_trace()
+        if not all(isinstance(x,int) and not isinstance(x,bool) for x in (start,measure,stop,end)) or not start<=measure<stop<end:
+            raise ValueError('invalid endpoint clock bounds')
         interval=int(1e9/c['probe_hz']) if c['probe_hz'] else 0
-        sends_bulk=c['role'] in ('bulk','duplex','bulk_probe');probes=c['role'] in ('probe','mixed_probe','bulk_probe')
+        sends_bulk=c['role'] in ('bulk','duplex','bulk_probe')
         counters['probes_expected']=max(0,(stop-start+interval-1)//interval) if probes else 0
-        next_bulk=start;next_sample=start;next_probe=start
+        next_bulk=start;next_sample=start;next_probe=start;bounds_ready=True
+        operation={'operation':'configure_queue_measurement'}
+        driver.configure_queue_measurement(measure,stop)
+        if trace and hasattr(driver,'configure_loss_trace'):
+            operation={'operation':'configure_loss_trace'};driver.configure_loss_trace()
         cpu_start=time.process_time_ns();sleep_until(start)
         phases=[('start',start),('measure',measure),('drain',stop)]
         def send(b,kind,record_id):
+            nonlocal operation
+            operation={'operation':'send','call_kind':kind,'record_id':record_id,'bytes':len(b)}
             a=time.monotonic_ns()
             try:driver.send(b)
+            except BaseException:
+                operation['admission']='unknown_after_failed_call'
+                raise
             finally:
                 btime=time.monotonic_ns()
                 if trace:trace.call(kind,record_id,len(b),a,btime)
-            if measure<=a<stop:send_block.append((btime-a)/1e6)
+                if measure<=a<stop:send_block.append((btime-a)/1e6)
         previous_loop_end=time.monotonic_ns()
         while time.monotonic_ns()<end:
             now=time.monotonic_ns()
@@ -127,11 +146,19 @@ def run(c):
                                        last_slow_call=trace.last_slow_call)
                     counters['probes_not_injected']+=1;probe_index+=1;next_probe=start+probe_index*interval
                 if next_probe<stop:
-                    injected=time.monotonic_ns();pending[probe_index]=(next_probe,injected)
-                    emit('probe_injected',id=probe_index,scheduled_ns=next_probe,injected_ns=injected)
-                    if trace:trace.add('probe_injected',id=probe_index,scheduled_ns=next_probe,injected_ns=injected)
-                    send(record(1,probe_index,next_probe,injected,b'P'*64),'probe',probe_index);counters['probes_injected']+=1
-                    probe_index+=1;next_probe=start+probe_index*interval
+                    injected=time.monotonic_ns();probe_id=probe_index;scheduled=next_probe
+                    pending[probe_id]=(scheduled,injected)
+                    # Injection means a call was attempted, not admission or delivery.
+                    # Advance before calling: a terminal send can fail after accepting bytes.
+                    counters['probes_injected']+=1;probe_index+=1;next_probe=start+probe_index*interval
+                    emit('probe_injected',id=probe_id,scheduled_ns=scheduled,injected_ns=injected)
+                    if trace:trace.add('probe_injected',id=probe_id,scheduled_ns=scheduled,injected_ns=injected)
+                    try:send(record(1,probe_id,scheduled,injected,b'P'*64),'probe',probe_id)
+                    except BaseException:
+                        counters['probe_send_failures']+=1
+                        emit('probe_send_failed',id=probe_id,admission='unknown_after_failed_call')
+                        raise
+                    counters['probes_admitted']+=1
             now=time.monotonic_ns()
             if sends_bulk and now<stop and now>=next_bulk:
                 send(record(0,seq,now,now,payload),'bulk',seq);seq+=1;counters['sent_records']+=1
@@ -140,12 +167,14 @@ def run(c):
                 if rate:
                     next_bulk+=int((H.size+len(payload))*8*1000/rate)
                     # The deficit is observable; do not silently reset next_bulk to now.
-            read_start=time.monotonic_ns() if trace else 0
-            b=driver.read(0 if sends_bulk and time.monotonic_ns()<stop else 5)
-            if trace:trace.call('read',None,len(b),read_start,time.monotonic_ns())
+            operation={'operation':'read'};read_start=time.monotonic_ns();b=b''
+            try:b=driver.read(0 if sends_bulk and time.monotonic_ns()<stop else 5)
+            finally:
+                if trace:trace.call('read',None,len(b),read_start,time.monotonic_ns())
             if b:
-                read_at=time.monotonic_ns()
+                operation={'operation':'parse'};read_at=time.monotonic_ns()
                 for kind,i,sched,inj,p in parser.feed(b,measure<=read_at<stop):
+                    operation={'operation':'parse','record_kind':kind,'record_id':i}
                     received=time.monotonic_ns()
                     if kind==0:
                         if i!=expected_seq:
@@ -172,7 +201,7 @@ def run(c):
                 counters['measured_bytes']=parser.measured_payload_bytes
             elif not sends_bulk:pass # read() already waited
             if observer_enabled and now>=next_sample:
-                out.emit('sample',counters=dict(counters),transport=driver.stats(),process_cpu_ns=time.process_time_ns(),rss_raw=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+                out.emit('sample',counters=dict(counters),transport=snapshot('native_stats',driver.stats),process_cpu_ns=time.process_time_ns(),rss_raw=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
                 next_sample+=1_000_000_000
             if sends_bulk and c.get('offered_mbps',0) and now<next_bulk and not b:
                 time.sleep(min(.001,(next_bulk-now)/1e9))
@@ -181,49 +210,82 @@ def run(c):
                 trace.add('owner_iteration',start_ns=loop_start,end_ns=previous_loop_end,
                           duration_ns=previous_loop_end-loop_start)
         emit('phase',name='end',planned_ns=end)
-        if last_rx:gaps.append(max(0,stop-last_rx)/1e6) # include final censored stall
-        elif c['role'] in ('sink','duplex','mixed_probe'):gaps.append((stop-measure)/1e6)
-        if probes:
-            while next_probe<stop:
-                emit('probe_not_injected',id=probe_index,scheduled_ns=next_probe,reason='never_serviced')
-                if trace:trace.add('probe_not_injected',id=probe_index,scheduled_ns=next_probe,
-                                   observed_ns=time.monotonic_ns(),reason='never_serviced',last_call=trace.last_call)
-                counters['probes_not_injected']+=1;probe_index+=1;next_probe=start+probe_index*interval
-        for i,(s,a) in pending.items():emit('probe_timeout',id=i,scheduled_ns=s,injected_ns=a,deadline_ns=end)
+    except BaseException as e:
+        error=repr(e);failure_ns=time.monotonic_ns()
+        out.emit('endpoint_error',error=error,operation=operation,failure_ns=failure_ns)
+    finally:
+        exit_ns=time.monotonic_ns()
+        if bounds_ready:
+            observed_stop=min(stop,max(measure,exit_ns))
+            if observed_stop>measure:
+                if last_rx:gaps.append(max(0,observed_stop-last_rx)/1e6)
+                elif c['role'] in ('sink','duplex','mixed_probe'):gaps.append((observed_stop-measure)/1e6)
+            if probes:
+                while next_probe<stop:
+                    reason='endpoint_failure' if error else 'never_serviced'
+                    emit('probe_not_injected',id=probe_index,scheduled_ns=next_probe,reason=reason)
+                    if trace:trace.add('probe_not_injected',id=probe_index,scheduled_ns=next_probe,
+                                       observed_ns=exit_ns,reason=reason,last_call=trace.last_call)
+                    counters['probes_not_injected']+=1
+                    if error:counters['probes_unserved_after_failure']+=1
+                    probe_index+=1;next_probe=start+probe_index*interval
+        # Early termination leaves attempted calls unobserved; it does not invent
+        # deadline expirations for probes whose drain deadline has not arrived.
+        deadline_reached=bounds_ready and exit_ns>=end
+        for i,(s,a) in pending.items():
+            emit('probe_timeout' if deadline_reached else 'probe_unobserved',id=i,
+                 scheduled_ns=s,injected_ns=a,deadline_ns=end,observed_ns=exit_ns,
+                 reason='drain_deadline' if deadline_reached else 'endpoint_terminated')
         counters['measured_bytes']=parser.measured_payload_bytes
         result={'version':1,'driver':c['driver'],'scope':'raw-udp2-steady-state' if c['driver']=='native' else 'HARNESS_CALIBRATION_ONLY',
                 'role':c['role'],'observer_enabled':observer_enabled,'counters':counters,'incomplete_record_bytes':len(parser.buf),
                 'sent_sha256':sent_hash.hexdigest(),'received_sha256':recv_hash.hexdigest(),
-                'goodput_mbps':counters['measured_bytes']*8/(stop-measure)*1000,
+                'goodput_mbps':counters['measured_bytes']*8/(stop-measure)*1000 if bounds_ready else None,
+                'goodput_scope':'CRC-validated record payload observed before exit; planned measurement denominator; complete-stream integrity requires peer audit',
                 'probe_rtt_ms':timing_summary(probe_delays),'probe_scheduled_ms':timing_summary(scheduled_delays),
+                'latency_scope':'observed responses to probes scheduled during measurement; survivor-only, excludes unobserved probes',
+                'probe_count_scope':'all probes scheduled from warmup start through measurement stop',
                 'send_call_ms':timing_summary(send_block),'delivery_gap_ms':timing_summary(gaps),
-                'probe_timeouts':len(pending),'cpu_total_s':(time.process_time_ns()-cpu_start)/1e9,
-                'measurement_s':(stop-measure)/1e9,'native_stats':driver.stats(),'queue_stats':driver.queue_stats(),'completed':True}
-    except BaseException as e:
-        error=repr(e);out.emit('endpoint_error',error=error)
-        result={'version':1,'driver':c['driver'],'completed':False,'error':error,'counters':counters}
-    finally:
+                'probe_timeouts':len(pending) if deadline_reached else 0,'probes_pending_at_exit':len(pending),
+                'probe_unobserved':len(pending),'cpu_total_s':(time.process_time_ns()-cpu_start)/1e9 if cpu_start is not None else None,
+                'measurement_s':(stop-measure)/1e9 if bounds_ready else None,
+                'measurement_observed_s':(min(stop,max(measure,exit_ns))-measure)/1e9 if bounds_ready else None,
+                'native_stats':snapshot('native_stats',driver.stats) if driver else None,
+                'queue_stats':snapshot('queue_stats',driver.queue_stats) if driver else None,
+                'telemetry_errors':telemetry_errors,'cleanup_errors':cleanup_errors,'completed':error is None}
+        if error:
+            result['error']=error
+            result['terminal']={**operation,'error':error,'failure_ns':failure_ns,
+                                'since_trial_start_ms':(failure_ns-start)/1e6 if bounds_ready else None,
+                                'since_measurement_start_ms':(failure_ns-measure)/1e6 if bounds_ready else None}
         if trace:
-            app_path=c['events']+'.loss-calls.jsonl';write_ledger(app_path,trace.records)
             try:
-                native=driver.loss_trace() if hasattr(driver,'loss_trace') else {
-                    'available':False,'valid':False,'reasons':['native loss trace ABI unavailable'],'rows':[]}
+                app_path=c['events']+'.loss-calls.jsonl';write_ledger(app_path,trace.records)
+                try:
+                    native=driver.loss_trace() if hasattr(driver,'loss_trace') else {
+                        'available':False,'valid':False,'reasons':['native loss trace ABI unavailable'],'rows':[]}
+                except Exception as e:
+                    native={'available':False,'valid':False,'reasons':['native loss trace export failed: '+repr(e)],'rows':[]}
+                native_path=c['events']+'.loss-native.jsonl'
+                fields=native.get('fields',[]);names=native.get('event_names',{})
+                def native_records():
+                    for row in native.get('rows',[]):
+                        value=dict(zip(fields,row));event=value.get('event')
+                        value['event_name']=(names[event] if isinstance(names,list) and isinstance(event,int) and 0<=event<len(names)
+                                             else names.get(str(event),names.get(event,str(event))) if isinstance(names,dict) else str(event))
+                        yield value
+                write_ledger(native_path,native_records())
+                result['loss_trace']=dict(trace.summary(),call_ledger=os.path.basename(app_path),
+                                          native_ledger=os.path.basename(native_path),
+                                          native={key:value for key,value in native.items() if key!='rows'})
             except Exception as e:
-                native={'available':False,'valid':False,'reasons':['native loss trace export failed: '+repr(e)],'rows':[]}
-            native_path=c['events']+'.loss-native.jsonl'
-            fields=native.get('fields',[]);names=native.get('event_names',{})
-            def native_records():
-                for row in native.get('rows',[]):
-                    value=dict(zip(fields,row));event=value.get('event')
-                    value['event_name']=(names[event] if isinstance(names,list) and isinstance(event,int) and 0<=event<len(names)
-                                         else names.get(str(event),names.get(event,str(event))) if isinstance(names,dict) else str(event))
-                    yield value
-            write_ledger(native_path,native_records())
-            result['loss_trace']=dict(trace.summary(),call_ledger=os.path.basename(app_path),
-                                      native_ledger=os.path.basename(native_path),
-                                      native={key:value for key,value in native.items() if key!='rows'})
-        if driver:driver.close()
-        out.close()
+                telemetry_errors.append({'operation':'loss_trace_export','error':repr(e),'observed_ns':time.monotonic_ns()})
+                result['loss_trace']=dict(trace.summary(),valid=False,reasons=['loss trace export failed: '+repr(e)])
+        if driver:
+            try:driver.close()
+            except Exception as e:cleanup_errors.append({'operation':'driver_close','error':repr(e)})
+        try:out.close()
+        except Exception as e:cleanup_errors.append({'operation':'journal_close','error':repr(e)})
     write_json(c['result'],result)
     return 1 if error else 0
 
