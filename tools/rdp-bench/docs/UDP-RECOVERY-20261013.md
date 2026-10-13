@@ -37,6 +37,10 @@ bug is repaired for future traces. This reference is diagnostic evidence,
 not a controlled FPS baseline: enabled tracing hashes/copies events under
 the lock and exports JSON on failure.
 
+The reference also has one provider error near the end of its measured phase;
+it remains a separate counter-error event. Its one valid contained FPS interval
+is retained without treating missing/error observations as zero.
+
 ## Recovery invariant
 
 The [receiver-window rules](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp2/0490fcf0-75fa-4362-a6c8-496732bce39b)
@@ -52,6 +56,10 @@ keep normal receipt and gap checks constant-time. It retains holes rather
 than sliding them out because of higher arrivals. Initial far-start
 compatibility remains explicitly restricted to the first DATA before
 AckOfAcks establishes the epoch.
+
+The receipt metadata has a fixed 512 KiB cost per UDP association. This
+replaces window copying/scanning with indexed receipt/history access; the
+separate lazy channel-payload map and its existing budget remain unchanged.
 
 Each ACK vector represents a truthful prefix within the 127-coded-byte
 wire limit. Its timestamp describes the highest positive receipt actually
@@ -120,6 +128,55 @@ p95/p99 latency.
 [CSV](../results/recovery-20261013.csv) and
 [readable results](../results/recovery-20261013.md) preserve every outcome.
 
+The candidate built from `189cc1b88` completed all three steps in one session:
+
+| Loss | Measured seconds | Server output FPS mean (valid intervals) | Actual small / large completed drop fraction | Recovery outcome |
+|---:|---:|---:|---:|---|
+| 25% | 120.002 | 7.808 (11) | 25.041% / 25.061% | Complete |
+| 50% | 120.002 | 6.084 (11) | 49.907% / 49.982% | Complete |
+| 70% | 120.005 | 4.574 (11) | 70.349% / 70.038% | Complete |
+
+There was no channel-gap, receive-budget, allocation or retry-exhaustion
+terminal failure. Teardown reported `recv_failed=0`, zero retained/unread
+bytes, and a whole-session peak of 611 chunks / 643-channel span /
+722,709 owned payload bytes. Those peaks include warmup and all three steps;
+they are not per-phase peaks. Both captures had zero kernel drops, with
+1,597,828 pre-impairment and 529,456 post-impairment records. The source filter
+and child qdisc counters establish actual loss treatment.
+
+The client was deliberately stopped after the measured ramp and owned
+Windows workload cleanup. Its exit code 145 is recorded as a planned stop,
+not a failed step. Existing teardown diagnostics about auto-reset events,
+an invalid window and terminal `tcsetattr` are retained in the raw log;
+they occurred after the three measured intervals. No fresh-session retries
+were needed. The traced reference's 26.149-second failure remains retained
+and is not substituted into a controlled FPS comparison.
+
+This is one unseeded campaign, establishing recovery for these exercised
+intervals. It does not estimate rare-failure probability or prove a throughput
+gain. The low/zero sampled server RTT values remain raw provider observations;
+they do not become network or input-to-display latency claims. Verified
+application goodput and input-to-display p95/p99 stay unavailable for this
+server-counter method.
+
+An independent streaming audit decoded all 2,127,284 capture records with
+zero visible-header errors. It also matched a real repair at each loss level:
+
+| Loss | Channel | Lost original → fresh retry DataSeq | Original offer to fresh retry offer | Actual positive client ACK packet |
+|---:|---|---|---:|---:|
+| 25% | `926e` | `977a` → `978d` | 10.573 ms | 6,466 |
+| 50% | `19a5` | `51f6` → `5218` | 12.339 ms | 548,331 |
+| 70% | `c5b3` | `afd9` → `b00c` | 12.280 ms | 1,076,199 |
+
+Each selected original is absent from the full post-loss capture; its retry
+has a unique post-loss match with the same channel, body length and captured
+ciphertext-prefix hash. The outgoing ACK explicitly marks the fresh retry
+positive. This proves observed transport repair beyond process survival.
+These selected retransmission intervals are not a latency distribution or p95/p99.
+The [packet summary](../results/recovery-candidate-packet-summary-20261013.json)
+retains sequence epochs, hashes, exact packet/ACK references and qualifications;
+snap-truncated ciphertext does not establish complete application-byte integrity.
+
 ## Regression coverage
 
 The native receiver cases inspect actual emitted ACK fields while DataSeq 1
@@ -142,3 +199,9 @@ The seven native transport/command-line targets passed in 3.56 seconds;
 all 280 Python tests passed with the actual development native library.
 The production Linux X11 client also built successfully with benchmark
 instrumentation disabled by default.
+
+A separate actual-clock ARM/failure smoke retained six ordered events with
+zero trace drops and a valid strict audit. Its successful ACK vector kept
+missing DataSeq 1 pending, with no automatic slide. The watchdog was exercised
+by an explicitly simulated seventeen-second clock advance; this is a native
+functional check, not another Windows measurement.

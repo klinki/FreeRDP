@@ -1,0 +1,959 @@
+{
+  "schema": "freerdp.udp2_recovery_windows_campaign",
+  "version": 1,
+  "source_commit": "189cc1b8818b13026285e783d8c8975352d778ad",
+  "validation": {
+    "native_targets_passed": 7,
+    "python_tests_passed": 280,
+    "production_linux_build": "PASS",
+    "corrected_native_arm_smoke": "PASS"
+  },
+  "planned_loss_percent": [
+    25,
+    50,
+    70
+  ],
+  "requested_seconds_per_step": 120,
+  "causal_proof": "recovery-causal-proof-20261013.json",
+  "candidate_packet_evidence": "recovery-candidate-packet-summary-20261013.json",
+  "all_requested_levels_exercised": true,
+  "trials": [
+    {
+      "trial": "ref25",
+      "trial_kind": "diagnostic reference",
+      "loss_percent": 25.0,
+      "outcome": "SESSION_ENDED",
+      "client_exit_code": 147,
+      "observed_duration_s": 26.149331845000006,
+      "receiver_retention": {
+        "peak_chunks": 3686,
+        "peak_span": 3688,
+        "peak_owned_bytes": 4125452,
+        "page_allocations": 432,
+        "buffered_chunks": 3686,
+        "buffered_bytes": 4125452,
+        "unread_stream_bytes": 0,
+        "byte_limit": 40370176,
+        "allocated_pages": 16,
+        "recv_failed": 1
+      },
+      "receiver_retention_scope": "whole session including warmup, not per loss phase",
+      "terminal_logs": [
+        "[14:38:52:083] [10597:0000296c] [ERROR][com.freerdp.core.rdpeudp] - [rdpeudp_check_stream_health]: UDP reassembly stalled for 16118 ms: expected channel a0dc, buffered=3686, DataSeq base=ca52; reconnect required"
+      ],
+      "metrics": {
+        "server_udp_bandwidth": {
+          "n": 1,
+          "mean": 221730,
+          "median": 221730,
+          "min": 221730,
+          "max": 221730
+        },
+        "server_udp_sent_rate": {
+          "n": 1,
+          "mean": 11495457.43178986,
+          "median": 11495457.43178986,
+          "min": 11495457.43178986,
+          "max": 11495457.43178986
+        },
+        "server_udp_rtt_ms": {
+          "n": 1,
+          "mean": 1,
+          "median": 1,
+          "min": 1,
+          "max": 1
+        },
+        "server_loss_percent": {
+          "n": 1,
+          "mean": 25.113939965425114,
+          "median": 25.113939965425114,
+          "min": 25.113939965425114,
+          "max": 25.113939965425114
+        },
+        "server_retransmission_percent": {
+          "n": 1,
+          "mean": 25.113939965425114,
+          "median": 25.113939965425114,
+          "min": 25.113939965425114,
+          "max": 25.113939965425114
+        },
+        "server_output_fps": {
+          "n": 1,
+          "mean": 1.6973437489723113,
+          "median": 1.6973437489723113,
+          "min": 1.6973437489723113,
+          "max": 1.6973437489723113
+        },
+        "server_skipped_network_fps": {
+          "n": 1,
+          "mean": 4.992187496977386,
+          "median": 4.992187496977386,
+          "min": 4.992187496977386,
+          "max": 4.992187496977386
+        }
+      },
+      "counter_samples": 1,
+      "counter_errors": [],
+      "counter_error_events": [
+        {
+          "category": "InvalidResult: (:) [Get-Counter], Exception",
+          "schema_version": 2,
+          "type": "collector_error",
+          "error_id": "CounterApiError,Microsoft.PowerShell.Commands.GetCounterCommand",
+          "utc": "2026-10-13T14:38:51.6217126Z",
+          "error": "The data is not valid.",
+          "last_sample_utc": "2026-10-13T14:38:41.5469381Z",
+          "monotonic_ticks": 3425500463551,
+          "frequency": 24000000
+        }
+      ],
+      "counter_error_event_count": 1,
+      "counter_clock_boundary_exclusions": 0,
+      "counter_diagnostics": [
+        {
+          "sequence": 1,
+          "error": null,
+          "schema_version": 2,
+          "interval_start_utc": null,
+          "baseline": true,
+          "interval_end_utc": "2026-10-13T14:37:51.3776549Z",
+          "utc": "2026-10-13T14:37:51.3776549Z",
+          "type": "baseline",
+          "errors": [],
+          "monotonic_start_ticks": null,
+          "monotonic_end_ticks": 3424055852736,
+          "frequency": 24000000,
+          "missing_metrics": [],
+          "counters": [
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "upstream kbps label; raw cooked counter",
+              "raw_cooked_value": 247669,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\current udp bandwidth",
+              "valid_for_rate": false,
+              "metric": "server_udp_bandwidth"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "raw cooked counter",
+              "raw_cooked_value": 17265933.802797254,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\udp sent rate",
+              "valid_for_rate": false,
+              "metric": "server_udp_sent_rate"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "ms",
+              "raw_cooked_value": 0,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\current udp rtt",
+              "valid_for_rate": false,
+              "metric": "server_udp_rtt_ms"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "percent",
+              "raw_cooked_value": 0.16321802769441374,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\loss rate",
+              "valid_for_rate": false,
+              "metric": "server_loss_percent"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "percent",
+              "raw_cooked_value": 0.16321802769441374,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\retransmission rate",
+              "valid_for_rate": false,
+              "metric": "server_retransmission_percent"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "server frames/s",
+              "raw_cooked_value": 4.699761173803018,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx graphics(rdp-tcp 0)\\output frames/second",
+              "valid_for_rate": false,
+              "metric": "server_output_fps"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "server frames/s",
+              "raw_cooked_value": 14.499263195775269,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx graphics(rdp-tcp 0)\\frames skipped/second - insufficient network resources",
+              "valid_for_rate": false,
+              "metric": "server_skipped_network_fps"
+            }
+          ],
+          "observed_interval_s": null
+        },
+        {
+          "category": "InvalidResult: (:) [Get-Counter], Exception",
+          "schema_version": 2,
+          "type": "collector_error",
+          "error_id": "CounterApiError,Microsoft.PowerShell.Commands.GetCounterCommand",
+          "utc": "2026-10-13T14:38:51.6217126Z",
+          "error": "The data is not valid.",
+          "last_sample_utc": "2026-10-13T14:38:41.5469381Z",
+          "monotonic_ticks": 3425500463551,
+          "frequency": 24000000
+        }
+      ],
+      "network": {
+        "small": {
+          "transmitted_packets": 1550,
+          "dropped_packets": 497,
+          "drop_fraction_completed_attempts": 0.2427943331704934,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; excludes pending packets"
+        },
+        "large": {
+          "transmitted_packets": 18155,
+          "dropped_packets": 5897,
+          "drop_fraction_completed_attempts": 0.24517711624812905,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; excludes pending packets"
+        }
+      },
+      "capture_health": {
+        "offered": {
+          "complete": true,
+          "kernel_drops": 0,
+          "captured_packets": 48758,
+          "exit_code": 0,
+          "stderr_file": "offered.log"
+        },
+        "received": {
+          "complete": true,
+          "kernel_drops": 0,
+          "captured_packets": 21072,
+          "exit_code": 0,
+          "stderr_file": "received.log"
+        }
+      },
+      "trace_receipt": {
+        "metadata": {
+          "type": "metadata",
+          "schema_version": 1,
+          "clock": "winpr_GetTickCount64NS",
+          "start_ns": 1682218235010,
+          "arm_ns": 1738538277162,
+          "armed": true,
+          "capacity": 1048576,
+          "count": 60253,
+          "dropped": 0,
+          "valid": true,
+          "reason": "transport_failure",
+          "receive_window": 128,
+          "hash": "sha256-first-8-bytes",
+          "payloads_recorded": false,
+          "clock_mapping": {
+            "raw_ns": 1738538462870,
+            "unix_100ns": 17919023067095812,
+            "bracket_ns": 46834,
+            "wall_resolution_ns": 1000000,
+            "max_uncertainty_ns": 1023417
+          }
+        },
+        "footer": {
+          "type": "footer",
+          "count": 60253,
+          "dropped": 0,
+          "valid": true
+        },
+        "terminal_failure_event": {
+          "type": "event",
+          "seq": 60252,
+          "event": "failure",
+          "time_ns": 1763911587132,
+          "data_seq": 0,
+          "channel_seq": 0,
+          "expected_channel": 41180,
+          "recv_base": 51794,
+          "flags": 0,
+          "aoa": 0,
+          "old_base": 0,
+          "new_base": 0,
+          "detail": 1,
+          "status": 0,
+          "bytes": 0,
+          "buffered_chunks": 3686,
+          "owned_bytes": 4125452,
+          "hash_hex": "0000000000000000",
+          "wire_hex": ""
+        },
+        "terminal_failure_linux_utc": "2026-10-13T14:38:52.082705+00:00",
+        "strict_whole_trace_valid": false,
+        "qualification": "Original ref25 ARM event timestamp precedes its triggering receive in sequence but follows it by209208ns in clock; later causal excerpt corroborated by packet bytes."
+      },
+      "client_exit_receipt": {
+        "exit_code": 147,
+        "ended_unix_s": 1791902335.912214,
+        "planned_stop_after_measurement": false
+      },
+      "report_json": "recovery-ref25-20261013.json",
+      "verified_goodput_mbps": null,
+      "input_to_display_p95_ms": null,
+      "input_to_display_p99_ms": null
+    },
+    {
+      "trial": "candidate",
+      "trial_kind": "candidate original ramp",
+      "loss_percent": 25.0,
+      "outcome": "COMPLETE",
+      "client_exit_code": null,
+      "observed_duration_s": 120.00197292899975,
+      "receiver_retention": {
+        "peak_chunks": 611,
+        "peak_span": 643,
+        "peak_owned_bytes": 722709,
+        "page_allocations": 2488,
+        "buffered_chunks": 0,
+        "buffered_bytes": 0,
+        "unread_stream_bytes": 0,
+        "byte_limit": 40370176,
+        "allocated_pages": 1,
+        "recv_failed": 0
+      },
+      "receiver_retention_scope": "whole session including warmup, not per loss phase",
+      "terminal_logs": [],
+      "metrics": {
+        "server_udp_bandwidth": {
+          "n": 11,
+          "mean": 327849.63636363635,
+          "median": 328103,
+          "min": 324246,
+          "max": 330995
+        },
+        "server_udp_sent_rate": {
+          "n": 11,
+          "mean": 23535338.859649416,
+          "median": 23742562.26719621,
+          "min": 22126792.948687855,
+          "max": 24133641.64899521
+        },
+        "server_udp_rtt_ms": {
+          "n": 11,
+          "mean": 0,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "server_loss_percent": {
+          "n": 11,
+          "mean": 25.133530608870984,
+          "median": 25.150819289300586,
+          "min": 24.65852727966425,
+          "max": 25.590236855111588
+        },
+        "server_retransmission_percent": {
+          "n": 11,
+          "mean": 25.13621958765894,
+          "median": 25.18538440849887,
+          "min": 24.6470812666921,
+          "max": 25.590236855111588
+        },
+        "server_output_fps": {
+          "n": 11,
+          "mean": 7.8084096912449645,
+          "median": 7.896042273311384,
+          "min": 7.091688009775941,
+          "max": 8.291875240594983
+        },
+        "server_skipped_network_fps": {
+          "n": 11,
+          "mean": 0.02724079901322385,
+          "median": 0,
+          "min": 0,
+          "max": 0.29964878914546234
+        }
+      },
+      "counter_samples": 11,
+      "counter_errors": [],
+      "counter_error_events": [],
+      "counter_error_event_count": 0,
+      "counter_clock_boundary_exclusions": 0,
+      "counter_diagnostics": [
+        {
+          "sequence": 1,
+          "error": null,
+          "schema_version": 2,
+          "interval_start_utc": null,
+          "baseline": true,
+          "interval_end_utc": "2026-10-13T15:08:09.4719496Z",
+          "utc": "2026-10-13T15:08:09.4719496Z",
+          "type": "baseline",
+          "errors": [],
+          "monotonic_start_ticks": null,
+          "monotonic_end_ticks": 3467689041995,
+          "frequency": 24000000,
+          "missing_metrics": [],
+          "counters": [
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "upstream kbps label; raw cooked counter",
+              "raw_cooked_value": 368111,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\current udp bandwidth",
+              "valid_for_rate": false,
+              "metric": "server_udp_bandwidth"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "raw cooked counter",
+              "raw_cooked_value": 18189485.63487637,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\udp sent rate",
+              "valid_for_rate": false,
+              "metric": "server_udp_sent_rate"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "ms",
+              "raw_cooked_value": 0,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\current udp rtt",
+              "valid_for_rate": false,
+              "metric": "server_udp_rtt_ms"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "percent",
+              "raw_cooked_value": 0.3537265842965325,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\loss rate",
+              "valid_for_rate": false,
+              "metric": "server_loss_percent"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "percent",
+              "raw_cooked_value": 0.3537265842965325,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\retransmission rate",
+              "valid_for_rate": false,
+              "metric": "server_retransmission_percent"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "server frames/s",
+              "raw_cooked_value": 5.093330050854112,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx graphics(rdp-tcp 0)\\output frames/second",
+              "valid_for_rate": false,
+              "metric": "server_output_fps"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "server frames/s",
+              "raw_cooked_value": 14.281297985728198,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx graphics(rdp-tcp 0)\\frames skipped/second - insufficient network resources",
+              "valid_for_rate": false,
+              "metric": "server_skipped_network_fps"
+            }
+          ],
+          "observed_interval_s": null
+        }
+      ],
+      "network": {
+        "small": {
+          "transmitted_packets": 16356,
+          "dropped_packets": 5464,
+          "drop_fraction_completed_attempts": 0.25041246562786434,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; excludes pending packets"
+        },
+        "large": {
+          "transmitted_packets": 215556,
+          "dropped_packets": 72086,
+          "drop_fraction_completed_attempts": 0.25061013342974947,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; excludes pending packets"
+        }
+      },
+      "capture_health": {
+        "offered": {
+          "complete": true,
+          "kernel_drops": 0,
+          "captured_packets": 1597828,
+          "exit_code": 0,
+          "stderr_file": "offered.log"
+        },
+        "received": {
+          "complete": true,
+          "kernel_drops": 0,
+          "captured_packets": 529456,
+          "exit_code": 0,
+          "stderr_file": "received.log"
+        }
+      },
+      "trace_receipt": null,
+      "client_exit_receipt": {
+        "exit_code": 145,
+        "ended_unix_s": 1791904488.61632,
+        "planned_stop_after_measurement": true
+      },
+      "report_json": "recovery-candidate-20261013.json",
+      "verified_goodput_mbps": null,
+      "input_to_display_p95_ms": null,
+      "input_to_display_p99_ms": null
+    },
+    {
+      "trial": "candidate",
+      "trial_kind": "candidate original ramp",
+      "loss_percent": 50.0,
+      "outcome": "COMPLETE",
+      "client_exit_code": null,
+      "observed_duration_s": 120.00216826400037,
+      "receiver_retention": {
+        "peak_chunks": 611,
+        "peak_span": 643,
+        "peak_owned_bytes": 722709,
+        "page_allocations": 2488,
+        "buffered_chunks": 0,
+        "buffered_bytes": 0,
+        "unread_stream_bytes": 0,
+        "byte_limit": 40370176,
+        "allocated_pages": 1,
+        "recv_failed": 0
+      },
+      "receiver_retention_scope": "whole session including warmup, not per loss phase",
+      "terminal_logs": [],
+      "metrics": {
+        "server_udp_bandwidth": {
+          "n": 11,
+          "mean": 303635.45454545453,
+          "median": 305557,
+          "min": 291691,
+          "max": 309098
+        },
+        "server_udp_sent_rate": {
+          "n": 11,
+          "mean": 24255168.087515514,
+          "median": 26540356.13367236,
+          "min": 0,
+          "max": 27685357.066932462
+        },
+        "server_udp_rtt_ms": {
+          "n": 11,
+          "mean": 2.090909090909091,
+          "median": 0,
+          "min": 0,
+          "max": 20
+        },
+        "server_loss_percent": {
+          "n": 11,
+          "mean": 50.023852579565826,
+          "median": 50.00657591898467,
+          "min": 49.773924868264494,
+          "max": 50.27086333401907
+        },
+        "server_retransmission_percent": {
+          "n": 11,
+          "mean": 50.02377947029994,
+          "median": 49.96383244558427,
+          "min": 49.77083686980139,
+          "max": 50.257506218687595
+        },
+        "server_output_fps": {
+          "n": 11,
+          "mean": 6.084474477046862,
+          "median": 6.096546433456831,
+          "min": 5.195613019202074,
+          "max": 6.69440860678466
+        },
+        "server_skipped_network_fps": {
+          "n": 11,
+          "mean": 0.3996870216614692,
+          "median": 0,
+          "min": 0,
+          "max": 1.7989809147905405
+        }
+      },
+      "counter_samples": 11,
+      "counter_errors": [],
+      "counter_error_events": [],
+      "counter_error_event_count": 0,
+      "counter_clock_boundary_exclusions": 0,
+      "counter_diagnostics": [
+        {
+          "sequence": 1,
+          "error": null,
+          "schema_version": 2,
+          "interval_start_utc": null,
+          "baseline": true,
+          "interval_end_utc": "2026-10-13T15:08:09.4719496Z",
+          "utc": "2026-10-13T15:08:09.4719496Z",
+          "type": "baseline",
+          "errors": [],
+          "monotonic_start_ticks": null,
+          "monotonic_end_ticks": 3467689041995,
+          "frequency": 24000000,
+          "missing_metrics": [],
+          "counters": [
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "upstream kbps label; raw cooked counter",
+              "raw_cooked_value": 368111,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\current udp bandwidth",
+              "valid_for_rate": false,
+              "metric": "server_udp_bandwidth"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "raw cooked counter",
+              "raw_cooked_value": 18189485.63487637,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\udp sent rate",
+              "valid_for_rate": false,
+              "metric": "server_udp_sent_rate"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "ms",
+              "raw_cooked_value": 0,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\current udp rtt",
+              "valid_for_rate": false,
+              "metric": "server_udp_rtt_ms"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "percent",
+              "raw_cooked_value": 0.3537265842965325,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\loss rate",
+              "valid_for_rate": false,
+              "metric": "server_loss_percent"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "percent",
+              "raw_cooked_value": 0.3537265842965325,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\retransmission rate",
+              "valid_for_rate": false,
+              "metric": "server_retransmission_percent"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "server frames/s",
+              "raw_cooked_value": 5.093330050854112,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx graphics(rdp-tcp 0)\\output frames/second",
+              "valid_for_rate": false,
+              "metric": "server_output_fps"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "server frames/s",
+              "raw_cooked_value": 14.281297985728198,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx graphics(rdp-tcp 0)\\frames skipped/second - insufficient network resources",
+              "valid_for_rate": false,
+              "metric": "server_skipped_network_fps"
+            }
+          ],
+          "observed_interval_s": null
+        }
+      ],
+      "network": {
+        "small": {
+          "transmitted_packets": 12183,
+          "dropped_packets": 12138,
+          "drop_fraction_completed_attempts": 0.499074873566054,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; excludes pending packets"
+        },
+        "large": {
+          "transmitted_packets": 163729,
+          "dropped_packets": 163609,
+          "drop_fraction_completed_attempts": 0.4998167032241903,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 4,
+          "scope": "completed attempts after minus before; excludes pending packets"
+        }
+      },
+      "capture_health": {
+        "offered": {
+          "complete": true,
+          "kernel_drops": 0,
+          "captured_packets": 1597828,
+          "exit_code": 0,
+          "stderr_file": "offered.log"
+        },
+        "received": {
+          "complete": true,
+          "kernel_drops": 0,
+          "captured_packets": 529456,
+          "exit_code": 0,
+          "stderr_file": "received.log"
+        }
+      },
+      "trace_receipt": null,
+      "client_exit_receipt": {
+        "exit_code": 145,
+        "ended_unix_s": 1791904488.61632,
+        "planned_stop_after_measurement": true
+      },
+      "report_json": "recovery-candidate-20261013.json",
+      "verified_goodput_mbps": null,
+      "input_to_display_p95_ms": null,
+      "input_to_display_p99_ms": null
+    },
+    {
+      "trial": "candidate",
+      "trial_kind": "candidate original ramp",
+      "loss_percent": 70.0,
+      "outcome": "COMPLETE",
+      "client_exit_code": null,
+      "observed_duration_s": 120.00537472099995,
+      "receiver_retention": {
+        "peak_chunks": 611,
+        "peak_span": 643,
+        "peak_owned_bytes": 722709,
+        "page_allocations": 2488,
+        "buffered_chunks": 0,
+        "buffered_bytes": 0,
+        "unread_stream_bytes": 0,
+        "byte_limit": 40370176,
+        "allocated_pages": 1,
+        "recv_failed": 0
+      },
+      "receiver_retention_scope": "whole session including warmup, not per loss phase",
+      "terminal_logs": [],
+      "metrics": {
+        "server_udp_bandwidth": {
+          "n": 11,
+          "mean": 273764.9090909091,
+          "median": 275031,
+          "min": 266127,
+          "max": 277840
+        },
+        "server_udp_sent_rate": {
+          "n": 11,
+          "mean": 28504324.517378338,
+          "median": 31662396.026277006,
+          "min": 0,
+          "max": 32067377.053150173
+        },
+        "server_udp_rtt_ms": {
+          "n": 11,
+          "mean": 0,
+          "median": 0,
+          "min": 0,
+          "max": 0
+        },
+        "server_loss_percent": {
+          "n": 11,
+          "mean": 70.07121304507795,
+          "median": 70.0514439377996,
+          "min": 69.84911474837922,
+          "max": 70.39944585546063
+        },
+        "server_retransmission_percent": {
+          "n": 11,
+          "mean": 70.06725021555692,
+          "median": 69.9975181485388,
+          "min": 69.85647334504979,
+          "max": 70.39655968598476
+        },
+        "server_output_fps": {
+          "n": 11,
+          "mean": 4.573622466376658,
+          "median": 4.588569090514975,
+          "min": 4.392710644441808,
+          "max": 4.693074859628176
+        },
+        "server_skipped_network_fps": {
+          "n": 11,
+          "mean": 0.09983912238887273,
+          "median": 0,
+          "min": 0,
+          "max": 0.5991159395270012
+        }
+      },
+      "counter_samples": 11,
+      "counter_errors": [],
+      "counter_error_events": [],
+      "counter_error_event_count": 0,
+      "counter_clock_boundary_exclusions": 0,
+      "counter_diagnostics": [
+        {
+          "sequence": 1,
+          "error": null,
+          "schema_version": 2,
+          "interval_start_utc": null,
+          "baseline": true,
+          "interval_end_utc": "2026-10-13T15:08:09.4719496Z",
+          "utc": "2026-10-13T15:08:09.4719496Z",
+          "type": "baseline",
+          "errors": [],
+          "monotonic_start_ticks": null,
+          "monotonic_end_ticks": 3467689041995,
+          "frequency": 24000000,
+          "missing_metrics": [],
+          "counters": [
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "upstream kbps label; raw cooked counter",
+              "raw_cooked_value": 368111,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\current udp bandwidth",
+              "valid_for_rate": false,
+              "metric": "server_udp_bandwidth"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "raw cooked counter",
+              "raw_cooked_value": 18189485.63487637,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\udp sent rate",
+              "valid_for_rate": false,
+              "metric": "server_udp_sent_rate"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "ms",
+              "raw_cooked_value": 0,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\current udp rtt",
+              "valid_for_rate": false,
+              "metric": "server_udp_rtt_ms"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "percent",
+              "raw_cooked_value": 0.3537265842965325,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\loss rate",
+              "valid_for_rate": false,
+              "metric": "server_loss_percent"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "percent",
+              "raw_cooked_value": 0.3537265842965325,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx network(rdp-tcp 0)\\retransmission rate",
+              "valid_for_rate": false,
+              "metric": "server_retransmission_percent"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "server frames/s",
+              "raw_cooked_value": 5.093330050854112,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx graphics(rdp-tcp 0)\\output frames/second",
+              "valid_for_rate": false,
+              "metric": "server_output_fps"
+            },
+            {
+              "instance": "rdp-tcp 0",
+              "unit": "server frames/s",
+              "raw_cooked_value": 14.281297985728198,
+              "status": 0,
+              "value": null,
+              "path": "\\\\win-rl37d50mr0j\\remotefx graphics(rdp-tcp 0)\\frames skipped/second - insufficient network resources",
+              "valid_for_rate": false,
+              "metric": "server_skipped_network_fps"
+            }
+          ],
+          "observed_interval_s": null
+        }
+      ],
+      "network": {
+        "small": {
+          "transmitted_packets": 5785,
+          "dropped_packets": 13725,
+          "drop_fraction_completed_attempts": 0.703485392106612,
+          "backlog_before_packets": 0,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; excludes pending packets"
+        },
+        "large": {
+          "transmitted_packets": 115210,
+          "dropped_packets": 269313,
+          "drop_fraction_completed_attempts": 0.7003820317640297,
+          "backlog_before_packets": 4,
+          "backlog_after_packets": 0,
+          "scope": "completed attempts after minus before; excludes pending packets"
+        }
+      },
+      "capture_health": {
+        "offered": {
+          "complete": true,
+          "kernel_drops": 0,
+          "captured_packets": 1597828,
+          "exit_code": 0,
+          "stderr_file": "offered.log"
+        },
+        "received": {
+          "complete": true,
+          "kernel_drops": 0,
+          "captured_packets": 529456,
+          "exit_code": 0,
+          "stderr_file": "received.log"
+        }
+      },
+      "trace_receipt": null,
+      "client_exit_receipt": {
+        "exit_code": 145,
+        "ended_unix_s": 1791904488.61632,
+        "planned_stop_after_measurement": true
+      },
+      "report_json": "recovery-candidate-20261013.json",
+      "verified_goodput_mbps": null,
+      "input_to_display_p95_ms": null,
+      "input_to_display_p99_ms": null
+    }
+  ],
+  "notes": [
+    "Reference is traced diagnostic evidence; tracing and export overhead prevent a controlled reference/candidate FPS comparison.",
+    "Candidate uses original stop-on-first-exit ramp; each unreached level gets exactly one separately labelled fresh session.",
+    "All outcomes are retained; no failed completed level is retried.",
+    "Server counters do not establish physical client FPS, verified application goodput or input-to-display tail latency.",
+    "Ingress applies loss to all incoming IPv4; no rate cap; packets >=512 IP bytes add1ms delay and70%reorder.",
+    "Kernel random loss and upstream coloured-noise RNG are unseeded; parameters are repeatable, exact losses are not.",
+    "Continuous10s PDH intervals exclude baseline, provider errors, crossed/uncertain boundaries.",
+    "Captures use256-byte snaplen and may contain encrypted body prefixes; decoded evidence uses visible transport headers."
+  ]
+}
