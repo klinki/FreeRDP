@@ -244,7 +244,10 @@ FREERDP_API UINT16 rdpeudp_payload_for_mtu(UINT16 mtu);
 
 /* ---- ACK vector codec ([MS-RDPEUDP2] 2.2.1.2.6, little-endian) ----
  * Bitmap mode (MSB 0): 7 seqs per byte, bit=1 received.
- * RLE mode (MSB 1): bit6 = state, low 6 bits = run length. */
+ * RLE mode (MSB 1): bit6 = state, low 6 bits = run length.
+ * Input covers at most the unambiguous 32768-packet half-space. The wire
+ * represents a truthful prefix bounded by 127 coded bytes; decode its actual
+ * coverage rather than assuming every supplied state fits in one datagram. */
 WINPR_ATTR_NODISCARD
 FREERDP_API wStream* rdpeudp_build_ackvec(UINT16 baseSeq, const BOOL* received, size_t count,
                                           BOOL withTs, UINT32 ts, BYTE sendGap);
@@ -425,6 +428,9 @@ typedef struct
 	size_t recvPeakBufferedChunks;
 	size_t recvPeakBufferedSpan;
 	size_t recvStreamCapacity;
+	size_t recvDataWindowLimit;
+	size_t recvDataCount;
+	size_t recvDataSpan;
 	BOOL recvFailed;
 } RdpUdpTestRecvState;
 

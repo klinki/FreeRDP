@@ -417,3 +417,9 @@ It requires a verified network adapter and an observer preflight; live traffic
 rates remain separate from transport-only verified goodput. See
 [LIVE-WINDOWS.md](docs/LIVE-WINDOWS.md) for provisioning, both 10 Mbit/s profiles,
 credential handling, metric boundaries and the machine-readable campaign format.
+
+For the Windows server-counter loss ramp and packet/ACK recovery evidence,
+see [UPSTREAM-METHOD.md](docs/UPSTREAM-METHOD.md) and
+[UDP-RECOVERY-20261013.md](docs/UDP-RECOVERY-20261013.md). The latter documents
+bounded optional core tracing, the independent PCAP header audit, and the
+25%/50%/70% campaign; its server counters have separate metric boundaries.

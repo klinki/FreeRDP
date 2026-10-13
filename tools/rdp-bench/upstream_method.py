@@ -215,7 +215,9 @@ def summarize(campaign, counter_rows, parse_errors=()):
     return {"schema_version": 1, "method": "OpenThinRDP server-counter loss ramp",
             "campaign_provenance": {key: campaign.get(key) for key in
                                     ("provenance", "method_fidelity", "clock_alignment", "counter_instance")},
-            "counter_metadata": metadata, "artifact_errors": all_issues, "steps": steps,
+            "counter_metadata": metadata,
+            "counter_diagnostics": [row for row in counter_rows if row.get("type") not in ("metadata", "sample")],
+            "artifact_errors": all_issues, "steps": steps,
             "counter_phase_alignment": "RECORDED" if isinstance(campaign.get("clock_alignment"), dict)
             and campaign["clock_alignment"].get("method")
             and finite(campaign["clock_alignment"].get("uncertainty_ms"))

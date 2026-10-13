@@ -23,6 +23,7 @@
 #include <winpr/crt.h>
 #include <winpr/crypto.h>
 #include <winpr/print.h>
+#include <winpr/path.h>
 #include <winpr/stream.h>
 #include <winpr/synch.h>
 #include <winpr/sysinfo.h>
@@ -636,27 +637,40 @@ BOOL rdpeudp_soft_sync_response_offers_udp(const BYTE* pdu, size_t len)
 /* ACK vector codec ([MS-RDPEUDP2] 2.2.1.2.6)                           */
 /* ------------------------------------------------------------------ */
 
-wStream* rdpeudp_build_ackvec(UINT16 baseSeq, const BOOL* received, size_t count, BOOL withTs,
-                              UINT32 ts, BYTE sendGap)
+typedef BOOL (*RdpUdpAckVecState)(const void* context, size_t index);
+
+typedef struct
 {
-	if (!received || (count == 0) || (count > 256))
-		return nullptr;
+	BYTE coded[127];
+	size_t length;
+	size_t covered;
+	size_t highestReceived;
+} RdpUdpAckVecEncoding;
+
+static BOOL rdpeudp_encode_ackvec_states(const void* context, RdpUdpAckVecState state, size_t count,
+                                         RdpUdpAckVecEncoding* out)
+{
+	if (!context || !state || !out || !count || count > 0x8000)
+		return FALSE;
+	memset(out, 0, sizeof(*out));
+	out->highestReceived = SIZE_MAX;
 
 	/* Bitmap mode always covers exactly 7 seqs; RLE covers exact run.
 	 * Greedy: RLE for runs >=4, else full 7-bit bitmaps (pad last). */
-	BYTE vec[64] = { 0 };
-	size_t vlen = 0;
 	size_t i = 0;
-	while ((i < count) && (vlen < sizeof(vec)))
+	while (i < count && out->length < sizeof(out->coded))
 	{
+		const BOOL received = state(context, i);
 		size_t run = 1;
-		while (((i + run) < count) && (run < 63) && (received[i + run] == received[i]))
+		while ((i + run) < count && run < 63 && state(context, i + run) == received)
 			run++;
 
 		if (run >= 4)
 		{
 			const size_t r = (run > 63) ? 63 : run;
-			vec[vlen++] = (BYTE)(0x80 | (received[i] ? 0x40 : 0x00) | (r & 0x3F));
+			out->coded[out->length++] = (BYTE)(0x80 | (received ? 0x40 : 0x00) | (r & 0x3F));
+			if (received)
+				out->highestReceived = i + r - 1;
 			i += r;
 		}
 		else
@@ -664,21 +678,30 @@ wStream* rdpeudp_build_ackvec(UINT16 baseSeq, const BOOL* received, size_t count
 			BYTE b = 0;
 			for (size_t n = 0; n < 7; n++)
 			{
-				if (((i + n) < count) && received[i + n])
+				if ((i + n) < count && state(context, i + n))
+				{
 					b |= (BYTE)(1u << n);
+					out->highestReceived = i + n;
+				}
 			}
-			vec[vlen++] = b;
+			out->coded[out->length++] = b;
 			i += 7;
 			if (i > count)
 				i = count;
 		}
 	}
+	out->covered = i;
+	return TRUE;
+}
 
-	wStream* s = Stream_New(nullptr, vlen + 8);
+static wStream* rdpeudp_ackvec_stream(UINT16 baseSeq, const RdpUdpAckVecEncoding* encoded,
+                                      BOOL withTs, UINT32 ts, BYTE sendGap)
+{
+	wStream* s = Stream_New(nullptr, encoded->length + 8);
 	if (!s)
 		return nullptr;
 	Stream_Write_UINT16(s, baseSeq);
-	Stream_Write_UINT8(s, (BYTE)((vlen & 0x7F) | (withTs ? 0x80 : 0x00)));
+	Stream_Write_UINT8(s, (BYTE)((encoded->length & 0x7F) | (withTs ? 0x80 : 0x00)));
 	if (withTs)
 	{
 		Stream_Write_UINT8(s, (BYTE)(ts & 0xFF));
@@ -686,8 +709,7 @@ wStream* rdpeudp_build_ackvec(UINT16 baseSeq, const BOOL* received, size_t count
 		Stream_Write_UINT8(s, (BYTE)((ts >> 16) & 0xFF));
 		Stream_Write_UINT8(s, sendGap);
 	}
-	if (vlen > 0)
-		Stream_Write(s, vec, vlen);
+	Stream_Write(s, encoded->coded, encoded->length);
 	Stream_SealLength(s);
 	if (!Stream_SetPosition(s, 0))
 	{
@@ -695,6 +717,21 @@ wStream* rdpeudp_build_ackvec(UINT16 baseSeq, const BOOL* received, size_t count
 		return nullptr;
 	}
 	return s;
+}
+
+static BOOL rdpeudp_ackvec_array_state(const void* context, size_t index)
+{
+	const BOOL* received = context;
+	return received[index];
+}
+
+wStream* rdpeudp_build_ackvec(UINT16 baseSeq, const BOOL* received, size_t count, BOOL withTs,
+                              UINT32 ts, BYTE sendGap)
+{
+	RdpUdpAckVecEncoding encoded = { 0 };
+	if (!rdpeudp_encode_ackvec_states(received, rdpeudp_ackvec_array_state, count, &encoded))
+		return nullptr;
+	return rdpeudp_ackvec_stream(baseSeq, &encoded, withTs, ts, sendGap);
 }
 
 /* Validate the vector before packet processing can update liveness, AOA or
@@ -961,6 +998,8 @@ BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer, size_t*
 /* ------------------------------------------------------------------ */
 
 #define RDPEUDP2_WINDOW_MAX 64
+#define RDPEUDP2_RECEIPT_WINDOW 32768u
+#define RDPEUDP2_INITIAL_EPOCH_THRESHOLD 128u
 #define RDPEUDP2_RECV_PAGE_SHIFT 8
 #define RDPEUDP2_RECV_PAGE_SIZE (1u << RDPEUDP2_RECV_PAGE_SHIFT)
 #define RDPEUDP2_RECV_PAGE_COUNT (1u << (16 - RDPEUDP2_RECV_PAGE_SHIFT))
@@ -972,6 +1011,9 @@ BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer, size_t*
 #define RDPEUDP2_REORDER_GRACE_MS 25
 #define RDPEUDP2_DEFAULT_DELAYED_ACKS 8
 #define RDPEUDP2_MAX_DELAYED_ACKS 15
+#define RDPEUDP_RECOVERY_TRACE_CAPACITY 262144u
+#define RDPEUDP_RECOVERY_TRACE_MAX_CAPACITY 1048576u
+#define RDPEUDP_RECOVERY_TRACE_WIRE 134u
 
 #if defined(WITH_RDP_BENCH)
 typedef struct RdpBenchQueueObserver RdpBenchQueueObserver;
@@ -1016,10 +1058,67 @@ typedef struct
 
 typedef struct
 {
+	UINT64 arrivalNs;
+	UINT32 channel;
 	UINT16 seq;
-	UINT64 ns;
-	BOOL valid;
-} UdpRecvArrival;
+	BYTE received;
+	BYTE arrivalValid;
+} UdpRecvReceipt;
+
+typedef struct
+{
+	UINT64 timeNs;
+	UINT32 kind;
+	UINT16 dataSeq;
+	UINT16 channelSeq;
+	UINT16 expectedChannel;
+	UINT16 recvBase;
+	UINT16 flags;
+	UINT16 aoa;
+	UINT16 oldBase;
+	UINT16 newBase;
+	UINT16 wireLength;
+	UINT32 detail;
+	UINT32 status;
+	UINT32 bytes;
+	UINT32 bufferedChunks;
+	UINT32 ownedBytes;
+	BYTE hash[8];
+	BYTE wire[RDPEUDP_RECOVERY_TRACE_WIRE];
+} UdpRecoveryEvent;
+
+typedef struct
+{
+	char* path;
+	char* armPath;
+	UdpRecoveryEvent* events;
+	size_t capacity;
+	size_t count;
+	size_t dropped;
+	UINT64 startNs;
+	UINT64 armNs;
+	UINT64 nextArmProbeNs;
+	UINT64 wallRawNs;
+	UINT64 wallUnix100ns;
+	UINT64 wallBracketNs;
+	BOOL armed;
+	BOOL invalid;
+	BOOL flushed;
+} UdpRecoveryTrace;
+
+enum
+{
+	UDP_RECOVERY_RX_DATA = 1,
+	UDP_RECOVERY_RX_AOA,
+	UDP_RECOVERY_AUTO_SLIDE,
+	UDP_RECOVERY_WINDOW_PROGRESS,
+	UDP_RECOVERY_TX_ACK,
+	UDP_RECOVERY_TX_DATA,
+	UDP_RECOVERY_CHANNEL_PROGRESS,
+	UDP_RECOVERY_GAP,
+	UDP_RECOVERY_FAILURE,
+	UDP_RECOVERY_ARM
+};
 
 struct rdp_udp_transport
 {
@@ -1067,11 +1166,13 @@ struct rdp_udp_transport
 
 	/* Receiver DataSeq window for ACK/ACKVEC generation ([MS-RDPEUDP2] 3.1.1.2.2).
 	 * recvDataBase = lowest DataSeq not yet cumulatively acked.
-	 * recvDataSeen[i] = received(DataSeq = base+i). */
+	 * Sequence-tagged slots hold actual receipts, never inferred receipts. */
 	UINT16 recvDataBase;
-	BOOL recvDataSeen[RDPEUDP2_WINDOW_MAX * 2];
-	/* Tagged timestamps survive bitmap sliding, but never alias a later epoch. */
-	UdpRecvArrival recvArrival[RDPEUDP2_WINDOW_MAX * 2];
+	/* Sequence-tagged ring entries retain actual receipt across a full
+	 * unambiguous half-space. Moving the lower edge never copies the ring. */
+	UdpRecvReceipt recvReceipts[RDPEUDP2_RECEIPT_WINDOW];
+	size_t recvDataCount;
+	UINT16 recvDataHighest;
 	UINT64 recvInOrderArrivalNs;
 	BOOL recvInOrderArrivalValid;
 	UINT64 recvLatestArrivalNs;
@@ -1088,7 +1189,6 @@ struct rdp_udp_transport
 	/* Process channel labels in DataSeq order. UINT32_MAX marks a dummy.
 	 * Before the first wrap, each missing datagram could introduce at most
 	 * one new channel label. The upper bound saturates at UINT16_MAX. */
-	UINT32 recvDataChannel[RDPEUDP2_WINDOW_MAX * 2];
 	UINT16 recvChannelUpperBound;
 	BOOL recvChannelZeroUncertain;
 	/* Learned only from an unambiguous wrap, and scoped to this transport. */
@@ -1147,6 +1247,8 @@ struct rdp_udp_transport
 	size_t testRecvByteLimit;
 	BOOL testRecvAllocFailureEnabled;
 	size_t testRecvAllocSuccesses;
+	/* Diagnostic only: a bounded opt-in ledger, never packet-by-packet I/O. */
+	UdpRecoveryTrace* recoveryTrace;
 	wStream* recvStream; /* reassembled byte stream for TLS */
 	size_t recvPos;      /* read cursor inside recvStream */
 	/* Tunnel TLS byte reassembly (R3): preserves partial Tunnel DATA PDUs
@@ -1231,21 +1333,32 @@ static UINT64 rdpeudp_recv_now_ns(const rdpUdpTransport* udp)
 	return udp->testClockEnabled ? udp->testClockMs * 1000000ULL : winpr_GetTickCount64NS();
 }
 
+static const UdpRecvReceipt* rdpeudp_recv_receipt_locked(const rdpUdpTransport* udp, UINT16 seq)
+{
+	return &udp->recvReceipts[seq & (RDPEUDP2_RECEIPT_WINDOW - 1)];
+}
+
+static BOOL rdpeudp_recv_data_seen_locked(const rdpUdpTransport* udp, UINT16 seq)
+{
+	const UdpRecvReceipt* receipt = rdpeudp_recv_receipt_locked(udp, seq);
+	return receipt->received && receipt->seq == seq;
+}
+
+static size_t rdpeudp_recv_data_span_locked(const rdpUdpTransport* udp)
+{
+	return udp->recvDataCount ? (size_t)(UINT16)(udp->recvDataHighest - udp->recvDataBase) + 1 : 0;
+}
+
 static BOOL rdpeudp2_has_recv_gap_locked(const rdpUdpTransport* udp)
 {
-	for (size_t i = 0; i < ARRAYSIZE(udp->recvDataSeen); i++)
-	{
-		if (udp->recvDataSeen[i])
-			return TRUE;
-	}
-	return FALSE;
+	return udp->recvDataCount > 0;
 }
 
 static UINT64 rdpeudp2_arrival_locked(const rdpUdpTransport* udp, UINT16 seq, BOOL* valid)
 {
-	const UdpRecvArrival* arrival = &udp->recvArrival[seq % ARRAYSIZE(udp->recvArrival)];
-	*valid = arrival->valid && arrival->seq == seq;
-	return *valid ? arrival->ns : 0;
+	const UdpRecvReceipt* receipt = rdpeudp_recv_receipt_locked(udp, seq);
+	*valid = receipt->arrivalValid && receipt->seq == seq;
+	return *valid ? receipt->arrivalNs : 0;
 }
 
 static BYTE rdpeudp2_ack_gap(UINT64 arrival, UINT64 now)
@@ -1285,6 +1398,253 @@ static UdpRecvSlot* rdpeudp_recv_slot_locked(const rdpUdpTransport* udp, UINT16 
 {
 	UdpRecvPage* page = udp->recvPages[channel >> RDPEUDP2_RECV_PAGE_SHIFT];
 	return page ? &page->slots[channel & (RDPEUDP2_RECV_PAGE_SIZE - 1)] : nullptr;
+}
+
+static void rdpeudp_recovery_clock_mapping(UdpRecoveryTrace* trace)
+{
+	const UINT64 before = winpr_GetTickCount64NS();
+	FILETIME wall = { 0 };
+	GetSystemTimeAsFileTime(&wall);
+	const UINT64 after = winpr_GetTickCount64NS();
+	trace->wallRawNs = before + (after - before) / 2;
+	trace->wallBracketNs = after - before;
+	trace->wallUnix100ns =
+	    (((UINT64)wall.dwHighDateTime << 32) | wall.dwLowDateTime) - 116444736000000000ULL;
+}
+
+static void rdpeudp_recovery_trace_init(rdpUdpTransport* udp)
+{
+	const char* path = getenv("RDPEUDP_RECOVERY_TRACE");
+	if (!path || !*path)
+		return;
+	UdpRecoveryTrace* trace = calloc(1, sizeof(*trace));
+	if (!trace)
+	{
+		WLog_ERR(TAG, "UDP recovery trace allocation failed");
+		return;
+	}
+	trace->path = _strdup(path);
+	if (!trace->path)
+	{
+		free(trace);
+		WLog_ERR(TAG, "UDP recovery trace path allocation failed");
+		return;
+	}
+	trace->capacity = RDPEUDP_RECOVERY_TRACE_CAPACITY;
+	const char* armPath = getenv("RDPEUDP_RECOVERY_TRACE_ARM");
+	if (armPath && *armPath)
+	{
+		trace->armPath = _strdup(armPath);
+		if (!trace->armPath)
+			trace->invalid = TRUE;
+	}
+	trace->armed = !armPath || !*armPath;
+	const char* limit = getenv("RDPEUDP_RECOVERY_TRACE_LIMIT");
+	if (limit && *limit)
+	{
+		char* end = nullptr;
+		const unsigned long requested = strtoul(limit, &end, 10);
+		if (end && !*end && requested > 0 && requested <= RDPEUDP_RECOVERY_TRACE_MAX_CAPACITY)
+			trace->capacity = (size_t)requested;
+		else
+			trace->invalid = TRUE;
+	}
+	trace->events = calloc(trace->capacity, sizeof(*trace->events));
+	if (!trace->events)
+		trace->invalid = TRUE;
+	trace->startNs = winpr_GetTickCount64NS();
+	if (trace->armed && trace->events)
+	{
+		rdpeudp_recovery_clock_mapping(trace);
+		trace->armNs = trace->startNs;
+		UdpRecoveryEvent* arm = &trace->events[trace->count++];
+		arm->timeNs = trace->armNs;
+		arm->kind = UDP_RECOVERY_ARM;
+		arm->expectedChannel = udp->expectedChannelSeq;
+		arm->recvBase = arm->oldBase = arm->newBase = udp->recvDataBase;
+		arm->bytes = (UINT32)RDPEUDP2_RECEIPT_WINDOW;
+		const size_t bits = RDPEUDP2_RECEIPT_WINDOW < sizeof(arm->wire) * 8
+		                        ? RDPEUDP2_RECEIPT_WINDOW
+		                        : sizeof(arm->wire) * 8;
+		arm->status = (UINT32)bits;
+		arm->detail = (UINT32)udp->recvDataCount;
+		arm->wireLength = (UINT16)((bits + 7) / 8);
+	}
+	udp->recoveryTrace = trace;
+}
+
+static UdpRecoveryEvent* rdpeudp_recovery_event_locked(rdpUdpTransport* udp, UINT32 kind)
+{
+	UdpRecoveryTrace* trace = udp->recoveryTrace;
+	if (!trace || trace->flushed)
+		return nullptr;
+	const UINT64 now = rdpeudp_recv_now_ns(udp);
+	if (!trace->armed)
+	{
+		if (now < trace->nextArmProbeNs)
+			return nullptr;
+		trace->nextArmProbeNs = now + 1000000000ULL;
+		if (!trace->armPath || !PathFileExistsA(trace->armPath))
+			return nullptr;
+		trace->armed = TRUE;
+		trace->armNs = now;
+		rdpeudp_recovery_clock_mapping(trace);
+		UdpRecoveryEvent* arm = rdpeudp_recovery_event_locked(udp, UDP_RECOVERY_ARM);
+		if (arm)
+		{
+			arm->oldBase = arm->newBase = udp->recvDataBase;
+			const size_t bits = RDPEUDP2_RECEIPT_WINDOW < sizeof(arm->wire) * 8
+			                        ? RDPEUDP2_RECEIPT_WINDOW
+			                        : sizeof(arm->wire) * 8;
+			arm->bytes = (UINT32)RDPEUDP2_RECEIPT_WINDOW;
+			arm->status = (UINT32)bits;
+			arm->detail = (UINT32)udp->recvDataCount;
+			arm->wireLength = (UINT16)((bits + 7) / 8);
+			size_t seen = 0;
+			for (size_t i = 0; i < bits; i++)
+			{
+				if (rdpeudp_recv_data_seen_locked(udp, (UINT16)(udp->recvDataBase + i)))
+				{
+					arm->wire[i / 8] |= (BYTE)(1u << (i % 8));
+					seen++;
+				}
+			}
+			/* A partial initial state cannot establish later absences. */
+			if (seen != udp->recvDataCount)
+				trace->invalid = TRUE;
+		}
+		WLog_INFO(TAG, "UDP recovery trace armed at %" PRIu64 " ns", now);
+	}
+	if (!trace->events || trace->count >= trace->capacity)
+	{
+		trace->dropped++;
+		trace->invalid = TRUE;
+		return nullptr;
+	}
+	UdpRecoveryEvent* event = &trace->events[trace->count++];
+	event->timeNs = rdpeudp_recv_now_ns(udp);
+	event->kind = kind;
+	event->expectedChannel = udp->expectedChannelSeq;
+	event->recvBase = udp->recvDataBase;
+	event->bufferedChunks = (UINT32)udp->recvBufferedChunks;
+	event->ownedBytes = (UINT32)(udp->recvBufferedBytes + rdpeudp_recv_pending_stream_locked(udp));
+	return event;
+}
+
+static BOOL rdpeudp_recovery_hash(UdpRecoveryEvent* event, const BYTE* data, size_t length)
+{
+	if (!event)
+		return TRUE;
+	BYTE digest[SHA256_DIGEST_LENGTH] = { 0 };
+	if (!SHA256(data, length, digest))
+		return FALSE;
+	memcpy(event->hash, digest, sizeof(event->hash));
+	return TRUE;
+}
+
+static UdpRecoveryEvent* rdpeudp_recovery_window_locked(rdpUdpTransport* udp, UINT32 kind,
+                                                        UINT16 newBase, size_t advance)
+{
+	UdpRecoveryEvent* event = rdpeudp_recovery_event_locked(udp, kind);
+	if (!event)
+		return nullptr;
+	event->oldBase = udp->recvDataBase;
+	event->newBase = newBase;
+	event->bytes = (UINT32)advance;
+	const size_t window = RDPEUDP2_RECEIPT_WINDOW;
+	for (size_t i = 0; i < advance; i++)
+		event->detail +=
+		    i >= window || !rdpeudp_recv_data_seen_locked(udp, (UINT16)(udp->recvDataBase + i))
+		        ? 1u
+		        : 0u;
+	const size_t bits = window < sizeof(event->wire) * 8 ? window : sizeof(event->wire) * 8;
+	event->wireLength = (UINT16)((bits + 7) / 8);
+	event->status = (UINT32)bits;
+	for (size_t i = 0; i < bits; i++)
+	{
+		if (rdpeudp_recv_data_seen_locked(udp, (UINT16)(udp->recvDataBase + i)))
+			event->wire[i / 8] |= (BYTE)(1u << (i % 8));
+	}
+	return event;
+}
+
+static void rdpeudp_recovery_hex(FILE* file, const BYTE* bytes, size_t count)
+{
+	for (size_t i = 0; i < count; i++)
+		(void)fprintf(file, "%02x", bytes[i]);
+}
+
+static void rdpeudp_recovery_flush_locked(rdpUdpTransport* udp, const char* reason)
+{
+	static const char* names[] = {
+		"unknown", "rx_data", "rx_aoa",           "auto_slide", "window_progress",
+		"tx_ack",  "tx_data", "channel_progress", "gap",        "failure",
+		"arm"
+	};
+	UdpRecoveryTrace* trace = udp->recoveryTrace;
+	if (!trace || trace->flushed)
+		return;
+	trace->flushed = TRUE;
+	/* Never replace a previous diagnostic, even across a reconnect. */
+	FILE* file = fopen(trace->path, "wx");
+	if (!file)
+	{
+		WLog_ERR(TAG, "UDP recovery trace could not create %s", trace->path);
+		return;
+	}
+	const UINT64 wallResolution =
+#if defined(_WIN32)
+	    16000000ULL;
+#else
+	    1000000ULL;
+#endif
+	(void)fprintf(
+	    file,
+	    "{\"type\":\"metadata\",\"schema_version\":1,\"clock\":\"winpr_GetTickCount64NS\","
+	    "\"start_ns\":%" PRIu64 ",\"arm_ns\":%" PRIu64 ",\"armed\":%s,"
+	    "\"capacity\":%zu,\"count\":%zu,\"dropped\":%zu,"
+	    "\"valid\":%s,\"reason\":\"%s\",\"receive_window\":%zu,"
+	    "\"hash\":\"sha256-first-8-bytes\",\"payloads_recorded\":false,"
+	    "\"clock_mapping\":{\"raw_ns\":%" PRIu64 ",\"unix_100ns\":%" PRIu64
+	    ",\"bracket_ns\":%" PRIu64 ",\"wall_resolution_ns\":%" PRIu64
+	    ",\"max_uncertainty_ns\":%" PRIu64 "}}\n",
+	    trace->startNs, trace->armNs, trace->armed ? "true" : "false", trace->capacity,
+	    trace->count, trace->dropped, trace->invalid || !trace->armed ? "false" : "true", reason,
+	    RDPEUDP2_RECEIPT_WINDOW, trace->wallRawNs, trace->wallUnix100ns, trace->wallBracketNs,
+	    wallResolution, trace->wallBracketNs / 2 + wallResolution);
+	for (size_t i = 0; i < trace->count; i++)
+	{
+		const UdpRecoveryEvent* event = &trace->events[i];
+		const char* name = event->kind < ARRAYSIZE(names) ? names[event->kind] : names[0];
+		(void)fprintf(
+		    file,
+		    "{\"type\":\"event\",\"seq\":%zu,\"event\":\"%s\",\"time_ns\":%" PRIu64
+		    ",\"data_seq\":%" PRIu16 ",\"channel_seq\":%" PRIu16 ",\"expected_channel\":%" PRIu16
+		    ",\"recv_base\":%" PRIu16 ",\"flags\":%" PRIu16 ",\"aoa\":%" PRIu16
+		    ",\"old_base\":%" PRIu16 ",\"new_base\":%" PRIu16 ",\"detail\":%" PRIu32
+		    ",\"status\":%" PRIu32 ",\"bytes\":%" PRIu32 ",\"buffered_chunks\":%" PRIu32
+		    ",\"owned_bytes\":%" PRIu32 ",\"hash_hex\":\"",
+		    i, name, event->timeNs, event->dataSeq, event->channelSeq, event->expectedChannel,
+		    event->recvBase, event->flags, event->aoa, event->oldBase, event->newBase,
+		    event->detail, event->status, event->bytes, event->bufferedChunks, event->ownedBytes);
+		rdpeudp_recovery_hex(file, event->hash, sizeof(event->hash));
+		(void)fprintf(file, "\",\"wire_hex\":\"");
+		rdpeudp_recovery_hex(file, event->wire, event->wireLength);
+		(void)fprintf(file, "\"}\n");
+	}
+	(void)fprintf(file, "{\"type\":\"footer\",\"count\":%zu,\"dropped\":%zu,\"valid\":%s}\n",
+	              trace->count, trace->dropped, trace->invalid || !trace->armed ? "false" : "true");
+	const BOOL ok = !ferror(file);
+	if (fclose(file) != 0 || !ok)
+		WLog_ERR(TAG, "UDP recovery trace export failed for %s", trace->path);
+}
+
+static void rdpeudp_recovery_failure_locked(rdpUdpTransport* udp, UINT32 reason)
+{
+	UdpRecoveryEvent* event = rdpeudp_recovery_event_locked(udp, UDP_RECOVERY_FAILURE);
+	if (event)
+		event->detail = reason;
+	rdpeudp_recovery_flush_locked(udp, "transport_failure");
 }
 
 static BOOL rdpeudp_recv_alloc_allowed_locked(rdpUdpTransport* udp)
@@ -1430,6 +1790,7 @@ static BOOL rdpeudp_check_stream_health(rdpUdpTransport* udp)
 		         now - udp->recvGapSince, udp->expectedChannelSeq, udp->recvBufferedChunks,
 		         udp->recvDataBase);
 		udp->recvFailed = TRUE;
+		rdpeudp_recovery_failure_locked(udp, 1);
 	}
 	const BOOL healthy = !udp->recvFailed && !udp->sendFailed;
 	LeaveCriticalSection(&udp->lock);
@@ -1634,6 +1995,7 @@ rdpUdpTransport* rdpeudp_new(rdpContext* context, const char* hostname, int port
 	}
 
 	InitializeCriticalSection(&udp->lock);
+	rdpeudp_recovery_trace_init(udp);
 	return udp;
 }
 
@@ -1644,6 +2006,7 @@ void rdpeudp_free(rdpUdpTransport* udp)
 		return;
 
 	EnterCriticalSection(&udp->lock);
+	rdpeudp_recovery_flush_locked(udp, "teardown");
 	if (udp->tunnelEstablished && udp->sockfd >= 0)
 	{
 		/* One receipt for an established association, including normal client
@@ -1686,6 +2049,13 @@ void rdpeudp_free(rdpUdpTransport* udp)
 		for (size_t n = 0; n < ARRAYSIZE(page->slots); n++)
 			free(page->slots[n].data);
 		free(page);
+	}
+	if (udp->recoveryTrace)
+	{
+		free(udp->recoveryTrace->events);
+		free(udp->recoveryTrace->armPath);
+		free(udp->recoveryTrace->path);
+		free(udp->recoveryTrace);
 	}
 	Stream_Release(udp->recvStream);
 	udp->recvStream = nullptr;
@@ -2146,6 +2516,79 @@ void rdpeudp_update_event(rdpUdpTransport* udp)
 		(void)SetEvent(stateEvent);
 }
 
+static void rdpeudp_recovery_wire_locked(rdpUdpTransport* udp, const BYTE* wire, size_t length,
+                                         UdpRecoveryEvent** ackEvent, UdpRecoveryEvent** dataEvent)
+{
+	*ackEvent = *dataEvent = nullptr;
+	if (!udp->recoveryTrace || !udp->recoveryTrace->armed || udp->recoveryTrace->flushed ||
+	    !udp->connected || !udp->useUdp2)
+		return;
+	BYTE copy[2048];
+	if (length > sizeof(copy))
+	{
+		udp->recoveryTrace->invalid = TRUE;
+		udp->recoveryTrace->dropped++;
+		return;
+	}
+	memcpy(copy, wire, length);
+	BOOL dummy = FALSE;
+	size_t offset = 0;
+	if (!rdpeudp2_unprotect(copy, length, &dummy, &offset))
+		return;
+	const BYTE shortLength = copy[0] >> 5;
+	const size_t layoutLength = shortLength < 7 ? shortLength : length - offset;
+	RdpUdp2Layout layout = { 0 };
+	if (!rdpeudp2_parse_layout(copy + offset, layoutLength, &layout))
+		return;
+	if (layout.hasAck || layout.hasAckvec)
+	{
+		UdpRecoveryEvent* event = rdpeudp_recovery_event_locked(udp, UDP_RECOVERY_TX_ACK);
+		*ackEvent = event;
+		if (event)
+		{
+			event->status = 2; /* Pending until the socket send completes. */
+			event->flags = layout.flags;
+			event->aoa = layout.hasAoa ? layout.aoa : 0;
+			event->dataSeq = layout.hasDataHeader ? layout.dataSeq : 0;
+			event->channelSeq = layout.hasDataBody ? layout.channelSeq : 0;
+			event->newBase = layout.hasAck
+			                     ? layout.ackBase
+			                     : (UINT16)(layout.ackvec[0] | ((UINT16)layout.ackvec[1] << 8));
+			const BYTE* body = layout.hasAckvec ? layout.ackvec : copy + offset + 2;
+			const size_t count = layout.hasAckvec ? layout.ackvecLen : 7 + layout.ackDelayedLen;
+			if (count <= sizeof(event->wire))
+			{
+				event->wireLength = (UINT16)count;
+				memcpy(event->wire, body, count);
+			}
+			else
+				udp->recoveryTrace->invalid = TRUE;
+		}
+	}
+	if (layout.hasDataHeader)
+	{
+		UdpRecoveryEvent* event = rdpeudp_recovery_event_locked(udp, UDP_RECOVERY_TX_DATA);
+		*dataEvent = event;
+		if (event)
+		{
+			event->status = 2;
+			event->flags = layout.flags;
+			event->aoa = layout.hasAoa ? layout.aoa : 0;
+			event->dataSeq = layout.dataSeq;
+			event->channelSeq = layout.channelSeq;
+			event->bytes = (UINT32)layout.dataBodyLen;
+			event->detail = UINT32_MAX;
+			for (size_t i = 0; i < ARRAYSIZE(udp->sent); i++)
+			{
+				if (udp->sent[i].data && udp->sent[i].dataSeq == layout.dataSeq)
+					event->detail = udp->sent[i].retries;
+			}
+			if (!rdpeudp_recovery_hash(event, layout.dataBody, layout.dataBodyLen))
+				udp->recoveryTrace->invalid = TRUE;
+		}
+	}
+}
+
 static BOOL rdpeudp_udp_send_stream(rdpUdpTransport* udp, wStream* s)
 {
 	WINPR_ASSERT(udp);
@@ -2154,8 +2597,21 @@ static BOOL rdpeudp_udp_send_stream(rdpUdpTransport* udp, wStream* s)
 	const BYTE* data = Stream_Buffer(s);
 	if (len == 0)
 		return FALSE;
+	UdpRecoveryEvent* ackEvent = nullptr;
+	UdpRecoveryEvent* dataEvent = nullptr;
+	if (udp->recoveryTrace)
+	{
+		EnterCriticalSection(&udp->lock);
+		rdpeudp_recovery_wire_locked(udp, data, len, &ackEvent, &dataEvent);
+	}
 	const SSIZE_T sent = udp->testSend ? udp->testSend(udp->testSendContext, data, len)
 	                                   : freerdp_udp_send(udp->sockfd, data, len);
+	if (ackEvent)
+		ackEvent->status = sent == (SSIZE_T)len ? 1 : 0;
+	if (dataEvent)
+		dataEvent->status = sent == (SSIZE_T)len ? 1 : 0;
+	if (udp->recoveryTrace)
+		LeaveCriticalSection(&udp->lock);
 	if (sent > 0) performance_account(udp->context, TRUE, TRUE, (size_t)sent);
 	if (sent != (SSIZE_T)len)
 		return FALSE;
@@ -2300,102 +2756,95 @@ static void rdpeudp_ack_cumulative_locked(rdpUdpTransport* udp, UINT16 base)
 
 static void rdpeudp_slide_recv_data_locked(rdpUdpTransport* udp, size_t advance)
 {
-	const size_t win = ARRAYSIZE(udp->recvDataSeen);
-	const size_t count = (advance < win) ? advance : win;
+	/* A real received prefix or peer AOA owns retirement. A higher DATA
+	 * sequence never permits forgetting a still-unreceived transmission. */
 	for (size_t i = 0; i < advance; i++)
 	{
 		const UINT16 seq = (UINT16)(udp->recvDataBase + i);
-		BOOL valid = FALSE;
-		const UINT64 arrival = rdpeudp2_arrival_locked(udp, seq, &valid);
-		udp->recvInOrderArrivalValid = i < win && udp->recvDataSeen[i] && valid;
-		udp->recvInOrderArrivalNs = udp->recvInOrderArrivalValid ? arrival : 0;
-		if (!udp->recvInOrderArrivalValid)
+		UdpRecvReceipt* receipt = &udp->recvReceipts[seq & (RDPEUDP2_RECEIPT_WINDOW - 1)];
+		const BOOL seen = receipt->received && receipt->seq == seq;
+		udp->recvInOrderArrivalValid = seen && receipt->arrivalValid;
+		udp->recvInOrderArrivalNs = udp->recvInOrderArrivalValid ? receipt->arrivalNs : 0;
+		if (!seen)
 		{
-			UdpRecvArrival* old = &udp->recvArrival[seq % ARRAYSIZE(udp->recvArrival)];
-			if (old->seq == seq)
-				old->valid = FALSE;
-		}
-		if ((i >= win) || !udp->recvDataSeen[i])
-		{
-			/* An unseen packet could contain the next original channel.
-			 * Older recovered loss cannot contain zero unless this bound
-			 * reaches the wrap. Never infer a skip once that is possible. */
+			if (receipt->seq == seq)
+				receipt->arrivalValid = FALSE;
+			/* Missing attempts may have introduced a channel label. Preserve
+			 * that evidence when deciding whether zero was omitted at wrap. */
 			if (udp->recvChannelUpperBound == UINT16_MAX)
 				udp->recvChannelZeroUncertain = TRUE;
 			else
 				udp->recvChannelUpperBound++;
 		}
-		else if (udp->recvDataChannel[i] != UINT32_MAX)
+		else
 		{
-			const UINT16 channel = (UINT16)udp->recvDataChannel[i];
-			if (channel > udp->recvChannelUpperBound)
-				udp->recvChannelUpperBound = channel;
+			if (receipt->channel != UINT32_MAX && receipt->channel > udp->recvChannelUpperBound)
+				udp->recvChannelUpperBound = (UINT16)receipt->channel;
+			receipt->received = FALSE;
+			udp->recvDataCount--;
 		}
 	}
-	memmove(udp->recvDataSeen, udp->recvDataSeen + count, (win - count) * sizeof(BOOL));
-	memset(udp->recvDataSeen + (win - count), 0, count * sizeof(BOOL));
-	memmove(udp->recvDataChannel, udp->recvDataChannel + count, (win - count) * sizeof(UINT32));
 }
 
-static void rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq, UINT32 channel)
+static BOOL rdpeudp_note_recv_data_seq_locked(rdpUdpTransport* udp, UINT16 dseq, UINT32 channel)
 {
-	/* V1: fixed 1-start base, never rebase from first arrival. Out-of-order
-	 * chunks are buffered (seen bitmap); base advances only on contiguous
-	 * prefix. haveRealData gates ACK emission; haveSeenAoa feeds the epoch
-	 * rule in recv_one. */
-	const size_t WIN = ARRAYSIZE(udp->recvDataSeen);
-	INT16 diff = (INT16)(dseq - udp->recvDataBase);
-	if (!udp->haveRecvData && !udp->haveSeenAoa && (diff >= (INT16)WIN))
+	UINT16 ahead = (UINT16)(dseq - udp->recvDataBase);
+	if (!udp->haveRecvData && !udp->haveSeenAoa && ahead >= RDPEUDP2_INITIAL_EPOCH_THRESHOLD &&
+	    ahead < RDPEUDP2_RECEIPT_WINDOW)
 	{
-		/* Initial epoch sync: the very first DATA starts far ahead of the
-		 * fixed base (peer counters start at 100+). Sliding would leave a
-		 * phantom 1..N gap so every cumulative ACK references ancient
-		 * history the peer ignores (observed: base stuck, zero valid ACKs,
-		 * peer retransmits forever). Adopt the first far-ahead seq as the
-		 * epoch instead. Scoped to pre-first-DATA only, so mid-session
-		 * jumps keep slide semantics and in-window reordering still
-		 * buffers (V1). Gated on !haveSeenAoa (P2): once an AOA fixed
-		 * the epoch, DataSeq alone must never skip unreceived sequences
-		 * again — the AOA block above owns that boundary now. */
+		/* Keep the established first far-start compatibility rule independent
+		 * of the new half-space window. In-window reordering still starts at 1;
+		 * a peer AOA, once observed, exclusively establishes the epoch. */
 		udp->recvDataBase = dseq;
 		udp->ackedSeq = (UINT16)(dseq - 1);
 		udp->recvInOrderArrivalValid = FALSE;
-		diff = 0;
+		ahead = 0;
 	}
-	if (diff < 0)
-		return; /* duplicate/old, still acked via base-1 */
-	if ((size_t)diff >= WIN)
+	if (ahead == RDPEUDP2_RECEIPT_WINDOW)
+		return FALSE; /* Exact half-space cannot distinguish old from ahead. */
+	if (ahead > RDPEUDP2_RECV_MAX_FORWARD)
+		return TRUE; /* Old receipt; the current truthful prefix remains the ACK. */
+
+	UdpRecvReceipt* receipt = &udp->recvReceipts[dseq & (RDPEUDP2_RECEIPT_WINDOW - 1)];
+	if (receipt->received && receipt->seq != dseq)
 	{
-		/* Window slide: advance base to dseq-WIN+1, dropping old */
-		const UINT16 newBase = (UINT16)(dseq - (WIN - 1));
-		const INT16 adv = (INT16)(newBase - udp->recvDataBase);
-		if (adv > 0)
-		{
-			rdpeudp_slide_recv_data_locked(udp, (size_t)adv);
-			udp->recvDataBase = newBase;
-			diff = (INT16)(dseq - udp->recvDataBase);
-		}
-		else
-			return;
+		WLog_ERR(TAG, "UDP receipt ring contains another active epoch; reconnect required");
+		udp->recvFailed = TRUE;
+		return FALSE;
 	}
-	UdpRecvArrival* arrival = &udp->recvArrival[dseq % ARRAYSIZE(udp->recvArrival)];
-	if (!arrival->valid || arrival->seq != dseq)
+	if (!receipt->received)
 	{
-		arrival->valid = TRUE;
-		arrival->seq = dseq;
-		arrival->ns = rdpeudp_recv_now_ns(udp);
+		receipt->seq = dseq;
+		receipt->channel = channel;
+		receipt->arrivalNs = rdpeudp_recv_now_ns(udp);
+		receipt->arrivalValid = TRUE;
+		receipt->received = TRUE;
+		if (!udp->recvDataCount || ahead > (UINT16)(udp->recvDataHighest - udp->recvDataBase))
+			udp->recvDataHighest = dseq;
+		udp->recvDataCount++;
 	}
-	udp->recvDataSeen[diff] = TRUE;
-	udp->recvDataChannel[diff] = channel;
 	udp->haveRecvData = TRUE;
-	/* Advance base while contiguous */
-	while (udp->recvDataSeen[0])
+	const UINT16 oldBase = udp->recvDataBase;
+	while (rdpeudp_recv_data_seen_locked(udp, udp->recvDataBase))
 	{
 		rdpeudp_slide_recv_data_locked(udp, 1);
 		udp->recvDataBase++;
 	}
+	if (oldBase != udp->recvDataBase)
+	{
+		UdpRecoveryEvent* progress =
+		    rdpeudp_recovery_event_locked(udp, UDP_RECOVERY_WINDOW_PROGRESS);
+		if (progress)
+		{
+			progress->oldBase = oldBase;
+			progress->newBase = udp->recvDataBase;
+			progress->dataSeq = dseq;
+			progress->channelSeq = channel == UINT32_MAX ? 0 : (UINT16)channel;
+		}
+	}
 	udp->lastAckSent = dseq;
 	udp->stats.recvPackets++;
+	return TRUE;
 }
 
 static BOOL rdpeudp_can_skip_channel_zero_locked(const rdpUdpTransport* udp)
@@ -2416,17 +2865,15 @@ static BOOL rdpeudp_can_skip_channel_zero_locked(const rdpUdpTransport* udp)
 		return TRUE;
 	if (udp->recvChannelZeroUncertain)
 		return FALSE;
-	for (size_t i = 0; i < ARRAYSIZE(udp->recvDataSeen); i++)
-	{
-		if (udp->recvDataSeen[i])
-			return FALSE;
-	}
+	if (udp->recvDataCount)
+		return FALSE;
 	return TRUE;
 }
 
 static void rdpeudp_deliver_recv_data_locked(rdpUdpTransport* udp)
 {
 	const UINT16 previous = udp->expectedChannelSeq;
+	const BOOL gapBefore = udp->recvGapActive;
 	while (TRUE)
 	{
 		UdpRecvSlot* slot = rdpeudp_recv_slot_locked(udp, udp->expectedChannelSeq);
@@ -2451,6 +2898,7 @@ static void rdpeudp_deliver_recv_data_locked(rdpUdpTransport* udp)
 		{
 			WLog_ERR(TAG, "UDP receive stream allocation failed; reconnect required");
 			udp->recvFailed = TRUE;
+			rdpeudp_recovery_failure_locked(udp, 3);
 			break;
 		}
 		if (udp->expectedChannelSeq == 0)
@@ -2484,6 +2932,22 @@ static void rdpeudp_deliver_recv_data_locked(rdpUdpTransport* udp)
 	if (pending && (!udp->recvGapActive || (previous != udp->expectedChannelSeq)))
 		udp->recvGapSince = rdpeudp_recv_now(udp);
 	udp->recvGapActive = pending;
+	if (previous != udp->expectedChannelSeq)
+	{
+		UdpRecoveryEvent* progress =
+		    rdpeudp_recovery_event_locked(udp, UDP_RECOVERY_CHANNEL_PROGRESS);
+		if (progress)
+		{
+			progress->oldBase = previous;
+			progress->newBase = udp->expectedChannelSeq;
+		}
+	}
+	if (gapBefore != udp->recvGapActive || (pending && previous != udp->expectedChannelSeq))
+	{
+		UdpRecoveryEvent* gap = rdpeudp_recovery_event_locked(udp, UDP_RECOVERY_GAP);
+		if (gap)
+			gap->detail = pending ? 1 : 0;
+	}
 }
 
 /* ---- unit-test driver (no sockets; see rdpeudp.h) ----
@@ -2549,6 +3013,19 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 		/* Malformed datagrams cannot keep a dead peer alive. */
 		udp->lastRecvTs = rdpeudp_recv_now(udp);
 		udp->stats.recvPackets++;
+		UdpRecoveryEvent* rxRecovery =
+		    L.hasDataHeader ? rdpeudp_recovery_event_locked(udp, UDP_RECOVERY_RX_DATA) : nullptr;
+		if (rxRecovery)
+		{
+			rxRecovery->dataSeq = L.dataSeq;
+			rxRecovery->channelSeq = L.hasDataBody ? L.channelSeq : 0;
+			rxRecovery->flags = L.flags;
+			rxRecovery->aoa = L.hasAoa ? L.aoa : 0;
+			rxRecovery->bytes = (UINT32)L.dataBodyLen;
+			rxRecovery->detail = dummy ? 4 : 0;
+			if (!rdpeudp_recovery_hash(rxRecovery, L.dataBody, L.dataBodyLen))
+				udp->recoveryTrace->invalid = TRUE;
+		}
 		rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_RECEIVE,
 		                            L.hasDataHeader ? L.dataSeq : 0,
 		                            L.hasDataBody ? L.channelSeq : 0, L.flags, 0);
@@ -2561,6 +3038,14 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 		if (L.hasAoa)
 		{
 			const INT16 advance = (INT16)(L.aoa - udp->recvDataBase);
+			UdpRecoveryEvent* aoaRecovery = rdpeudp_recovery_window_locked(
+			    udp, UDP_RECOVERY_RX_AOA, advance > 0 ? L.aoa : udp->recvDataBase,
+			    advance > 0 ? (size_t)advance : 0);
+			if (aoaRecovery)
+			{
+				aoaRecovery->aoa = L.aoa;
+				aoaRecovery->dataSeq = L.hasDataHeader ? L.dataSeq : 0;
+			}
 			if (advance > 0)
 			{
 				const BOOL zeroUncertain = udp->recvChannelZeroUncertain;
@@ -2570,7 +3055,7 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 				 * used. Later AOA retirement must retain real-gap evidence. */
 				if (!udp->haveSeenAoa && !udp->haveRealData)
 					udp->recvChannelZeroUncertain = zeroUncertain;
-				while (udp->recvDataSeen[0])
+				while (rdpeudp_recv_data_seen_locked(udp, udp->recvDataBase))
 				{
 					rdpeudp_slide_recv_data_locked(udp, 1);
 					udp->recvDataBase++;
@@ -2635,18 +3120,30 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 		}
 
 		const BOOL channelGapBefore = udp->recvGapActive;
-		BOOL ackEligible = TRUE;
+		BOOL ackEligible =
+		    !L.hasDataHeader || (UINT16)(L.dataSeq - udp->recvDataBase) != RDPEUDP2_RECEIPT_WINDOW;
+		if (!ackEligible && rxRecovery)
+			rxRecovery->detail = 5;
 		/* DataBody (ChannelSeqNum + Data) follows ACKVEC per spec. */
-		if (!dummy && L.hasDataHeader && L.hasDataBody)
+		if (!dummy && L.hasDataHeader && L.hasDataBody && ackEligible)
 		{
 			const UINT16 cseq = L.channelSeq;
 			const BYTE* dp = L.dataBody;
 			const size_t drem = L.dataBodyLen;
+			const UINT16 distance = (UINT16)(cseq - udp->expectedChannelSeq);
+			const UdpRecvSlot* retained = rdpeudp_recv_slot_locked(udp, cseq);
+			const BOOL duplicate = retained && retained->occupied;
 
 			/* Retain channel bytes before marking their DataSeq received. A
 			 * full 16-bit index cannot collide with another channel label. */
 			if (!rdpeudp_recv_retain_locked(udp, cseq, dp, drem, &ackEligible))
 				udp->recvFailed = TRUE;
+			if (rxRecovery)
+				rxRecovery->detail = udp->recvFailed                        ? 6
+				                     : !ackEligible                         ? 5
+				                     : distance > RDPEUDP2_RECV_MAX_FORWARD ? 3
+				                     : duplicate                            ? 2
+				                                                            : 1;
 		}
 
 		if (L.hasDataHeader && ackEligible && !udp->recvFailed)
@@ -2662,11 +3159,13 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 			 * translation above. AOA retires transmission attempts; it
 			 * does not discard still-required channel bytes. A DataSeq
 			 * alone cannot prove preceding attempts need no ACK. */
-			rdpeudp_note_recv_data_seq_locked(
+			ackEligible = rdpeudp_note_recv_data_seq_locked(
 			    udp, L.dataSeq, (!dummy && L.hasDataBody) ? L.channelSeq : UINT32_MAX);
-			if (!dummy)
+			if (!dummy && ackEligible)
 				udp->haveRealData = TRUE;
 		}
+		if (udp->recvFailed)
+			rdpeudp_recovery_failure_locked(udp, 2);
 
 		/* A duplicate or dummy can close the last DataSeq gap at wrap. */
 		rdpeudp_deliver_recv_data_locked(udp);
@@ -2773,6 +3272,9 @@ BOOL rdpeudp_test_recv_state(const rdpUdpTransport* udp, RdpUdpTestRecvState* ou
 	out->recvPeakBufferedChunks = udp->recvPeakBufferedChunks;
 	out->recvPeakBufferedSpan = udp->recvPeakBufferedSpan;
 	out->recvStreamCapacity = Stream_Capacity(udp->recvStream);
+	out->recvDataWindowLimit = RDPEUDP2_RECEIPT_WINDOW;
+	out->recvDataCount = udp->recvDataCount;
+	out->recvDataSpan = rdpeudp_recv_data_span_locked(udp);
 	out->recvFailed = udp->recvFailed;
 	LeaveCriticalSection((CRITICAL_SECTION*)&udp->lock);
 	return TRUE;
@@ -2824,8 +3326,8 @@ BOOL rdpeudp_test_seen(const rdpUdpTransport* udp, size_t i)
 	if (!udp)
 		return FALSE;
 	EnterCriticalSection((CRITICAL_SECTION*)&udp->lock);
-	if (i < ARRAYSIZE(udp->recvDataSeen))
-		v = udp->recvDataSeen[i];
+	if (i < RDPEUDP2_RECEIPT_WINDOW)
+		v = rdpeudp_recv_data_seen_locked(udp, (UINT16)(udp->recvDataBase + i));
 	LeaveCriticalSection((CRITICAL_SECTION*)&udp->lock);
 	return v;
 }
@@ -2887,6 +3389,18 @@ static BOOL rdpeudp_recv_one(rdpUdpTransport* udp, DWORD timeoutMs, BOOL* haveV1
 	return TRUE;
 }
 
+typedef struct
+{
+	const rdpUdpTransport* udp;
+	UINT16 base;
+} RdpUdpRecvAckVec;
+
+static BOOL rdpeudp_ackvec_receipt_state(const void* context, size_t index)
+{
+	const RdpUdpRecvAckVec* window = context;
+	return rdpeudp_recv_data_seen_locked(window->udp, (UINT16)(window->base + index));
+}
+
 static BOOL rdpeudp2_send_ack_locked(rdpUdpTransport* udp)
 {
 	/* Build the complete packet without releasing the lock. Base, bitmap,
@@ -2901,18 +3415,22 @@ static BOOL rdpeudp2_send_ack_locked(rdpUdpTransport* udp)
 	wStream* vector = nullptr;
 	if (gap)
 	{
-		size_t count = ARRAYSIZE(udp->recvDataSeen);
-		while (count > 1 && !udp->recvDataSeen[count - 1])
-			count--;
-		const UINT16 highest = (UINT16)(udp->recvDataBase + count - 1);
-		BOOL valid = FALSE;
-		UINT64 arrival = rdpeudp2_arrival_locked(udp, highest, &valid);
+		const RdpUdpRecvAckVec window = { udp, udp->recvDataBase };
+		RdpUdpAckVecEncoding encoded = { 0 };
+		if (!rdpeudp_encode_ackvec_states(&window, rdpeudp_ackvec_receipt_state,
+		                                  rdpeudp_recv_data_span_locked(udp), &encoded))
+			return FALSE;
 		const UINT64 now = rdpeudp_recv_now_ns(udp);
-		if (!valid)
-			arrival = now;
-		const UINT32 timestamp = (UINT32)((arrival / 4000ULL) & 0xFFFFFFULL);
-		vector = rdpeudp_build_ackvec(udp->recvDataBase, udp->recvDataSeen, count, TRUE, timestamp,
-		                              rdpeudp2_ack_gap(udp->recvLatestArrivalNs, now));
+		BOOL valid = FALSE;
+		UINT64 arrival = 0;
+		if (encoded.highestReceived != SIZE_MAX)
+			arrival = rdpeudp2_arrival_locked(
+			    udp, (UINT16)(udp->recvDataBase + encoded.highestReceived), &valid);
+		/* The timestamp describes only a positive receipt represented on wire.
+		 * A full coded prefix may contain only pending nodes; omit TS then. */
+		const UINT32 timestamp = valid ? (UINT32)((arrival / 4000ULL) & 0xFFFFFFULL) : 0;
+		vector = rdpeudp_ackvec_stream(udp->recvDataBase, &encoded, valid, timestamp,
+		                               rdpeudp2_ack_gap(udp->recvLatestArrivalNs, now));
 		if (!vector)
 			return FALSE; /* Never fall back to a cumulative ACK over a hole. */
 	}
@@ -3343,6 +3861,7 @@ pump_fail:
 	rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_PUMP_EXIT, 0, 0, udp->sendBytes, 0);
 fail:
 	udp->sendFailed = TRUE;
+	rdpeudp_recovery_failure_locked(udp, 4);
 	LeaveCriticalSection(&udp->lock);
 	return FALSE;
 }
@@ -4617,6 +5136,7 @@ rdpUdpTransport* rdpeudp_accept_ex(rdpContext* context, int port, UINT32 expecte
 		return nullptr;
 	}
 	InitializeCriticalSection(&udp->lock);
+	rdpeudp_recovery_trace_init(udp);
 
 	udp->sockfd = rdpeudp_bind_udp(port);
 	if (udp->sockfd < 0)

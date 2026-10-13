@@ -96,6 +96,42 @@ class UpstreamMethodTests(unittest.TestCase):
             self.assertEqual(len(plan['source_files']),6)
             self.assertTrue(all(len(row['sha256'])==64 for row in plan['source_files']))
 
+    def test_continuous_counter_stream_keeps_every_rate_and_lost_provider_event(self):
+        baseline=dict(sample(start='2026-10-13T12:00:00Z',end='2026-10-13T12:00:00Z',value=99),
+                      type='baseline',interval_start_utc=None,baseline=True)
+        first=sample(start='2026-10-13T12:00:00Z',end='2026-10-13T12:00:10Z',value=30)
+        second=sample(start='2026-10-13T12:00:10Z',end='2026-10-13T12:00:20Z',value=20)
+        lost=dict(type='collector_error',utc='2026-10-13T12:00:30Z',error='No data to return')
+        ended=dict(type='collector_end',utc='2026-10-13T12:00:30Z',observed_counter_sets=3)
+        report=method.summarize(campaign(),[baseline,first,second,lost,ended])
+        metric=report['steps'][0]['metrics']['server_output_fps']
+        self.assertEqual(metric['n'],2)
+        self.assertEqual(metric['mean'],25)
+        self.assertEqual(report['counter_diagnostics'],[baseline,lost,ended])
+
+    def test_client_exit_before_ten_second_interval_does_not_promote_baseline(self):
+        cfg=campaign();cfg['steps'][0].update(end_utc='2026-10-13T12:00:08Z',
+                                            outcome='SESSION_ENDED',client_alive_end=False)
+        baseline=dict(sample(end='2026-10-13T12:00:00Z',value=99),type='baseline',interval_start_utc=None)
+        completed_after_exit=sample(start='2026-10-13T12:00:00Z',end='2026-10-13T12:00:10Z',value=30)
+        report=method.summarize(cfg,[baseline,completed_after_exit])
+        self.assertEqual(report['steps'][0]['metrics']['server_output_fps']['n'],0)
+        self.assertIsNone(report['steps'][0]['metrics']['server_output_fps']['mean'])
+        self.assertEqual(report['steps'][0]['outcome'],'SESSION_ENDED')
+
+    def test_collector_contract_has_one_stream_and_records_baseline_and_cadence(self):
+        source=(ROOT/'upstream-method/Collect-Counters.ps1').read_text()
+        self.assertEqual(source.count('Get-Counter -Counter'),1)
+        self.assertIn('-SampleInterval $Interval -MaxSamples $maxSets',source)
+        self.assertNotIn('-MaxSamples 2',source)
+        self.assertNotIn('Start-Sleep',source)
+        self.assertIn("type=if($baseline) {'baseline'} else {'sample'}",source)
+        self.assertIn('interval_start_utc=if(!$baseline) {$previousTimestamp',source)
+        self.assertIn('collector_sha256=',source)
+        self.assertIn('observed_interval_s=$span',source)
+        self.assertIn("type='collector_error'",source)
+        self.assertIn('raw_cooked_value=$raw;valid_for_rate=$valid',source)
+
     def test_csv_and_json_retain_unknown_fields(self):
         report=method.summarize(campaign(),[])
         with tempfile.TemporaryDirectory() as folder:

@@ -34,38 +34,69 @@ try { $available=@(Get-Counter -ListSet * -ErrorAction SilentlyContinue | Where-
 catch { $discoveryErrors+=$_.Exception.Message }
 $writer=[IO.StreamWriter]::new($OutFile,$false,[Text.UTF8Encoding]::new($false))
 $watch=[Diagnostics.Stopwatch]::StartNew()
+# One PDH query remains open for the whole run. The extra set establishes a
+# baseline; every subsequent set covers the interval since the previous one.
+$maxSets=[int][Math]::Ceiling($Seconds/[double]$Interval)+1
+$previousTimestamp=$null;$previousTicks=$null;$setCount=0;$errorCount=0
+$pendingErrors=[Collections.Generic.List[string]]::new()
+$cadences=[Collections.Generic.List[double]]::new()
+$terminalError=$null
 try {
- $metadata=@{type='metadata';schema_version=1;utc=[DateTime]::UtcNow.ToString('o');counter_instance=$Instance;
-  interval_s=$Interval;definitions=$definitions;available_sets=$available;discovery_errors=$discoveryErrors;
-  notes=@('Server output FPS does not establish physical client display rate.','All per-instance samples are retained; the report rejects ambiguous sessions.','Raw cooked values and nonzero PDH statuses are retained.')}
+ $metadata=@{type='metadata';schema_version=2;utc=[DateTime]::UtcNow.ToString('o');counter_instance=$Instance;
+  interval_s=$Interval;requested_counter_span_s=$Seconds;max_counter_sets=$maxSets;
+  sampling_mode='continuous Get-Counter stream; first set is baseline';
+  collector_sha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLower();
+  definitions=$definitions;available_sets=$available;discovery_errors=$discoveryErrors;
+  notes=@('Server output FPS does not establish physical client display rate.','All per-instance samples are retained; the report rejects ambiguous sessions.','The first set has no rate interval and never contributes cooked values to measured rates.','Raw cooked values, actual sample intervals and nonzero PDH statuses are retained.')}
  $writer.WriteLine(($metadata|ConvertTo-Json -Depth 10 -Compress));$writer.Flush()
- while($watch.Elapsed.TotalSeconds -lt $Seconds) {
-  $begin=[DateTime]::UtcNow.ToString('o');$beginTicks=[Diagnostics.Stopwatch]::GetTimestamp()
-  $row=@{type='sample';schema_version=1;interval_start_utc=$begin;interval_end_utc=$null;utc=$null;
-   monotonic_start_ticks=$beginTicks;monotonic_end_ticks=$null;frequency=[Diagnostics.Stopwatch]::Frequency;
-   counters=@();error=$null;errors=@();missing_metrics=@()}
-  $samples=@();$counterErrors=@();$batches=@()
-  try {
-   $batches=@(Get-Counter -Counter @($definitions|ForEach-Object {$_.path}) -SampleInterval $Interval -MaxSamples 2 -ErrorAction SilentlyContinue -ErrorVariable counterErrors)
-   if($batches.Count) { $samples=@($batches[-1].CounterSamples) }
-   if($batches.Count -gt 1) { $row.interval_start_utc=$batches[0].Timestamp.ToUniversalTime().ToString('o') }
-  } catch { $row.error=$_.Exception.Message }
-  $row.errors=@($counterErrors|ForEach-Object {$_.Exception.Message})
-  foreach($d in $definitions) {
-   $matches=@($samples|Where-Object { ($_.Path -split '\\')[-1] -ieq $d.localizedCounter -and $_.InstanceName -ine '_total' })
-   if(!$matches.Count) {$row.missing_metrics+=$d.metric}
-   foreach($sample in $matches) {
-    $value=$sample.CookedValue;if([double]::IsNaN($value) -or [double]::IsInfinity($value)) {$value=$null}
-    $row.counters+=@{metric=$d.metric;path=$sample.Path;instance=$sample.InstanceName;value=$value;status=$sample.Status;unit=$d.unit}
+ Get-Counter -Counter @($definitions|ForEach-Object {$_.path}) -SampleInterval $Interval -MaxSamples $maxSets -ErrorAction Continue 2>&1 | ForEach-Object {
+  $item=$_
+  if($item -is [Management.Automation.ErrorRecord]) {
+   $errorCount++;$message=$item.Exception.Message;$pendingErrors.Add($message)
+   $errorRow=@{type='collector_error';schema_version=2;utc=[DateTime]::UtcNow.ToString('o');
+    monotonic_ticks=[Diagnostics.Stopwatch]::GetTimestamp();frequency=[Diagnostics.Stopwatch]::Frequency;
+    error=$message;error_id=$item.FullyQualifiedErrorId;category=[string]$item.CategoryInfo;
+    last_sample_utc=if($null -ne $previousTimestamp) {$previousTimestamp.ToUniversalTime().ToString('o')} else {$null}}
+   $writer.WriteLine(($errorRow|ConvertTo-Json -Depth 6 -Compress));$writer.Flush()
+  } else {
+   $setCount++;$end=$item.Timestamp;$endTicks=[Diagnostics.Stopwatch]::GetTimestamp()
+   $baseline=$null -eq $previousTimestamp
+   $span=if(!$baseline) {($end-$previousTimestamp).TotalSeconds} else {$null}
+   if($null -ne $span) {$cadences.Add($span)}
+   $row=@{type=if($baseline) {'baseline'} else {'sample'};schema_version=2;sequence=$setCount;
+    interval_start_utc=if(!$baseline) {$previousTimestamp.ToUniversalTime().ToString('o')} else {$null};
+    interval_end_utc=$end.ToUniversalTime().ToString('o');utc=$end.ToUniversalTime().ToString('o');
+    observed_interval_s=$span;baseline=$baseline;
+    monotonic_start_ticks=$previousTicks;monotonic_end_ticks=$endTicks;frequency=[Diagnostics.Stopwatch]::Frequency;
+    counters=@();error=$null;errors=@($pendingErrors.ToArray());missing_metrics=@()}
+   $pendingErrors.Clear()
+   foreach($d in $definitions) {
+    $matches=@($item.CounterSamples|Where-Object {($_.Path -split '\\')[-1] -ieq $d.localizedCounter -and $_.InstanceName -ine '_total'})
+    if(!$matches.Count) {$row.missing_metrics+=$d.metric}
+    foreach($sample in $matches) {
+     $raw=$sample.CookedValue
+     $finite=$null -ne $raw -and ![double]::IsNaN($raw) -and ![double]::IsInfinity($raw)
+     if(!$finite) {$raw=$null}
+     $valid=!$baseline -and $null -ne $sample.Status -and $sample.Status -eq 0 -and $finite
+     $row.counters+=@{metric=$d.metric;path=$sample.Path;instance=$sample.InstanceName;
+      value=if($valid) {$raw} else {$null};raw_cooked_value=$raw;valid_for_rate=$valid;
+      status=$sample.Status;unit=$d.unit}
+    }
    }
+   $writer.WriteLine(($row|ConvertTo-Json -Depth 8 -Compress));$writer.Flush()
+   $previousTimestamp=$end;$previousTicks=$endTicks
   }
-  $row.interval_end_utc=[DateTime]::UtcNow.ToString('o')
-  if($batches.Count -gt 1) { $row.interval_end_utc=$batches[-1].Timestamp.ToUniversalTime().ToString('o') }
-  $row.utc=$row.interval_end_utc
-  $row.monotonic_end_ticks=[Diagnostics.Stopwatch]::GetTimestamp()
-  $writer.WriteLine(($row|ConvertTo-Json -Depth 8 -Compress));$writer.Flush()
-  # Missing providers can make Get-Counter return immediately. Bound sampling even then.
-  $elapsed=([Diagnostics.Stopwatch]::GetTimestamp()-$beginTicks)/[Diagnostics.Stopwatch]::Frequency
-  if($elapsed -lt $Interval) {Start-Sleep -Milliseconds ([int](1000*($Interval-$elapsed)))}
  }
-} finally { $writer.Dispose() }
+} catch {
+ $terminalError=$_.Exception.Message
+ $writer.WriteLine((@{type='collector_error';schema_version=2;utc=[DateTime]::UtcNow.ToString('o');error=$terminalError;terminal=$true}|ConvertTo-Json -Compress));$writer.Flush()
+ throw
+} finally {
+ $cadenceSummary=if($cadences.Count) {$cadences|Measure-Object -Minimum -Maximum -Average} else {$null}
+ $final=@{type='collector_end';schema_version=2;utc=[DateTime]::UtcNow.ToString('o');
+  observed_counter_sets=$setCount;expected_counter_sets=$maxSets;nonterminal_errors=$errorCount;terminal_error=$terminalError;
+  pending_errors=@($pendingErrors.ToArray());elapsed_s=$watch.Elapsed.TotalSeconds;
+  cadence=@{n=$cadences.Count;min_s=if($cadenceSummary) {$cadenceSummary.Minimum} else {$null};
+   max_s=if($cadenceSummary) {$cadenceSummary.Maximum} else {$null};mean_s=if($cadenceSummary) {$cadenceSummary.Average} else {$null}}}
+ try {$writer.WriteLine(($final|ConvertTo-Json -Depth 6 -Compress));$writer.Flush()} finally {$writer.Dispose()}
+}

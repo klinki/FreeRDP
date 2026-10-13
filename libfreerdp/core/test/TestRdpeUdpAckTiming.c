@@ -93,6 +93,120 @@ static UINT32 timestamp(const BYTE* bytes)
 	return bytes[0] | ((UINT32)bytes[1] << 8) | ((UINT32)bytes[2] << 16);
 }
 
+/* Keep only the latest actual wire packet for long receive sequences. */
+static SSIZE_T capture_last(void* context, const BYTE* data, size_t len)
+{
+	Capture* out = context;
+	if (len > sizeof(out->packets[0]))
+		return -1;
+	memcpy(out->packets[0], data, len);
+	out->lengths[0] = len;
+	out->count = 1;
+	return (SSIZE_T)len;
+}
+
+static int test_wide_vector_prefix_timestamps(void)
+{
+	rdpUdpTransport* udp = rdpeudp_test_new();
+	Capture out = { 0 };
+	BYTE storage[2048];
+	RdpUdp2Layout ack = { 0 };
+	RdpUdpTestRecvState state = { 0 };
+	BOOL* received = nullptr;
+	UINT16 base = 0;
+	size_t count = 0;
+	CHECK(udp);
+	rdpeudp_test_set_send(udp, capture_last, &out);
+	rdpeudp_test_set_time_ns(udp, 100000000);
+	CHECK(feed(udp, 0, 0, FALSE, FALSE, FALSE, 0, 0, TRUE, 1));
+	/* Alternating receipt is deliberately hostile to RLE: 1600 positions
+	 * require more than the wire's 127 coded bytes. The first 889 positions
+	 * are truthful; later receipt must not move the base or its timestamp. */
+	for (UINT16 seq = 2; seq <= 1600; seq += 2)
+	{
+		rdpeudp_test_set_time_ns(udp, 100000000ULL + (UINT64)seq * 4000ULL);
+		CHECK(feed(udp, seq, seq, TRUE, FALSE, FALSE, 0, 0, FALSE, 0));
+	}
+	CHECK(rdpeudp_test_recv_state(udp, &state) && state.recvDataBase == 1 &&
+	      state.recvDataWindowLimit == 32768 && state.recvDataCount == 800 &&
+	      state.recvDataSpan == 1600);
+	CHECK(decode(&out, 0, storage, &ack) && ack.hasAckvec && !ack.hasAck);
+	CHECK((ack.ackvec[2] & 0x7F) == 127 && (ack.ackvec[2] & 0x80));
+	CHECK(ack.ackvecLen == 134 && timestamp(ack.ackvec + 3) == 25888);
+	CHECK(rdpeudp_parse_ackvec(ack.ackvec, ack.ackvecLen, &base, &received, &count));
+	CHECK(base == 1 && count == 889);
+	for (size_t i = 0; i < count; i++)
+		CHECK(received[i] == ((i % 2) != 0));
+	free(received);
+	received = nullptr;
+	/* The late original fills the receipt holes without peer retirement. */
+	for (UINT16 seq = 1; seq < 1600; seq += 2)
+	{
+		rdpeudp_test_set_time_ns(udp, 120000000ULL + (UINT64)seq * 4000ULL);
+		CHECK(feed(udp, seq, seq, TRUE, FALSE, FALSE, 0, 0, FALSE, 0));
+	}
+	CHECK(rdpeudp_test_recv_state(udp, &state) && state.recvDataBase == 1601 &&
+	      !state.recvDataCount && !state.recvDataSpan && state.expectedChannelSeq == 1601);
+	CHECK(decode(&out, 0, storage, &ack) && ack.hasAck && ack.ackBase == 1600 &&
+	      timestamp(ack.ackTs) == 26600);
+	rdpeudp_test_free(udp);
+	udp = rdpeudp_test_new();
+	CHECK(udp);
+	ZeroMemory(&out, sizeof(out));
+	rdpeudp_test_set_send(udp, capture_last, &out);
+	rdpeudp_test_set_time_ns(udp, 200000000);
+	CHECK(feed(udp, 0, 0, FALSE, FALSE, FALSE, 0, 0, TRUE, 1));
+	CHECK(feed(udp, 9000, 2, TRUE, FALSE, FALSE, 0, 0, FALSE, 0));
+	CHECK(decode(&out, 0, storage, &ack) && ack.hasAckvec && !ack.hasAck);
+	/* A truncated all-missing prefix has no receipt to timestamp. The far
+	 * positive remains retained, but it is not represented by this packet. */
+	CHECK(ack.ackvec[2] == 127 && ack.ackvecLen == 130);
+	CHECK(rdpeudp_parse_ackvec(ack.ackvec, ack.ackvecLen, &base, &received, &count));
+	CHECK(base == 1 && count == 8001);
+	for (size_t i = 0; i < count; i++)
+		CHECK(!received[i]);
+	CHECK(rdpeudp_test_recv_state(udp, &state) && state.recvDataBase == 1 &&
+	      state.recvDataCount == 1 && state.recvDataSpan == 9000);
+	free(received);
+	rdpeudp_test_free(udp);
+	return 0;
+fail:
+	free(received);
+	rdpeudp_test_free(udp);
+	return -1;
+}
+
+static int test_receipt_ring_tagged_arrival(void)
+{
+	rdpUdpTransport* udp = rdpeudp_test_new();
+	Capture out = { 0 };
+	BYTE storage[2048];
+	RdpUdp2Layout ack = { 0 };
+	RdpUdpTestRecvState state = { 0 };
+	CHECK(udp);
+	/* With no output hook, the actual ACK stays pending while AoA retires
+	 * the missing prefix. Sequence 0 shares the slot of valid 32768, but is
+	 * old in this epoch and cannot replace its original arrival timestamp. */
+	rdpeudp_test_set_time_ns(udp, 100000000);
+	CHECK(feed(udp, 0, 0, FALSE, FALSE, FALSE, 0, 0, TRUE, 1));
+	CHECK(feed(udp, 32768, 2, TRUE, FALSE, FALSE, 0, 0, FALSE, 0));
+	rdpeudp_test_set_time_ns(udp, 110000000);
+	CHECK(feed(udp, 0, 1, TRUE, FALSE, FALSE, 0, 0, FALSE, 0));
+	CHECK(rdpeudp_test_recv_state(udp, &state) && state.recvDataBase == 1 &&
+	      state.recvDataCount == 1 && rdpeudp_test_seen(udp, 32767));
+	CHECK(feed(udp, 0, 0, FALSE, FALSE, FALSE, 0, 0, TRUE, 32768));
+	CHECK(rdpeudp_test_recv_state(udp, &state) && state.recvDataBase == 32769 &&
+	      !state.recvDataCount && state.expectedChannelSeq == 3);
+	rdpeudp_test_set_send(udp, capture, &out);
+	CHECK(rdpeudp_test_check_health(udp) && out.count == 1 && decode(&out, 0, storage, &ack));
+	CHECK(ack.hasAck && !ack.hasAckvec && ack.ackBase == 32768 && timestamp(ack.ackTs) == 25000);
+	rdpeudp_test_free(udp);
+	return 0;
+fail:
+	rdpeudp_test_free(udp);
+	return -1;
+}
+
 static int test_deadline_and_batch(void)
 {
 	rdpUdpTransport* udp = rdpeudp_test_new();
@@ -338,7 +452,9 @@ int TestRdpeUdpAckTiming(int argc, char* argv[])
 	WINPR_UNUSED(argv);
 	return test_deadline_and_batch() || test_gap_arrivals_and_retirement() ||
 	               test_limits_dummy_and_snapshot() ||
-	               test_timestamp_wrap_tighter_hint_and_keepalive() || test_sparse_mainloop_timer()
+	               test_timestamp_wrap_tighter_hint_and_keepalive() ||
+	               test_wide_vector_prefix_timestamps() || test_receipt_ring_tagged_arrival() ||
+	               test_sparse_mainloop_timer()
 	           ? -1
 	           : 0;
 }
