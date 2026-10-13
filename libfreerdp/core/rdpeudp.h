@@ -518,6 +518,11 @@ FREERDP_API void rdpeudp_test_set_abort(rdpUdpTransport* udp, HANDLE event);
 /* Private deterministic ownership-observer fixtures, never in a normal build. */
 FREERDP_API BOOL rdpeudp_test_queue_enable(rdpUdpTransport* udp, size_t capacity);
 FREERDP_API BOOL rdpeudp_test_queue_configure_env(rdpUdpTransport* udp);
+/** Empty-fixture packet cap: 16/32/48/64; zero restores the original LogWindow. */
+FREERDP_API BOOL rdpeudp_test_flight_configure(rdpUdpTransport* udp, size_t cap);
+FREERDP_API BOOL rdpeudp_test_flight_configure_env(rdpUdpTransport* udp);
+/** Separate private ABI, 16 UINT64 fields; the 40-field queue ABI is unchanged. */
+FREERDP_API BOOL rdpeudp_test_flight_stats(rdpUdpTransport* udp, UINT64* out, size_t count);
 FREERDP_API BOOL rdpeudp_test_queue_measure(rdpUdpTransport* udp, UINT64 start, UINT64 stop);
 FREERDP_API BOOL rdpeudp_test_queue_stats(rdpUdpTransport* udp, UINT64* out, size_t count);
 FREERDP_API BOOL rdpeudp_test_queue_hist(rdpUdpTransport* udp, UINT32 kind, UINT64* out, size_t count);

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "phase": "main",
+  "warmup_s": 5,
+  "measure_s": 30,
+  "drain_s": 12,
+  "payload_bytes": 16384,
+  "probe_hz": 20,
+  "seeds": [
+    11,
+    29,
+    47,
+    71,
+    101
+  ],
+  "cases": [
+    {
+      "id": "loss0-upload-mixed",
+      "profile": "flight_loss0",
+      "workload": "upload_mixed",
+      "loss_trace": false
+    },
+    {
+      "id": "loss25-upload-mixed",
+      "profile": "flight_loss25",
+      "workload": "upload_mixed",
+      "loss_trace": false
+    },
+    {
+      "id": "loss50-upload-mixed",
+      "profile": "flight_loss50",
+      "workload": "upload_mixed",
+      "loss_trace": false
+    },
+    {
+      "id": "loss70-upload-mixed",
+      "profile": "flight_loss70",
+      "workload": "upload_mixed",
+      "loss_trace": false
+    }
+  ],
+  "notes": "Inflight DATA packet-count matrix. Byte queue fixed128KiB, records16KiB, wireMTU1232; no per-cell byte-queue or logical-record-size treatment."
+}

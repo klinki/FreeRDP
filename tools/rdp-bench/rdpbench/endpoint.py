@@ -260,6 +260,7 @@ def run(c):
                 'measurement_observed_s':(min(stop,max(measure,exit_ns))-measure)/1e9 if bounds_ready else None,
                 'native_stats':snapshot('native_stats',driver.stats) if driver else None,
                 'queue_stats':snapshot('queue_stats',driver.queue_stats) if driver else None,
+                'flight_config':snapshot('flight_config',driver.flight_config) if driver and hasattr(driver,'flight_config') else None,
                 'telemetry_errors':telemetry_errors,'cleanup_errors':cleanup_errors,
                 'benchmark_deadline_reached':snapshot('deadline_reached',driver.deadline_reached) if driver and hasattr(driver,'deadline_reached') else False,
                 'native_cancel_deadline_ns':cancel_deadline_ns,

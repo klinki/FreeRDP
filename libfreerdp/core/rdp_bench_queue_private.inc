@@ -8,6 +8,7 @@
 #define RDP_BENCH_QUEUE_HIST_BINS 16384
 #define RDP_BENCH_QUEUE_HIST_WIDTH_NS 125000ULL
 #define RDP_BENCH_QUEUE_STATS_COUNT 40
+#define RDP_BENCH_FLIGHT_STATS_COUNT 16
 
 typedef struct
 {
@@ -288,6 +289,96 @@ static BOOL rdp_bench_queue_configure_env(rdpUdpTransport* udp)
 	return rdp_bench_queue_configure(udp, capacity, !enabled || strcmp(enabled, "0") != 0);
 }
 
+static BOOL rdp_bench_flight_configure_locked(rdpUdpTransport* udp, size_t cap)
+{
+	if (!udp || udp->sendBytes || udp->sentCount || udp->sendFailed || udp->recvFailed ||
+	    (cap != 0 && cap != 16 && cap != 32 && cap != 48 && cap != 64))
+		return FALSE;
+	if (cap)
+	{
+		if (!udp->benchOriginalLogWindowSaved)
+		{
+			udp->benchOriginalLogWindow = udp->logWindow;
+			udp->benchOriginalLogWindowSaved = TRUE;
+		}
+		/* All packet-count variants share the same protocol sequence credit.
+		 * The independent cap limits outstanding logical DATA chunks. */
+		udp->logWindow = 7;
+	}
+	else if (udp->benchOriginalLogWindowSaved)
+	{
+		udp->logWindow = udp->benchOriginalLogWindow;
+		udp->benchOriginalLogWindowSaved = FALSE;
+	}
+	udp->benchMaxInFlightPackets = cap;
+	udp->benchPeakInFlightPackets = udp->benchPeakActiveSpan = 0;
+	return TRUE;
+}
+
+static BOOL rdp_bench_flight_configure_env(rdpUdpTransport* udp)
+{
+	const char* value = getenv("RDP_BENCH_MAX_INFLIGHT_PACKETS");
+	size_t cap = 0;
+	if (value)
+	{
+		const char* names[] = { "16", "32", "48", "64" };
+		const size_t caps[] = { 16, 32, 48, 64 };
+		BOOL found = FALSE;
+		for (size_t i = 0; i < ARRAYSIZE(names); i++)
+		{
+			if (strcmp(value, names[i]) == 0)
+			{
+				cap = caps[i];
+				found = TRUE;
+				break;
+			}
+		}
+		if (!found)
+			return FALSE;
+	}
+	EnterCriticalSection(&udp->lock);
+	const BOOL result = rdp_bench_flight_configure_locked(udp, cap);
+	LeaveCriticalSection(&udp->lock);
+	return result;
+}
+
+static void rdp_bench_flight_sent_locked(rdpUdpTransport* udp, size_t packets, size_t span)
+{
+	/* Values were captured before a socketless callback can retire this entry.
+	 * Count them only after the complete DATA datagram was accepted by send. */
+	if (packets > udp->benchPeakInFlightPackets)
+		udp->benchPeakInFlightPackets = packets;
+	if (span > udp->benchPeakActiveSpan)
+		udp->benchPeakActiveSpan = span;
+}
+
+static BOOL rdp_bench_flight_stats_locked(rdpUdpTransport* udp, UINT64* out, size_t count)
+{
+	if (!udp || !out || count < RDP_BENCH_FLIGHT_STATS_COUNT)
+		return FALSE;
+	RdpBenchQueueObserver* observer = udp->benchQueueObserver;
+	const UINT64 fields[RDP_BENCH_FLIGHT_STATS_COUNT] = {
+		1,
+		udp->benchMaxInFlightPackets,
+		rdpeudp2_send_window_locked(udp),
+		rdpeudp2_local_protocol_capacity_locked(udp),
+		rdpeudp2_peer_protocol_capacity_locked(udp),
+		ARRAYSIZE(udp->sent),
+		rdpeudp2_usable_sent_storage_locked(udp),
+		udp->logWindow,
+		udp->peerLogWindow,
+		udp->benchSendQueueBytes ? udp->benchSendQueueBytes : RDPEUDP2_SEND_QUEUE_BYTES,
+		udp->sentCount,
+		(UINT16)(udp->nextDataSeq - rdpeudp2_send_base_locked(udp, ARRAYSIZE(udp->sent))),
+		udp->benchPeakInFlightPackets,
+		udp->benchPeakActiveSpan,
+		observer ? observer->peakInFlightPackets : 0,
+		observer && observer->valid && observer->measureStopNs > observer->measureStartNs ? 1 : 0
+	};
+	memcpy(out, fields, sizeof(fields));
+	return TRUE;
+}
+
 static BOOL rdp_bench_queue_stats_locked(rdpUdpTransport* udp, UINT64* out, size_t count)
 {
 	RdpBenchQueueObserver* o = udp->benchQueueObserver;
@@ -300,9 +391,7 @@ static BOOL rdp_bench_queue_stats_locked(rdpUdpTransport* udp, UINT64* out, size
 	out[32] = udp->logWindow;
 	out[33] = udp->peerLogWindow;
 	out[34] = udp->maxPayload;
-	const BYTE logWindow = udp->logWindow < udp->peerLogWindow ? udp->logWindow : udp->peerLogWindow;
-	const size_t window = ((size_t)1 << (logWindow < RDPUDP2_LOCAL_MAX_LOGWINDOW ? logWindow : RDPUDP2_LOCAL_MAX_LOGWINDOW)) - 1;
-	out[35] = window < ARRAYSIZE(udp->sent) ? window : ARRAYSIZE(udp->sent) - 1;
+	out[35] = rdpeudp2_send_window_locked(udp);
 	out[36] = o ? 1 : 0;
 	if (!o)
 		return TRUE;
@@ -331,6 +420,31 @@ FREERDP_API BOOL rdpeudp_test_queue_enable(rdpUdpTransport* udp, size_t capacity
 FREERDP_API BOOL rdpeudp_test_queue_configure_env(rdpUdpTransport* udp)
 {
 	return rdp_bench_queue_configure_env(udp);
+}
+
+FREERDP_API BOOL rdpeudp_test_flight_configure(rdpUdpTransport* udp, size_t cap)
+{
+	if (!udp)
+		return FALSE;
+	EnterCriticalSection(&udp->lock);
+	const BOOL result = rdp_bench_flight_configure_locked(udp, cap);
+	LeaveCriticalSection(&udp->lock);
+	return result;
+}
+
+FREERDP_API BOOL rdpeudp_test_flight_configure_env(rdpUdpTransport* udp)
+{
+	return udp && rdp_bench_flight_configure_env(udp);
+}
+
+FREERDP_API BOOL rdpeudp_test_flight_stats(rdpUdpTransport* udp, UINT64* out, size_t count)
+{
+	if (!udp)
+		return FALSE;
+	EnterCriticalSection(&udp->lock);
+	const BOOL result = rdp_bench_flight_stats_locked(udp, out, count);
+	LeaveCriticalSection(&udp->lock);
+	return result;
 }
 
 FREERDP_API BOOL rdpeudp_test_queue_measure(rdpUdpTransport* udp, UINT64 start, UINT64 stop)

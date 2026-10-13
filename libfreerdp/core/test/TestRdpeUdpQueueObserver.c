@@ -13,6 +13,7 @@
 #define QUEUE_STATS 40
 #define QUEUE_BINS 16384
 #define QUEUE_NS(ms) ((UINT64)(ms) * 1000000ULL)
+#define FLIGHT_STATS 16
 
 typedef struct
 {
@@ -377,6 +378,86 @@ fail:
 	return FALSE;
 }
 
+static BOOL test_flight_configuration_and_abi(void)
+{
+	QueueFixture* fixture = queue_fixture_new(1150, 5);
+	UINT64 flight[FLIGHT_STATS] = { 0 };
+	UINT64 queue[QUEUE_STATS] = { 0 };
+	const size_t caps[] = { 16, 32, 48, 64 };
+	const size_t invalid[] = { 1, 15, 17, 31, 33, 47, 49, 63, 65, SIZE_MAX };
+	QUEUE_CHECK(fixture && rdpeudp_test_flight_stats(fixture->udp, flight, FLIGHT_STATS));
+	QUEUE_CHECK(flight[0] == 1 && flight[1] == 0 && flight[2] == 31 && flight[5] == 128 &&
+	            flight[6] == 63 && flight[7] == 5 && flight[8] == 5 && flight[9] == 32768 &&
+	            !flight[10] && !flight[15]);
+	QUEUE_CHECK(!rdpeudp_test_flight_stats(nullptr, flight, FLIGHT_STATS));
+	QUEUE_CHECK(!rdpeudp_test_flight_stats(fixture->udp, nullptr, FLIGHT_STATS));
+	QUEUE_CHECK(!rdpeudp_test_flight_stats(fixture->udp, flight, FLIGHT_STATS - 1));
+	QUEUE_CHECK(!rdpeudp_test_flight_configure(nullptr, 64));
+	QUEUE_CHECK(rdpeudp_test_queue_enable(fixture->udp, 131072));
+	QUEUE_CHECK(rdpeudp_test_queue_measure(fixture->udp, QUEUE_NS(1000), QUEUE_NS(2000)));
+	for (size_t i = 0; i < ARRAYSIZE(caps); i++)
+	{
+		QUEUE_CHECK(rdpeudp_test_flight_configure(fixture->udp, caps[i]));
+		QUEUE_CHECK(rdpeudp_test_flight_stats(fixture->udp, flight, FLIGHT_STATS));
+		QUEUE_CHECK(flight[1] == caps[i] && flight[2] == (caps[i] < 31 ? caps[i] : 31) &&
+		            flight[3] == 127 && flight[4] == 31 && flight[5] == 128 && flight[6] == 127 &&
+		            flight[7] == 7 && flight[8] == 5 && flight[9] == 131072 && flight[15]);
+	}
+	for (size_t i = 0; i < ARRAYSIZE(invalid); i++)
+		QUEUE_CHECK(!rdpeudp_test_flight_configure(fixture->udp, invalid[i]));
+	QUEUE_CHECK(rdpeudp_test_flight_stats(fixture->udp, flight, FLIGHT_STATS) && flight[1] == 64);
+	QUEUE_CHECK(rdpeudp_test_flight_configure(fixture->udp, 0));
+	QUEUE_CHECK(rdpeudp_test_flight_stats(fixture->udp, flight, FLIGHT_STATS));
+	QUEUE_CHECK(!flight[1] && flight[2] == 31 && flight[6] == 63 && flight[7] == 5 &&
+	            flight[9] == 131072);
+	/* The existing 40-field queue ABI remains intact and reports the actual
+	 * effective packet bound, independently of the separate byte-queue cap. */
+	QUEUE_CHECK(rdpeudp_test_queue_stats(fixture->udp, queue, QUEUE_STATS));
+	QUEUE_CHECK(queue[1] == 131072 && queue[32] == 5 && queue[33] == 5 && queue[35] == 31);
+	queue_fixture_free(fixture);
+	return TRUE;
+fail:
+	queue_fixture_free(fixture);
+	return FALSE;
+}
+
+static BOOL test_flight_environment(void)
+{
+	QueueFixture* fixture = queue_fixture_new(1150, 7);
+	UINT64 flight[FLIGHT_STATS] = { 0 };
+	const char* old = getenv("RDP_BENCH_MAX_INFLIGHT_PACKETS");
+	char* saved = old ? _strdup(old) : nullptr;
+	const char* valid[] = { "16", "32", "48", "64" };
+	const size_t expected[] = { 16, 32, 48, 64 };
+	const char* invalid[] = { "", "0", "15", "65", "016", "+16", "16 ", "16.0" };
+	QUEUE_CHECK(fixture);
+	for (size_t i = 0; i < ARRAYSIZE(valid); i++)
+	{
+		QUEUE_CHECK(SetEnvironmentVariableA("RDP_BENCH_MAX_INFLIGHT_PACKETS", valid[i]));
+		QUEUE_CHECK(rdpeudp_test_flight_configure_env(fixture->udp));
+		QUEUE_CHECK(rdpeudp_test_flight_stats(fixture->udp, flight, FLIGHT_STATS));
+		QUEUE_CHECK(flight[1] == expected[i] && flight[2] == expected[i] && flight[9] == 32768);
+	}
+	for (size_t i = 0; i < ARRAYSIZE(invalid); i++)
+	{
+		QUEUE_CHECK(SetEnvironmentVariableA("RDP_BENCH_MAX_INFLIGHT_PACKETS", invalid[i]));
+		QUEUE_CHECK(!rdpeudp_test_flight_configure_env(fixture->udp));
+	}
+	QUEUE_CHECK(SetEnvironmentVariableA("RDP_BENCH_MAX_INFLIGHT_PACKETS", nullptr));
+	QUEUE_CHECK(rdpeudp_test_flight_configure_env(fixture->udp));
+	QUEUE_CHECK(rdpeudp_test_flight_stats(fixture->udp, flight, FLIGHT_STATS));
+	QUEUE_CHECK(!flight[1] && flight[2] == 63 && flight[6] == 63 && flight[7] == 7);
+	QUEUE_CHECK(SetEnvironmentVariableA("RDP_BENCH_MAX_INFLIGHT_PACKETS", saved));
+	free(saved);
+	queue_fixture_free(fixture);
+	return TRUE;
+fail:
+	(void)SetEnvironmentVariableA("RDP_BENCH_MAX_INFLIGHT_PACKETS", saved);
+	free(saved);
+	queue_fixture_free(fixture);
+	return FALSE;
+}
+
 int TestRdpeUdpQueueObserver(int argc, char* argv[])
 {
 	WINPR_UNUSED(argc);
@@ -384,7 +465,8 @@ int TestRdpeUdpQueueObserver(int argc, char* argv[])
 	if (!test_queue_segment_boundaries() || !test_queue_compaction_and_cohort() ||
 	    !test_queue_rejection_and_caps() || !test_queue_retries_and_callback() ||
 	    !test_queue_all_cap_boundaries() || !test_queue_admission_wait() ||
-	    !test_queue_observer_limits() || !test_queue_environment())
+	    !test_queue_observer_limits() || !test_queue_environment() ||
+	    !test_flight_configuration_and_abi() || !test_flight_environment())
 		return -1;
 	printf("TestRdpeUdpQueueObserver passed\n");
 	return 0;

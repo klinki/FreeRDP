@@ -8,7 +8,7 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def effective_environment(overlay):
     keys={'RDPEUDP_TRACE','RDP_BENCH_COUNTERS','RDP_BENCH_OBSERVER','RDP_BENCH_QUEUE_OBSERVER',
-          'RDP_BENCH_SEND_QUEUE_BYTES','RDP_BENCH_LOSS_TRACE','RDP_BENCH_LOSS_RECOVERY_MODE',
+          'RDP_BENCH_SEND_QUEUE_BYTES','RDP_BENCH_MAX_INFLIGHT_PACKETS','RDP_BENCH_LOSS_TRACE','RDP_BENCH_LOSS_RECOVERY_MODE',
           'WLOG_LEVEL','WLOG_FILTER','WLOG_APPENDER'}|set(overlay)
     return {key:overlay.get(key,os.environ.get(key)) for key in sorted(keys)}
 
@@ -41,10 +41,12 @@ def endpoint_result(path):
         if 'benchmark_deadline_reached' in value and not isinstance(value['benchmark_deadline_reached'],bool):
             raise ValueError('invalid endpoint benchmark_deadline_reached; expected boolean')
         if not isinstance(value.get('counters',{}),dict):raise ValueError('invalid endpoint counters')
-        for name in ('native_stats','queue_stats'):
+        for name in ('native_stats','queue_stats','flight_config'):
             if value.get(name) is not None and not isinstance(value[name],dict):raise ValueError('invalid endpoint '+name)
         for name in ('probe_rtt_ms','probe_scheduled_ms','send_call_ms','delivery_gap_ms','loss_trace'):
             if name in value and not isinstance(value[name],dict):raise ValueError('invalid endpoint '+name)
+        flight=value.get('flight_config') or {}
+        if 'fields' in flight and not isinstance(flight['fields'],dict):raise ValueError('invalid flight configuration fields')
         queue=value.get('queue_stats') or {}
         for name in ('fields','summaries'):
             if name in queue and not isinstance(queue[name],dict):raise ValueError('invalid queue '+name)
@@ -280,6 +282,9 @@ def one_trial(variant,case,profile,config,seed,folder,driver='native',calibratio
                      'admission_calls','capacity_blocked_calls','clock_error_count','segment_overflow_count','counter_overflow_count',
                      'own_log_window','peer_log_window','max_payload_bytes','effective_window_packets','observer_enabled'):
             metrics[prefix+'.queue_'+name]=queue.get('fields',{}).get(name)
+        flight=r.get('flight_config') or {}
+        for name,value in flight.get('fields',{}).items():
+            metrics[prefix+'.flight_'+name]=value
         alignment=queue.get('clock_alignment') or {}
         metrics[prefix+'.queue_clock_offset_drift_ns']=alignment.get('offset_drift_ns')
         metrics[prefix+'.queue_clock_combined_uncertainty_ns']=alignment.get('combined_uncertainty_ns')

@@ -998,6 +998,11 @@ BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer, size_t*
 /* ------------------------------------------------------------------ */
 
 #define RDPEUDP2_WINDOW_MAX 64
+#if defined(WITH_RDP_BENCH)
+#define RDPEUDP2_SENT_STORAGE 128
+#else
+#define RDPEUDP2_SENT_STORAGE RDPEUDP2_WINDOW_MAX
+#endif
 #define RDPEUDP2_RECEIPT_WINDOW 32768u
 #define RDPEUDP2_INITIAL_EPOCH_THRESHOLD 128u
 #define RDPEUDP2_RECV_PAGE_SHIFT 8
@@ -1208,7 +1213,7 @@ struct rdp_udp_transport
 	BYTE delayAckMax;
 	UINT16 delayAckTimeoutMs;
 
-	UdpSentEntry sent[RDPEUDP2_WINDOW_MAX];
+	UdpSentEntry sent[RDPEUDP2_SENT_STORAGE];
 	size_t sentCount;
 	/* Owned bytes include queued payload and logical in-flight chunks. */
 	wStream* sendQueue;
@@ -1222,6 +1227,11 @@ struct rdp_udp_transport
 #if defined(WITH_RDP_BENCH)
 	/* Private experiments never alter the normal-build queue bound. */
 	size_t benchSendQueueBytes;
+	size_t benchMaxInFlightPackets;
+	size_t benchPeakInFlightPackets;
+	size_t benchPeakActiveSpan;
+	BYTE benchOriginalLogWindow;
+	BOOL benchOriginalLogWindowSaved;
 	RdpBenchQueueObserver* benchQueueObserver;
 	RdpBenchLossTrace* benchLossTrace;
 	BOOL benchTimerRecovery;
@@ -1311,6 +1321,55 @@ static UINT64 rdpeudp_recv_now(const rdpUdpTransport* udp)
 {
 	return udp->testClockEnabled ? udp->testClockMs : udp_now_ms();
 }
+
+static size_t rdpeudp2_local_protocol_capacity_locked(const rdpUdpTransport* udp)
+{
+	const BYTE log =
+	    udp->logWindow < RDPUDP2_LOCAL_MAX_LOGWINDOW ? udp->logWindow : RDPUDP2_LOCAL_MAX_LOGWINDOW;
+	return ((size_t)1 << log) - 1;
+}
+
+static size_t rdpeudp2_peer_protocol_capacity_locked(const rdpUdpTransport* udp)
+{
+	const BYTE log = udp->peerLogWindow < RDPUDP2_PROTOCOL_MAX_LOGWINDOW
+	                     ? udp->peerLogWindow
+	                     : RDPUDP2_PROTOCOL_MAX_LOGWINDOW;
+	return ((size_t)1 << log) - 1;
+}
+
+static size_t rdpeudp2_usable_sent_storage_locked(const rdpUdpTransport* udp)
+{
+#if defined(WITH_RDP_BENCH)
+	if (udp->benchMaxInFlightPackets)
+		return ARRAYSIZE(udp->sent) - 1;
+#else
+	WINPR_UNUSED(udp);
+#endif
+	/* Extra benchmark storage never enlarges an association without opt-in. */
+	return RDPEUDP2_WINDOW_MAX - 1;
+}
+
+static size_t rdpeudp2_protocol_window_locked(const rdpUdpTransport* udp)
+{
+	size_t limit = rdpeudp2_local_protocol_capacity_locked(udp);
+	const size_t peer = rdpeudp2_peer_protocol_capacity_locked(udp);
+	const size_t storage = rdpeudp2_usable_sent_storage_locked(udp);
+	if (peer < limit)
+		limit = peer;
+	return storage < limit ? storage : limit;
+}
+
+static size_t rdpeudp2_send_window_locked(const rdpUdpTransport* udp)
+{
+	size_t limit = rdpeudp2_protocol_window_locked(udp);
+#if defined(WITH_RDP_BENCH)
+	if (udp->benchMaxInFlightPackets && udp->benchMaxInFlightPackets < limit)
+		limit = udp->benchMaxInFlightPackets;
+#endif
+	return limit;
+}
+
+static UINT16 rdpeudp2_send_base_locked(const rdpUdpTransport* udp, size_t excluded);
 
 #include "rdp_bench_queue_private.inc"
 #include "rdp_bench_loss_private.inc"
@@ -3634,15 +3693,6 @@ BOOL rdpeudp_connect(rdpUdpTransport* udp, DWORD timeoutMs)
 
 /* One logical payload owns all its transmission aliases. The active window
  * contains only latest attempts; a lost older attempt cannot pin it forever. */
-static size_t rdpeudp2_send_window_locked(const rdpUdpTransport* udp)
-{
-	BYTE logWindow = udp->logWindow < udp->peerLogWindow ? udp->logWindow : udp->peerLogWindow;
-	if (logWindow > RDPUDP2_LOCAL_MAX_LOGWINDOW)
-		logWindow = RDPUDP2_LOCAL_MAX_LOGWINDOW;
-	const size_t limit = ((size_t)1 << logWindow) - 1;
-	return limit < ARRAYSIZE(udp->sent) ? limit : ARRAYSIZE(udp->sent) - 1;
-}
-
 static UINT16 rdpeudp2_send_base_locked(const rdpUdpTransport* udp, size_t excluded)
 {
 	UINT16 base = udp->nextDataSeq;
@@ -3676,7 +3726,7 @@ static void rdpeudp2_update_send_aoa_locked(rdpUdpTransport* udp)
 static BOOL rdpeudp2_can_allocate_seq_locked(const rdpUdpTransport* udp, size_t excluded,
                                             BOOL retransmission)
 {
-	size_t limit = rdpeudp2_send_window_locked(udp);
+	size_t limit = rdpeudp2_protocol_window_locked(udp);
 	if (retransmission)
 	{
 		/* A narrower peer window cannot revoke attempts already on the
@@ -3684,9 +3734,9 @@ static BOOL rdpeudp2_can_allocate_seq_locked(const rdpUdpTransport* udp, size_t 
 		 * can drain it; never admit new channel bytes using this allowance. */
 		const UINT16 activeBase = rdpeudp2_send_base_locked(udp, ARRAYSIZE(udp->sent));
 		const size_t activeSpan = (UINT16)(udp->nextDataSeq - activeBase);
-		const BYTE logWindow = udp->logWindow < RDPUDP2_LOCAL_MAX_LOGWINDOW ? udp->logWindow : RDPUDP2_LOCAL_MAX_LOGWINDOW;
-		const size_t advertised = ((size_t)1 << logWindow) - 1;
-		const size_t localLimit = advertised < ARRAYSIZE(udp->sent) ? advertised : ARRAYSIZE(udp->sent) - 1;
+		const size_t advertised = rdpeudp2_local_protocol_capacity_locked(udp);
+		const size_t storage = rdpeudp2_usable_sent_storage_locked(udp);
+		const size_t localLimit = advertised < storage ? advertised : storage;
 		if (activeSpan > limit)
 			limit = activeSpan < localLimit ? activeSpan : localLimit;
 	}
@@ -3717,10 +3767,20 @@ static BOOL rdpeudp2_emit_sent_locked(rdpUdpTransport* udp, UdpSentEntry* entry,
 	const UINT16 traceChannelSeq = entry->channelSeq;
 	const size_t traceBytes = entry->len;
 	const UINT32 traceRetries = entry->retries;
+#if defined(WITH_RDP_BENCH)
+	const size_t flightPackets = udp->sentCount;
+	const size_t activeSpan =
+	    (UINT16)(udp->nextDataSeq - rdpeudp2_send_base_locked(udp, ARRAYSIZE(udp->sent)));
+#endif
 	const BOOL result = rdpeudp_udp_send_stream(udp, packet);
 	if (result)
+	{
+#if defined(WITH_RDP_BENCH)
+		rdp_bench_flight_sent_locked(udp, flightPackets, activeSpan);
+#endif
 		rdp_bench_loss_event_locked(udp, RDP_BENCH_LOSS_DATA_SEND, traceDataSeq,
 		                            traceChannelSeq, traceBytes, traceRetries);
+	}
 	Stream_Release(packet);
 	return result;
 }

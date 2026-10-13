@@ -142,6 +142,36 @@ def peak_pps(timestamps, window_s):
     return best / window_s
 
 
+def receiver_rate_bounds(offered_wire_mbps, cap_mbps, loss, candidates, seconds, packet_wire_bytes):
+    """Loss-aware raw UDP envelope, never a FreeRDP goodput certification.
+
+    The loss draw is after blackout/queue admission. Use that offered cohort,
+    not only surviving packets. A two-sided Hoeffding envelope with alpha .001
+    bounds finite Bernoulli sampling; the existing 5% pacing envelope and two
+    boundary datagrams remain separate. Zero/total loss have no random spread.
+    Exact receiver/drop/seed accounting is checked independently by run_sample.
+    """
+    numbers = (offered_wire_mbps, cap_mbps, loss, seconds, packet_wire_bytes)
+    if (any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v)
+            for v in numbers) or offered_wire_mbps <= 0 or cap_mbps < 0 or
+            not 0 <= loss <= 1 or seconds <= 0 or packet_wire_bytes <= 0 or
+            isinstance(candidates, bool) or not isinstance(candidates, int) or candidates <= 0):
+        return {'valid': False, 'reason': 'known positive offered cohort/rate required'}
+    base = min(offered_wire_mbps, cap_mbps) if cap_mbps else offered_wire_mbps
+    delta = math.sqrt(math.log(2 / .001) / (2 * candidates)) if 0 < loss < 1 else 0
+    low_loss, high_loss = max(0, loss - delta), min(1, loss + delta)
+    quantum = 2 * packet_wire_bytes * 8 / seconds / 1e6
+    return {'valid': True, 'expected_wire_mbps': base * (1 - loss),
+            'lower_wire_mbps': max(0, .95 * base * (1 - high_loss) - quantum),
+            'upper_wire_mbps': 1.05 * base * (1 - low_loss) + quantum,
+            'base_wire_mbps': base, 'offered_wire_mbps': offered_wire_mbps,
+            'loss_probability': loss, 'loss_draw_candidates': candidates,
+            'finite_cohort_probability_delta': delta, 'sampling_alpha': .001,
+            'pacing_tolerance_fraction': .05, 'boundary_datagram_allowance': 2,
+            'counting_layer': 'UDP datagram + 28 IPv4/UDP bytes',
+            'scope': 'raw UDP network/harness envelope; no ARQ or application goodput'}
+
+
 def run_sample(profile, profile_id, seed, mode, direction, seconds, output,
                packet_size=1232, offered_mbps=9, target_pps=6000, probe_hz=60,
                observer=True, drain_s=.25, burst_factor=4):
@@ -319,12 +349,15 @@ def run_sample(profile, profile_id, seed, mode, direction, seconds, output,
     received_rate = counts['received_measure_wire_bytes'] * 8 / seconds / 1e6
     if mode in ('paced', 'saturated'):
         cap = profile[direction_name]['rate_mbps']
-        expected = min(cap, offered_mbps) if cap else offered_mbps
         check('sender offered rate', .95 * offered_mbps <= offered_rate <= 1.05 * offered_mbps,
               {'requested_wire_mbps': offered_mbps, 'observed_wire_mbps': offered_rate})
-        check('independent receiver wire rate', .95 * expected <= received_rate <= 1.05 * expected,
-              {'expected_wire_mbps': expected, 'received_wire_mbps': received_rate,
-               'tolerance_fraction': .05, 'counting_layer': 'UDP datagram + 28 IPv4/UDP bytes'})
+        candidates = directional_shape.get('received_datagrams', 0) - sum(
+            directional_shape.get(k, 0) for k in ('queue_drops', 'blackout_drops'))
+        envelope = receiver_rate_bounds(offered_rate, cap, profile[direction_name].get('loss', 0),
+                                        candidates, seconds, packet_size + 28)
+        check('independent receiver wire rate', envelope['valid'] and
+              envelope['lower_wire_mbps'] <= received_rate <= envelope['upper_wire_mbps'],
+              dict(envelope, received_wire_mbps=received_rate))
     if mode == 'paced':
         check('no unintended paced queue loss', not directional_shape.get('queue_drops'), directional_shape.get('queue_drops', 0))
         expected_missing = sorted(index for index in offered if seeded_loss(seed, direction, index, profile[direction_name].get('loss', 0)))

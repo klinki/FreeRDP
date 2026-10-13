@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "profiles": {
+    "flight_loss0": {
+      "description": "10 Mbit/s in each direction with 0% independent datagram loss; fixed jitter and delay",
+      "c2s": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28,
+        "loss": 0.0
+      },
+      "s2c": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28,
+        "loss": 0.0
+      }
+    },
+    "flight_loss25": {
+      "description": "10 Mbit/s in each direction with 25% independent datagram loss; fixed jitter and delay",
+      "c2s": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28,
+        "loss": 0.25
+      },
+      "s2c": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28,
+        "loss": 0.25
+      }
+    },
+    "flight_loss50": {
+      "description": "10 Mbit/s in each direction with 50% independent datagram loss; fixed jitter and delay",
+      "c2s": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28,
+        "loss": 0.5
+      },
+      "s2c": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28,
+        "loss": 0.5
+      }
+    },
+    "flight_loss70": {
+      "description": "10 Mbit/s in each direction with 70% independent datagram loss; fixed jitter and delay",
+      "c2s": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28,
+        "loss": 0.7
+      },
+      "s2c": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28,
+        "loss": 0.7
+      }
+    }
+  }
+}

@@ -1337,10 +1337,147 @@ static BOOL test_send_abort(void)
 	return TRUE;
 }
 
+#if defined(WITH_RDP_BENCH)
+static BOOL test_send_exact_benchmark_flight_caps(void)
+{
+	SendFixture* fixture = nullptr;
+	RdpUdpTestSendState state = { 0 };
+	const size_t caps[] = { 16, 32, 48, 64 };
+	BYTE bytes[65 * RDPUDP2_MAX_PAYLOAD] = { 0 };
+	for (size_t i = 0; i < ARRAYSIZE(caps); i++)
+	{
+		fixture = send_fixture_new(RDPUDP2_MAX_PAYLOAD, 5, 7, 1, 1);
+		SEND_CHECK(fixture && rdpeudp_test_flight_configure(fixture->sender, caps[i]));
+		SEND_CHECK(rdpeudp_test_queue_enable(fixture->sender, 131072));
+		SEND_CHECK(rdpeudp_test_queue_enqueue(fixture->sender, bytes, 60000) == 60000);
+		const size_t rest = (caps[i] + 1) * RDPUDP2_MAX_PAYLOAD > 60000
+		                        ? (caps[i] + 1) * RDPUDP2_MAX_PAYLOAD - 60000
+		                        : 0;
+		if (rest)
+			SEND_CHECK(rdpeudp_test_queue_enqueue(fixture->sender, bytes, rest) == (SSIZE_T)rest);
+		SEND_CHECK(rdpeudp_test_service_send(fixture->sender) && fixture->count == caps[i]);
+		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) &&
+		           state.sendWindow == caps[i] && state.inFlight == caps[i]);
+		for (size_t p = 0; p < fixture->count; p++)
+			SEND_CHECK(fixture->packets[p].len == RDPUDP2_MAX_PAYLOAD &&
+			           fixture->packets[p].dataSeq == p + 1 &&
+			           fixture->packets[p].channelSeq == p + 1);
+		SEND_CHECK(send_tick(fixture, 0) && fixture->count == caps[i]);
+		SEND_CHECK(!rdpeudp_test_flight_configure(fixture->sender, 0));
+		SEND_CHECK(send_ack(fixture, 1) && send_tick(fixture, 0) && fixture->count == caps[i] + 1);
+		SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == caps[i]);
+		send_fixture_free(fixture);
+		fixture = nullptr;
+	}
+	return TRUE;
+}
+
+static BOOL test_send_benchmark_flight_peer_shrink(void)
+{
+	BYTE bytes[80] = { 0 };
+	SendFixture* fixture = send_fixture_new(1, 5, 5, 1, 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture && rdpeudp_test_flight_configure(fixture->sender, 64));
+	SEND_CHECK(rdpeudp_test_queue_enable(fixture->sender, 131072));
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, sizeof(bytes)) == sizeof(bytes));
+	SEND_CHECK(fixture->count == 31);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.sendWindow == 31);
+	fixture->peerLogWindow = 7;
+	SEND_CHECK(send_ack(fixture, 0) && send_tick(fixture, 0) && fixture->count == 64);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 64 &&
+	           state.sendWindow == 64);
+	fixture->peerLogWindow = 2;
+	SEND_CHECK(send_ack(fixture, 0) && send_tick(fixture, 0) && fixture->count == 64);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 64 &&
+	           state.sendWindow == 3);
+	/* Existing attempts may retry under the grandfathered span. New channel
+	 * bytes remain blocked until genuine ACKs reduce flight below peer cap. */
+	SEND_CHECK(send_tick(fixture, 300) && fixture->count == 128);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 64 &&
+	           state.aliasCount == 128 && state.maxRetries == 1 && state.nextChannelSeq == 65);
+	SEND_CHECK(send_ack(fixture, 126) && send_tick(fixture, 300) && fixture->count == 129);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 3 &&
+	           state.sendWindow == 3 && state.nextChannelSeq == 66 && !state.sendFailed);
+	SEND_CHECK(!fixture->callbackFailed);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+
+static BOOL test_send_benchmark_flight_full_wrap_aliases(void)
+{
+	BYTE bytes[72] = { 0 };
+	BOOL original[64];
+	const UINT16 start = UINT16_MAX - 31;
+	SendFixture* fixture = send_fixture_new(1, 5, 7, start, 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture && rdpeudp_test_flight_configure(fixture->sender, 64));
+	SEND_CHECK(rdpeudp_test_queue_enable(fixture->sender, 131072));
+	for (size_t i = 0; i < sizeof(bytes); i++)
+		bytes[i] = (BYTE)(i + 1);
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, sizeof(bytes)) == sizeof(bytes));
+	SEND_CHECK(fixture->count == 64 && fixture->packets[31].dataSeq == UINT16_MAX &&
+	           fixture->packets[32].dataSeq == 0);
+	SEND_CHECK(send_tick(fixture, 300) && fixture->count == 128);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 64 &&
+	           state.aliasCount == 128 && state.maxRetries == 1 && state.sendWindow == 64);
+	for (size_t i = 0; i < 64; i++)
+	{
+		SEND_CHECK(fixture->packets[i + 64].dataSeq == (UINT16)(start + i + 64) &&
+		           fixture->packets[i + 64].channelSeq == i + 1 &&
+		           fixture->packets[i + 64].payload[0] == bytes[i]);
+		original[i] = TRUE;
+	}
+	/* Positive ACKs of older aliases must retire every logical payload once,
+	 * even though their latest attempts are across the DataSeq wrap. */
+	SEND_CHECK(send_ackvec(fixture, start, original, ARRAYSIZE(original)));
+	SEND_CHECK(send_tick(fixture, 300) && fixture->count == 136);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 8 &&
+	           state.aliasCount == 8 && state.queuedBytes == 8 && !state.sendFailed);
+	SEND_CHECK(send_ack(fixture, fixture->packets[135].dataSeq));
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && !state.inFlight &&
+	           !state.aliasCount && !state.queuedBytes && !state.sendFailed);
+	SEND_CHECK(!fixture->callbackFailed);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+
+static BOOL test_send_benchmark_flight_selective_holes(void)
+{
+	BYTE bytes[20] = { 0 };
+	BOOL received[16] = { 0 };
+	UINT64 flight[16] = { 0 };
+	SendFixture* fixture = send_fixture_new(1, 5, 7, 1, 1);
+	RdpUdpTestSendState state = { 0 };
+	SEND_CHECK(fixture && rdpeudp_test_flight_configure(fixture->sender, 16));
+	SEND_CHECK(rdpeudp_test_queue_enable(fixture->sender, 131072));
+	SEND_CHECK(rdpeudp_test_send_data(fixture->sender, bytes, sizeof(bytes)) == sizeof(bytes));
+	SEND_CHECK(fixture->count == 16);
+	received[15] = TRUE;
+	SEND_CHECK(send_ackvec(fixture, 1, received, ARRAYSIZE(received)) && send_tick(fixture, 0));
+	SEND_CHECK(fixture->count == 17);
+	SEND_CHECK(rdpeudp_test_send_state(fixture->sender, &state) && state.inFlight == 16 &&
+	           state.sendWindow == 16 && !state.sendFailed);
+	SEND_CHECK(rdpeudp_test_flight_stats(fixture->sender, flight, ARRAYSIZE(flight)));
+	/* Packet-count credit can refill through a selective hole while the
+	 * independent protocol sequence range remains wider than that count. */
+	SEND_CHECK(flight[1] == 16 && flight[2] == 16 && flight[3] == 127 && flight[10] == 16 &&
+	           flight[11] == 17 && flight[12] == 16 && flight[13] == 17);
+	SEND_CHECK(!fixture->callbackFailed);
+	send_fixture_free(fixture);
+	return TRUE;
+}
+#endif
+
 int TestRdpeUdpSend(int argc, char* argv[])
 {
 	WINPR_UNUSED(argc);
 	WINPR_UNUSED(argv);
+#if defined(WITH_RDP_BENCH)
+	if (!test_send_exact_benchmark_flight_caps() || !test_send_benchmark_flight_peer_shrink() ||
+	    !test_send_benchmark_flight_full_wrap_aliases() ||
+	    !test_send_benchmark_flight_selective_holes())
+		return -1;
+#endif
 	if (!test_send_pipeline() || !test_send_window_and_selective_ack() ||
 	    !test_send_window_shrink() || !test_send_window_shrink_with_loss() ||
 	    !test_send_window_storage_cap() || !test_send_peer_window_tracking() ||

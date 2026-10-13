@@ -32,8 +32,14 @@ FREERDP_API void* freerdp_bench_v1_open(const char* bindAddress, UINT16 port,
                         INITIATE_REQUEST_PROTOCOL_UDPFECR, cookie);
     if (!b->udp) goto fail;
     if (!rdp_bench_queue_configure_env(b->udp)) goto fail;
-    if (!rdp_bench_loss_configure_env(b->udp)) goto fail;
-    b->udp->sockfd = (int)socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (!rdp_bench_flight_configure_env(b->udp))
+		goto fail;
+	if (!rdp_bench_loss_configure_env(b->udp)) goto fail;
+	/* Raw associations skip SYN. Opt-in flight experiments declare both
+	 * peers' fixed LogWindow 7; actual incoming headers still update it. */
+	if (b->udp->benchMaxInFlightPackets)
+		b->udp->peerLogWindow = 7;
+	b->udp->sockfd = (int)socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (b->udp->sockfd < 0) goto fail;
     local.sin_family = AF_INET; local.sin_port = htons(port);
     peer.sin_family = AF_INET; peer.sin_port = htons(peerPort);
@@ -135,6 +141,16 @@ FREERDP_API int freerdp_bench_v1_queue_stats(void* handle, UINT64* out, size_t c
     const BOOL result = rdp_bench_queue_stats_locked(b->udp, out, count);
     LeaveCriticalSection(&b->udp->lock);
     return result;
+}
+FREERDP_API int freerdp_bench_v1_flight_config(void* handle, UINT64* out, size_t count)
+{
+	FreeRdpBenchV1* b = handle;
+	if (!b || !b->udp)
+		return 0;
+	EnterCriticalSection(&b->udp->lock);
+	const BOOL result = rdp_bench_flight_stats_locked(b->udp, out, count);
+	LeaveCriticalSection(&b->udp->lock);
+	return result;
 }
 FREERDP_API int freerdp_bench_v1_queue_hist(void* handle, UINT32 kind, UINT64* out, size_t count)
 {

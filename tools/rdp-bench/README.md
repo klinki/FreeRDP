@@ -426,3 +426,10 @@ bounded optional core tracing, the independent PCAP header audit, and the
 The matched transport rerun on both 10 Mbit/s profiles is recorded in
 [RECOVERY-TEN-MBIT-20261013.md](docs/RECOVERY-TEN-MBIT-20261013.md), including
 verified payload goodput, probe p95/p99 and retained failures.
+
+## Packet-loss and outstanding-packet matrix
+
+[FLIGHT-MATRIX.md](docs/FLIGHT-MATRIX.md) describes the benchmark-only exact
+16/32/48/64 outstanding DATA limits, fixed byte queue, 0/25/50/70% loss
+profiles and transport dashboard. Use `flight_sweep.py` to freeze and run the
+80-condition matrix, then `flight_report.py` to re-audit the sealed evidence.
