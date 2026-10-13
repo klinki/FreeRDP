@@ -176,6 +176,10 @@ typedef struct
 	UINT64 due;
 	UINT32 rto;
 	UINT32 retransmits;
+#if defined(WITH_RDP_BENCH)
+	UINT64 benchAccepted;
+	BOOL benchFirstSent;
+#endif
 } rdpudp_pending;
 
 typedef struct
@@ -190,7 +194,12 @@ typedef struct
 {
 	BYTE* data;
 	size_t length;
+#if defined(WITH_RDP_BENCH)
+	UINT64 benchAccepted;
+#endif
 } rdpudp_chunk;
+
+#include "rdpudp_bench_types.inc"
 
 struct rdp_udp
 {
@@ -258,7 +267,13 @@ struct rdp_udp
 
 	/* One received datagram. Kept here rather than on the stack, rdpudp_check is not reentrant. */
 	BYTE recvBuffer[0x10000];
+#if defined(WITH_RDP_BENCH)
+	/* Set only by the private adapter; normal associations keep nullptr. */
+	RdpUdpBench* bench;
+#endif
 };
+
+#include "rdpudp_bench_observer.inc"
 
 /* RDP-UDP sequence numbers are 16 (RDPUDP2) or 32 (RDPUDP) bit counters that wrap around, they
  * are compared and advanced with RFC 1982 serial number arithmetic. The wrap in the helpers
@@ -412,6 +427,10 @@ static BOOL rdpudp_send_raw(rdpUdp* udp, const BYTE* data, size_t length)
 {
 	WINPR_ASSERT(udp);
 	WINPR_ASSERT(data);
+#if defined(WITH_RDP_BENCH)
+	if (udp->bench)
+		udp->bench->lastRawSendComplete = FALSE;
+#endif
 	const int rc = _send(udp->sockfd, (const char*)data, WINPR_ASSERTING_INT_CAST(int, length), 0);
 	if (rc < 0)
 	{
@@ -425,6 +444,14 @@ static BOOL rdpudp_send_raw(rdpUdp* udp, const BYTE* data, size_t length)
 		WLog_Print(udp->log, WLOG_DEBUG, "send failed with %d, the datagram counts as lost", error);
 		return TRUE;
 	}
+#if defined(WITH_RDP_BENCH)
+	if (udp->bench && ((size_t)rc == length))
+	{
+		udp->bench->lastRawSendComplete = TRUE;
+		if (udp->bench->countersEnabled)
+			udp->bench->sentDatagrams++;
+	}
+#endif
 	udp->lastSent = now_ms();
 	return TRUE;
 }
@@ -930,13 +957,17 @@ static BOOL ack_when_due(rdpUdp* udp)
 }
 
 WINPR_ATTR_NODISCARD
-static BOOL rdpudp_transmit(rdpUdp* udp, const rdpudp_pending* p)
+static BOOL rdpudp_transmit(rdpUdp* udp, rdpudp_pending* p)
 {
 	WINPR_ASSERT(udp);
 	WINPR_ASSERT(p);
-	if (udp->version == RDPUDP_PROTOCOL_VERSION_3)
-		return v3_send_data(udp, p);
-	return v1_send_packet(udp, p);
+	const BOOL result =
+	    udp->version == RDPUDP_PROTOCOL_VERSION_3 ? v3_send_data(udp, p) : v1_send_packet(udp, p);
+#if defined(WITH_RDP_BENCH)
+	if (result)
+		rdpudp_bench_transmitted(udp, p);
+#endif
+	return result;
 }
 
 /* ------------------------------------------------------------------------------------------ */
@@ -951,6 +982,12 @@ static size_t window_limit(const rdpUdp* udp)
 	if ((udp->version != RDPUDP_PROTOCOL_VERSION_3) && (udp->peerWindow > 0) &&
 	    (udp->peerWindow < limit))
 		limit = udp->peerWindow;
+#if defined(WITH_RDP_BENCH)
+	/* The optional treatment caps new logical chunks only. Native retransmission
+	 * scheduling and v3 sequence/peer-advertisement behavior remain unchanged. */
+	if (udp->bench && udp->bench->cap && (udp->bench->cap < limit))
+		limit = udp->bench->cap;
+#endif
 	return limit;
 }
 
@@ -998,6 +1035,11 @@ static BOOL send_chunk_now(rdpUdp* udp, BYTE* data, size_t length)
 	p->due = now + p->rto;
 	p->retransmits = 0;
 	udp->inFlight++;
+#if defined(WITH_RDP_BENCH)
+	p->benchAccepted = udp->bench ? udp->bench->dequeuedAccepted : 0;
+	p->benchFirstSent = FALSE;
+	rdpudp_bench_peak(udp, rdpudp_bench_now(udp));
+#endif
 
 	return rdpudp_transmit(udp, p);
 }
@@ -1014,6 +1056,9 @@ static BOOL flush_send_queue(rdpUdp* udp)
 			break;
 		BYTE* data = chunk->data;
 		const size_t length = chunk->length;
+#if defined(WITH_RDP_BENCH)
+		rdpudp_bench_dequeued(udp, chunk);
+#endif
 		free(chunk);
 		if (!send_chunk_now(udp, data, length))
 			return FALSE;
@@ -1048,6 +1093,9 @@ BOOL rdpudp_send(rdpUdp* udp, const BYTE* data, size_t length)
 		chunk_free(chunk);
 		return FALSE;
 	}
+#if defined(WITH_RDP_BENCH)
+	rdpudp_bench_accepted(udp, chunk);
+#endif
 	// NOLINTNEXTLINE(clang-analyzer-unix.Malloc): Queue_Enqueue takes ownership of chunk
 	return flush_send_queue(udp);
 }
@@ -1072,6 +1120,9 @@ static void acknowledge(rdpUdp* udp, rdpudp_pending* p)
 	WINPR_ASSERT(udp);
 	WINPR_ASSERT(p);
 	sample_rtt(udp, p);
+#if defined(WITH_RDP_BENCH)
+	rdpudp_bench_retired(udp, p);
+#endif
 	pending_clear(p);
 	if (udp->inFlight > 0)
 		udp->inFlight--;
@@ -1496,7 +1547,18 @@ static BOOL v3_process_datagram(rdpUdp* udp, const BYTE* wire, size_t length)
 
 	if (!Stream_CheckAndLogRequiredLengthWLog(udp->log, s, 2))
 		return TRUE;
-	const UINT16 flags = Stream_Get_UINT16(s) & 0x0FFF;
+	const UINT16 header = Stream_Get_UINT16(s);
+	const UINT16 flags = header & 0x0FFF;
+#if defined(WITH_RDP_BENCH)
+	if (udp->bench)
+	{
+		const BYTE log = WINPR_ASSERTING_INT_CAST(BYTE, header >> 12);
+		if (log >= 2)
+			udp->bench->peerLog = log; /* observation only; upstream does not gate v3 sends */
+		else if (udp->bench->observer)
+			udp->bench->observer->valid = FALSE;
+	}
+#endif
 
 	if ((flags & RDPUDP2_ACK) && (flags & RDPUDP2_ACKVEC))
 		return TRUE;
@@ -1839,6 +1901,10 @@ static BOOL run_timers(rdpUdp* udp)
 			return FALSE;
 		}
 		p->retransmits++;
+#if defined(WITH_RDP_BENCH)
+		if (udp->bench && udp->bench->countersEnabled)
+			udp->bench->retransmissions++;
+#endif
 		p->rto = (p->rto * 2 > RDPUDP_MAX_RTO_MS) ? RDPUDP_MAX_RTO_MS : p->rto * 2;
 		p->due = now + p->rto;
 		if (udp->version == RDPUDP_PROTOCOL_VERSION_3)
@@ -2055,6 +2121,10 @@ UINT32 rdpudp_get_timeout(const rdpUdp* udp)
 BOOL rdpudp_check(rdpUdp* udp)
 {
 	WINPR_ASSERT(udp);
+#if defined(WITH_RDP_BENCH)
+	if (rdpudp_bench_deadline(udp))
+		return FALSE;
+#endif
 
 	if ((udp->state == RDPUDP_STATE_FAILED) || (udp->state == RDPUDP_STATE_CLOSED))
 		return FALSE;
@@ -2062,6 +2132,11 @@ BOOL rdpudp_check(rdpUdp* udp)
 	BYTE* buffer = udp->recvBuffer;
 	while (TRUE)
 	{
+#if defined(WITH_RDP_BENCH)
+		/* Also bound a continuously readable socket to the benchmark deadline. */
+		if (rdpudp_bench_deadline(udp))
+			return FALSE;
+#endif
 		const int rc = _recv(udp->sockfd, (char*)buffer,
 		                     WINPR_ASSERTING_INT_CAST(int, sizeof(udp->recvBuffer)), 0);
 		if (rc < 0)
@@ -2080,6 +2155,10 @@ BOOL rdpudp_check(rdpUdp* udp)
 			break;
 		}
 
+#if defined(WITH_RDP_BENCH)
+		if (udp->bench && udp->bench->countersEnabled)
+			udp->bench->receivedDatagrams++;
+#endif
 		if (!process_datagram(udp, buffer, WINPR_ASSERTING_INT_CAST(size_t, rc)))
 		{
 			rdpudp_fail(udp, "failed to process a datagram");
@@ -2099,3 +2178,5 @@ BOOL rdpudp_check(rdpUdp* udp)
 
 	return run_timers(udp);
 }
+
+#include "rdpudp_bench_private.inc"

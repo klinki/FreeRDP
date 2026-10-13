@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "phase": "smoke",
+  "warmup_s": 3,
+  "measure_s": 10,
+  "response_timeout_s": 3,
+  "seeds": [11],
+  "source_fps": 60,
+  "scroll_px_s": 400,
+  "probe_hz": 2,
+  "injection_budget_ms": 50,
+  "cases": [
+    {"id": "canvas-ten-clean", "scene": "canvas-motion", "profile": "ten_mbit_clean"},
+    {"id": "canvas-ten-impaired", "scene": "canvas-motion", "profile": "ten_mbit"}
+  ]
+}

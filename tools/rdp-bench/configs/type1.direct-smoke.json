@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "warmup_s": 0.5,
+  "measure_s": 3,
+  "drain_s": 2,
+  "payload_bytes": 16384,
+  "probe_hz": 20,
+  "seeds": [
+    11
+  ],
+  "cases": [
+    {
+      "id": "direct-upload",
+      "profile": "loopback",
+      "workload": "upload"
+    },
+    {
+      "id": "direct-download",
+      "profile": "loopback",
+      "workload": "download"
+    },
+    {
+      "id": "direct-duplex",
+      "profile": "loopback",
+      "workload": "duplex"
+    },
+    {
+      "id": "direct-probe",
+      "profile": "loopback",
+      "workload": "probe"
+    },
+    {
+      "id": "direct-mixed",
+      "profile": "loopback",
+      "workload": "mixed"
+    }
+  ],
+  "notes": "Quick diagnostic; use >=5 paired repetitions and 30+ seconds for a release decision."
+}

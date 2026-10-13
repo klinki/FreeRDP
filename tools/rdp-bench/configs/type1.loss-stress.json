@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "phase": "main",
+  "warmup_s": 5,
+  "measure_s": 30,
+  "drain_s": 12,
+  "payload_bytes": 16384,
+  "probe_hz": 20,
+  "seeds": [
+    11,
+    29,
+    47,
+    71,
+    101
+  ],
+  "cases": [
+    {
+      "id": "upload-loss-control",
+      "profile": "ten_mbit",
+      "workload": "upload_mixed"
+    },
+    {
+      "id": "upload-loss25",
+      "profile": "ten_mbit_loss25",
+      "workload": "upload_mixed"
+    },
+    {
+      "id": "upload-loss50",
+      "profile": "ten_mbit_loss50",
+      "workload": "upload_mixed"
+    },
+    {
+      "id": "upload-loss70",
+      "profile": "ten_mbit_loss70",
+      "workload": "upload_mixed"
+    }
+  ],
+  "notes": "Candidate-only high-loss stress campaign: use a variants file containing one production-default candidate, with no queue override. Independent per-datagram loss applies to both directions, including ACKs and retransmissions. Retain transport failures, missed probes and incomplete payloads; high-loss failures are expected observations, not passing throughput samples."
+}

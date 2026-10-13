@@ -545,6 +545,11 @@ endif()
 
 option(WITH_AAD "Compile with support for Azure AD authentication" ${WITH_WINPR_JSON})
 
+option(WITH_RDP_BENCH "Build the private raw UDP2 benchmark adapter (development only)" OFF)
+if(WITH_RDP_BENCH AND (NOT UNIX OR NOT BUILD_SHARED_LIBS OR NOT WITH_RDPEUDP))
+  message(FATAL_ERROR "WITH_RDP_BENCH requires a POSIX shared-library build with WITH_RDPEUDP=ON")
+endif()
+
 # Include directories
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)

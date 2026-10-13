@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "approved": false,
+  "approved_by": "",
+  "host": "REPLACE_WITH_EXACT_HOST_FROM_MANIFEST",
+  "engine": "python-relay",
+  "valid_until_utc": "",
+  "max_rate_mbps": 0,
+  "max_packet_rate": 0,
+  "engine_files": {},
+  "evidence": [],
+  "notes": "Generate current hashes using ci/make_acceptance_template.py. Then calibrate, review, and attach absolute evidence paths and SHA256 hashes. Never just change approved to true. This example deliberately fails acceptance."
+}

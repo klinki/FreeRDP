@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RDP end-to-end workload fixture</title>
+<style>
+html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#f8f9fb; color:#182033; font-family:'Segoe UI',sans-serif; }
+#controls { position:fixed; z-index:100; inset:0; display:grid; place-content:center; background:#edf1f8; gap:16px; padding:32px; }
+button,select,input { font:inherit; padding:10px; } .small {max-width:700px; line-height:1.5;}
+#viewport {position:absolute; inset:0; overflow:hidden; }
+#document { position:absolute; inset:0; overflow:hidden; background:#fff; padding:64px 48px; box-sizing:border-box; }
+#lines { font:18px/28px Consolas,monospace; white-space:pre; margin:0; }
+#article { max-width:1500px; margin:auto; line-height:1.6; }
+h1 {font-size:42px;} .cards {display:grid;grid-template-columns:repeat(3,1fr);gap:24px;} .card {padding:24px;background:#eef2f8;border:1px solid #cbd5e1;min-height:160px;}
+canvas#motion {position:absolute; inset:0; width:100%; height:100%;}
+#movie {position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#141923;}
+#marker {position:absolute;left:12px;top:12px; z-index:20;width:112px;height:64px;image-rendering:pixelated;pointer-events:none;}
+#typing {font:22px/1.6 Consolas,monospace; white-space:pre-wrap; padding:100px 64px;}
+.hidden {display:none!important;}
+</style></head><body>
+<div id="controls"><h1>RDP workload preview</h1><div class="small">Run this page on the Windows desktop being remoted. This fixture generates load; it does not measure RDP performance by itself. A future agent can control <code>window.rdpBench</code>. Escape stops the preview.</div>
+<select id="scene"><option>text-scroll</option><option>web-scroll</option><option>canvas-motion</option><option>typing-visual</option><option>static-idle</option><option>video</option></select>
+<label>Local video URL (video only) <input id="video-url" placeholder="clip.mp4"></label>
+<button id="start">Start preview</button><div id="error" role="alert"></div></div>
+<div id="viewport"><div id="document"><pre id="lines"></pre><article id="article"></article></div><canvas id="motion"></canvas><video id="movie" muted playsinline preload="auto"></video><div id="typing"></div><canvas id="marker" width="112" height="64"></canvas></div>
+<script src="model.js"></script><script src="workload.js"></script></body></html>

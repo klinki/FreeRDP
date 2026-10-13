@@ -241,6 +241,10 @@ endif()
 
 addtargetwithresourcefile(${MODULE_NAME} FALSE "${FREERDP_VERSION}" LIBFREERDP_SRCS)
 
+if(WITH_RDP_BENCH)
+  set_property(SOURCE core/rdpudp.c APPEND PROPERTY COMPILE_DEFINITIONS WITH_RDP_BENCH)
+endif()
+
 if(WITH_RESOURCE_VERSIONING)
   target_compile_definitions(${MODULE_NAME} PRIVATE WITH_RESOURCE_VERSIONING)
 endif()

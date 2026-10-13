@@ -1,0 +1,316 @@
+{
+  "version": 1,
+  "rate_layer": "IPv4+UDP (UDP datagram bytes + 28); Ethernet excluded",
+  "profiles": {
+    "lan": {
+      "description": "lan",
+      "c2s": {
+        "one_way_ms": 1,
+        "jitter_ms": 0,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 100,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 1,
+        "jitter_ms": 0,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 100,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      }
+    },
+    "office": {
+      "description": "office",
+      "c2s": {
+        "one_way_ms": 10,
+        "jitter_ms": 1,
+        "loss": 0.0001,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 100,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 10,
+        "jitter_ms": 1,
+        "loss": 0.0001,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 100,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      }
+    },
+    "home": {
+      "description": "home",
+      "c2s": {
+        "one_way_ms": 20,
+        "jitter_ms": 2,
+        "loss": 0.001,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 20,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 20,
+        "jitter_ms": 2,
+        "loss": 0.001,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 100,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      }
+    },
+    "remote": {
+      "description": "remote",
+      "c2s": {
+        "one_way_ms": 30,
+        "jitter_ms": 2,
+        "loss": 0.0005,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 30,
+        "jitter_ms": 2,
+        "loss": 0.0005,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 50,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      }
+    },
+    "ten_mbit": {
+      "description": "ten_mbit",
+      "c2s": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "loss": 0.0005,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "loss": 0.0005,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      }
+    },
+    "ten_mbit_clean": {
+      "description": "ten_mbit_clean",
+      "c2s": {
+        "one_way_ms": 15,
+        "jitter_ms": 0,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 15,
+        "jitter_ms": 0,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      }
+    },
+    "reorder": {
+      "description": "reorder",
+      "c2s": {
+        "one_way_ms": 10,
+        "jitter_ms": 0,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 100,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 10,
+        "jitter_ms": 0,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0.005,
+        "rate_mbps": 100,
+        "queue_ms": 30,
+        "overhead_bytes": 28,
+        "reorder_extra_ms": 15
+      }
+    },
+    "burst": {
+      "description": "burst",
+      "c2s": {
+        "one_way_ms": 20,
+        "jitter_ms": 1,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 20,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 20,
+        "jitter_ms": 1,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 50,
+        "queue_ms": 30,
+        "overhead_bytes": 28,
+        "blackouts_ms": [
+          [
+            3000,
+            40
+          ],
+          [
+            6000,
+            40
+          ]
+        ]
+      }
+    },
+    "bufferbloat_stress": {
+      "description": "bufferbloat_stress",
+      "c2s": {
+        "one_way_ms": 15,
+        "jitter_ms": 0,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 250,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 15,
+        "jitter_ms": 0,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 250,
+        "overhead_bytes": 28
+      }
+    },
+    "loopback": {
+      "description": "loopback",
+      "c2s": {
+        "one_way_ms": 0,
+        "jitter_ms": 0,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 0,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 0,
+        "jitter_ms": 0,
+        "loss": 0,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 0,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      }
+    },
+    "ten_mbit_loss25": {
+      "description": "10 Mbit/s high-loss stress: 25% independent random UDP loss in each direction",
+      "c2s": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "loss": 0.25,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "loss": 0.25,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      }
+    },
+    "ten_mbit_loss50": {
+      "description": "10 Mbit/s high-loss stress: 50% independent random UDP loss in each direction",
+      "c2s": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "loss": 0.5,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "loss": 0.5,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      }
+    },
+    "ten_mbit_loss70": {
+      "description": "10 Mbit/s high-loss stress: 70% independent random UDP loss in each direction",
+      "c2s": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "loss": 0.7,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      },
+      "s2c": {
+        "one_way_ms": 15,
+        "jitter_ms": 1,
+        "loss": 0.7,
+        "duplicate": 0,
+        "reorder": 0,
+        "rate_mbps": 10,
+        "queue_ms": 30,
+        "overhead_bytes": 28
+      }
+    }
+  }
+}
