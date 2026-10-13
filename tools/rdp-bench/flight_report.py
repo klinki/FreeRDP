@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import statistics
 
-from rdpbench.common import audit,digest,read_json,write_json
+from rdpbench.common import audit,digest,read_json,sha256,write_json
 from rdpbench.native import FLIGHT_FIELDS
 from rdpbench.type1 import endpoint_result
 
@@ -17,6 +17,12 @@ LOSSES=(0,25,50,70)
 WINDOWS=(16,32,48,64)
 METRICS=('goodput_mbps','rtt_p95_ms','rtt_p99_ms','scheduled_p99_ms')
 VALID=('PROVISIONAL_UNCALIBRATED','VALIDATED_LAB')
+# This exact Link implementation serializes dict(collections.Counter), whose
+# absent event keys mean zero. Accept that contract only with its frozen source
+# receipt and matching manifest; other/missing provider data remains unknown.
+SPARSE_COUNTER_LINK_SHA256='effd658120bf9fe5ddf02aeac9933a6998d389a948dcab474faa1175b80601e2'
+RELAY_COUNTER_FIELDS=('received_datagrams','random_drops','queue_drops','blackout_drops',
+                      'delivered_datagrams','socket_send_errors','duplicates')
 
 
 def finite(value):
@@ -36,6 +42,21 @@ def known_sum(values):
 
 def count(value):
     return isinstance(value,int) and not isinstance(value,bool) and value>=0
+
+
+def relay_counter_values(value,shape,plan,invariants):
+    """Distinguish sealed sparse Counter zeros from unavailable telemetry."""
+    known_contract=(shape.get('engine')=='python_udp_relay_v1'
+                    and plan.get('source_hashes',{}).get('rdpbench/link.py')==SPARSE_COUNTER_LINK_SHA256
+                    and invariants.get('suite_source_hash')==digest(plan['source_hashes']))
+    counts={};inferred=[]
+    for name in RELAY_COUNTER_FIELDS:
+        if name in value:counts[name]=value[name]
+        else:
+            counts[name]=0 if known_contract else None
+            if known_contract:inferred.append(name)
+        if counts[name] is not None and not count(counts[name]):raise ValueError('invalid relay counter: '+name)
+    return counts,inferred
 
 
 def flight_fields(config):
@@ -109,20 +130,30 @@ def inspect_trial(folder,declared,plan):
             if any(actual.get(k)!=v for k,v in expected.items()):raise ValueError('frozen endpoint environment differs')
         endpoints=[endpoint_result(folder/f'endpoint-{i}.result.json') for i in (0,1)]
         if any(e.get('result_read_error') for e in endpoints):raise ValueError('endpoint schema invalid')
-        shape=object_at(folder/'shaper.json');timing=summary['validity'] in VALID and not shape.get('error');pending=0
+        shape=object_at(folder/'shaper.json');timing=summary['validity'] in VALID and shape.get('engine')=='python_udp_relay_v1' and not shape.get('error');pending=0
+        row['network_counter_provenance']=dict(link_source_sha256=plan['source_hashes'].get('rdpbench/link.py'),
+            zero_omission_contract='dict(collections.Counter); only the recognized frozen Link source and matching manifest permit absent event keys to mean zero')
         for direction in ('c2s','s2c'):
             v=shape[direction]
-            if not all(count(v.get(k)) for k in ('received_datagrams','random_drops','queue_drops','blackout_drops','delivered_datagrams','socket_send_errors','duplicates')):raise ValueError('relay counters unavailable')
-            offers=v['received_datagrams'];random=v['random_drops'];eligible=offers-v['queue_drops']-v['blackout_drops']
-            residual=offers+v.get('duplicates',0)-sum(v.get(k,0) for k in ('random_drops','queue_drops','blackout_drops','delivered_datagrams','socket_send_errors'))
-            if eligible<0 or not 0<=random<=eligible or residual<0:raise ValueError('relay accounting inconsistent')
-            if loss==0 and random:raise ValueError('zero-loss control has random drops')
-            pending+=residual;p99=v.get('lateness_ms',{}).get('p99')
-            timing=bool(timing and finite(p99) and 0<=p99<=max(.5,manifest['profile'][direction]['one_way_ms']*.1) and v.get('socket_send_errors')==0)
+            counters,inferred=relay_counter_values(v,shape,plan,inv)
+            known=all(count(x) for x in counters.values())
+            offers=counters['received_datagrams'];random=counters['random_drops'];eligible=residual=None
+            if known:
+                eligible=offers-counters['queue_drops']-counters['blackout_drops']
+                residual=offers+counters['duplicates']-sum(counters[k] for k in ('random_drops','queue_drops','blackout_drops','delivered_datagrams','socket_send_errors'))
+                if eligible<0 or not 0<=random<=eligible or residual<0:raise ValueError('relay accounting inconsistent')
+                if loss==0 and random:raise ValueError('zero-loss control has random drops')
+            else:row['qualification_notes'].append(direction+': relay counters unavailable; no recognized sparse-Counter zero contract')
+            pending=pending+residual if pending is not None and residual is not None else None
+            p99=v.get('lateness_ms',{}).get('p99')
+            timing=bool(timing and known and finite(p99) and 0<=p99<=max(.5,manifest['profile'][direction]['one_way_ms']*.1) and counters['socket_send_errors']==0)
             row['network'][direction]=dict(offered=offers,random_drops=random,random_candidates=eligible,
-                actual_loss=random/eligible if eligible else None,queue_drops=v['queue_drops'],blackout_drops=v['blackout_drops'],
-                delivered=v['delivered_datagrams'],socket_errors=v.get('socket_send_errors'),pending=residual,dispatch_p99_ms=p99)
-        if pending!=shape.get('pending_on_close',0):raise ValueError('pending relay copy count differs')
+                actual_loss=random/eligible if eligible else None,queue_drops=counters['queue_drops'],blackout_drops=counters['blackout_drops'],
+                delivered=counters['delivered_datagrams'],socket_errors=counters['socket_send_errors'],pending=residual,dispatch_p99_ms=p99,
+                inferred_zero_counters=inferred)
+        if not count(shape.get('pending_on_close')):
+            timing=False;row['qualification_notes'].append('relay pending-on-close receipt unavailable')
+        elif pending is not None and pending!=shape['pending_on_close']:raise ValueError('pending relay copy count differs')
         integrity=summary.get('integrity_verified') is True and all(e.get('completed') is True and not e.get('incomplete_record_bytes') and e.get('counters',{}).get('unexpected_order')==0 for e in endpoints)
         for sent,received in (endpoints,endpoints[::-1]):
             sent_count=sent.get('counters',{}).get('sent_bytes');other=received.get('counters',{}).get('received_bytes')
@@ -220,6 +251,9 @@ def dashboard(plan,rows,status='preparing',network_checks=None):
                 first_failure_ms=stats(r['first_failure_ms'] for r in intact),
                 incomplete_count=sum(r['outcome'] not in ('COMPLETE','FAIL') for r in cell)))
     meta=dict(status=status,generated_utc=datetime.now(timezone.utc).isoformat(),commit=plan.get('commit'),planned_trials=80,
+        reporter=dict(source_sha256=sha256(Path(__file__)),frozen_source_sha256=plan.get('reporter_sha256'),
+                      interpretation_revision='sparse-counter-v2',
+                      matches_frozen_source=sha256(Path(__file__))==plan.get('reporter_sha256')),
         seeds=plan['suite']['seeds'],loss_percent=list(LOSSES),window_packets=list(WINDOWS),
         network=dict(rate_mbps=10,one_way_ms=15,jitter_ms=1,queue_ms=30),byte_queue=131072,wire_mtu=1232,scope='native-udp2',
         record_payload_bytes=16384,record_header_bytes=36,parameter='configured active reliable DATA packet limit',

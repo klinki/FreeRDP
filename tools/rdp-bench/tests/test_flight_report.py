@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from flight_report import collect,dashboard,flight_fields,inspect_trial
+from flight_report import collect,dashboard,flight_fields,inspect_trial,relay_counter_values
 from flight_sweep import execute,prepare,validate_matrix
 from rdpbench.common import digest,read_json,seal,sha256,write_json
 from rdpbench.native import FLIGHT_FIELDS
@@ -76,6 +76,14 @@ class FlightReportTests(unittest.TestCase):
             self.assertIsNone(group['queue_drops']['s2c'])
             self.assertIsNone(group['metrics']['qualified']['goodput_mbps']['median'])
 
+    def test_corrected_reporter_receipt_preserves_frozen_source_identity(self):
+        plan=copy.deepcopy(self.plan);plan['reporter_sha256']='0'*64
+        result=dashboard(plan,[])
+        self.assertEqual(result['meta']['reporter']['frozen_source_sha256'],'0'*64)
+        self.assertEqual(result['meta']['reporter']['source_sha256'],sha256(ROOT/'flight_report.py'))
+        self.assertFalse(result['meta']['reporter']['matches_frozen_source'])
+        self.assertEqual(result['meta']['reporter']['interpretation_revision'],'sparse-counter-v2')
+
     def test_exact_count_and_larger_span_are_valid_and_actual_payload_reported(self):
         folder,declared=self.trial()
         row=inspect_trial(folder,declared,self.plan)
@@ -126,6 +134,33 @@ class FlightReportTests(unittest.TestCase):
         def mutate2(summary,manifest,endpoints,shape):endpoints[0]['probe_unobserved']=1
         folder,declared=self.trial(ident='bad-probes',mutator=mutate2)
         self.assertIn('unobserved probes',inspect_trial(folder,declared,self.plan)['artifact_errors'][0])
+
+    def test_real_sparse_counter_zero_contract_is_qualified_and_receipted(self):
+        def mutate(summary,manifest,endpoints,shape):
+            for direction in ('c2s','s2c'):
+                for key in ('random_drops','queue_drops','blackout_drops','socket_send_errors','duplicates'):del shape[direction][key]
+        folder,declared=self.trial(mutator=mutate);row=inspect_trial(folder,declared,self.plan)
+        self.assertTrue(row['qualified'],row['reasons'])
+        self.assertEqual(row['network']['c2s']['random_drops'],0)
+        self.assertEqual(row['network']['c2s']['inferred_zero_counters'],['random_drops','queue_drops','blackout_drops','socket_send_errors','duplicates'])
+        self.assertEqual(row['network_counter_provenance']['link_source_sha256'],self.plan['source_hashes']['rdpbench/link.py'])
+
+    def test_sparse_counter_unknown_provider_or_manifest_stays_unknown(self):
+        sparse=dict(received_datagrams=10,delivered_datagrams=10)
+        inv=dict(suite_source_hash=digest(self.plan['source_hashes']))
+        unknown_plan=copy.deepcopy(self.plan);unknown_plan['source_hashes']['rdpbench/link.py']='0'*64
+        unknown_inv=dict(suite_source_hash=digest(unknown_plan['source_hashes']))
+        for shape,plan,receipt in [(dict(engine='unknown'),self.plan,inv),
+                                   (dict(engine='python_udp_relay_v1'),unknown_plan,unknown_inv),
+                                   (dict(engine='python_udp_relay_v1'),self.plan,dict(suite_source_hash='0'*64))]:
+            counters,inferred=relay_counter_values(sparse,shape,plan,receipt)
+            self.assertIsNone(counters['random_drops']);self.assertIsNone(counters['queue_drops']);self.assertEqual(inferred,[])
+
+    def test_explicit_null_counter_is_never_normalized_to_zero(self):
+        sparse=dict(received_datagrams=10,delivered_datagrams=10,random_drops=None)
+        counters,inferred=relay_counter_values(sparse,dict(engine='python_udp_relay_v1'),self.plan,
+                                              dict(suite_source_hash=digest(self.plan['source_hashes'])))
+        self.assertIsNone(counters['random_drops']);self.assertNotIn('random_drops',inferred)
 
     def test_changed_raw_artifact_is_rejected(self):
         folder,declared=self.trial();write_json(folder/'shaper.json',{})
