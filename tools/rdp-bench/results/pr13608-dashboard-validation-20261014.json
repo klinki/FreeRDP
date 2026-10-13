@@ -1,0 +1,16 @@
+{
+  "utc": "2026-10-13T22:54:01.710752+00:00",
+  "checks": {
+    "desktop_source_selector": true,
+    "qualified_cohort_values": true,
+    "startup_reason_digest_and_unknown_native": true,
+    "ledger_search": true,
+    "network_check_evidence": true,
+    "mobile_390x844": true,
+    "unavailable_PR_data_clears_metrics": true,
+    "viewport_reset": true
+  },
+  "console_before_missing_fixture": [],
+  "missing_fixture": "HTTP404 intentional; original data restored byte-for-byte",
+  "status": "pass"
+}

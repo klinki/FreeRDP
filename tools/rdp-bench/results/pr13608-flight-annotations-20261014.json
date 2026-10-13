@@ -1,0 +1,13 @@
+{
+  "schema": "rdp-bench.operational-annotations.v1",
+  "frozen_dashboard_sha256": "d3a549df3d36f0611d264d2f0a0827880c57254c2dbe5f4fd3a244035768553a",
+  "annotations": [
+    {
+      "trial_id": "loss0-upload-mixed-flight64-s71-e0b5f02c",
+      "stage": "startup",
+      "reason": "Endpoint 1 initialization timed out before measurement; endpoint result files are absent. Native failure and deadline state remain unknown.",
+      "source": "campaign/main/loss0-upload-mixed-flight64-s71-e0b5f02c/summary.json",
+      "source_sha256": "f34ca3e987a66c33786a02f2f76f52bf0c681dce1e47e33c4798895bdcdf9f65"
+    }
+  ]
+}

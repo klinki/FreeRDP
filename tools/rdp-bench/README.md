@@ -1,6 +1,6 @@
 # PR 13608 transport benchmark integration
 
-This worktree ports the transport-only loss/inflight matrix to the upstream PR implementation without altering its native retry/RTO/ACK policy. Read [docs/FLIGHT-MATRIX.md](docs/FLIGHT-MATRIX.md) for Log15/64-slot geometry, truthful unified stats, and the preserved historical comparison. Build with `python3 build.py`, then use `flight_sweep.py` with the resulting metadata. No new benchmark outcome is claimed by source integration alone.
+This worktree ports the transport-only loss/inflight matrix to the upstream PR implementation without altering its native retry/RTO/ACK policy. Read [docs/FLIGHT-MATRIX.md](docs/FLIGHT-MATRIX.md) for Log15/64-slot geometry, truthful unified stats, and the preserved historical comparison. Build with `python3 build.py`, then use `flight_sweep.py` with the resulting metadata. The completed 80-trial comparison and its qualification limits are in [docs/PR13608-FLIGHT-RESULTS-20261014.md](docs/PR13608-FLIGHT-RESULTS-20261014.md).
 
 ---
 
