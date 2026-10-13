@@ -41,7 +41,8 @@ def collect(root):
              'configured_loss':declaration.get('configured_loss',{}),
              'loss_probability':declaration.get('configured_loss',{}).get('c2s'),
              'sut_outcome':'UNKNOWN','validity':'INVALID_ARTIFACT','artifact_errors':[],
-             'metrics':{},'endpoints':[],'network':{},'reasons':[],'verified_goodput_mbps':None}
+             'metrics':{},'endpoints':[],'network':{},'reasons':[],'verified_goodput_mbps':None,
+             'integrity_verified_goodput_mbps':None}
         try:
             errors=audit(folder)
             if errors:raise ValueError('; '.join(errors))
@@ -112,9 +113,32 @@ def collect(root):
                         raise ValueError('verified transfer byte/hash mismatch')
                     if receiver.get('incomplete_record_bytes'):
                         raise ValueError('verified transfer has partial application record')
+                # Payload integrity and probe service are independent outcomes.
+                # A probe-only FAIL may retain a fully delivered payload rate,
+                # but never becomes a COMPLETE-qualified throughput observation.
+                failures=summary.get('sut_failures') or []
+                payload_outcome=(summary.get('sut_outcome')=='COMPLETE' and not failures) or (
+                    summary.get('sut_outcome')=='FAIL' and failures and all(
+                        note=='probe deadlines unserved/unobserved' for note in failures))
+                timing_ok=not shape.get('error') and all(
+                    isinstance(shape.get(d,{}).get('lateness_ms',{}).get('p99'),(int,float)) and
+                    not isinstance(shape[d]['lateness_ms']['p99'],bool) and
+                    math.isfinite(shape[d]['lateness_ms']['p99']) and
+                    0<=shape[d]['lateness_ms']['p99']<=max(.5,manifest['profile'][d]['one_way_ms']*.1) and
+                    not shape[d].get('socket_send_errors') for d in ('c2s','s2c'))
+                endpoints_ok=all(not endpoint.get('error') and not endpoint.get('benchmark_deadline_reached') and
+                    not endpoint.get('telemetry_errors') and not endpoint.get('cleanup_errors') and
+                    not (endpoint.get('native_stats') or {}).get('send_failed') and
+                    not (endpoint.get('native_stats') or {}).get('receive_failed') and
+                    not endpoint.get('counters',{}).get('probe_send_failures') for endpoint in raw_endpoints)
+                if payload_outcome and timing_ok and endpoints_ok and summary.get('validity') in (
+                        'PROVISIONAL_UNCALIBRATED','VALIDATED_LAB'):
+                    value=summary['metrics'].get('c2s.verified_goodput_mbps')
+                    if isinstance(value,(int,float)) and not isinstance(value,bool) and math.isfinite(value) and value>=0:
+                        row['integrity_verified_goodput_mbps']=value
         except (ValueError,OSError,KeyError,TypeError,AttributeError) as error:
             row.update(validity='INVALID_ARTIFACT',artifact_errors=[str(error)],metrics={},
-                       verified_goodput_mbps=None,endpoints=[],network={})
+                       verified_goodput_mbps=None,integrity_verified_goodput_mbps=None,endpoints=[],network={})
         trials.append(row)
     groups=[]
     by_profile=defaultdict(list)
@@ -135,6 +159,7 @@ def collect(root):
             'trials':len(rows),'outcomes':dict(Counter(r['sut_outcome'] for r in rows)),
             'artifact_invalid':len(rows)-len(intact),'timing_valid_complete':len(qualified),'probes':counts,
             'verified_goodput_mbps':stats(r['verified_goodput_mbps'] for r in qualified),
+            'integrity_verified_goodput_mbps':stats(r['integrity_verified_goodput_mbps'] for r in intact),
             'observed_trial_p95_ms':stats(r['metrics'].get('client.probe_rtt_ms.p95') for r in intact),
             'observed_trial_p99_ms':stats(r['metrics'].get('client.probe_rtt_ms.p99') for r in intact),
             'first_failure_ms':stats(r.get('first_failure_ms') for r in intact),
@@ -149,7 +174,9 @@ def collect(root):
         'outcomes':dict(Counter(r['sut_outcome'] for r in trials)),'artifact_invalid':sum(bool(r['artifact_errors']) for r in trials)},
         'groups':groups,'trials':trials,'notes':[
             'No accepted calibration receipt or live Windows performance claim is implied.',
-            'Goodput summaries require artifact-intact timing-valid COMPLETE integrity-verified transfers; failed transfers are unavailable.',
+            'Qualified goodput requires artifact-intact timing-valid COMPLETE integrity-verified transfers; this cohort is unchanged.',
+            'Integrity-verified payload goodput also includes timing-valid probe-only FAIL trials whose endpoints complete with matching full-stream bytes/hashes and CRC records. It does not promote their SUT outcome; all probe failures remain displayed.',
+            'Incomplete streams, deadline cancellations, native failures, invalid timing and malformed observations have no integrity-verified payload goodput.',
             'p95/p99 are medians of per-trial observed-response percentiles; failed trials with responses remain diagnostic. Samples are never pooled.',
             'Latency is survivor-only: compare it with unobserved responses and unserved scheduled injections. Missing observations do not become zero.',
             'Probe counts include warmup; percentile samples include measurement-scheduled probes only.',
@@ -166,13 +193,14 @@ def export(report,output):
     output=Path(output)
     write_json(output.with_suffix('.json'),report)
     lines=['# High-loss native transport campaign','',report['scope'],'',
-        '| Configured loss each direction | Complete / failed | Qualified goodput Mbit/s (N) | Observed p95 / p99 ms (N) | Expected / injected / observed | Unserved / unobserved | First failure ms (N) |',
-        '|---|---:|---:|---:|---:|---:|---:|']
+        '| Configured loss each direction | Complete / failed | Qualified goodput Mbit/s (N) | Integrity-verified payload goodput Mbit/s (N) | Observed p95 / p99 ms (N) | Expected / injected / observed | Unserved / unobserved | First failure ms (N) |',
+        '|---|---:|---:|---:|---:|---:|---:|---:|']
     for group in report['groups']:
         probes=group['probes'];goodput=group['verified_goodput_mbps'];p95=group['observed_trial_p95_ms'];p99=group['observed_trial_p99_ms']
         loss=group['configured_loss_probability']
         failure=group['first_failure_ms']
-        lines.append(f"| {display(loss*100 if loss is not None else None)}% | {group['outcomes'].get('COMPLETE',0)} / {group['outcomes'].get('FAIL',0)} | {display(goodput['median'])} ({goodput['n']}) | {display(p95['median'])} / {display(p99['median'])} ({p99['n']}) | {probes['probes_expected']} / {probes['probes_injected']} / {probes['probes_observed']} | {probes['probes_not_injected']} / {probes['unobserved']} | {display(failure['median'])} ({failure['n']}) |")
+        payload=group['integrity_verified_goodput_mbps']
+        lines.append(f"| {display(loss*100 if loss is not None else None)}% | {group['outcomes'].get('COMPLETE',0)} / {group['outcomes'].get('FAIL',0)} | {display(goodput['median'])} ({goodput['n']}) | {display(payload['median'])} ({payload['n']}) | {display(p95['median'])} / {display(p99['median'])} ({p99['n']}) | {probes['probes_expected']} / {probes['probes_injected']} / {probes['probes_observed']} | {probes['probes_not_injected']} / {probes['unobserved']} | {display(failure['median'])} ({failure['n']}) |")
     lines+=['','## Limits','']+['- '+note for note in report['notes']]
     lines+=['','## Retained failures','']
     for row in report['trials']:
@@ -182,13 +210,13 @@ def export(report,output):
     output.with_suffix('.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
     with output.with_suffix('.csv').open('w',encoding='utf-8',newline='') as stream:
         writer=csv.writer(stream,lineterminator='\n');writer.writerow(['trial_id','profile','seed','outcome','validity','configured_loss',
-            'verified_goodput_mbps','observed_p95_ms','observed_p99_ms','expected','injected','observed','unserved',
+            'verified_goodput_mbps','integrity_verified_goodput_mbps','observed_p95_ms','observed_p99_ms','expected','injected','observed','unserved',
             'unobserved','timeouts','client_send_failed','client_receive_failed','c2s_random_loss','s2c_random_loss',
             'first_failure_ms','client_measurement_observed_s'])
         for row in report['trials']:
             endpoint=row['endpoints'][0] if row['endpoints'] else {};counter=endpoint.get('counters') or {};native=endpoint.get('native_stats') or {}
             writer.writerow([row['trial_id'],row.get('profile_id'),row['seed'],row['sut_outcome'],row['validity'],
-                row.get('loss_probability'),row['verified_goodput_mbps'],row['metrics'].get('client.probe_rtt_ms.p95'),
+                row.get('loss_probability'),row['verified_goodput_mbps'],row['integrity_verified_goodput_mbps'],row['metrics'].get('client.probe_rtt_ms.p95'),
                 row['metrics'].get('client.probe_rtt_ms.p99'),*[counter.get(k) for k in ('probes_expected','probes_injected','probes_observed','probes_not_injected')],
                 endpoint.get('probe_unobserved'),endpoint.get('probe_timeouts'),native.get('send_failed'),native.get('receive_failed'),
                 *[row['network'].get(d,{}).get('realized_random_loss') for d in ('c2s','s2c')],

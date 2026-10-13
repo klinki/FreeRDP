@@ -53,7 +53,8 @@ class LossStressReportTests(unittest.TestCase):
                                                             effective_window_packets=31)))
 
     def add_trial(self, ident="trial", outcome="COMPLETE", validity="PROVISIONAL_UNCALIBRATED",
-                  integrity=True, endpoints=None, p95=10, p99=11, goodput=2.5, shape=None):
+                  integrity=True, endpoints=None, p95=10, p99=11, goodput=2.5, shape=None,
+                  sut_failures=None):
         folder = self.root / ident
         folder.mkdir()
         profile = read_json(ROOT / "configs/profiles.json")["profiles"]["ten_mbit_loss25"]
@@ -66,6 +67,8 @@ class LossStressReportTests(unittest.TestCase):
                        endpoint_termination=[], telemetry_notes=[],
                        metrics={"c2s.verified_goodput_mbps": goodput,
                                 "client.probe_rtt_ms.p95": p95, "client.probe_rtt_ms.p99": p99})
+        if sut_failures is not None:
+            summary['sut_failures'] = sut_failures
         manifest = dict(profile_id="ten_mbit_loss25", profile=profile,
                         invariants=dict(warmup_s=5, measure_s=30, drain_s=12, payload_bytes=16384,
                                         probe_hz=20, peer_sha256="cd" * 32, peer_environment={}))
@@ -138,6 +141,59 @@ class LossStressReportTests(unittest.TestCase):
             row = next(csv.DictReader(stream))
         self.assertEqual(row["verified_goodput_mbps"], "")
         self.assertEqual(row["outcome"], "FAIL")
+
+    def test_probe_only_failure_retains_payload_goodput_without_promoting_outcome(self):
+        endpoint = self.endpoint(0, expected=100, observed=99, unserved=1)
+        failures = ['probe deadlines unserved/unobserved']
+        self.add_trial(outcome='FAIL', integrity=True, endpoints=[endpoint, self.endpoint(1)],
+                       goodput=3.5, sut_failures=failures)
+        report = collect(self.root)
+        row = report['trials'][0]
+        self.assertEqual(row['sut_outcome'], 'FAIL')
+        self.assertEqual(row['sut_failures'], failures)
+        self.assertIsNone(row['verified_goodput_mbps'])
+        self.assertEqual(row['integrity_verified_goodput_mbps'], 3.5)
+        self.assertEqual(report['groups'][0]['verified_goodput_mbps']['n'], 0)
+        self.assertEqual(report['groups'][0]['integrity_verified_goodput_mbps'],
+                         dict(n=1, median=3.5, min=3.5, max=3.5))
+        output = Path(self.temporary.name) / 'report'
+        export(report, output)
+        with output.with_suffix('.csv').open(newline='') as stream:
+            csv_row = next(csv.DictReader(stream))
+        self.assertEqual(csv_row['verified_goodput_mbps'], '')
+        self.assertEqual(csv_row['integrity_verified_goodput_mbps'], '3.5')
+        self.assertEqual(csv_row['outcome'], 'FAIL')
+        markdown = output.with_suffix('.md').read_text()
+        self.assertIn('Integrity-verified payload goodput', markdown)
+        self.assertIn('probe deadlines unserved/unobserved', markdown)
+
+    def test_incomplete_probe_failure_never_has_payload_goodput(self):
+        endpoint = self.endpoint(0, expected=100, observed=50, unobserved=50)
+        endpoint.update(completed=False, error='production send failed: retry budget exhausted')
+        self.add_trial(outcome='FAIL', integrity=False, endpoints=[endpoint, self.endpoint(1)],
+                       goodput=99, sut_failures=['probe deadlines unserved/unobserved'])
+        report = collect(self.root)
+        self.assertIsNone(report['trials'][0]['integrity_verified_goodput_mbps'])
+        self.assertEqual(report['groups'][0]['integrity_verified_goodput_mbps']['n'], 0)
+
+    def test_payload_goodput_rejects_bad_timing_native_flags_and_other_failures(self):
+        failures = ['probe deadlines unserved/unobserved']
+        self.add_trial('harness_invalid', outcome='FAIL', validity='INVALID_HARNESS',
+                       sut_failures=failures)
+        endpoint = self.endpoint(0)
+        endpoint['native_stats']['send_failed'] = 1
+        self.add_trial('native_flag', outcome='FAIL', endpoints=[endpoint, self.endpoint(1)],
+                       sut_failures=failures)
+        self.add_trial('other_failure', outcome='FAIL', sut_failures=['native transport failed'])
+        direction = dict(received_datagrams=100, random_drops=25, queue_drops=0,
+                         blackout_drops=0, delivered_datagrams=75, socket_send_errors=0,
+                         duplicates=0, lateness_ms={'p99': 2.0})
+        self.add_trial('bad_dispatch', outcome='FAIL', sut_failures=failures,
+                       shape=dict(pending_on_close=0, c2s=direction, s2c=dict(direction)))
+        report = collect(self.root)
+        self.assertTrue(all(row['integrity_verified_goodput_mbps'] is None
+                            for row in report['trials']))
+        self.assertEqual(report['groups'][0]['integrity_verified_goodput_mbps']['n'], 0)
 
     def test_random_drop_denominator_excludes_queue_and_blackout_drops(self):
         direction = dict(received_datagrams=100, random_drops=35, queue_drops=20,
