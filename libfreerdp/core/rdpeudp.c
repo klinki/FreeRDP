@@ -961,7 +961,12 @@ BOOL rdpeudp_dvc_pdu_length(const BYTE* data, size_t len, BOOL isServer, size_t*
 /* ------------------------------------------------------------------ */
 
 #define RDPEUDP2_WINDOW_MAX 64
-#define RDPEUDP2_RECV_MAP 256
+#define RDPEUDP2_RECV_PAGE_SHIFT 8
+#define RDPEUDP2_RECV_PAGE_SIZE (1u << RDPEUDP2_RECV_PAGE_SHIFT)
+#define RDPEUDP2_RECV_PAGE_COUNT (1u << (16 - RDPEUDP2_RECV_PAGE_SHIFT))
+#define RDPEUDP2_RECV_CHUNK_LIMIT 0x8000u
+#define RDPEUDP2_RECV_MAX_FORWARD 0x7FFFu
+#define RDPEUDP2_RECV_STREAM_RESERVE 65536u
 #define RDPEUDP2_SEND_QUEUE_BYTES 32768
 #define RDPEUDP2_FAST_LOSS_EVIDENCE 3
 #define RDPEUDP2_REORDER_GRACE_MS 25
@@ -1002,6 +1007,12 @@ typedef struct
 	BYTE* data;
 	size_t len;
 } UdpRecvSlot;
+
+typedef struct
+{
+	UdpRecvSlot slots[RDPEUDP2_RECV_PAGE_SIZE];
+	size_t count;
+} UdpRecvPage;
 
 typedef struct
 {
@@ -1119,7 +1130,23 @@ struct rdp_udp_transport
 	BOOL benchDeadlineReached;
 #endif
 
-	UdpRecvSlot recvMap[RDPEUDP2_RECV_MAP];
+	/* Full channel identities, allocated only for occupied 256-channel pages.
+	 * Forward labels cover at most one unambiguous half of the sequence space.
+	 * Payload ownership (unordered plus unread stream) is bounded separately. */
+	UdpRecvPage* recvPages[RDPEUDP2_RECV_PAGE_COUNT];
+	size_t recvBufferedChunks;
+	size_t recvBufferedBytes;
+	size_t recvBufferedPages;
+	size_t recvPageAllocations;
+	UINT16 recvHighestChannelSeq;
+	size_t recvPeakOwnedBytes;
+	size_t recvPeakBufferedChunks;
+	size_t recvPeakBufferedSpan;
+	/* Socketless regression drivers do not change normal receive limits. */
+	size_t testRecvChunkLimit;
+	size_t testRecvByteLimit;
+	BOOL testRecvAllocFailureEnabled;
+	size_t testRecvAllocSuccesses;
 	wStream* recvStream; /* reassembled byte stream for TLS */
 	size_t recvPos;      /* read cursor inside recvStream */
 	/* Tunnel TLS byte reassembly (R3): preserves partial Tunnel DATA PDUs
@@ -1231,6 +1258,163 @@ static BOOL rdpeudp2_service_send(rdpUdpTransport* udp);
 static BOOL rdpeudp2_service_ack(rdpUdpTransport* udp);
 static void rdpeudp2_update_send_aoa_locked(rdpUdpTransport* udp);
 
+static size_t rdpeudp_recv_chunk_limit_locked(const rdpUdpTransport* udp)
+{
+	return udp->testRecvChunkLimit ? udp->testRecvChunkLimit : RDPEUDP2_RECV_CHUNK_LIMIT;
+}
+
+static size_t rdpeudp_recv_byte_limit_locked(const rdpUdpTransport* udp)
+{
+	return udp->testRecvByteLimit ? udp->testRecvByteLimit
+	                              : (size_t)RDPEUDP2_RECV_CHUNK_LIMIT * udp->negotiatedDownMtu;
+}
+
+static size_t rdpeudp_recv_pending_stream_locked(const rdpUdpTransport* udp)
+{
+	return Stream_Length(udp->recvStream) - udp->recvPos;
+}
+
+static size_t rdpeudp_recv_span_locked(const rdpUdpTransport* udp)
+{
+	return udp->recvBufferedChunks
+	           ? (size_t)(UINT16)(udp->recvHighestChannelSeq - udp->expectedChannelSeq) + 1
+	           : 0;
+}
+
+static UdpRecvSlot* rdpeudp_recv_slot_locked(const rdpUdpTransport* udp, UINT16 channel)
+{
+	UdpRecvPage* page = udp->recvPages[channel >> RDPEUDP2_RECV_PAGE_SHIFT];
+	return page ? &page->slots[channel & (RDPEUDP2_RECV_PAGE_SIZE - 1)] : nullptr;
+}
+
+static BOOL rdpeudp_recv_alloc_allowed_locked(rdpUdpTransport* udp)
+{
+	if (!udp->testRecvAllocFailureEnabled)
+		return TRUE;
+	if (!udp->testRecvAllocSuccesses)
+		return FALSE;
+	udp->testRecvAllocSuccesses--;
+	return TRUE;
+}
+
+static void rdpeudp_recv_compact_stream_locked(rdpUdpTransport* udp)
+{
+	if (!udp->recvPos)
+		return;
+	const size_t pending = rdpeudp_recv_pending_stream_locked(udp);
+	if (pending)
+		memmove(Stream_Buffer(udp->recvStream), Stream_Buffer(udp->recvStream) + udp->recvPos,
+		        pending);
+	(void)Stream_SetPosition(udp->recvStream, pending);
+	Stream_SealLength(udp->recvStream);
+	udp->recvPos = 0;
+}
+
+static void rdpeudp_recv_release_empty_stream_locked(rdpUdpTransport* udp)
+{
+	if (Stream_Length(udp->recvStream) ||
+	    Stream_Capacity(udp->recvStream) <= RDPEUDP2_RECV_STREAM_RESERVE)
+		return;
+	/* Delivery already succeeded. A best-effort reserve allocation failure
+	 * must not turn successfully consumed bytes into a transport failure. */
+	wStream* reserve = Stream_New(nullptr, RDPEUDP2_RECV_STREAM_RESERVE);
+	if (!reserve)
+		return;
+	(void)Stream_SetPosition(reserve, 0);
+	(void)Stream_SetLength(reserve, 0);
+	Stream_Release(udp->recvStream);
+	udp->recvStream = reserve;
+}
+
+static BOOL rdpeudp_recv_retain_locked(rdpUdpTransport* udp, UINT16 channel, const BYTE* data,
+                                       size_t length, BOOL* ackEligible)
+{
+	*ackEligible = TRUE;
+	const UINT16 distance = (UINT16)(channel - udp->expectedChannelSeq);
+	if (length > udp->negotiatedDownMtu)
+	{
+		WLog_ERR(TAG, "UDP channel payload %zu exceeds receive MTU %" PRIu16 "; reconnect required",
+		         length, udp->negotiatedDownMtu);
+		return FALSE;
+	}
+	if (distance == RDPEUDP2_RECV_CHUNK_LIMIT)
+	{
+		/* Full channel-number recovery is ambiguous at exactly half the
+		 * sequence space. Keep it unacknowledged so a later retry can enter
+		 * the forward window after earlier channel bytes make progress. */
+		*ackEligible = FALSE;
+		return TRUE;
+	}
+	if (distance > RDPEUDP2_RECV_MAX_FORWARD)
+		return TRUE; /* Already delivered within the backward half-space: duplicate receipt. */
+	UdpRecvSlot* slot = rdpeudp_recv_slot_locked(udp, channel);
+	if (slot && slot->occupied)
+		return TRUE; /* Fresh DataSeq may carry the same retained channel bytes. */
+	const size_t pending = rdpeudp_recv_pending_stream_locked(udp);
+	const size_t byteLimit = rdpeudp_recv_byte_limit_locked(udp);
+	const size_t owned = udp->recvBufferedBytes + pending;
+	if (udp->recvBufferedChunks >= rdpeudp_recv_chunk_limit_locked(udp) || owned > byteLimit ||
+	    length > byteLimit - owned)
+	{
+		WLog_ERR(TAG,
+		         "UDP receive budget exhausted: chunks=%zu/%zu, bytes=%zu/%zu, span=%zu, "
+		         "expected channel=%04" PRIx16 "; reconnect required",
+		         udp->recvBufferedChunks, rdpeudp_recv_chunk_limit_locked(udp), owned, byteLimit,
+		         rdpeudp_recv_span_locked(udp), udp->expectedChannelSeq);
+		return FALSE;
+	}
+	const size_t pageIndex = channel >> RDPEUDP2_RECV_PAGE_SHIFT;
+	UdpRecvPage* page = udp->recvPages[pageIndex];
+	if (!page)
+	{
+		page = rdpeudp_recv_alloc_allowed_locked(udp) ? calloc(1, sizeof(*page)) : nullptr;
+		if (!page)
+		{
+			WLog_ERR(TAG, "UDP receive page allocation failed; reconnect required");
+			return FALSE;
+		}
+		udp->recvPages[pageIndex] = page;
+		udp->recvBufferedPages++;
+		udp->recvPageAllocations++;
+	}
+	BYTE* copy = nullptr;
+	if (length)
+	{
+		copy = rdpeudp_recv_alloc_allowed_locked(udp) ? malloc(length) : nullptr;
+		if (!copy)
+		{
+			if (!page->count)
+			{
+				free(page);
+				udp->recvPages[pageIndex] = nullptr;
+				udp->recvBufferedPages--;
+			}
+			WLog_ERR(TAG, "UDP receive payload allocation failed; reconnect required");
+			return FALSE;
+		}
+		memcpy(copy, data, length);
+	}
+	slot = &page->slots[channel & (RDPEUDP2_RECV_PAGE_SIZE - 1)];
+	slot->occupied = TRUE;
+	slot->channelSeq = channel;
+	slot->data = copy;
+	slot->len = length;
+	page->count++;
+	if (!udp->recvBufferedChunks ||
+	    distance > (UINT16)(udp->recvHighestChannelSeq - udp->expectedChannelSeq))
+		udp->recvHighestChannelSeq = channel;
+	udp->recvBufferedChunks++;
+	udp->recvBufferedBytes += length;
+	if (owned + length > udp->recvPeakOwnedBytes)
+		udp->recvPeakOwnedBytes = owned + length;
+	if (udp->recvBufferedChunks > udp->recvPeakBufferedChunks)
+		udp->recvPeakBufferedChunks = udp->recvBufferedChunks;
+	const size_t span = rdpeudp_recv_span_locked(udp);
+	if (span > udp->recvPeakBufferedSpan)
+		udp->recvPeakBufferedSpan = span;
+	return TRUE;
+}
+
 static BOOL rdpeudp_check_stream_health(rdpUdpTransport* udp)
 {
 	if (!udp)
@@ -1240,13 +1424,11 @@ static BOOL rdpeudp_check_stream_health(rdpUdpTransport* udp)
 	if (!udp->recvFailed && udp->recvGapActive &&
 	    (now - udp->recvGapSince >= RDPEUDP_REASSEMBLY_TIMEOUT_MS))
 	{
-		size_t buffered = 0;
-		for (size_t i = 0; i < ARRAYSIZE(udp->recvMap); i++)
-			buffered += udp->recvMap[i].occupied ? 1 : 0;
 		WLog_ERR(TAG,
 		         "UDP reassembly stalled for %" PRIu64 " ms: expected channel %04" PRIx16
 		         ", buffered=%zu, DataSeq base=%04" PRIx16 "; reconnect required",
-		         now - udp->recvGapSince, udp->expectedChannelSeq, buffered, udp->recvDataBase);
+		         now - udp->recvGapSince, udp->expectedChannelSeq, udp->recvBufferedChunks,
+		         udp->recvDataBase);
 		udp->recvFailed = TRUE;
 	}
 	const BOOL healthy = !udp->recvFailed && !udp->sendFailed;
@@ -1462,6 +1644,19 @@ void rdpeudp_free(rdpUdpTransport* udp)
 		return;
 
 	EnterCriticalSection(&udp->lock);
+	if (udp->tunnelEstablished && udp->sockfd >= 0)
+	{
+		/* One receipt for an established association, including normal client
+		 * shutdown. Keep packet processing free of diagnostic output. */
+		WLog_INFO(TAG,
+		          "UDP receive retention: peak_chunks=%zu peak_span=%zu peak_owned_bytes=%zu "
+		          "page_allocations=%zu buffered_chunks=%zu buffered_bytes=%zu "
+		          "unread_stream_bytes=%zu byte_limit=%zu allocated_pages=%zu recv_failed=%d",
+		          udp->recvPeakBufferedChunks, udp->recvPeakBufferedSpan, udp->recvPeakOwnedBytes,
+		          udp->recvPageAllocations, udp->recvBufferedChunks, udp->recvBufferedBytes,
+		          rdpeudp_recv_pending_stream_locked(udp), rdpeudp_recv_byte_limit_locked(udp),
+		          udp->recvBufferedPages, udp->recvFailed);
+	}
 	if (udp->tls)
 	{
 		/* tls owns tlsBio chain; avoid double free of udpBio */
@@ -1483,8 +1678,15 @@ void rdpeudp_free(rdpUdpTransport* udp)
 	udp->benchQueueObserver = nullptr;
 	rdp_bench_loss_free(udp);
 #endif
-	for (size_t i = 0; i < ARRAYSIZE(udp->recvMap); i++)
-		free(udp->recvMap[i].data);
+	for (size_t i = 0; i < ARRAYSIZE(udp->recvPages); i++)
+	{
+		UdpRecvPage* page = udp->recvPages[i];
+		if (!page)
+			continue;
+		for (size_t n = 0; n < ARRAYSIZE(page->slots); n++)
+			free(page->slots[n].data);
+		free(page);
+	}
 	Stream_Release(udp->recvStream);
 	udp->recvStream = nullptr;
 	if (udp->tunnelBuf)
@@ -2204,8 +2406,9 @@ static BOOL rdpeudp_can_skip_channel_zero_locked(const rdpUdpTransport* udp)
 	 * and no discarded datagram could have introduced channel zero. An original
 	 * zero would then already be buffered. Adjacent DataSeqs alone are not
 	 * sufficient: they could both belong to retransmissions. */
-	if ((udp->expectedChannelSeq != 0) || udp->peerUsesChannelZero || !udp->recvMap[1].occupied ||
-	    (udp->recvMap[1].channelSeq != 1))
+	const UdpRecvSlot* next = rdpeudp_recv_slot_locked(udp, 1);
+	if ((udp->expectedChannelSeq != 0) || udp->peerUsesChannelZero || !next || !next->occupied ||
+	    (next->channelSeq != 1))
 		return FALSE;
 	/* An old lost datagram can be replaced by a new DataSeq carrying the same
 	 * channel bytes. It must not disable a convention already proven here. */
@@ -2226,8 +2429,8 @@ static void rdpeudp_deliver_recv_data_locked(rdpUdpTransport* udp)
 	const UINT16 previous = udp->expectedChannelSeq;
 	while (TRUE)
 	{
-		UdpRecvSlot* slot = &udp->recvMap[udp->expectedChannelSeq % RDPEUDP2_RECV_MAP];
-		if (!slot->occupied || (slot->channelSeq != udp->expectedChannelSeq))
+		UdpRecvSlot* slot = rdpeudp_recv_slot_locked(udp, udp->expectedChannelSeq);
+		if (!slot || !slot->occupied || (slot->channelSeq != udp->expectedChannelSeq))
 		{
 			if (rdpeudp_can_skip_channel_zero_locked(udp))
 			{
@@ -2242,7 +2445,9 @@ static void rdpeudp_deliver_recv_data_locked(rdpUdpTransport* udp)
 			 * omitted. Preserve the gap until it fills or the watchdog fails. */
 			break;
 		}
-		if (!Stream_EnsureRemainingCapacity(udp->recvStream, slot->len))
+		rdpeudp_recv_compact_stream_locked(udp);
+		const size_t pendingBytes = rdpeudp_recv_pending_stream_locked(udp);
+		if (!Stream_EnsureCapacity(udp->recvStream, pendingBytes + slot->len))
 		{
 			WLog_ERR(TAG, "UDP receive stream allocation failed; reconnect required");
 			udp->recvFailed = TRUE;
@@ -2255,15 +2460,27 @@ static void rdpeudp_deliver_recv_data_locked(rdpUdpTransport* udp)
 		}
 		if (slot->len > 0)
 			Stream_Write(udp->recvStream, slot->data, slot->len);
+		Stream_SealLength(udp->recvStream);
+		udp->recvBufferedChunks--;
+		udp->recvBufferedBytes -= slot->len;
 		free(slot->data);
 		ZeroMemory(slot, sizeof(*slot));
+		const size_t pageIndex = udp->expectedChannelSeq >> RDPEUDP2_RECV_PAGE_SHIFT;
+		UdpRecvPage* page = udp->recvPages[pageIndex];
+		page->count--;
 		udp->expectedChannelSeq++;
+		/* Reuse one empty page for ordinary in-order traffic. At a page
+		 * boundary it is no longer current and can be released immediately. */
+		if (!page->count && pageIndex != (udp->expectedChannelSeq >> RDPEUDP2_RECV_PAGE_SHIFT))
+		{
+			free(page);
+			udp->recvPages[pageIndex] = nullptr;
+			udp->recvBufferedPages--;
+		}
 	}
 	/* Stream_Write advances position only; publish bytes via length. */
 	Stream_SealLength(udp->recvStream);
-	BOOL pending = FALSE;
-	for (size_t i = 0; i < ARRAYSIZE(udp->recvMap); i++)
-		pending |= udp->recvMap[i].occupied;
+	const BOOL pending = udp->recvBufferedChunks > 0;
 	if (pending && (!udp->recvGapActive || (previous != udp->expectedChannelSeq)))
 		udp->recvGapSince = rdpeudp_recv_now(udp);
 	udp->recvGapActive = pending;
@@ -2418,6 +2635,7 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 		}
 
 		const BOOL channelGapBefore = udp->recvGapActive;
+		BOOL ackEligible = TRUE;
 		/* DataBody (ChannelSeqNum + Data) follows ACKVEC per spec. */
 		if (!dummy && L.hasDataHeader && L.hasDataBody)
 		{
@@ -2425,51 +2643,13 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 			const BYTE* dp = L.dataBody;
 			const size_t drem = L.dataBodyLen;
 
-			/* DataSeq already recorded above (dummies included); here only
-			 * channel reassembly and delivery. */
-			/* V1: fixed 1-start expectedChannelSeq; buffer later chunks,
-			 * deliver in order. Never infer start from first arrival. */
-			/* Deduplicate by channel seq */
-			BOOL dup = FALSE;
-			if (((INT16)(cseq - udp->expectedChannelSeq) < 0))
-			{
-				/* Already delivered (within window) -> dup, still ACK */
-				dup = TRUE;
-			}
-			else
-			{
-				const size_t slot = (size_t)(cseq % RDPEUDP2_RECV_MAP);
-				if (udp->recvMap[slot].occupied &&
-				    (udp->recvMap[slot].channelSeq == cseq))
-					dup = TRUE;
-			}
-
-			if (!dup && (drem <= 65535))
-			{
-				const size_t slot = (size_t)(cseq % RDPEUDP2_RECV_MAP);
-				if (udp->recvMap[slot].occupied)
-				{
-					/* Never discard acknowledged bytes or guess across a gap. */
-					WLog_ERR(TAG, "UDP channel receive window overflow; reconnect required");
-					udp->recvFailed = TRUE;
-				}
-				else if ((drem == 0) || ((udp->recvMap[slot].data = malloc(drem)) != nullptr))
-				{
-					if (drem > 0)
-						memcpy(udp->recvMap[slot].data, dp, drem);
-					udp->recvMap[slot].len = drem;
-					udp->recvMap[slot].channelSeq = cseq;
-					udp->recvMap[slot].occupied = TRUE;
-				}
-				else
-				{
-					WLog_ERR(TAG, "UDP receive allocation failed; reconnect required");
-					udp->recvFailed = TRUE;
-				}
-			}
+			/* Retain channel bytes before marking their DataSeq received. A
+			 * full 16-bit index cannot collide with another channel label. */
+			if (!rdpeudp_recv_retain_locked(udp, cseq, dp, drem, &ackEligible))
+				udp->recvFailed = TRUE;
 		}
 
-		if (L.hasDataHeader && !udp->recvFailed)
+		if (L.hasDataHeader && ackEligible && !udp->recvFailed)
 		{
 			/* ACK state tracks EVERY received DataSeq, including dummy
 			 * (probe/keepalive) packets: dropping whole ranges (e.g. the
@@ -2491,7 +2671,7 @@ BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* buf, size_t len)
 		/* A duplicate or dummy can close the last DataSeq gap at wrap. */
 		rdpeudp_deliver_recv_data_locked(udp);
 		rdpeudp2_update_send_aoa_locked(udp);
-		if (L.hasDataHeader && udp->haveRealData && !udp->recvFailed)
+		if (L.hasDataHeader && ackEligible && udp->haveRealData && !udp->recvFailed)
 		{
 			const UINT64 now = rdpeudp_recv_now_ns(udp);
 			udp->recvLatestArrivalNs = now;
@@ -2581,8 +2761,48 @@ BOOL rdpeudp_test_recv_state(const rdpUdpTransport* udp, RdpUdpTestRecvState* ou
 	out->haveSeenAoa = udp->haveSeenAoa;
 	out->haveRealData = udp->haveRealData;
 	out->recvStreamLen = Stream_Length(udp->recvStream);
+	out->recvBufferedChunks = udp->recvBufferedChunks;
+	out->recvBufferedBytes = udp->recvBufferedBytes;
+	out->recvBufferedPages = udp->recvBufferedPages;
+	out->recvPageAllocations = udp->recvPageAllocations;
+	out->recvPendingStreamBytes = rdpeudp_recv_pending_stream_locked(udp);
+	out->recvChunkLimit = rdpeudp_recv_chunk_limit_locked(udp);
+	out->recvByteLimit = rdpeudp_recv_byte_limit_locked(udp);
+	out->recvBufferedSpan = rdpeudp_recv_span_locked(udp);
+	out->recvPeakOwnedBytes = udp->recvPeakOwnedBytes;
+	out->recvPeakBufferedChunks = udp->recvPeakBufferedChunks;
+	out->recvPeakBufferedSpan = udp->recvPeakBufferedSpan;
+	out->recvStreamCapacity = Stream_Capacity(udp->recvStream);
+	out->recvFailed = udp->recvFailed;
 	LeaveCriticalSection((CRITICAL_SECTION*)&udp->lock);
 	return TRUE;
+}
+
+BOOL rdpeudp_test_configure_recv(rdpUdpTransport* udp, size_t maxChunks, size_t maxBytes)
+{
+	if (!udp || maxChunks > RDPEUDP2_RECV_CHUNK_LIMIT)
+		return FALSE;
+	EnterCriticalSection(&udp->lock);
+	const size_t naturalBytes = (size_t)RDPEUDP2_RECV_CHUNK_LIMIT * udp->negotiatedDownMtu;
+	const BOOL valid = !udp->recvBufferedChunks && !rdpeudp_recv_pending_stream_locked(udp) &&
+	                   !udp->haveRealData && !udp->recvFailed && maxBytes <= naturalBytes;
+	if (valid)
+	{
+		udp->testRecvChunkLimit = maxChunks;
+		udp->testRecvByteLimit = maxBytes;
+	}
+	LeaveCriticalSection(&udp->lock);
+	return valid;
+}
+
+void rdpeudp_test_fail_recv_allocation(rdpUdpTransport* udp, size_t afterSuccesses)
+{
+	if (!udp)
+		return;
+	EnterCriticalSection(&udp->lock);
+	udp->testRecvAllocFailureEnabled = TRUE;
+	udp->testRecvAllocSuccesses = afterSuccesses;
+	LeaveCriticalSection(&udp->lock);
 }
 
 BOOL rdpeudp_test_recv_data(const rdpUdpTransport* udp, size_t offset, BYTE* data, size_t len)
@@ -3428,6 +3648,7 @@ static SSIZE_T rdpeudp2_recv_reliable(rdpUdpTransport* udp, BYTE* buffer, size_t
 					return -1;
 				}
 				udp->recvPos = 0;
+				rdpeudp_recv_release_empty_stream_locked(udp);
 			}
 			LeaveCriticalSection(&udp->lock);
 			return (SSIZE_T)copy;
@@ -3447,6 +3668,13 @@ static SSIZE_T rdpeudp2_recv_reliable(rdpUdpTransport* udp, BYTE* buffer, size_t
 
 	errno = EAGAIN;
 	return 0;
+}
+
+SSIZE_T rdpeudp_test_read_data(rdpUdpTransport* udp, BYTE* data, size_t length)
+{
+	if (!udp || !data || !length)
+		return -1;
+	return rdpeudp2_recv_reliable(udp, data, length, 0);
 }
 
 /* ------------------------------------------------------------------ */

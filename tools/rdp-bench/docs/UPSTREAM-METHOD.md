@@ -82,3 +82,31 @@ Each `change` replaces the two child netem qdiscs, resetting their counters and 
 The original script's 100-small/100-large ICMP verification is unavailable on this Docker-to-UTM route: no ping replies were obtained with a clean line. Retain that failure as a method deviation. A clean TCP/TLS connection, a deliberately blocked connection at 100% loss, and actual per-phase source-filter/netem counters can prove the adaptation affects VM traffic, but they do not substitute for the original two ICMP loss measurements. Record the proof results and exact protocol used. Do not label a run fully equivalent to the upstream IFB/ping method.
 
 Cleanup requires the recorded namespace and both ownership aliases, removes only the owned ingress qdisc/veth pair, and restores recorded interface settings. If setup fails partway, its state is retained for inspection. Automated cleanup is available only once the recorded interface identities and any installed ingress redirect can be verified; incomplete setup can deliberately refuse cleanup. Inspect the exact recorded objects before manual removal. Legacy state files without interface-index receipts are refused; use the matching original helper for cleanup before creating a fresh state. Do not delete unrecognized interfaces or qdiscs to force a retry.
+
+## Fresh-session trials after a terminated ramp
+
+Preserve the original sequential ramp and its stop-on-first-exit rule. If that ramp terminates at 25%, explicitly mark 50% and 70% `NOT_RUN` in that campaign. A request to measure every level can then use **one separate, fresh session per remaining level**, each for 120 seconds or until termination. Label those as fresh-session diagnostics, retain every attempt, and do not restart failed measurements to select survivors. A fresh 25% trial is an independent repeat, not a replacement for the failed original ramp. Keep the same frozen client/library hashes, codec settings, load source and network method across these sessions.
+
+`upstream-method/host-control.py` provides per-trial Windows control through an **already authenticated SSH control socket**. It handles no passwords, Linux client launch, Docker setup or shaping. Deploy the pinned upstream `load.ps1`, `Collect-Counters.ps1` and new `Invoke-Workload.ps1` into a shared scripts directory first. The existing `Invoke-Load.ps1` remains available for its previous callers. Use a unique Windows output directory, local output directory and task name for every session:
+
+```sh
+python3 tools/rdp-bench/upstream-method/host-control.py \
+  --ssh-target david@192.168.64.2 \
+  --ssh-socket /private/tmp/freerdp-pr13608-vm.sock \
+  --scripts-root 'C:\RdpBenchRecv20261013' \
+  --windows-root 'C:\RdpBenchRecv20261013\loss50' \
+  --task-name RdpBench-Pr13608-loss50-unique \
+  --output build/pr13608-method/fresh-loss50 prepare
+```
+
+Use the same global arguments for subsequent commands, in this order:
+
+1. Start the owned Linux client with credentials on stdin, certificate pinning and unique client logs. Record its actual container PID and `/proc` start ticks. Wait for authenticated RDP/UDP setup.
+2. `discover` retains raw `quser` and provider paths, requires one active RDP session for the authenticated Windows user, and correlates that session name with the actual PDH instance. Missing PDH instances remain unavailable.
+3. `clock` records three Windows-versus-host UTC bounds. Record Linux-versus-host bounds separately. Repeat clock measurements after each trial to bound drift.
+4. `load --seconds 180` creates exactly one unique interactive workload task and waits for its actual PID receipt. The wrapper invokes the original upstream load in the same PowerShell process and records PID, creation UTC, RDP session ID, source/wrapper hashes and termination when available. Confirm the workload is active before applying loss.
+5. Run `collector --seconds 180 --interval 10` as a separately owned **foreground** host process while the trial runs. It records the actual collector PID, creation UTC, session ID and trial owner before sampling. Root owns that SSH invocation's lifetime; no detached daemon is created. Use a longer bounded duration if setup/warmup would otherwise exceed 180 seconds.
+6. Run the Linux ramp runner with just that level (`--loss 50 --seconds 120`) and retain its unique campaign/network receipts.
+7. `cleanup` validates the exact task action and stops only receipt-owned PIDs whose creation time and session still match. It does not select all processes by script path. `fetch` copies the allowlisted trial artifacts and records their SHA-256 hashes. Fetch after collector cleanup for a complete JSONL file. Windows trial files remain preserved.
+
+A trial that terminates before 10 seconds cannot provide a fully-contained 10-second primary counter interval. Its loss-phase server FPS remains unavailable. Do not substitute a preceding clean or cross-boundary sample. An optional separate one-second collector is diagnostic and must use separate outputs/labels; never merge its samples into the upstream ten-second series.

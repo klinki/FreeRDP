@@ -1391,10 +1391,10 @@ typedef struct
 	BOOL withBody;
 } RxScriptPkt;
 
-static wStream* rx_emit(const RxScriptPkt* pkt)
+static wStream* rx_emit_window(const RxScriptPkt* pkt, BYTE logWindow)
 {
 	RdpUdp2Layout in = { 0 };
-	in.logWindow = 5;
+	in.logWindow = logWindow;
 	if (pkt->hasAoa)
 	{
 		in.flags |= RDPUDP2_FLAG_AOA;
@@ -1420,6 +1420,21 @@ static wStream* rx_emit(const RxScriptPkt* pkt)
 		return nullptr;
 	}
 	return s;
+}
+
+static wStream* rx_emit(const RxScriptPkt* pkt)
+{
+	return rx_emit_window(pkt, 5);
+}
+
+static int rx_feed_windows_peer(rdpUdpTransport* udp, const RxScriptPkt* pkt)
+{
+	wStream* s = rx_emit_window(pkt, 15);
+	if (!s)
+		return -1;
+	const BOOL ok = rdpeudp_test_feed(udp, Stream_Buffer(s), Stream_Length(s));
+	Stream_Release(s);
+	return ok ? 0 : -1;
 }
 
 static int rx_feed(rdpUdpTransport* udp, const RxScriptPkt* pkt)
@@ -1847,21 +1862,39 @@ static int test_rx_wrap_delayed_zero_chunks(void)
 	return 0;
 }
 
-static int test_rx_wrap_ring_overflow(void)
+static int test_rx_wrap_backlog_aliases(void)
 {
 	rdpUdpTransport* udp = rdpeudp_test_new();
 	RdpUdpTestRecvState st = { 0 };
-	static const BYTE body[] = { 'A' };
+	BYTE expected[258] = { 'Z', 'A' };
+	BYTE actual[sizeof(expected)] = { 0 };
+	expected[257] = 'B';
 	RX_CHECK(udp != nullptr);
 	rdpeudp_test_set_time(udp, WRAP_TEST_T0);
 	RX_CHECK(rx_wrap_dirty_runup(udp) == 0);
-	const RxScriptPkt first = { 101, 1, body, 1, FALSE, 0, FALSE, TRUE };
-	const RxScriptPkt collision = { 102, 257, body, 1, FALSE, 0, FALSE, TRUE };
-	RX_CHECK(rx_feed(udp, &first) == 0);
-	RX_CHECK(rx_feed(udp, &collision) == 0);
-	RX_CHECK(!rdpeudp_test_check_health(udp));
+	const RxScriptPkt first = { 101, 1, &expected[1], 1, FALSE, 0, FALSE, TRUE };
+	const RxScriptPkt alias = { 102, 257, &expected[257], 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &first) == 0);
+	RX_CHECK(rx_feed_windows_peer(udp, &alias) == 0);
+	RX_CHECK(rdpeudp_test_check_health(udp));
 	RX_CHECK(rx_state(udp, &st) == 0 && st.expectedChannelSeq == 0 &&
 	         st.recvStreamLen == 65535);
+	/* A real zero is still missing. Neither storage growth nor a contiguous
+	 * fresh DataSeq run proves the Windows omission convention here. */
+	for (UINT16 c = 2; c <= 256; c++)
+	{
+		expected[c] = (BYTE)c;
+		const RxScriptPkt next = { (UINT16)(101 + c), c, &expected[c], 1, FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed_windows_peer(udp, &next) == 0);
+	}
+	RX_CHECK(rx_state(udp, &st) == 0 && st.expectedChannelSeq == 0 &&
+	         st.recvStreamLen == 65535 && rdpeudp_test_check_health(udp));
+	const RxScriptPkt zero = { 358, 0, expected, 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &zero) == 0);
+	RX_CHECK(rx_state(udp, &st) == 0 && st.expectedChannelSeq == 258 &&
+	         st.recvStreamLen == 65535 + sizeof(expected));
+	RX_CHECK(rdpeudp_test_recv_data(udp, 65535, actual, sizeof(actual)));
+	RX_CHECK(memcmp(actual, expected, sizeof(actual)) == 0);
 	rdpeudp_test_free(udp);
 	return 0;
 }
@@ -2062,15 +2095,335 @@ static int test_rx_stall(void)
 	rdpeudp_test_set_time(udp, 600000);
 	RX_CHECK(rdpeudp_test_check_health(udp));
 	rdpeudp_test_free(udp);
-	/* Receive-map overflow must fail before ACKing data we cannot retain. */
+	/* Half-space ambiguity is ignored without ACK or allocation. A later valid
+	 * packet must still recover the existing channel gap. */
 	udp = rdpeudp_test_new();
 	RxAckCapture capture = { 0 };
 	RX_CHECK(udp != nullptr);
 	rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
-	RX_CHECK(rx_feed(udp, &ahead) == 0 && capture.count == 1);
-	const RxScriptPkt collision = { 3, 258, body, 1, FALSE, 0, FALSE, TRUE };
-	RX_CHECK(rx_feed(udp, &collision) == 0 && capture.count == 1);
+	RX_CHECK(rx_feed_windows_peer(udp, &ahead) == 0 && capture.count == 1);
+	const RxScriptPkt ambiguous = { 3, 32769, body, 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &ambiguous) == 0 && capture.count == 1);
+	RX_CHECK(rdpeudp_test_check_health(udp));
+	RdpUdpTestRecvState boundaryState = { 0 };
+	RX_CHECK(rx_state(udp, &boundaryState) == 0 && !boundaryState.recvFailed &&
+	         boundaryState.recvBufferedChunks == 1 && boundaryState.recvDataBase == 1);
+	const RxScriptPkt late = { 3, 1, body, 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &late) == 0 && capture.count == 2);
+	RX_CHECK(rx_state(udp, &boundaryState) == 0 && boundaryState.expectedChannelSeq == 3 &&
+	         boundaryState.recvStreamLen == 2 && !boundaryState.recvBufferedChunks);
+	rdpeudp_test_free(udp);
+	return 0;
+}
+
+static void rx_channel_bytes(UINT16 channel, BYTE out[3])
+{
+	out[0] = (BYTE)channel;
+	out[1] = (BYTE)(channel >> 8);
+	out[2] = (BYTE)(out[0] ^ out[1] ^ 0xA5);
+}
+
+static int test_rx_large_backlog_and_aoa(void)
+{
+	enum { CHANNELS = 600, BYTES_PER_CHANNEL = 3 };
+	BYTE expected[CHANNELS * BYTES_PER_CHANNEL] = { 0 };
+	BYTE actual[sizeof(expected)] = { 0 };
+	rdpUdpTransport* udp = rdpeudp_test_new();
+	RdpUdpTestRecvState st = { 0 };
+	RxAckCapture capture = { 0 };
+	RX_CHECK(udp);
+	rdpeudp_test_set_time(udp, 100);
+	rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+	RX_CHECK(rx_prompt_ack_hint(udp));
+	for (UINT16 channel = 1; channel <= CHANNELS; channel++)
+		rx_channel_bytes(channel, expected + (channel - 1) * BYTES_PER_CHANNEL);
+	/* The lost first channel holds hundreds of already-ACKed later bytes.
+	 * Channels 2/258 and 257/513 used to alias the fixed 256-slot map. */
+	for (UINT16 channel = 2; channel <= CHANNELS; channel++)
+	{
+		const RxScriptPkt next = { channel, channel,
+		                          expected + (channel - 1) * BYTES_PER_CHANNEL,
+		                          BYTES_PER_CHANNEL, FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed_windows_peer(udp, &next) == 0);
+		RX_CHECK(rdpeudp_test_check_health(udp));
+	}
+	RX_CHECK(rx_state(udp, &st) == 0 && st.expectedChannelSeq == 1 && !st.recvStreamLen);
+	RX_CHECK(st.recvBufferedChunks == CHANNELS - 1 &&
+	         st.recvBufferedBytes == (CHANNELS - 1) * BYTES_PER_CHANNEL &&
+	         st.recvBufferedPages == 3 && st.recvBufferedSpan == CHANNELS);
+	/* AOA retires old datagram attempts, never required channel bytes. */
+	const size_t ackCount = capture.count;
+	const RxScriptPkt aoa = { 0, 0, nullptr, 0, TRUE, 1200, FALSE, FALSE };
+	RX_CHECK(rx_feed_windows_peer(udp, &aoa) == 0 && capture.count == ackCount);
+	RX_CHECK(rx_state(udp, &st) == 0 && st.recvDataBase == 1200 &&
+	         st.expectedChannelSeq == 1 && st.recvBufferedChunks == CHANNELS - 1);
+	/* Fresh retry labels with conflicting bytes cannot overwrite retained data. */
+	static const BYTE wrong[] = { 'B', 'A', 'D' };
+	const RxScriptPkt duplicateA = { 1200, 257, wrong, sizeof(wrong), FALSE, 0, FALSE, TRUE };
+	const RxScriptPkt duplicateB = { 1201, 513, wrong, sizeof(wrong), FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &duplicateA) == 0);
+	RX_CHECK(rx_feed_windows_peer(udp, &duplicateB) == 0);
+	RX_CHECK(rx_state(udp, &st) == 0 && st.recvBufferedChunks == CHANNELS - 1 &&
+	         st.recvBufferedBytes == (CHANNELS - 1) * BYTES_PER_CHANNEL);
+	const RxScriptPkt lateHole = { 1202, 1, expected, BYTES_PER_CHANNEL, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &lateHole) == 0 && rdpeudp_test_check_health(udp));
+	RX_CHECK(rx_state(udp, &st) == 0 && st.expectedChannelSeq == CHANNELS + 1 &&
+	         st.recvStreamLen == sizeof(expected) && !st.recvBufferedChunks &&
+	         !st.recvBufferedBytes && st.recvBufferedPages <= 1 &&
+	         st.recvPendingStreamBytes == sizeof(expected));
+	RX_CHECK(rdpeudp_test_recv_data(udp, 0, actual, sizeof(actual)));
+	RX_CHECK(memcmp(actual, expected, sizeof(actual)) == 0);
+	/* The production read path releases the consumed byte budget and pages. */
+	rdpeudp_test_set_connected(udp, TRUE);
+	ZeroMemory(actual, sizeof(actual));
+	RX_CHECK(rdpeudp_test_read_data(udp, actual, sizeof(actual)) == sizeof(actual));
+	RX_CHECK(memcmp(actual, expected, sizeof(actual)) == 0);
+	RX_CHECK(rx_state(udp, &st) == 0 && !st.recvPendingStreamBytes && st.recvBufferedPages <= 1);
+	rdpeudp_test_free(udp);
+	return 0;
+}
+
+static int test_rx_retention_bounds_and_ack(void)
+{
+	static const BYTE body[] = { 'X' };
+	for (size_t mode = 0; mode < 3; mode++)
+	{
+		rdpUdpTransport* udp = rdpeudp_test_new();
+		RdpUdpTestRecvState st = { 0 };
+		RxAckCapture capture = { 0 };
+		RX_CHECK(udp);
+		rdpeudp_test_set_time(udp, 100);
+		rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+		RX_CHECK(rx_prompt_ack_hint(udp));
+		/* Isolate chunk and byte limits; mode 2 tests the valid far edge. */
+		RX_CHECK(rdpeudp_test_configure_recv(udp, mode == 0 ? 3 : 32768,
+		                                    mode == 1 ? 3 : 4096));
+		if (mode == 2)
+		{
+			const RxScriptPkt edge = { 1, 32768, body, 1, FALSE, 0, FALSE, TRUE };
+			RX_CHECK(rx_feed_windows_peer(udp, &edge) == 0 && capture.count == 1);
+			RX_CHECK(rdpeudp_test_check_health(udp));
+			RX_CHECK(rx_state(udp, &st) == 0 && st.recvBufferedChunks == 1 &&
+			         st.recvBufferedSpan == 32768);
+			const RxScriptPkt ambiguous = { 2, 32769, body, 1, FALSE, 0, FALSE, TRUE };
+			RX_CHECK(rx_feed_windows_peer(udp, &ambiguous) == 0 && capture.count == 1);
+			RX_CHECK(rdpeudp_test_check_health(udp));
+			RX_CHECK(rx_state(udp, &st) == 0 && !st.recvFailed && st.recvDataBase == 2 &&
+			         st.recvBufferedChunks == 1 && st.recvBufferedBytes == 1);
+		}
+		else
+		{
+			for (UINT16 channel = 2; channel <= 4; channel++)
+			{
+				const RxScriptPkt next = { (UINT16)(channel - 1), channel, body, 1, FALSE, 0, FALSE, TRUE };
+				RX_CHECK(rx_feed_windows_peer(udp, &next) == 0);
+			}
+			RX_CHECK(rx_state(udp, &st) == 0 && st.recvBufferedChunks == 3 && st.recvBufferedBytes == 3);
+			const RxScriptPkt retry = { 4, 2, body, 1, FALSE, 0, FALSE, TRUE };
+			RX_CHECK(rx_feed_windows_peer(udp, &retry) == 0 && capture.count == 4);
+			RX_CHECK(rdpeudp_test_check_health(udp));
+			/* Rejection is sticky and may not positively ACK the unstored bytes. */
+			const RxScriptPkt rejected = { 5, 5, body, 1, FALSE, 0, FALSE, TRUE };
+			RX_CHECK(rx_feed_windows_peer(udp, &rejected) == 0 && capture.count == 4);
+			RX_CHECK(!rdpeudp_test_check_health(udp));
+			RX_CHECK(rx_state(udp, &st) == 0 && st.recvFailed && st.recvDataBase == 5 &&
+			         st.recvBufferedChunks == 3 && st.recvBufferedBytes == 3);
+		}
+		rdpeudp_test_free(udp);
+	}
+	return 0;
+}
+
+static int test_rx_unread_budget_and_reuse(void)
+{
+	static const BYTE bytes[] = "ABCDEF";
+	for (size_t consume = 0; consume < 2; consume++)
+	{
+		rdpUdpTransport* udp = rdpeudp_test_new();
+		RdpUdpTestRecvState st = { 0 };
+		RxAckCapture capture = { 0 };
+		BYTE actual[sizeof(bytes) - 1] = { 0 };
+		RX_CHECK(udp);
+		rdpeudp_test_set_time(udp, 100);
+		rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+		RX_CHECK(rx_prompt_ack_hint(udp));
+		RX_CHECK(rdpeudp_test_configure_recv(udp, 10, sizeof(actual)));
+		const RxScriptPkt first = { 1, 1, bytes, 4, FALSE, 0, FALSE, TRUE };
+		const RxScriptPkt second = { 2, 2, bytes + 4, 2, FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed_windows_peer(udp, &first) == 0);
+		RX_CHECK(rx_feed_windows_peer(udp, &second) == 0);
+		RX_CHECK(rx_state(udp, &st) == 0 && st.recvPendingStreamBytes == sizeof(actual) &&
+		         !st.recvBufferedChunks && st.recvBufferedPages <= 1);
+		if (consume)
+		{
+			rdpeudp_test_set_connected(udp, TRUE);
+			RX_CHECK(rdpeudp_test_read_data(udp, actual, sizeof(actual)) == sizeof(actual));
+			RX_CHECK(memcmp(actual, bytes, sizeof(actual)) == 0);
+			RX_CHECK(rx_state(udp, &st) == 0 && !st.recvPendingStreamBytes);
+		}
+		const size_t ackCount = capture.count;
+		const RxScriptPkt next = { 3, 3, bytes, 1, FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed_windows_peer(udp, &next) == 0);
+		RX_CHECK(rdpeudp_test_check_health(udp) == (consume != 0));
+		RX_CHECK(capture.count == ackCount + consume);
+		RX_CHECK(rx_state(udp, &st) == 0 && st.recvPendingStreamBytes == (consume ? 1 : sizeof(actual)));
+		rdpeudp_test_free(udp);
+	}
+	return 0;
+}
+
+static int test_rx_allocation_failure_and_duplicate(void)
+{
+	static const BYTE bytes[] = { 'O', 'K' };
+	for (size_t successes = 0; successes < 2; successes++)
+	{
+		rdpUdpTransport* udp = rdpeudp_test_new();
+		RdpUdpTestRecvState st = { 0 };
+		RxAckCapture capture = { 0 };
+		RX_CHECK(udp);
+		rdpeudp_test_set_time(udp, 100);
+		rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+		RX_CHECK(rx_prompt_ack_hint(udp));
+		rdpeudp_test_fail_recv_allocation(udp, successes);
+		const RxScriptPkt ahead = { 1, 2, bytes, sizeof(bytes), FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed_windows_peer(udp, &ahead) == 0 && capture.count == 0);
+		RX_CHECK(!rdpeudp_test_check_health(udp));
+		RX_CHECK(rx_state(udp, &st) == 0 && st.recvFailed && !st.recvBufferedChunks &&
+		         !st.recvBufferedBytes && !st.recvPendingStreamBytes && st.recvDataBase == 1);
+		rdpeudp_test_free(udp);
+	}
+	/* Deduplication must not allocate or recharge retained bytes. */
+	rdpUdpTransport* udp = rdpeudp_test_new();
+	RdpUdpTestRecvState st = { 0 };
+	RxAckCapture capture = { 0 };
+	RX_CHECK(udp);
+	rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+	RX_CHECK(rx_prompt_ack_hint(udp));
+	const RxScriptPkt ahead = { 1, 2, bytes, sizeof(bytes), FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &ahead) == 0 && capture.count == 1);
+	rdpeudp_test_fail_recv_allocation(udp, 0);
+	const RxScriptPkt retry = { 2, 2, bytes, sizeof(bytes), FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &retry) == 0 && capture.count == 2);
+	RX_CHECK(rdpeudp_test_check_health(udp));
+	RX_CHECK(rx_state(udp, &st) == 0 && st.recvBufferedChunks == 1 &&
+	         st.recvBufferedBytes == sizeof(bytes) && st.recvBufferedPages == 1);
+	rdpeudp_test_free(udp);
+	return 0;
+}
+
+static int test_rx_inorder_page_allocation_bound(void)
+{
+	enum { CHANNELS = 1000 };
+	rdpUdpTransport* udp = rdpeudp_test_new();
+	RdpUdpTestRecvState st = { 0 };
+	RX_CHECK(udp);
+	/* Consecutive traffic should reuse the current empty page rather than
+	 * introducing a multi-KiB page allocation for every ordinary packet. */
+	for (UINT16 channel = 1; channel <= CHANNELS; channel++)
+	{
+		BYTE body[3];
+		rx_channel_bytes(channel, body);
+		const RxScriptPkt packet = { channel, channel, body, sizeof(body), FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed_windows_peer(udp, &packet) == 0);
+	}
+	RX_CHECK(rx_state(udp, &st) == 0 && st.expectedChannelSeq == CHANNELS + 1 &&
+	         st.recvPendingStreamBytes == CHANNELS * 3 && !st.recvBufferedChunks &&
+	         st.recvBufferedPages <= 1 && st.recvPageAllocations <= 6);
+	RX_CHECK(rdpeudp_test_check_health(udp));
+	rdpeudp_test_free(udp);
+	return 0;
+}
+
+static int test_rx_partial_compaction_and_idle_capacity(void)
+{
+	rdpUdpTransport* udp = rdpeudp_test_new();
+	RdpUdpTestRecvState st = { 0 };
+	BYTE small[6] = { 0 };
+	RX_CHECK(udp);
+	RX_CHECK(rdpeudp_test_configure_recv(udp, 10, sizeof(small)));
+	rdpeudp_test_set_connected(udp, TRUE);
+	static const BYTE firstBytes[] = "ABCD";
+	static const BYTE secondBytes[] = "EFGH";
+	const RxScriptPkt first = { 1, 1, firstBytes, sizeof(firstBytes) - 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &first) == 0);
+	RX_CHECK(rdpeudp_test_read_data(udp, small, 2) == 2 && memcmp(small, "AB", 2) == 0);
+	const RxScriptPkt second = { 2, 2, secondBytes, sizeof(secondBytes) - 1, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &second) == 0 && rdpeudp_test_check_health(udp));
+	RX_CHECK(rx_state(udp, &st) == 0 && st.recvPendingStreamBytes == sizeof(small) &&
+	         st.recvStreamLen == sizeof(small));
+	RX_CHECK(rdpeudp_test_read_data(udp, small, sizeof(small)) == sizeof(small));
+	RX_CHECK(memcmp(small, "CDEFGH", sizeof(small)) == 0);
+	rdpeudp_test_free(udp);
+
+	enum { CHUNKS = 128, CHUNK_BYTES = 1024 };
+	BYTE expected[CHUNKS * CHUNK_BYTES] = { 0 };
+	BYTE actual[sizeof(expected)] = { 0 };
+	udp = rdpeudp_test_new();
+	RX_CHECK(udp);
+	rdpeudp_test_set_connected(udp, TRUE);
+	for (UINT16 channel = 1; channel <= CHUNKS; channel++)
+	{
+		for (size_t index = 0; index < CHUNK_BYTES; index++)
+			expected[(channel - 1) * CHUNK_BYTES + index] = (BYTE)(channel ^ index);
+		const RxScriptPkt next = { channel, channel,
+		                          expected + (channel - 1) * CHUNK_BYTES,
+		                          CHUNK_BYTES, FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed_windows_peer(udp, &next) == 0);
+	}
+	RX_CHECK(rx_state(udp, &st) == 0 && st.recvPendingStreamBytes == sizeof(expected) &&
+	         st.recvStreamCapacity >= sizeof(expected) && st.recvBufferedPages <= 1);
+	RX_CHECK(rdpeudp_test_read_data(udp, actual, sizeof(actual)) == sizeof(actual));
+	RX_CHECK(memcmp(actual, expected, sizeof(actual)) == 0);
+	RX_CHECK(rx_state(udp, &st) == 0 && !st.recvPendingStreamBytes &&
+	         st.recvStreamCapacity <= 65536 && st.recvBufferedPages <= 1);
+	rdpeudp_test_free(udp);
+	return 0;
+}
+
+static int test_rx_oversize_payload_has_no_receipt(void)
+{
+	BYTE body[RDPUDP2_MTU + 1] = { 0 };
+	rdpUdpTransport* udp = rdpeudp_test_new();
+	RdpUdpTestRecvState st = { 0 };
+	RxAckCapture capture = { 0 };
+	RX_CHECK(udp);
+	rdpeudp_test_set_send(udp, rx_capture_ack, &capture);
+	const RxScriptPkt oversize = { 1, 1, body, sizeof(body), FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &oversize) == 0 && !capture.count);
 	RX_CHECK(!rdpeudp_test_check_health(udp));
+	RX_CHECK(rx_state(udp, &st) == 0 && st.recvFailed && st.recvDataBase == 1 &&
+	         !st.recvBufferedChunks && !st.recvBufferedBytes && !st.recvBufferedPages);
+	rdpeudp_test_free(udp);
+	return 0;
+}
+
+static int test_rx_windows_wrap_with_large_backlog(void)
+{
+	enum { CHANNELS = 300 };
+	BYTE expected[(CHANNELS + 1) * 3] = { 0 };
+	BYTE actual[sizeof(expected)] = { 0 };
+	rdpUdpTransport* udp = rdpeudp_test_new();
+	RdpUdpTestRecvState st = { 0 };
+	RX_CHECK(udp);
+	RX_CHECK(rx_before_channel_wrap(udp, 1) == 0);
+	rx_channel_bytes(UINT16_MAX, expected);
+	/* Original ffff is lost; Windows skips channel zero while DataSeq still
+	 * wraps through zero. The ffff gap must survive hundreds of later labels. */
+	for (UINT16 channel = 1; channel <= CHANNELS; channel++)
+	{
+		rx_channel_bytes(channel, expected + channel * 3);
+		const RxScriptPkt next = { (UINT16)(channel - 1), channel,
+		                          expected + channel * 3, 3, FALSE, 0, FALSE, TRUE };
+		RX_CHECK(rx_feed_windows_peer(udp, &next) == 0 && rdpeudp_test_check_health(udp));
+	}
+	RX_CHECK(rx_state(udp, &st) == 0 && st.expectedChannelSeq == UINT16_MAX &&
+	         st.recvStreamLen == UINT16_MAX - 1 && st.recvBufferedChunks == CHANNELS);
+	const RxScriptPkt late = { CHANNELS, UINT16_MAX, expected, 3, FALSE, 0, FALSE, TRUE };
+	RX_CHECK(rx_feed_windows_peer(udp, &late) == 0 && rdpeudp_test_check_health(udp));
+	RX_CHECK(rx_state(udp, &st) == 0 && st.expectedChannelSeq == CHANNELS + 1 &&
+	         st.recvStreamLen == UINT16_MAX - 1 + sizeof(expected) && !st.recvBufferedChunks);
+	RX_CHECK(rdpeudp_test_recv_data(udp, UINT16_MAX - 1, actual, sizeof(actual)));
+	RX_CHECK(memcmp(actual, expected, sizeof(actual)) == 0);
 	rdpeudp_test_free(udp);
 	return 0;
 }
@@ -2716,9 +3069,9 @@ int TestRdpeUdp(int argc, char* argv[])
 		(void)fprintf(stderr, "test_rx_wrap_delayed_zero_chunks FAILED\n");
 		return -1;
 	}
-	if (test_rx_wrap_ring_overflow() != 0)
+	if (test_rx_wrap_backlog_aliases() != 0)
 	{
-		(void)fprintf(stderr, "test_rx_wrap_ring_overflow FAILED\n");
+		(void)fprintf(stderr, "test_rx_wrap_backlog_aliases FAILED\n");
 		return -1;
 	}
 	if (test_rx_wrap_early_zero() != 0)
@@ -2729,6 +3082,16 @@ int TestRdpeUdp(int argc, char* argv[])
 	if (test_rx_prompt_ack() != 0 || test_rx_stall() != 0 || test_rx_watchdog_mainloop() != 0)
 	{
 		(void)fprintf(stderr, "receive ACK/watchdog regression FAILED\n");
+		return -1;
+	}
+	if (test_rx_large_backlog_and_aoa() != 0 || test_rx_retention_bounds_and_ack() != 0 ||
+	    test_rx_unread_budget_and_reuse() != 0 || test_rx_allocation_failure_and_duplicate() != 0 ||
+	    test_rx_inorder_page_allocation_bound() != 0 ||
+	    test_rx_partial_compaction_and_idle_capacity() != 0 ||
+	    test_rx_oversize_payload_has_no_receipt() != 0 ||
+	    test_rx_windows_wrap_with_large_backlog() != 0)
+	{
+		(void)fprintf(stderr, "receive backlog retention regression FAILED\n");
 		return -1;
 	}
 	if (test_soft_sync_alloc() != 0)

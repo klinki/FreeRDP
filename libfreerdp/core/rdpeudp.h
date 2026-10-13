@@ -413,6 +413,19 @@ typedef struct
 	BOOL haveSeenAoa;
 	BOOL haveRealData;
 	size_t recvStreamLen; /* delivered in-order channel bytes */
+	size_t recvBufferedChunks;
+	size_t recvBufferedBytes;
+	size_t recvBufferedPages;
+	size_t recvPageAllocations;
+	size_t recvPendingStreamBytes;
+	size_t recvChunkLimit;
+	size_t recvByteLimit;
+	size_t recvBufferedSpan;
+	size_t recvPeakOwnedBytes;
+	size_t recvPeakBufferedChunks;
+	size_t recvPeakBufferedSpan;
+	size_t recvStreamCapacity;
+	BOOL recvFailed;
 } RdpUdpTestRecvState;
 
 FREERDP_API void rdpeudp_test_free(rdpUdpTransport* udp);
@@ -425,6 +438,13 @@ WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_test_feed(rdpUdpTransport* udp, const BYTE* datagram, size_t len);
 /** Snapshot scalar receive state (bitmap via rdpeudp_test_seen below). */
 FREERDP_API BOOL rdpeudp_test_recv_state(const rdpUdpTransport* udp, RdpUdpTestRecvState* out);
+/** Empty-fixture receive budget overrides; zero selects the production limit. */
+FREERDP_API BOOL rdpeudp_test_configure_recv(rdpUdpTransport* udp, size_t maxChunks,
+                                             size_t maxBytes);
+/** Fail receiver page/payload allocation after this many permitted allocations. */
+FREERDP_API void rdpeudp_test_fail_recv_allocation(rdpUdpTransport* udp, size_t afterSuccesses);
+/** Consume the delivered stream through the production nonblocking reliable reader. */
+FREERDP_API SSIZE_T rdpeudp_test_read_data(rdpUdpTransport* udp, BYTE* data, size_t length);
 /** Copy a range of the delivered channel stream without consuming it. */
 WINPR_ATTR_NODISCARD
 FREERDP_API BOOL rdpeudp_test_recv_data(const rdpUdpTransport* udp, size_t offset, BYTE* data,
