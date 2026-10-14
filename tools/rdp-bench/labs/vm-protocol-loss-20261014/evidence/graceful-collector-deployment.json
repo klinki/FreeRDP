@@ -1,0 +1,8 @@
+{
+  "local": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/Collect-Counters.ps1",
+  "remote": "C:\\RdpBenchProtocol20261014\\Collect-Counters.ps1",
+  "sha256": "ead48e058e04baa804802e9c4cddde5712f72ca9721cab01530ca3f6ca207edc",
+  "remote_sha256": "ead48e058e04baa804802e9c4cddde5712f72ca9721cab01530ca3f6ca207edc",
+  "previous_deployment": "windows-script-deployment.json",
+  "scope": "new optional stop-file parameter; original workload unchanged"
+}

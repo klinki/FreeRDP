@@ -1,0 +1,12 @@
+{
+  "utc": "2026-10-14T13:10:02.214541+00:00",
+  "reason": "Agent-local PTY session was inaccessible from root credential memory",
+  "cancelled_agent_session": 46482,
+  "cancelled_before_authentication": true,
+  "started_trials": 0,
+  "network_preflight_started": false,
+  "credential_sent": false,
+  "preserved_directory": "campaign-fixed-all.unstarted-auth-handoff",
+  "performance_eligible": false,
+  "relaunch": "Root owns final all8 coordinator and hidden credential prompt"
+}

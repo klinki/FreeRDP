@@ -1,0 +1,764 @@
+{
+  "schema": "freerdp.pr13608.recovery_compact",
+  "version": 1,
+  "source_analysis_schema": "freerdp.pr13608.recovery_audit",
+  "source_analysis_version": 1,
+  "performance_eligible": false,
+  "scope": "visible UDP2 headers and native recovery state; no TLS/ciphertext decoding",
+  "channel": 1125,
+  "conclusion": {
+    "classification": "observed_channel_recovery",
+    "qualified_unretained_ack_count": 0,
+    "offered_aliases": 19,
+    "postloss_alias_observations": 1,
+    "watchdog": false,
+    "peer_age_ms": null,
+    "gap_age_ms": null
+  },
+  "gap_scope": {
+    "channel": 1125,
+    "duration_ms": 10848.235631,
+    "max_gap_age_ms": 10848,
+    "max_buffered_chunks": 1158,
+    "recovered_in_native_trace": true,
+    "started_before_arm": false,
+    "peer_age_ms_at_end": 0,
+    "native_start_ns": 8376606064285,
+    "native_end_ns": 8387454299916,
+    "wall_start_envelope_ns": [
+      1791979806163158050,
+      1791979806203194425
+    ],
+    "wall_end_envelope_ns": [
+      1791979817011393681,
+      1791979817051430056
+    ],
+    "capture_observed_bounds": {
+      "offered": {
+        "first_time_ns": 1791979774769547000,
+        "last_time_ns": 1791979911127532000,
+        "record_count": 612491,
+        "snaplen": 256,
+        "linktype": 1,
+        "error_count": 0
+      },
+      "received": {
+        "first_time_ns": 1791979774872112000,
+        "last_time_ns": 1791979911127542000,
+        "record_count": 241398,
+        "snaplen": 256,
+        "linktype": 1,
+        "error_count": 0
+      }
+    },
+    "inside_both_capture_observed_windows": true,
+    "inside_measured_loss_step": true,
+    "recovered_after_zero_loss_receipt": false,
+    "profile_windows": [
+      {
+        "id": "loss70",
+        "loss_percent": 70.0,
+        "start_unix_ns": 1791979775097971000,
+        "end_unix_ns": 1791979895105147000,
+        "outcome": "COMPLETE",
+        "requested_s": 120.0
+      }
+    ],
+    "native_recovery_after_received_last_packet_ms": -94096.130132,
+    "loss_reset_zero_receipt_unix_ns": 1791979895213108000
+  },
+  "native_qualification": {
+    "retained_valid": true,
+    "complete_from_arm": true,
+    "overwritten_events": 0,
+    "rows_truncated": false,
+    "alignment": {
+      "offset_min_ns": 1791971429577093765,
+      "offset_max_ns": 1791971429577130140,
+      "bracket_ns": 36375,
+      "wallclock_api": "GetSystemTimeAsFileTime"
+    },
+    "clock_slop_ms": 20
+  },
+  "native_error_counts": {
+    "trace": 0,
+    "headers": 0
+  },
+  "capture_qualification": {
+    "offered": {
+      "complete": true,
+      "kernel_drops": 0,
+      "header_error_count": 0,
+      "serial_ambiguous": false,
+      "absence_qualified": true,
+      "body_snap_truncations": 590064
+    },
+    "received": {
+      "complete": true,
+      "kernel_drops": 0,
+      "header_error_count": 0,
+      "serial_ambiguous": false,
+      "absence_qualified": true,
+      "body_snap_truncations": 240188
+    }
+  },
+  "flow_association": {
+    "verified": true,
+    "flow": "172.17.0.2:46348",
+    "unique_header_matches": {
+      "172.17.0.2:46348": 485
+    },
+    "ambiguous_header_matches": 0,
+    "required_unique_matches": 1,
+    "method": "successful native TX ACK/header fingerprint + arm wallclock envelope",
+    "scope": "one native UDP object; distinct tunnel flows are never pooled"
+  },
+  "ack_qualification": {
+    "base_eligibility": true,
+    "reference_counts": {
+      "positive_references": 35,
+      "positive_references_retired_by_peer_aoa": 34,
+      "positive_current_attempt_references": 1,
+      "wire_observed_references": 628,
+      "outside_offered_observed_packet_window": 0,
+      "eligible_captured_active_positive_references": 0,
+      "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+      "raw_analyzer_qualified_violation_references": 0,
+      "eligible_captured_active_violation_references": 0,
+      "native_only_or_otherwise_unqualified_violation_references": 0
+    },
+    "reference_kinds": {
+      "explicit_vector_negative": 87,
+      "below_vector_base_nonpositive": 506,
+      "cumulative": 34,
+      "explicit_vector_positive": 1
+    }
+  },
+  "serial_ambiguity": {
+    "ambiguous_aliases": 19,
+    "receiver_resync_count": 1,
+    "first_receiver_resync": {
+      "id": 229385,
+      "time_ns": 8387452387332,
+      "data_seq": 7651,
+      "detail": 7662,
+      "base": 7651,
+      "next_channel": 1125,
+      "buffered": 1154,
+      "peer_age_ms": 0,
+      "gap_age_ms": 10846
+    },
+    "offered_channel_extended_values": [
+      66661
+    ],
+    "repeated_alias_data_labels": 0,
+    "capture_serial_ambiguity": {
+      "offered": false,
+      "received": false
+    },
+    "scope": "a receiver resync conservatively invalidates continuous-epoch active-ACK qualification for the focused window; does not imply capture corruption"
+  },
+  "alias_count": 19,
+  "aliases": [
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 3451,
+      "data_extended": 200059,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979804615238000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 8,
+        "below_vector_base_nonpositive": 89,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 99,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 3750,
+      "data_extended": 200358,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979804925967000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 9,
+        "below_vector_base_nonpositive": 80,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 91,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 4113,
+      "data_extended": 200721,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979805229586000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 13,
+        "below_vector_base_nonpositive": 66,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 81,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 4668,
+      "data_extended": 201276,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979805650830000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 11,
+        "below_vector_base_nonpositive": 55,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 68,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 5314,
+      "data_extended": 201922,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979805696347000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 11,
+        "below_vector_base_nonpositive": 43,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 56,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 5880,
+      "data_extended": 202488,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979805813788000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 5,
+        "below_vector_base_nonpositive": 38,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 45,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 6282,
+      "data_extended": 202890,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979805992720000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 8,
+        "below_vector_base_nonpositive": 25,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 35,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 6691,
+      "data_extended": 203299,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806032135000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 2,
+        "below_vector_base_nonpositive": 23,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 27,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 6968,
+      "data_extended": 203576,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806062251000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 3,
+        "below_vector_base_nonpositive": 17,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 22,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 7167,
+      "data_extended": 203775,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806081670000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 2,
+        "below_vector_base_nonpositive": 15,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 19,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 7316,
+      "data_extended": 203924,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806099099000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 1,
+        "below_vector_base_nonpositive": 13,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 16,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 7427,
+      "data_extended": 204035,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806115049000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 3,
+        "below_vector_base_nonpositive": 10,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 15,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 7512,
+      "data_extended": 204120,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806149813000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 2,
+        "below_vector_base_nonpositive": 9,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 13,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 7570,
+      "data_extended": 204178,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806167644000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 1,
+        "below_vector_base_nonpositive": 8,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 11,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 7609,
+      "data_extended": 204217,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806185588000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 2,
+        "below_vector_base_nonpositive": 6,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 10,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 7633,
+      "data_extended": 204241,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806254351000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 2,
+        "below_vector_base_nonpositive": 5,
+        "cumulative": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 9,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 7647,
+      "data_extended": 204255,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806289580000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 3,
+        "cumulative": 2,
+        "below_vector_base_nonpositive": 2
+      },
+      "ack_qualification": {
+        "positive_references": 2,
+        "positive_references_retired_by_peer_aoa": 2,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 7,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 7657,
+      "data_extended": 204265,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979806497439000,
+      "postloss_matches": 0,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {},
+      "ack_reference_kinds": {
+        "below_vector_base_nonpositive": 2
+      },
+      "ack_qualification": {
+        "positive_references": 0,
+        "positive_references_retired_by_peer_aoa": 0,
+        "positive_current_attempt_references": 0,
+        "wire_observed_references": 2,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    },
+    {
+      "flow": "172.17.0.2:46348",
+      "data_seq": 7668,
+      "data_extended": 204276,
+      "channel_extended": 66661,
+      "offered_time_ns": 1791979817032774000,
+      "postloss_matches": 1,
+      "bounded_no_postloss_match_qualified": false,
+      "serial_ambiguous": true,
+      "native_rx_status_counts": {
+        "1": 1
+      },
+      "ack_reference_kinds": {
+        "explicit_vector_negative": 1,
+        "explicit_vector_positive": 1
+      },
+      "ack_qualification": {
+        "positive_references": 1,
+        "positive_references_retired_by_peer_aoa": 0,
+        "positive_current_attempt_references": 1,
+        "wire_observed_references": 2,
+        "outside_offered_observed_packet_window": 0,
+        "eligible_captured_active_positive_references": 0,
+        "eligible_current_attempt_receipts_with_native_receipt_evidence": 0,
+        "raw_analyzer_qualified_violation_references": 0,
+        "eligible_captured_active_violation_references": 0,
+        "native_only_or_otherwise_unqualified_violation_references": 0
+      }
+    }
+  ],
+  "observed_inter_alias_offer_ms": [
+    310.729,
+    303.619,
+    421.244,
+    45.517,
+    117.441,
+    178.932,
+    39.415,
+    30.116,
+    19.419,
+    17.429,
+    15.95,
+    34.764,
+    17.831,
+    17.944,
+    68.763,
+    35.229,
+    207.859,
+    10535.335
+  ],
+  "native_channel_rx_status_counts": {
+    "1": 1
+  },
+  "native_channel_delivery_count": 1,
+  "native_slot_collision_count": 0,
+  "source_inputs": {
+    "offered.pcap": {
+      "path": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/diagnostic-pr70-udp-buffered/baseline-pr70-udp-buffered-diagnostic-udp-pr-loss70-c5b5b101/offered.pcap",
+      "sha256": "28166e8ad5f851fd0930487ec116a2db4109e7d73736e3775b50fb889dd8b0ec"
+    },
+    "received.pcap": {
+      "path": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/diagnostic-pr70-udp-buffered/baseline-pr70-udp-buffered-diagnostic-udp-pr-loss70-c5b5b101/received.pcap",
+      "sha256": "650f3564fb30d04cb3d7ea606f7a794ae1ebcf172dd2f9c75fbd5ffdd6075634"
+    },
+    "recovery-trace.jsonl": {
+      "path": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/diagnostic-pr70-udp-buffered/baseline-pr70-udp-buffered-diagnostic-udp-pr-loss70-c5b5b101/recovery-trace.jsonl",
+      "sha256": "c5e0f98f0f9c1f4e8855e4de0aa388296345447a89ad5427df9c552b64ecff7b"
+    },
+    "capture-health.json": {
+      "path": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/diagnostic-pr70-udp-buffered/baseline-pr70-udp-buffered-diagnostic-udp-pr-loss70-c5b5b101/capture-health.json",
+      "sha256": "117e1494adba3e5f069e9d8b1508db534200e047cbd831fd8faed65b4372fef8"
+    }
+  },
+  "notes": [
+    "This compact summary omits all per-packet/per-ACK arrays; detailed analyses and raw evidence remain local/in the ZIP.",
+    "ACK counts are reference counts per alias, not unique ACK datagrams or global receipt totals.",
+    "Historical AoA-retired attempts are separate from captured active-attempt receipt eligibility.",
+    "Wire observations prove emitted/captured transport headers, not Windows acceptance, TLS plaintext or rendering.",
+    "Capture bounds are first/last observed packet times, not recorder lifecycle timestamps.",
+    "Native recovery beyond the capture or measured profile window cannot be described as captured recovery under that profile.",
+    "The clock-slop envelope is declared; independent drift/clock-step review remains necessary.",
+    "These observer-enabled diagnostics do not replace production benchmark failures."
+  ],
+  "generator_sha256": "65674cd5c337aa2c8746c18f6d37cb89e12cafb5caa79c928283c29a2a9007c4",
+  "analysis_sha256": "60003d7bb350680786a8f250cc148e648576a8369fa1407904692504a79da4ad",
+  "extra_source_receipts": {
+    "campaign.json": {
+      "path": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/diagnostic-pr70-udp-buffered/baseline-pr70-udp-buffered-diagnostic-udp-pr-loss70-c5b5b101/ramp/campaign.json",
+      "sha256": "e316d362db0f34b1a536208d989fa767143e4fbd9b4ec065330d9576c74ba497"
+    },
+    "network-reset-zero.json": {
+      "path": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/diagnostic-pr70-udp-buffered/baseline-pr70-udp-buffered-diagnostic-udp-pr-loss70-c5b5b101/ramp/network-reset-zero.json",
+      "sha256": "015aa3b059b7a6c75ee25a293324c1f6bb5cd5d220781c062e59165462c979bd"
+    },
+    "provenance.json": {
+      "path": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/diagnostic-pr70-udp-buffered/baseline-pr70-udp-buffered-diagnostic-udp-pr-loss70-c5b5b101/provenance.json",
+      "sha256": "4e1e26a42a8b769fa052247d59edc21ebfb3a1fa32559fdae4997ebb1c9eafbf"
+    }
+  }
+}

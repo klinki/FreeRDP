@@ -1,0 +1,16 @@
+{
+  "container_absent": true,
+  "power_assertion_absent": true,
+  "ssh_socket_absent": true,
+  "network_removed": true,
+  "network_cleanup_keys": [
+    "schema_version",
+    "utc",
+    "outcome",
+    "before",
+    "restored_rp_filter",
+    "restored_interface_mtu"
+  ],
+  "guest_owned_tasks_absent": true,
+  "guest_owned_processes_absent": true
+}

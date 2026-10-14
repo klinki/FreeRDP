@@ -1,0 +1,30 @@
+[10:15:07:653] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     recovery_trace_records_retention_and_real_ack
+[10:15:08:808] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     recovery_trace_overflow_keeps_an_explicit_valid_tail
+ok     syn_offers_version_3_with_the_cookie_hash
+ok     syn_offers_version_2_without_a_cookie_hash
+[10:15:08:815] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     dummy_packets_are_acknowledged_but_not_delivered
+[10:15:08:840] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     retransmission_is_reordered_back_into_the_stream
+[10:15:08:844] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     ack_of_acks_advances_the_window_without_touching_the_stream
+[10:15:08:888] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     retransmitted_packets_are_acknowledged_again
+[10:15:08:934] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     retransmitted_channel_data_is_not_delivered_twice
+[10:15:08:936] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     gap_produces_an_ack_vector_rather_than_a_cumulative_ack
+[10:15:08:960] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     ack_advertises_the_largest_window
+[10:15:08:982] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     channel_sequence_wraps_past_zero
+[10:15:10:718] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     real_server_ack_with_delayed_acks_and_data
+[10:15:10:721] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     ack_of_acks_reports_the_oldest_unacknowledged_packet
+[10:15:10:785] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     acknowledgements_survive_sequence_wraparound
+[10:15:13:181] [13265:000033d1] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+ok     ack_of_acks_resyncs_after_a_silence

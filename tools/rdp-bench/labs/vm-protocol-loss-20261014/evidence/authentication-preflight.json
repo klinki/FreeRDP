@@ -1,0 +1,46 @@
+[
+  {
+    "variant": "local",
+    "exit_code": 0,
+    "log": "auth-local.log",
+    "args": [
+      "docker",
+      "exec",
+      "-i",
+      "freerdp-protocol-loss-20261014",
+      "env",
+      "DISPLAY=:99",
+      "/bench/linux-local/client/X11/xfreerdp",
+      "/auth-only",
+      "/v:192.168.64.2",
+      "/u:david",
+      "/d:WIN-RL37D50MR0J",
+      "/from-stdin:force",
+      "/cert:fingerprint:sha256:4f04fd907faedebb45444bfd9d118675eb24ec3fa2bacb24ac38e431d9185081",
+      "/timeout:20000",
+      "/log-level:INFO"
+    ]
+  },
+  {
+    "variant": "pr",
+    "exit_code": 0,
+    "log": "auth-pr.log",
+    "args": [
+      "docker",
+      "exec",
+      "-i",
+      "freerdp-protocol-loss-20261014",
+      "env",
+      "DISPLAY=:99",
+      "/bench/linux-pr/client/X11/xfreerdp",
+      "/auth-only",
+      "/v:192.168.64.2",
+      "/u:david",
+      "/d:WIN-RL37D50MR0J",
+      "/from-stdin:force",
+      "/cert:fingerprint:sha256:4f04fd907faedebb45444bfd9d118675eb24ec3fa2bacb24ac38e431d9185081",
+      "/timeout:20000",
+      "/log-level:INFO"
+    ]
+  }
+]

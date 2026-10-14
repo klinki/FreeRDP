@@ -1,0 +1,34 @@
+{
+  "scope": "deterministic compliant loopback peer, not Windows retry-cadence claim",
+  "expected_red_observed": true,
+  "failure_event": {
+    "kind": "event",
+    "id": 35,
+    "time_ns": 6335244082270,
+    "event": "failure",
+    "data_seq": 0,
+    "channel_seq": 0,
+    "status": 0,
+    "detail": 0,
+    "length": 0,
+    "base": 100,
+    "highest": 116,
+    "next_channel": 1,
+    "buffered": 1,
+    "peer_age_ms": 706,
+    "gap_age_ms": 16027,
+    "flags": 0,
+    "header_fragment_hex": ""
+  },
+  "trace_footer": {
+    "kind": "footer",
+    "retained_sequence_valid": true,
+    "complete_from_arm": true,
+    "overwritten_events": 0,
+    "first_event_ns": 6319216951679,
+    "last_event_ns": 6335244082270,
+    "state": 3,
+    "failure": "the stream is stuck behind a chunk the server no longer resends"
+  },
+  "reason": "ordered progress exceeded16s while peer silence was only the recorded sub-second age; valid Channel1 repair was scheduled at17.5s"
+}

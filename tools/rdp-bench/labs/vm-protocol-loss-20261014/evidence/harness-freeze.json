@@ -1,0 +1,18 @@
+{
+  "utc": "2026-10-14T10:20:03.974560+00:00",
+  "sha256": {
+    "run-protocol-loss.py": "28bc70f5809a072cefccec506c4934ccfe81fd7c7d2d847508f9219f8a4957e6",
+    "host-control.py": "73e733dede60d32b2bfa238335575edb9d6f87ab2b53d0c498a4920b44752fdd",
+    "Collect-Counters.ps1": "ead48e058e04baa804802e9c4cddde5712f72ca9721cab01530ca3f6ca207edc",
+    "measurement-driver.py": "8c6187e896b3c46d6fc0b5cc18af45092a4a5cdb2963ffdef9d5698a502d692d",
+    "process-guard.py": "088fd71ab7c32922c2d9056056a11422a8c54d354cf9300bbf5e7af8a292acbb",
+    "owned-exec.py": "bba552ebd37c48f030ed6eaaa8091b4d703ef3cd885b5cb7f67c8935b7119328",
+    "image-progress.py": "efb8810f913bb0d66fc08e927cba0aa72c31e858692d499f145a8c7eba60ce4e"
+  },
+  "source_copy": "measured-harness",
+  "upstream_helper_tests": 43,
+  "native_udp_cases": 16,
+  "guard_tests": 10,
+  "image_tests": 6,
+  "no_timed_trials_started_before_freeze": true
+}

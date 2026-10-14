@@ -1,0 +1,13 @@
+{
+  "binding_query_error": null,
+  "version": "10.0.26200",
+  "utc": "2026-10-14T09:50:31.6341907Z",
+  "hostname": "WIN-RL37D50MR0J",
+  "certificate_count": 1,
+  "certificate_sha1": "6A28F3096155CA2DA6D2D7DC7906CB1000D7A381",
+  "os": "Microsoft Windows 11 Pro",
+  "logical_cpus": 4,
+  "rdp_certificate_binding": "6A28F3096155CA2DA6D2D7DC7906CB1000D7A381",
+  "memory_bytes": 4285267968,
+  "certificate_sha256": "4f04fd907faedebb45444bfd9d118675eb24ec3fa2bacb24ac38e431d9185081"
+}

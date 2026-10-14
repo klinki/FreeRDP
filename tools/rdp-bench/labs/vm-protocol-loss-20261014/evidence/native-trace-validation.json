@@ -1,0 +1,59 @@
+{
+  "scope": "CI-only native regression build; separate from measured production runtimes",
+  "kind": "trace",
+  "source_tree_sha256": "7c029aef97fb95723ed7ada5da0f50795b35733e3825f0d47145b84844c8e1c9",
+  "cmake_flags": [
+    "-G",
+    "Ninja",
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DBUILD_SHARED_LIBS=ON",
+    "-DWITH_CLIENT=ON",
+    "-DWITH_X11=ON",
+    "-DWITH_CLIENT_SDL=OFF",
+    "-DWITH_WAYLAND=OFF",
+    "-DWITH_SERVER=OFF",
+    "-DWITH_SAMPLE=OFF",
+    "-DWITH_OPENSSL=ON",
+    "-DWITH_FFMPEG=OFF",
+    "-DWITH_OPENH264=OFF",
+    "-DWITH_OPUS=OFF",
+    "-DWITH_GFX_AV1=OFF",
+    "-DWITH_AOM=OFF",
+    "-DWITH_DAV1D=OFF",
+    "-DWITH_YUV=OFF",
+    "-DWITH_JPEG=OFF",
+    "-DWITH_CUPS=OFF",
+    "-DWITH_PCSC=OFF",
+    "-DWITH_KRB5=OFF",
+    "-DWITH_PULSE=OFF",
+    "-DWITH_MANPAGES=OFF",
+    "-DWITH_DOCUMENTATION=OFF",
+    "-DWITH_CCACHE=OFF",
+    "-DWITH_DEBUG_ALL=OFF",
+    "-DWITH_SWSCALE=ON",
+    "-DWITH_FUSE=OFF",
+    "-DWITH_RDPEUDP=ON",
+    "-DWITH_RDP_BENCH=OFF",
+    "-DBUILD_TESTING=OFF",
+    "-DBUILD_TESTING_INTERNAL=ON"
+  ],
+  "started_unix_s": 1791972873.572499,
+  "configure": {
+    "exit_code": 0,
+    "log": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-trace-configure.log",
+    "sha256": "ccdcfe21ac0d6e1a8c9c632ec2dd3e045b2871e1272669a514ce385a19846c13"
+  },
+  "build": {
+    "exit_code": 0,
+    "log": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-trace-build.log",
+    "sha256": "8a0663b6cf38961e63497f43d92c8efdea3e26d11d6feeef3cbea024fe06b295"
+  },
+  "test": {
+    "exit_code": 0,
+    "log": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-trace-test.log",
+    "sha256": "b2b946e439bdffcf1b62af35fba4af79a5d96cec627b7f2bde8f00fb4e41b23a"
+  },
+  "outcome": "PASS",
+  "completed_unix_s": 1791972921.7923572,
+  "passed_udp_cases": 16
+}

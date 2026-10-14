@@ -1,0 +1,13 @@
+{
+  "commit": "49fcbb72c0b6fbfdb00822f98a9ff3697af6a1ab",
+  "branch": "codex/pr13608-protocol-loss-recovery",
+  "scope": "v3 recovery policy, opt-in diagnostics and native regression tests",
+  "compiled_source_sha256": {
+    "libfreerdp/core/rdpudp.c": "e60a90a161fbb3868949d6473eaf70d807b81998dc8d3d06fbb373d081a5ca53",
+    "libfreerdp/core/rdpudp.h": "24e297e309af6c311b3b67571d6a80abfb86383f84f5fed787c7c04b6f319a09",
+    "libfreerdp/core/test/TestRdpUdp.c": "d9a16c9fe0e6ef2538f68cfd7c39b09fb710f8a49ec18cc02481048227db9ca9"
+  },
+  "native_cases_passed": 19,
+  "production_build_receipt": "pr-fixed-build.json",
+  "production_build_started_before_commit": true
+}

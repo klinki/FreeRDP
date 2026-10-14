@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT=Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('upstream_host_control',ROOT/'upstream-method/host-control.py')
@@ -47,8 +48,11 @@ class HostControlTests(unittest.TestCase):
     def test_cleanup_uses_exact_task_and_pid_creation_session_receipts(self):
         with tempfile.TemporaryDirectory() as folder:
             runner=self.controller(folder);commands=[]
-            runner.ps=lambda expression,**kwargs:(commands.append(expression) or '{}')
-            runner.cleanup();expression=commands[0]
+            replies=iter([{'status':'LEGACY_NO_STOP_FILE'},{'owner':'ab'*16,'actions':[]}])
+            runner.ps=lambda expression,**kwargs:(commands.append(expression) or json.dumps(next(replies)))
+            receipt=runner.cleanup();expression=commands[1]
+            self.assertEqual(receipt['collector_stop']['status'],'LEGACY_NO_STOP_FILE')
+            self.assertIn('Collector process identity differs',commands[0])
             self.assertIn("Get-ScheduledTask -TaskName 'RdpBench-Pr13608-loss50'",expression)
             self.assertIn("ProcessId='+$r.pid",expression)
             self.assertIn('$p.SessionId -ne $r.session_id',expression)
@@ -76,6 +80,51 @@ class HostControlTests(unittest.TestCase):
             self.assertIn('creation_utc',expression)
             self.assertEqual(kwargs['timeout'],270)
             self.assertNotIn('Start-Process',expression)
+
+
+    def test_collector_graceful_mode_is_explicit_and_owned(self):
+        with tempfile.TemporaryDirectory() as folder:
+            runner=self.controller(folder)
+            control.save(Path(folder)/'session-discovery.json',dict(counter_instance='RDP-Tcp 3'))
+            commands=[]
+            runner.ps=lambda expression,**kwargs:(commands.append(expression) or '')
+            runner.collector(180,10)
+            self.assertNotIn(' -StopFile ',commands[-1])
+            runner.collector(180,10,True)
+            self.assertIn("-StopFile 'C:\\bench\\loss50\\collector-stop.request.json'",commands[-1])
+            self.assertIn('stop_file=',commands[-1])
+
+    def test_graceful_footer_and_timeout_are_retained(self):
+        with tempfile.TemporaryDirectory() as folder:
+            runner=self.controller(folder)
+            footer={'type':'collector_end','requested_stop':True,'terminal_error':None}
+            replies=iter([{'status':'STOP_REQUESTED','process_present':True},footer])
+            runner.ps=lambda expression,**kwargs:json.dumps(next(replies))
+            result=runner.stop_collector()
+            self.assertEqual(result['status'],'GRACEFUL_FOOTER_RECEIVED')
+            self.assertEqual(result['footer'],footer)
+            self.assertFalse(result['fallback_owned_cleanup_required'])
+            runner.ps=lambda expression,**kwargs:json.dumps({'status':'STOP_REQUESTED','process_present':True})
+            with mock.patch.object(control.time,'monotonic',side_effect=[0,16,16]):
+                result=runner.stop_collector()
+            self.assertEqual(result['status'],'GRACEFUL_STOP_TIMEOUT')
+            self.assertTrue(result['fallback_owned_cleanup_required'])
+            self.assertIsNone(result['footer'])
+
+    def test_malformed_stop_status_is_not_hidden(self):
+        with tempfile.TemporaryDirectory() as folder:
+            runner=self.controller(folder);runner.ps=lambda expression,**kwargs:'{}'
+            with self.assertRaisesRegex(ValueError,'malformed collector stop'):
+                runner.cleanup()
+
+    def test_stop_sentinel_disposes_query_without_fabricated_provider_error(self):
+        source=(ROOT/'upstream-method/Collect-Counters.ps1').read_text()
+        self.assertIn("[string]$StopFile=''",source)
+        self.assertIn('throw [OperationCanceledException]',source)
+        self.assertIn('if(!$script:requestedStop)',source)
+        self.assertIn("stop_reason=if($script:requestedStop) {'REQUESTED_STOP'}",source)
+        self.assertGreater(source.index('$script:requestedStop=$true'),source.index('$previousTimestamp=$end'))
+        self.assertIn("type='collector_end'",source)
 
 
 if __name__=='__main__':unittest.main()

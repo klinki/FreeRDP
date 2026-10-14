@@ -1,0 +1,75 @@
+{
+  "schema": "freerdp.protocol_lab_cleanup",
+  "version": 1,
+  "utc": "2026-10-14T13:39:56.351873+00:00",
+  "closed_phases": [
+    {
+      "phase": "campaign-baseline",
+      "trials": 16
+    },
+    {
+      "phase": "campaign-fixed",
+      "trials": 16
+    },
+    {
+      "phase": "campaign-fixed-all",
+      "trials": 8
+    },
+    {
+      "phase": "diagnostic-pr70-udp",
+      "trials": 1
+    },
+    {
+      "phase": "diagnostic-pr70-all",
+      "trials": 1
+    },
+    {
+      "phase": "diagnostic-pr70-udp-buffered",
+      "trials": 1
+    }
+  ],
+  "guest": {
+    "tasks": [],
+    "processes": [],
+    "utc": "2026-10-14T13:39:43.1491232Z",
+    "nonowned_prefix_tasks_ignored": 0
+  },
+  "container_id": "e494d0ab1cec80284733f60aa93a4a973816d41c130cfe7e2b9874c469c5c9a1",
+  "container_removed": true,
+  "collector_wait_timeouts": [
+    {
+      "trial_id": "fixed-tcp-pr-loss25-1b948bbd",
+      "wait_receipt": {
+        "status": "GRACEFUL_STOP_TIMEOUT",
+        "process_present": true,
+        "elapsed_s": 15.041050917003304,
+        "footer": null,
+        "fallback_owned_cleanup_required": true
+      },
+      "final_footer": {
+        "schema_version": 2,
+        "observed_counter_sets": 20,
+        "type": "collector_end",
+        "pending_errors": [],
+        "expected_counter_sets": 22,
+        "utc": "2026-10-14T12:25:47.7139487Z",
+        "stop_reason": "REQUESTED_STOP",
+        "requested_stop": true,
+        "nonterminal_errors": 0,
+        "elapsed_s": 208.0617577,
+        "cadence": {
+          "min_s": 10.0179157,
+          "mean_s": 10.401143605263158,
+          "max_s": 12.036976899999999,
+          "n": 19
+        },
+        "terminal_error": null
+      },
+      "qualification": "Bounded footer observation timed out; fetched final footer and exact guest absence are verified separately."
+    }
+  ],
+  "network_receipt": "network-cleanup.json",
+  "ssh_control_socket_closed": "/private/tmp/freerdp-protocol-loss-20261014.sock",
+  "power_assertion_pid_stopped": 47893,
+  "persistent_power_settings_changed": false
+}

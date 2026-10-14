@@ -1,0 +1,82 @@
+{
+  "directory": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/collector-smoke-3355781c",
+  "result": {
+    "scope": "graceful collector-stop smoke; no workload or network impairment",
+    "cleanup": {
+      "utc": "2026-10-14T10:12:40.9350930Z",
+      "actions": [],
+      "owner": "aecf861e0ab34b21a8f278c069e2315d",
+      "collector_stop": {
+        "status": "GRACEFUL_FOOTER_RECEIVED",
+        "process_present": true,
+        "elapsed_s": 2.931616458983626,
+        "footer": {
+          "schema_version": 2,
+          "observed_counter_sets": 0,
+          "type": "collector_end",
+          "pending_errors": [
+            "The specified instance is not present."
+          ],
+          "expected_counter_sets": 31,
+          "utc": "2026-10-14T10:12:39.3329227Z",
+          "stop_reason": "REQUESTED_STOP",
+          "requested_stop": true,
+          "nonterminal_errors": 1,
+          "elapsed_s": 0.1128029,
+          "cadence": {
+            "min_s": null,
+            "mean_s": null,
+            "max_s": null,
+            "n": 0
+          },
+          "terminal_error": null
+        },
+        "fallback_owned_cleanup_required": false
+      }
+    },
+    "collector_result": {
+      "outcome": "COLLECTOR_RETURNED",
+      "stdout": ""
+    },
+    "fetch": [
+      {
+        "name": "ownership.json",
+        "bytes": 150,
+        "sha256": "142bd252cde3d84dfc77b09f8db4176278bfe5dd57fef637e4e56f2ce32d794d"
+      },
+      {
+        "name": "collector-pid.json",
+        "bytes": 327,
+        "sha256": "5c12d1d6fd00b5404ed9d2491e6f481dc64ffb8f064c3cfe0da897f5a3665648"
+      },
+      {
+        "name": "counters.jsonl",
+        "bytes": 5117,
+        "sha256": "00248ab67e12d64c285e5368bdd73364837f79e947f41e4f8e15b003e6608064"
+      }
+    ],
+    "pass_validation": true,
+    "footer": {
+      "schema_version": 2,
+      "observed_counter_sets": 0,
+      "type": "collector_end",
+      "pending_errors": [
+        "The specified instance is not present."
+      ],
+      "expected_counter_sets": 31,
+      "utc": "2026-10-14T10:12:39.3329227Z",
+      "stop_reason": "REQUESTED_STOP",
+      "requested_stop": true,
+      "nonterminal_errors": 1,
+      "elapsed_s": 0.1128029,
+      "cadence": {
+        "min_s": null,
+        "mean_s": null,
+        "max_s": null,
+        "n": 0
+      },
+      "terminal_error": null
+    },
+    "raw_rows": 3
+  }
+}

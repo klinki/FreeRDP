@@ -1,0 +1,51 @@
+{
+  "label": "udp70",
+  "gap_wall_ns": [
+    1791973413034227723,
+    1791973425093091145
+  ],
+  "captures": {
+    "offered": {
+      "first_ns": 1791973298752997000,
+      "last_ns": 1791973417502425000,
+      "native_gap_end_after_capture_ms": 7590.666145
+    },
+    "received": {
+      "first_ns": 1791973298848143000,
+      "last_ns": 1791973417477184000,
+      "native_gap_end_after_capture_ms": 7615.907145
+    }
+  },
+  "all_target_rx_events": [
+    {
+      "id": 130110,
+      "time_ns": 1885641618690,
+      "data_seq": 2865,
+      "channel_seq": 2591,
+      "status": 1,
+      "base": 2790,
+      "next_channel": 2299,
+      "buffered": 375
+    },
+    {
+      "id": 333800,
+      "time_ns": 1938710113216,
+      "data_seq": 33906,
+      "channel_seq": 2591,
+      "status": 1,
+      "base": 33893,
+      "next_channel": 2345,
+      "buffered": 199
+    },
+    {
+      "id": 542692,
+      "time_ns": 1995587131993,
+      "data_seq": 6755,
+      "channel_seq": 2591,
+      "status": 1,
+      "base": 6750,
+      "next_channel": 3542,
+      "buffered": 14
+    }
+  ]
+}

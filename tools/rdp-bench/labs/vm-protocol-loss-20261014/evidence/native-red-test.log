@@ -1,0 +1,4 @@
+[11:36:04:800] [22578:00005832] [WARN][com.freerdp.core.test.rdpudp] - [rdpudp_fail]: RDP-UDP connection failed: the stream is stuck behind a chunk the server no longer resends
+/bench/native-red-source/libfreerdp/core/test/TestRdpUdp.c:1134: check failed: pump(&ctx)
+[11:35:48:773] [22578:00005832] [INFO][com.freerdp.core.test.rdpudp] - [process_syn_ack]: RDP-UDP connected, protocol version 0x0101, MTU 1232
+FAILED live_peer_can_repair_an_ordered_gap_after_16_seconds

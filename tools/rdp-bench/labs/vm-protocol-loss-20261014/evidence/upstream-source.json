@@ -1,0 +1,35 @@
+{
+  "source_commit": "142434adf715c3f3352c0e6dd7b7ece90244aeec",
+  "files": [
+    {
+      "name": "README.md",
+      "url": "https://raw.githubusercontent.com/OpenThinRdp/openthinrdp/142434adf715c3f3352c0e6dd7b7ece90244aeec/tests/udp-bench/README.md",
+      "sha256": "a9bb651f7cc1fb707b282dd900e4f655d653c7f5752940081de60d237b24da78"
+    },
+    {
+      "name": "session.sh",
+      "url": "https://raw.githubusercontent.com/OpenThinRdp/openthinrdp/142434adf715c3f3352c0e6dd7b7ece90244aeec/tests/udp-bench/session.sh",
+      "sha256": "268f26903ec7f372e37fc6b9ee12ce80fac525fc173c71a8783e41e31ad63526"
+    },
+    {
+      "name": "line.sh",
+      "url": "https://raw.githubusercontent.com/OpenThinRdp/openthinrdp/142434adf715c3f3352c0e6dd7b7ece90244aeec/tests/udp-bench/line.sh",
+      "sha256": "122e76218054d11c458f5cfb43019558ea10322d4035210272bb30a76cd08daa"
+    },
+    {
+      "name": "ramp.sh",
+      "url": "https://raw.githubusercontent.com/OpenThinRdp/openthinrdp/142434adf715c3f3352c0e6dd7b7ece90244aeec/tests/udp-bench/ramp.sh",
+      "sha256": "0da5af9a40be0d8623733801a719a282b83bddd83a5d2259f9a96d33ee112541"
+    },
+    {
+      "name": "load.ps1",
+      "url": "https://raw.githubusercontent.com/OpenThinRdp/openthinrdp/142434adf715c3f3352c0e6dd7b7ece90244aeec/tests/udp-bench/load.ps1",
+      "sha256": "972ff4b0d2fa01d113cec49f823868b9f306dc43bb4c915a4a5c8751fb966ca5"
+    },
+    {
+      "name": "counters.ps1",
+      "url": "https://raw.githubusercontent.com/OpenThinRdp/openthinrdp/142434adf715c3f3352c0e6dd7b7ece90244aeec/tests/udp-bench/counters.ps1",
+      "sha256": "2e8e65a16dd30c06c8154d14ca8ebeb07d2bd91f0c272a558bd6720df7661b46"
+    }
+  ]
+}

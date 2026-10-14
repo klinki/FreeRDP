@@ -3,7 +3,8 @@
 param([Parameter(Mandatory=$true)][string]$OutFile,
       [ValidateRange(1,86400)][int]$Seconds=600,
       [ValidateRange(1,60)][int]$Interval=10,
-      [string]$Instance='')
+      [string]$Instance='',
+      [string]$StopFile='')
 $ErrorActionPreference='Stop'
 $definitions=@(
  @{metric='server_udp_bandwidth';object='RemoteFX Network';counter='Current UDP Bandwidth';unit='upstream kbps label; raw cooked counter'},
@@ -41,10 +42,12 @@ $previousTimestamp=$null;$previousTicks=$null;$setCount=0;$errorCount=0
 $pendingErrors=[Collections.Generic.List[string]]::new()
 $cadences=[Collections.Generic.List[double]]::new()
 $terminalError=$null
+$script:requestedStop=$false
 try {
  $metadata=@{type='metadata';schema_version=2;utc=[DateTime]::UtcNow.ToString('o');counter_instance=$Instance;
   interval_s=$Interval;requested_counter_span_s=$Seconds;max_counter_sets=$maxSets;
   sampling_mode='continuous Get-Counter stream; first set is baseline';
+  optional_stop_file=$StopFile;
   collector_sha256=(Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash.ToLower();
   definitions=$definitions;available_sets=$available;discovery_errors=$discoveryErrors;
   notes=@('Server output FPS does not establish physical client display rate.','All per-instance samples are retained; the report rejects ambiguous sessions.','The first set has no rate interval and never contributes cooked values to measured rates.','Raw cooked values, actual sample intervals and nonzero PDH statuses are retained.')}
@@ -86,15 +89,25 @@ try {
    $writer.WriteLine(($row|ConvertTo-Json -Depth 8 -Compress));$writer.Flush()
    $previousTimestamp=$end;$previousTicks=$endTicks
   }
+  # Query disposal must pass through finally so the caller receives a flushed
+  # collector_end receipt. Check after retaining the set/error that arrived.
+  if($StopFile -and (Test-Path -LiteralPath $StopFile)) {
+   $script:requestedStop=$true
+   throw [OperationCanceledException]::new('RdpBench requested collector stop')
+  }
  }
 } catch {
- $terminalError=$_.Exception.Message
- $writer.WriteLine((@{type='collector_error';schema_version=2;utc=[DateTime]::UtcNow.ToString('o');error=$terminalError;terminal=$true}|ConvertTo-Json -Compress));$writer.Flush()
- throw
+ if(!$script:requestedStop) {
+  $terminalError=$_.Exception.Message
+  $writer.WriteLine((@{type='collector_error';schema_version=2;utc=[DateTime]::UtcNow.ToString('o');error=$terminalError;terminal=$true}|ConvertTo-Json -Compress));$writer.Flush()
+  throw
+ }
 } finally {
  $cadenceSummary=if($cadences.Count) {$cadences|Measure-Object -Minimum -Maximum -Average} else {$null}
  $final=@{type='collector_end';schema_version=2;utc=[DateTime]::UtcNow.ToString('o');
   observed_counter_sets=$setCount;expected_counter_sets=$maxSets;nonterminal_errors=$errorCount;terminal_error=$terminalError;
+  requested_stop=$script:requestedStop;
+  stop_reason=if($script:requestedStop) {'REQUESTED_STOP'} elseif($terminalError) {'TERMINAL_ERROR'} else {'MAX_SAMPLES'};
   pending_errors=@($pendingErrors.ToArray());elapsed_s=$watch.Elapsed.TotalSeconds;
   cadence=@{n=$cadences.Count;min_s=if($cadenceSummary) {$cadenceSummary.Minimum} else {$null};
    max_s=if($cadenceSummary) {$cadenceSummary.Maximum} else {$null};mean_s=if($cadenceSummary) {$cadenceSummary.Average} else {$null}}}

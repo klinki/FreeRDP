@@ -1,0 +1,255 @@
+{
+  "schema": "freerdp.protocol_final_validation",
+  "version": 1,
+  "utc": "2026-10-14T13:55:13.912103+00:00",
+  "gates": [
+    {
+      "name": "upstream_selector_and_control",
+      "passed_tests": 43,
+      "log": "upstream-stop-tests.log",
+      "log_sha256": "8c850cdb85b3ce09a777c4eef411413cb024e383155a6809dc3ecd68039e725f",
+      "outcome": "PASS"
+    },
+    {
+      "name": "protocol_report",
+      "passed_tests": 9,
+      "log": "protocol-report-tests-terminal-final.log",
+      "log_sha256": "55df81c03b1fc09a739803668e8b10b1a1cd87ac7e716666dddb1c968f87bb76",
+      "outcome": "PASS"
+    },
+    {
+      "name": "phase_comparison",
+      "passed_tests": 13,
+      "log": "phase-comparison-tests-final-preserved-raw.log",
+      "log_sha256": "46c74e95e49409273cff5b0d474bb3f780e57977a4af5da2071b99cd4731838f",
+      "outcome": "PASS"
+    },
+    {
+      "name": "header_analyzer",
+      "passed_tests": 17,
+      "log": "header-analyzer-tests-final.log",
+      "log_sha256": "9dc643229373b931825a3a7c9965099f844e48cce8c5fa034d23c590b44f2e4a",
+      "outcome": "PASS"
+    },
+    {
+      "name": "compact_analyzer",
+      "passed_tests": 9,
+      "log": "compact-analyzer-tests-final.log",
+      "log_sha256": "43afb429fdd1be9baec7669820d7d93894604c92c675327428c48e407517b6f5",
+      "outcome": "PASS"
+    }
+  ],
+  "native_green": {
+    "scope": "CI-only native regression build; separate from measured production runtimes",
+    "kind": "fixed",
+    "source_tree_sha256": "715596a8c877ebadd9bc10de4b939f151c09e17aa8ce72ed865bac3dd34e11b7",
+    "cmake_flags": [
+      "-G",
+      "Ninja",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DBUILD_SHARED_LIBS=ON",
+      "-DWITH_CLIENT=ON",
+      "-DWITH_X11=ON",
+      "-DWITH_CLIENT_SDL=OFF",
+      "-DWITH_WAYLAND=OFF",
+      "-DWITH_SERVER=OFF",
+      "-DWITH_SAMPLE=OFF",
+      "-DWITH_OPENSSL=ON",
+      "-DWITH_FFMPEG=OFF",
+      "-DWITH_OPENH264=OFF",
+      "-DWITH_OPUS=OFF",
+      "-DWITH_GFX_AV1=OFF",
+      "-DWITH_AOM=OFF",
+      "-DWITH_DAV1D=OFF",
+      "-DWITH_YUV=OFF",
+      "-DWITH_JPEG=OFF",
+      "-DWITH_CUPS=OFF",
+      "-DWITH_PCSC=OFF",
+      "-DWITH_KRB5=OFF",
+      "-DWITH_PULSE=OFF",
+      "-DWITH_MANPAGES=OFF",
+      "-DWITH_DOCUMENTATION=OFF",
+      "-DWITH_CCACHE=OFF",
+      "-DWITH_DEBUG_ALL=OFF",
+      "-DWITH_SWSCALE=ON",
+      "-DWITH_FUSE=OFF",
+      "-DWITH_RDPEUDP=ON",
+      "-DWITH_RDP_BENCH=OFF",
+      "-DBUILD_TESTING=OFF",
+      "-DBUILD_TESTING_INTERNAL=ON"
+    ],
+    "started_unix_s": 1791978794.506832,
+    "configure": {
+      "exit_code": 0,
+      "log": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-fixed-configure.log",
+      "sha256": "1ba0c4cb1ee6a834b7fcd8bd8a0100627918523fad604a2e1f26e83fe927287a"
+    },
+    "build": {
+      "exit_code": 0,
+      "log": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-fixed-build.log",
+      "sha256": "22ac6b5f82004b88721575ff1dd89edad85c60e035e914a2051b6c33b522134b"
+    },
+    "test": {
+      "exit_code": 0,
+      "log": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-fixed-test.log",
+      "sha256": "3264375b71a50584d04a02990f2b0b5eb05ed9126289959eb334a29cd81c71c4"
+    },
+    "outcome": "PASS",
+    "completed_unix_s": 1791978877.2362702,
+    "passed_udp_cases": 19
+  },
+  "native_red_expected_failure": {
+    "scope": "unchanged recovery policy; new regression expected RED",
+    "started_unix_s": 1791977713.211853,
+    "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-red-source",
+    "source_rdpudp_sha256": "9884526390aba0142b236e8f781ad85e7f2746a58d2c32bf0cca49f4e0aabeef",
+    "source_test_sha256": "d9a16c9fe0e6ef2538f68cfd7c39b09fb710f8a49ec18cc02481048227db9ca9",
+    "cmake_flags": [
+      "-G",
+      "Ninja",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DBUILD_SHARED_LIBS=ON",
+      "-DWITH_CLIENT=ON",
+      "-DWITH_X11=ON",
+      "-DWITH_CLIENT_SDL=OFF",
+      "-DWITH_WAYLAND=OFF",
+      "-DWITH_SERVER=OFF",
+      "-DWITH_SAMPLE=OFF",
+      "-DWITH_OPENSSL=ON",
+      "-DWITH_FFMPEG=OFF",
+      "-DWITH_OPENH264=OFF",
+      "-DWITH_OPUS=OFF",
+      "-DWITH_GFX_AV1=OFF",
+      "-DWITH_AOM=OFF",
+      "-DWITH_DAV1D=OFF",
+      "-DWITH_YUV=OFF",
+      "-DWITH_JPEG=OFF",
+      "-DWITH_CUPS=OFF",
+      "-DWITH_PCSC=OFF",
+      "-DWITH_KRB5=OFF",
+      "-DWITH_PULSE=OFF",
+      "-DWITH_MANPAGES=OFF",
+      "-DWITH_DOCUMENTATION=OFF",
+      "-DWITH_CCACHE=OFF",
+      "-DWITH_DEBUG_ALL=OFF",
+      "-DWITH_SWSCALE=ON",
+      "-DWITH_FUSE=OFF",
+      "-DWITH_RDPEUDP=ON",
+      "-DWITH_RDP_BENCH=OFF",
+      "-DBUILD_TESTING=OFF",
+      "-DBUILD_TESTING_INTERNAL=ON"
+    ],
+    "configure": {
+      "exit_code": 0,
+      "log": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-red-configure.log",
+      "sha256": "0282e8f6ad7f6bd0cb958fc88301fbaf30d72c77db815224980798c478f66e29"
+    },
+    "build": {
+      "exit_code": 0,
+      "log": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-red-build.log",
+      "sha256": "e2602e717af903283bde240d51a25d133ce36ffb596a51c9ea5502c9415d9995"
+    },
+    "test": {
+      "exit_code": 255,
+      "log": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-red-test.log",
+      "sha256": "b2b19652379b3caf5f19778bb4c62d926746d956d49cef19e847929456e99f3c"
+    },
+    "expected_red_observed": true,
+    "completed_unix_s": 1791977764.879114
+  },
+  "new_production_rows": 40,
+  "completed": 34,
+  "session_failures": 6,
+  "diagnostic_trials": 3,
+  "auth_only_cancelled_startups": 1,
+  "descriptive_pairs": 24,
+  "phase_audits": {
+    "baseline": {
+      "planned": 16,
+      "survived_120s": 13,
+      "session_ended": 3,
+      "source_qualified": 16,
+      "artifact_issues": 0,
+      "raw_provider_errors": 4,
+      "admitted_phase_provider_errors": 0,
+      "original_process_bound_phase_provider_errors": 1,
+      "provider_error_unknown_trials": 0,
+      "missing_collector_footers": 0,
+      "graceful_collector_timeouts": 0,
+      "known_fallback_requests": 0,
+      "unknown_collector_stop_receipts": 0
+    },
+    "fixed": {
+      "planned": 16,
+      "survived_120s": 15,
+      "session_ended": 1,
+      "source_qualified": 16,
+      "artifact_issues": 0,
+      "raw_provider_errors": 1,
+      "admitted_phase_provider_errors": 0,
+      "original_process_bound_phase_provider_errors": 0,
+      "provider_error_unknown_trials": 0,
+      "missing_collector_footers": 0,
+      "graceful_collector_timeouts": 1,
+      "known_fallback_requests": 1,
+      "unknown_collector_stop_receipts": 0
+    },
+    "fixed_all": {
+      "planned": 8,
+      "survived_120s": 6,
+      "session_ended": 2,
+      "source_qualified": 8,
+      "artifact_issues": 0,
+      "raw_provider_errors": 2,
+      "admitted_phase_provider_errors": 0,
+      "original_process_bound_phase_provider_errors": 0,
+      "provider_error_unknown_trials": 0,
+      "missing_collector_footers": 0,
+      "graceful_collector_timeouts": 0,
+      "known_fallback_requests": 0,
+      "unknown_collector_stop_receipts": 0
+    },
+    "prior_all": {
+      "planned": 8,
+      "survived_120s": 6,
+      "session_ended": 2,
+      "source_qualified": 8,
+      "artifact_issues": 0,
+      "raw_provider_errors": 1,
+      "admitted_phase_provider_errors": 0,
+      "original_process_bound_phase_provider_errors": 0,
+      "provider_error_unknown_trials": 0,
+      "missing_collector_footers": 8,
+      "graceful_collector_timeouts": 0,
+      "known_fallback_requests": 0,
+      "unknown_collector_stop_receipts": 8
+    }
+  },
+  "source_qualification": "40/40",
+  "independent_audit": "recomputed40visualchains/cutoffs;4blackteardownframesexcluded;source/controlidentity,24pairs,nullmetricsandcleanupverified",
+  "cleanup": {
+    "container_absent": true,
+    "power_assertion_absent": true,
+    "ssh_socket_absent": true,
+    "network_removed": true,
+    "network_cleanup_keys": [
+      "schema_version",
+      "utc",
+      "outcome",
+      "before",
+      "restored_rp_filter",
+      "restored_interface_mtu"
+    ],
+    "guest_owned_tasks_absent": true,
+    "guest_owned_processes_absent": true
+  },
+  "native_fix_commit": "49fcbb72c0b6fbfdb00822f98a9ff3697af6a1ab",
+  "full_matrix_sha256": "b243a7ebc9494ab7d8541aa126aee2292df1b07642bf43b5f83fb36ea7e5386d",
+  "unknown_metrics": [
+    "verified_application_goodput",
+    "crc_integrity",
+    "physical_client_fps",
+    "transport_rtt_p95_p99",
+    "input_to_display_p95_p99"
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "label": "all70",
+  "gap_wall_ns": [
+    1791973984377803223,
+    1791973985197593265
+  ],
+  "captures": {
+    "offered": {
+      "first_ns": 1791973879047871000,
+      "last_ns": 1791973999585374000,
+      "native_gap_end_after_capture_ms": -14387.780735
+    },
+    "received": {
+      "first_ns": 1791973879146686000,
+      "last_ns": 1791973999726933000,
+      "native_gap_end_after_capture_ms": -14529.339735
+    }
+  },
+  "all_target_rx_events": [
+    {
+      "id": 12865,
+      "time_ns": 2446400611749,
+      "data_seq": 42588,
+      "channel_seq": 39729,
+      "status": 1,
+      "base": 42556,
+      "next_channel": 39697,
+      "buffered": 24
+    },
+    {
+      "id": 197949,
+      "time_ns": 2475965199180,
+      "data_seq": 26807,
+      "channel_seq": 39729,
+      "status": 1,
+      "base": 26740,
+      "next_channel": 39350,
+      "buffered": 421
+    },
+    {
+      "id": 402114,
+      "time_ns": 2515237493241,
+      "data_seq": 59758,
+      "channel_seq": 39729,
+      "status": 1,
+      "base": 59476,
+      "next_channel": 39278,
+      "buffered": 476
+    },
+    {
+      "id": 609257,
+      "time_ns": 2555692647093,
+      "data_seq": 28936,
+      "channel_seq": 39729,
+      "status": 1,
+      "base": 28636,
+      "next_channel": 40028,
+      "buffered": 482
+    },
+    {
+      "id": 770822,
+      "time_ns": 2579023360396,
+      "data_seq": 21231,
+      "channel_seq": 39729,
+      "status": 1,
+      "base": 21235,
+      "next_channel": 39733,
+      "buffered": 12
+    }
+  ]
+}

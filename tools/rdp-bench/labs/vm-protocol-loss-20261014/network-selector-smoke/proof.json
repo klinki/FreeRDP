@@ -1,0 +1,897 @@
+{
+  "schema": "freerdp.protocol_selector_smoke",
+  "version": 1,
+  "container_hostname": "e494d0ab1cec",
+  "started_utc": "2026-10-14T10:02:34.710021+00:00",
+  "finished_utc": "2026-10-14T10:02:35.027381+00:00",
+  "helper_sha256": "a2d08d4e8fe5fb43f7f70e7c2589aa87097ff2f7508a1a06007fc4960f5d69be",
+  "scope": "synthetic IPv4 protocol headers over an owned isolated veth; no VM traffic or RDP performance measurement",
+  "temporary_interfaces": {
+    "bp_ing_a": {
+      "ifindex": 19,
+      "link": "bp_rx_a",
+      "ifname": "bp_ing_a",
+      "flags": [
+        "NO-CARRIER",
+        "BROADCAST",
+        "MULTICAST",
+        "UP",
+        "M-DOWN"
+      ],
+      "mtu": 1500,
+      "qdisc": "noqueue",
+      "operstate": "LOWERLAYERDOWN",
+      "linkmode": "DEFAULT",
+      "group": "default",
+      "txqlen": 1000,
+      "link_type": "ether",
+      "address": "aa:8a:26:3f:7c:76",
+      "broadcast": "ff:ff:ff:ff:ff:ff",
+      "ifalias": "freerdp-classifier-proof-20261014"
+    },
+    "bp_rx_a": {
+      "ifindex": 18,
+      "link": "bp_ing_a",
+      "ifname": "bp_rx_a",
+      "flags": [
+        "BROADCAST",
+        "MULTICAST",
+        "UP",
+        "LOWER_UP"
+      ],
+      "mtu": 1500,
+      "qdisc": "noqueue",
+      "operstate": "UP",
+      "linkmode": "DEFAULT",
+      "group": "default",
+      "txqlen": 1000,
+      "link_type": "ether",
+      "address": "d6:ff:85:10:51:e9",
+      "broadcast": "ff:ff:ff:ff:ff:ff",
+      "ifalias": "freerdp-classifier-proof-20261014"
+    }
+  },
+  "owner": "freerdp-classifier-proof-20261014",
+  "records": [
+    {
+      "loss_protocol": "all",
+      "configured_loss_percent": 100,
+      "sent": [
+        {
+          "protocol": 1,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 600,
+          "id": 2
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 600,
+          "id": 2
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 600,
+          "id": 2
+        }
+      ],
+      "observed": [],
+      "netem_counters": {
+        "large": {
+          "transmitted_packets": 0,
+          "dropped_packets": 6,
+          "backlog_packets": 0,
+          "transmitted_bytes": 0,
+          "drop_fraction_completed_attempts": 1.0,
+          "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+        },
+        "small": {
+          "transmitted_packets": 0,
+          "dropped_packets": 6,
+          "backlog_packets": 0,
+          "transmitted_bytes": 0,
+          "drop_fraction_completed_attempts": 1.0,
+          "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+        }
+      },
+      "bypass_counters": {
+        "enabled": false,
+        "classid": null,
+        "qdisc_kind": null,
+        "transmitted_packets": null,
+        "dropped_packets": null,
+        "backlog_packets": null,
+        "transmitted_bytes": null,
+        "scope": "not used; all IPv4 from VM is selected by the legacy method"
+      },
+      "raw_tc_qdiscs": "[{\"kind\":\"prio\",\"handle\":\"1:\",\"root\":true,\"refcnt\":11,\"options\":{\"bands\":3,\"priomap\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"multiqueue\":false},\"bytes\":90,\"packets\":1,\"drops\":12,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0},{\"kind\":\"netem\",\"handle\":\"10:\",\"parent\":\"1:1\",\"options\":{\"limit\":100000,\"delay\":{\"delay\":0.001,\"jitter\":0,\"correlation\":0},\"loss-random\":{\"loss\":1,\"correlation\":0},\"reorder\":{\"reorder\":0.7,\"correlation\":0},\"ecn\":false,\"gap\":1},\"bytes\":0,\"packets\":0,\"drops\":6,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0},{\"kind\":\"netem\",\"handle\":\"20:\",\"parent\":\"1:2\",\"options\":{\"limit\":100000,\"loss-random\":{\"loss\":1,\"correlation\":0},\"ecn\":false,\"gap\":0},\"bytes\":0,\"packets\":0,\"drops\":6,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0}]\n",
+      "raw_tc_filters": "[{\"protocol\":\"ip\",\"pref\":1,\"kind\":\"u32\",\"chain\":0},{\"protocol\":\"ip\",\"pref\":1,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"800:\",\"ht_divisor\":1}},{\"protocol\":\"ip\",\"pref\":1,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"800::800\",\"order\":2048,\"key_ht\":\"800\",\"bkt\":\"0\",\"flowid\":\"1:2\",\"not_in_hw\":true,\"rule_hit\":12,\"success\":6,\"match\":{\"value\":\"0\",\"mask\":\"fe00\",\"offmask\":\"\",\"off\":0},\"success\":6}},{\"protocol\":\"ip\",\"pref\":2,\"kind\":\"u32\",\"chain\":0},{\"protocol\":\"ip\",\"pref\":2,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"801:\",\"ht_divisor\":1}},{\"protocol\":\"ip\",\"pref\":2,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"801::800\",\"order\":2048,\"key_ht\":\"801\",\"bkt\":\"0\",\"flowid\":\"1:1\",\"not_in_hw\":true,\"rule_hit\":6,\"success\":6,\"match\":{\"value\":\"0\",\"mask\":\"0\",\"offmask\":\"\",\"off\":0},\"success\":6}}]\n",
+      "parsed_tc_filters": [
+        {
+          "protocol": "ip",
+          "pref": 1,
+          "kind": "u32",
+          "chain": 0
+        },
+        {
+          "protocol": "ip",
+          "pref": 1,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "800:",
+            "ht_divisor": 1
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 1,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "800::800",
+            "order": 2048,
+            "key_ht": "800",
+            "bkt": "0",
+            "flowid": "1:2",
+            "not_in_hw": true,
+            "rule_hit": 12,
+            "success": [
+              6,
+              6
+            ],
+            "match": {
+              "value": "0",
+              "mask": "fe00",
+              "offmask": "",
+              "off": 0
+            }
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 2,
+          "kind": "u32",
+          "chain": 0
+        },
+        {
+          "protocol": "ip",
+          "pref": 2,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "801:",
+            "ht_divisor": 1
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 2,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "801::800",
+            "order": 2048,
+            "key_ht": "801",
+            "bkt": "0",
+            "flowid": "1:1",
+            "not_in_hw": true,
+            "rule_hit": 6,
+            "success": [
+              6,
+              6
+            ],
+            "match": {
+              "value": "0",
+              "mask": "0",
+              "offmask": "",
+              "off": 0
+            }
+          }
+        }
+      ],
+      "canonical_matches": [
+        {
+          "priority": 1,
+          "flowid": "1:2",
+          "words": [
+            [
+              0,
+              65024,
+              0
+            ]
+          ]
+        },
+        {
+          "priority": 2,
+          "flowid": "1:1",
+          "words": [
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        }
+      ],
+      "duplicate_key_diagnostic": "iproute2 repeats match keys for selector words and success keys for per-word counters; preserved by object_pairs_hook",
+      "guard_passed": true,
+      "reconciled": true
+    },
+    {
+      "loss_protocol": "tcp",
+      "configured_loss_percent": 100,
+      "sent": [
+        {
+          "protocol": 1,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 600,
+          "id": 2
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 600,
+          "id": 2
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 600,
+          "id": 2
+        }
+      ],
+      "observed": [
+        {
+          "protocol": 1,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 600,
+          "id": 2
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 600,
+          "id": 2
+        }
+      ],
+      "netem_counters": {
+        "large": {
+          "transmitted_packets": 0,
+          "dropped_packets": 2,
+          "backlog_packets": 0,
+          "transmitted_bytes": 0,
+          "drop_fraction_completed_attempts": 1.0,
+          "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+        },
+        "small": {
+          "transmitted_packets": 0,
+          "dropped_packets": 2,
+          "backlog_packets": 0,
+          "transmitted_bytes": 0,
+          "drop_fraction_completed_attempts": 1.0,
+          "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+        }
+      },
+      "bypass_counters": {
+        "enabled": true,
+        "classid": "1:3",
+        "qdisc_kind": "pfifo",
+        "transmitted_packets": 8,
+        "dropped_packets": 0,
+        "backlog_packets": 0,
+        "transmitted_bytes": 2912,
+        "scope": "nonselected IPv4 from VM; clean FIFO, no netem loss/delay/reorder"
+      },
+      "raw_tc_qdiscs": "[{\"kind\":\"prio\",\"handle\":\"1:\",\"root\":true,\"refcnt\":11,\"options\":{\"bands\":3,\"priomap\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"multiqueue\":false},\"bytes\":2912,\"packets\":8,\"drops\":4,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0},{\"kind\":\"pfifo\",\"handle\":\"30:\",\"parent\":\"1:3\",\"options\":{\"limit\":100000},\"bytes\":2912,\"packets\":8,\"drops\":0,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0},{\"kind\":\"netem\",\"handle\":\"10:\",\"parent\":\"1:1\",\"options\":{\"limit\":100000,\"delay\":{\"delay\":0.001,\"jitter\":0,\"correlation\":0},\"loss-random\":{\"loss\":1,\"correlation\":0},\"reorder\":{\"reorder\":0.7,\"correlation\":0},\"ecn\":false,\"gap\":1},\"bytes\":0,\"packets\":0,\"drops\":2,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0},{\"kind\":\"netem\",\"handle\":\"20:\",\"parent\":\"1:2\",\"options\":{\"limit\":100000,\"loss-random\":{\"loss\":1,\"correlation\":0},\"ecn\":false,\"gap\":0},\"bytes\":0,\"packets\":0,\"drops\":2,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0}]\n",
+      "raw_tc_filters": "[{\"protocol\":\"ip\",\"pref\":1,\"kind\":\"u32\",\"chain\":0},{\"protocol\":\"ip\",\"pref\":1,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"800:\",\"ht_divisor\":1}},{\"protocol\":\"ip\",\"pref\":1,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"800::800\",\"order\":2048,\"key_ht\":\"800\",\"bkt\":\"0\",\"flowid\":\"1:2\",\"not_in_hw\":true,\"rule_hit\":12,\"success\":2,\"match\":{\"value\":\"60000\",\"mask\":\"ff0000\",\"offmask\":\"\",\"off\":8},\"success\":4,\"match\":{\"value\":\"0\",\"mask\":\"fe00\",\"offmask\":\"\",\"off\":0},\"success\":2}},{\"protocol\":\"ip\",\"pref\":2,\"kind\":\"u32\",\"chain\":0},{\"protocol\":\"ip\",\"pref\":2,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"801:\",\"ht_divisor\":1}},{\"protocol\":\"ip\",\"pref\":2,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"801::800\",\"order\":2048,\"key_ht\":\"801\",\"bkt\":\"0\",\"flowid\":\"1:1\",\"not_in_hw\":true,\"rule_hit\":10,\"success\":2,\"match\":{\"value\":\"60000\",\"mask\":\"ff0000\",\"offmask\":\"\",\"off\":8},\"success\":2}},{\"protocol\":\"ip\",\"pref\":3,\"kind\":\"u32\",\"chain\":0},{\"protocol\":\"ip\",\"pref\":3,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"802:\",\"ht_divisor\":1}},{\"protocol\":\"ip\",\"pref\":3,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"802::800\",\"order\":2048,\"key_ht\":\"802\",\"bkt\":\"0\",\"flowid\":\"1:3\",\"not_in_hw\":true,\"rule_hit\":8,\"success\":8,\"match\":{\"value\":\"0\",\"mask\":\"0\",\"offmask\":\"\",\"off\":0},\"success\":8}}]\n",
+      "parsed_tc_filters": [
+        {
+          "protocol": "ip",
+          "pref": 1,
+          "kind": "u32",
+          "chain": 0
+        },
+        {
+          "protocol": "ip",
+          "pref": 1,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "800:",
+            "ht_divisor": 1
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 1,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "800::800",
+            "order": 2048,
+            "key_ht": "800",
+            "bkt": "0",
+            "flowid": "1:2",
+            "not_in_hw": true,
+            "rule_hit": 12,
+            "success": [
+              2,
+              4,
+              2
+            ],
+            "match": [
+              {
+                "value": "60000",
+                "mask": "ff0000",
+                "offmask": "",
+                "off": 8
+              },
+              {
+                "value": "0",
+                "mask": "fe00",
+                "offmask": "",
+                "off": 0
+              }
+            ]
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 2,
+          "kind": "u32",
+          "chain": 0
+        },
+        {
+          "protocol": "ip",
+          "pref": 2,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "801:",
+            "ht_divisor": 1
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 2,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "801::800",
+            "order": 2048,
+            "key_ht": "801",
+            "bkt": "0",
+            "flowid": "1:1",
+            "not_in_hw": true,
+            "rule_hit": 10,
+            "success": [
+              2,
+              2
+            ],
+            "match": {
+              "value": "60000",
+              "mask": "ff0000",
+              "offmask": "",
+              "off": 8
+            }
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 3,
+          "kind": "u32",
+          "chain": 0
+        },
+        {
+          "protocol": "ip",
+          "pref": 3,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "802:",
+            "ht_divisor": 1
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 3,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "802::800",
+            "order": 2048,
+            "key_ht": "802",
+            "bkt": "0",
+            "flowid": "1:3",
+            "not_in_hw": true,
+            "rule_hit": 8,
+            "success": [
+              8,
+              8
+            ],
+            "match": {
+              "value": "0",
+              "mask": "0",
+              "offmask": "",
+              "off": 0
+            }
+          }
+        }
+      ],
+      "canonical_matches": [
+        {
+          "priority": 1,
+          "flowid": "1:2",
+          "words": [
+            [
+              0,
+              65024,
+              0
+            ],
+            [
+              393216,
+              16711680,
+              8
+            ]
+          ]
+        },
+        {
+          "priority": 2,
+          "flowid": "1:1",
+          "words": [
+            [
+              393216,
+              16711680,
+              8
+            ]
+          ]
+        },
+        {
+          "priority": 3,
+          "flowid": "1:3",
+          "words": [
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        }
+      ],
+      "duplicate_key_diagnostic": "iproute2 repeats match keys for selector words and success keys for per-word counters; preserved by object_pairs_hook",
+      "guard_passed": true,
+      "reconciled": true
+    },
+    {
+      "loss_protocol": "udp",
+      "configured_loss_percent": 100,
+      "sent": [
+        {
+          "protocol": 1,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 600,
+          "id": 2
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 600,
+          "id": 2
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 17,
+          "ipv4_length": 600,
+          "id": 2
+        }
+      ],
+      "observed": [
+        {
+          "protocol": 1,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 1,
+          "ipv4_length": 600,
+          "id": 2
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 100,
+          "id": 1
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 100,
+          "id": 2
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 600,
+          "id": 1
+        },
+        {
+          "protocol": 6,
+          "ipv4_length": 600,
+          "id": 2
+        }
+      ],
+      "netem_counters": {
+        "large": {
+          "transmitted_packets": 0,
+          "dropped_packets": 2,
+          "backlog_packets": 0,
+          "transmitted_bytes": 0,
+          "drop_fraction_completed_attempts": 1.0,
+          "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+        },
+        "small": {
+          "transmitted_packets": 0,
+          "dropped_packets": 2,
+          "backlog_packets": 0,
+          "transmitted_bytes": 0,
+          "drop_fraction_completed_attempts": 1.0,
+          "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+        }
+      },
+      "bypass_counters": {
+        "enabled": true,
+        "classid": "1:3",
+        "qdisc_kind": "pfifo",
+        "transmitted_packets": 8,
+        "dropped_packets": 0,
+        "backlog_packets": 0,
+        "transmitted_bytes": 2912,
+        "scope": "nonselected IPv4 from VM; clean FIFO, no netem loss/delay/reorder"
+      },
+      "raw_tc_qdiscs": "[{\"kind\":\"prio\",\"handle\":\"1:\",\"root\":true,\"refcnt\":11,\"options\":{\"bands\":3,\"priomap\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"multiqueue\":false},\"bytes\":2912,\"packets\":8,\"drops\":4,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0},{\"kind\":\"pfifo\",\"handle\":\"30:\",\"parent\":\"1:3\",\"options\":{\"limit\":100000},\"bytes\":2912,\"packets\":8,\"drops\":0,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0},{\"kind\":\"netem\",\"handle\":\"10:\",\"parent\":\"1:1\",\"options\":{\"limit\":100000,\"delay\":{\"delay\":0.001,\"jitter\":0,\"correlation\":0},\"loss-random\":{\"loss\":1,\"correlation\":0},\"reorder\":{\"reorder\":0.7,\"correlation\":0},\"ecn\":false,\"gap\":1},\"bytes\":0,\"packets\":0,\"drops\":2,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0},{\"kind\":\"netem\",\"handle\":\"20:\",\"parent\":\"1:2\",\"options\":{\"limit\":100000,\"loss-random\":{\"loss\":1,\"correlation\":0},\"ecn\":false,\"gap\":0},\"bytes\":0,\"packets\":0,\"drops\":2,\"overlimits\":0,\"requeues\":0,\"backlog\":0,\"qlen\":0}]\n",
+      "raw_tc_filters": "[{\"protocol\":\"ip\",\"pref\":1,\"kind\":\"u32\",\"chain\":0},{\"protocol\":\"ip\",\"pref\":1,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"800:\",\"ht_divisor\":1}},{\"protocol\":\"ip\",\"pref\":1,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"800::800\",\"order\":2048,\"key_ht\":\"800\",\"bkt\":\"0\",\"flowid\":\"1:2\",\"not_in_hw\":true,\"rule_hit\":12,\"success\":2,\"match\":{\"value\":\"110000\",\"mask\":\"ff0000\",\"offmask\":\"\",\"off\":8},\"success\":4,\"match\":{\"value\":\"0\",\"mask\":\"fe00\",\"offmask\":\"\",\"off\":0},\"success\":2}},{\"protocol\":\"ip\",\"pref\":2,\"kind\":\"u32\",\"chain\":0},{\"protocol\":\"ip\",\"pref\":2,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"801:\",\"ht_divisor\":1}},{\"protocol\":\"ip\",\"pref\":2,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"801::800\",\"order\":2048,\"key_ht\":\"801\",\"bkt\":\"0\",\"flowid\":\"1:1\",\"not_in_hw\":true,\"rule_hit\":10,\"success\":2,\"match\":{\"value\":\"110000\",\"mask\":\"ff0000\",\"offmask\":\"\",\"off\":8},\"success\":2}},{\"protocol\":\"ip\",\"pref\":3,\"kind\":\"u32\",\"chain\":0},{\"protocol\":\"ip\",\"pref\":3,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"802:\",\"ht_divisor\":1}},{\"protocol\":\"ip\",\"pref\":3,\"kind\":\"u32\",\"chain\":0,\"options\":{\"fh\":\"802::800\",\"order\":2048,\"key_ht\":\"802\",\"bkt\":\"0\",\"flowid\":\"1:3\",\"not_in_hw\":true,\"rule_hit\":8,\"success\":8,\"match\":{\"value\":\"0\",\"mask\":\"0\",\"offmask\":\"\",\"off\":0},\"success\":8}}]\n",
+      "parsed_tc_filters": [
+        {
+          "protocol": "ip",
+          "pref": 1,
+          "kind": "u32",
+          "chain": 0
+        },
+        {
+          "protocol": "ip",
+          "pref": 1,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "800:",
+            "ht_divisor": 1
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 1,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "800::800",
+            "order": 2048,
+            "key_ht": "800",
+            "bkt": "0",
+            "flowid": "1:2",
+            "not_in_hw": true,
+            "rule_hit": 12,
+            "success": [
+              2,
+              4,
+              2
+            ],
+            "match": [
+              {
+                "value": "110000",
+                "mask": "ff0000",
+                "offmask": "",
+                "off": 8
+              },
+              {
+                "value": "0",
+                "mask": "fe00",
+                "offmask": "",
+                "off": 0
+              }
+            ]
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 2,
+          "kind": "u32",
+          "chain": 0
+        },
+        {
+          "protocol": "ip",
+          "pref": 2,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "801:",
+            "ht_divisor": 1
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 2,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "801::800",
+            "order": 2048,
+            "key_ht": "801",
+            "bkt": "0",
+            "flowid": "1:1",
+            "not_in_hw": true,
+            "rule_hit": 10,
+            "success": [
+              2,
+              2
+            ],
+            "match": {
+              "value": "110000",
+              "mask": "ff0000",
+              "offmask": "",
+              "off": 8
+            }
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 3,
+          "kind": "u32",
+          "chain": 0
+        },
+        {
+          "protocol": "ip",
+          "pref": 3,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "802:",
+            "ht_divisor": 1
+          }
+        },
+        {
+          "protocol": "ip",
+          "pref": 3,
+          "kind": "u32",
+          "chain": 0,
+          "options": {
+            "fh": "802::800",
+            "order": 2048,
+            "key_ht": "802",
+            "bkt": "0",
+            "flowid": "1:3",
+            "not_in_hw": true,
+            "rule_hit": 8,
+            "success": [
+              8,
+              8
+            ],
+            "match": {
+              "value": "0",
+              "mask": "0",
+              "offmask": "",
+              "off": 0
+            }
+          }
+        }
+      ],
+      "canonical_matches": [
+        {
+          "priority": 1,
+          "flowid": "1:2",
+          "words": [
+            [
+              0,
+              65024,
+              0
+            ],
+            [
+              1114112,
+              16711680,
+              8
+            ]
+          ]
+        },
+        {
+          "priority": 2,
+          "flowid": "1:1",
+          "words": [
+            [
+              1114112,
+              16711680,
+              8
+            ]
+          ]
+        },
+        {
+          "priority": 3,
+          "flowid": "1:3",
+          "words": [
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        }
+      ],
+      "duplicate_key_diagnostic": "iproute2 repeats match keys for selector words and success keys for per-word counters; preserved by object_pairs_hook",
+      "guard_passed": true,
+      "reconciled": true
+    }
+  ],
+  "temporary_pair_removed": true,
+  "pass": true
+}

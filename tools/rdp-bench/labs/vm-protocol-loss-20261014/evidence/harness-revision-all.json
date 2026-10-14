@@ -1,0 +1,6 @@
+{
+  "utc": "2026-10-14T10:28:03.756192+00:00",
+  "runner_sha256": "ac1c787578c77ee2e8e7e3bad1e47322782ef3606837ede5bd5d32b6002f0cd1",
+  "scope": "permit separate PR70 all-IPv4 diagnostic; no other behavioral change",
+  "previous": "harness-freeze.json"
+}

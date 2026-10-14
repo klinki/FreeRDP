@@ -157,23 +157,59 @@ class Controller:
             time.sleep(.5)
         raise RuntimeError('workload did not write its PID receipt within the bounded wait')
 
-    def collector(self, seconds, interval):
+    def collector(self, seconds, interval, graceful_stop=False):
         discovery=json.loads((self.output/'session-discovery.json').read_text())
         expression=self.guard() + "if(Test-Path -LiteralPath " + quote(self.path('collector-pid.json')) + ") {throw 'Collector receipt exists'}; "
-        expression += "$self=Get-CimInstance Win32_Process -Filter ('ProcessId='+$PID); @{owner=" + quote(self.state['owner']) + ";pid=$PID;session_id=$self.SessionId;creation_utc=$self.CreationDate.ToUniversalTime().ToString('o');script=" + quote(self.script('Collect-Counters.ps1')) + ";started_utc=[DateTime]::UtcNow.ToString('o')}|ConvertTo-Json -Compress|Set-Content -LiteralPath " + quote(self.path('collector-pid.json')) + " -Encoding UTF8; "
+        stop_file = self.path('collector-stop.request.json') if graceful_stop else None
+        expression += "$self=Get-CimInstance Win32_Process -Filter ('ProcessId='+$PID); @{owner=" + quote(self.state['owner']) + ";pid=$PID;session_id=$self.SessionId;creation_utc=$self.CreationDate.ToUniversalTime().ToString('o');script=" + quote(self.script('Collect-Counters.ps1')) + ";stop_file=" + (quote(stop_file) if stop_file else '$null') + ";started_utc=[DateTime]::UtcNow.ToString('o')}|ConvertTo-Json -Compress|Set-Content -LiteralPath " + quote(self.path('collector-pid.json')) + " -Encoding UTF8; "
         expression += '& ' + quote(self.script('Collect-Counters.ps1')) + ' -OutFile ' + quote(self.path('counters.jsonl')) + ' -Seconds ' + str(seconds) + ' -Interval ' + str(interval)
         if discovery.get('counter_instance'):
             expression += ' -Instance ' + quote(discovery['counter_instance'])
+        if stop_file:
+            expression += ' -StopFile ' + quote(stop_file)
         # The caller owns this foreground SSH invocation; no detached host worker.
         return dict(outcome='COLLECTOR_RETURNED',stdout=self.ps(expression,timeout=seconds+90))
 
+    def stop_collector(self, wait_seconds=15):
+        """Request a footer-producing stop, then retain any bounded fallback need."""
+        expression = self.guard() + "$p=" + quote(self.path('collector-pid.json')) + "; "
+        expression += "if(!(Test-Path -LiteralPath $p)) {@{status='NO_COLLECTOR_RECEIPT'}|ConvertTo-Json -Compress;exit}; $r=Get-Content -LiteralPath $p -Raw|ConvertFrom-Json; "
+        expression += "if(!$r.stop_file) {@{status='LEGACY_NO_STOP_FILE'}|ConvertTo-Json -Compress;exit}; "
+        expression += "if($r.owner -ne " + quote(self.state['owner']) + " -or $r.stop_file -ne " + quote(self.path('collector-stop.request.json')) + ") {throw 'Collector stop ownership differs'}; "
+        expression += "$process=Get-CimInstance Win32_Process -Filter ('ProcessId='+$r.pid); if($process -and ($process.Name -ne 'powershell.exe' -or $process.SessionId -ne $r.session_id -or $process.CreationDate.ToUniversalTime().ToString('o') -ne $r.creation_utc)) {throw 'Collector process identity differs'}; "
+        expression += "if(!(Test-Path -LiteralPath $r.stop_file)) {@{owner=" + quote(self.state['owner']) + ";requested_utc=[DateTime]::UtcNow.ToString('o')}|ConvertTo-Json -Compress|Set-Content -LiteralPath $r.stop_file -Encoding UTF8}; @{status='STOP_REQUESTED';process_present=[bool]$process}|ConvertTo-Json -Compress"
+        receipt = json.loads(self.ps(expression))
+        if not isinstance(receipt, dict) or receipt.get('status') not in ('NO_COLLECTOR_RECEIPT', 'LEGACY_NO_STOP_FILE', 'STOP_REQUESTED'):
+            raise ValueError('malformed collector stop response')
+        if receipt['status'] != 'STOP_REQUESTED':
+            save(self.output / 'collector-stop.json', receipt)
+            return receipt
+        started = time.monotonic(); deadline = started + wait_seconds
+        footer = None
+        while time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            probe = self.guard() + "$p=" + quote(self.path('counters.jsonl')) + ";if(Test-Path -LiteralPath $p) {$last=Get-Content -LiteralPath $p -Tail 1;if($last) {$row=$last|ConvertFrom-Json;if($row.type -eq 'collector_end') {$last}}}"
+            try:
+                value = self.ps(probe, timeout=min(3, max(.2, remaining)))
+                if value:
+                    footer = json.loads(value); break
+            except subprocess.TimeoutExpired:
+                pass
+            time.sleep(min(.25, max(0, deadline - time.monotonic())))
+        receipt.update(status='GRACEFUL_FOOTER_RECEIVED' if footer else 'GRACEFUL_STOP_TIMEOUT',
+                       elapsed_s=time.monotonic()-started, footer=footer,
+                       fallback_owned_cleanup_required=footer is None)
+        save(self.output / 'collector-stop.json', receipt)
+        return receipt
+
     def cleanup(self):
+        graceful = self.stop_collector()
         expression=self.guard() + "$actions=@();$task=Get-ScheduledTask -TaskName " + quote(self.config['task_name']) + " -ErrorAction SilentlyContinue; "
         expression += "if($task) {if($task.Actions.Count -ne 1 -or !$task.Actions[0].Arguments.Contains(" + quote(self.path('load-pid.json')) + ") -or !$task.Actions[0].Arguments.Contains(" + quote(self.state['owner']) + ")) {throw 'Task action differs from owned workload'}; Stop-ScheduledTask -TaskName " + quote(self.config['task_name']) + ";Unregister-ScheduledTask -TaskName " + quote(self.config['task_name']) + " -Confirm:$false;$actions+='owned task removed'}; "
         for name in ('load-pid.json','collector-pid.json'):
             expression += "if(Test-Path -LiteralPath " + quote(self.path(name)) + ") {$r=Get-Content -LiteralPath " + quote(self.path(name)) + " -Raw|ConvertFrom-Json;if($r.owner -ne " + quote(self.state['owner']) + " -or $r.pid -le 0) {throw 'Process receipt ownership differs'}; $p=Get-CimInstance Win32_Process -Filter ('ProcessId='+$r.pid);if($p) {if($p.Name -ne 'powershell.exe' -or $p.SessionId -ne $r.session_id -or $p.CreationDate.ToUniversalTime().ToString('o') -ne $r.creation_utc) {throw 'Process identity differs; refusing to stop'};Stop-Process -Id $r.pid;$actions+='owned " + name + " process stopped'}}; "
         expression += "@{owner=" + quote(self.state['owner']) + ";actions=$actions;utc=[DateTime]::UtcNow.ToString('o')}|ConvertTo-Json -Compress"
-        receipt=json.loads(self.ps(expression));save(self.output/'cleanup.json',receipt)
+        receipt=json.loads(self.ps(expression));receipt['collector_stop']=graceful;save(self.output/'cleanup.json',receipt)
         return receipt
 
     def fetch(self):
@@ -201,15 +237,15 @@ def main():
     parser.add_argument('--task-name',required=True)
     parser.add_argument('--output',type=Path,required=True,help='unique local trial directory')
     commands=parser.add_subparsers(dest='command',required=True)
-    for name in ('prepare','discover','clock','cleanup','fetch'):commands.add_parser(name)
+    for name in ('prepare','discover','clock','cleanup','fetch','stop_collector'):commands.add_parser(name)
     load=commands.add_parser('load');load.add_argument('--seconds',type=int,default=180)
-    collector=commands.add_parser('collector');collector.add_argument('--seconds',type=int,default=180);collector.add_argument('--interval',type=int,default=10)
+    collector=commands.add_parser('collector');collector.add_argument('--seconds',type=int,default=180);collector.add_argument('--interval',type=int,default=10);collector.add_argument('--graceful-stop',action='store_true')
     args=parser.parse_args()
     if hasattr(args,'seconds') and not 1<=args.seconds<=86400:parser.error('seconds must be 1..86400')
     if hasattr(args,'interval') and not 1<=args.interval<=60:parser.error('interval must be 1..60')
     control=Controller(checked_config(args),args.output)
     if args.command in ('load','collector'):
-        result=getattr(control,args.command)(args.seconds,*([args.interval] if args.command=='collector' else []))
+        result=getattr(control,args.command)(args.seconds,*([args.interval,args.graceful_stop] if args.command=='collector' else []))
     else:result=getattr(control,args.command)()
     print(json.dumps(result,indent=2,allow_nan=False))
 

@@ -1,0 +1,41 @@
+{
+  "utc": "2026-10-14T10:03:51.591267+00:00",
+  "files": {
+    "/Users/david/.codex/worktrees/pr13608-flight-bench/FreeRDP/tools/rdp-bench/upstream-method/linux-ingress.py": "a2d08d4e8fe5fb43f7f70e7c2589aa87097ff2f7508a1a06007fc4960f5d69be",
+    "/Users/david/.codex/worktrees/pr13608-flight-bench/FreeRDP/tools/rdp-bench/tests/test_upstream_protocol_ingress.py": "67844bf4cd088a8acc631958e961597a458996d0499a154a1f8ca40849acb90d"
+  },
+  "kernel_proof": {
+    "pass": true,
+    "helper_sha256": "a2d08d4e8fe5fb43f7f70e7c2589aa87097ff2f7508a1a06007fc4960f5d69be",
+    "container_hostname": "e494d0ab1cec",
+    "temporary_pair_removed": true,
+    "records": [
+      {
+        "loss_protocol": "all",
+        "sent": 12,
+        "observed_bypass": 0,
+        "small_drops": 6,
+        "large_drops": 6,
+        "reconciled": true
+      },
+      {
+        "loss_protocol": "tcp",
+        "sent": 12,
+        "observed_bypass": 8,
+        "small_drops": 2,
+        "large_drops": 2,
+        "reconciled": true
+      },
+      {
+        "loss_protocol": "udp",
+        "sent": 12,
+        "observed_bypass": 8,
+        "small_drops": 2,
+        "large_drops": 2,
+        "reconciled": true
+      }
+    ]
+  },
+  "offline_tests": 12,
+  "scope": "no VM traffic; temporary owned veth classifier fixtures only"
+}

@@ -1,0 +1,827 @@
+{
+  "schema": "freerdp.protocol_loss_repository_evidence",
+  "version": 1,
+  "native_fix_commit": "49fcbb72c0b6fbfdb00822f98a9ff3697af6a1ab",
+  "original_lab": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014",
+  "files": [
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/Collect-Counters.ps1",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/Collect-Counters.ps1",
+      "bytes": 7999,
+      "sha256": "ead48e058e04baa804802e9c4cddde5712f72ca9721cab01530ca3f6ca207edc"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/Invoke-Workload.ps1",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/Invoke-Workload.ps1",
+      "bytes": 3086,
+      "sha256": "52959a4330eb3813fe6255160ad592dbf54e4787588f8c6a2ce952b9677de0cd"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/analyze-recovery.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/analyze-recovery.py",
+      "bytes": 46537,
+      "sha256": "3b93c101d4092e022aea59a031e51becbe34648ded803c77e0bef98524a4210c"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/auth-preflight.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/auth-preflight.py",
+      "bytes": 1110,
+      "sha256": "99f7240c64abad5c41720bdac5cbfae4949b492a36f4d4ecbc1991ecd2157fd9"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/build-pr.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/build-pr.py",
+      "bytes": 6093,
+      "sha256": "345bb0baa1c64c8baf889b579ea6b64aa7b8598ffc5264efd9842f53220b2231"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/cleanup-resources.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/cleanup-resources.py",
+      "bytes": 5727,
+      "sha256": "6c2ffa741f205c45bc3d5d4dc235843af8b4daeffd2686be2518028c08d47151"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/collector-stop-smoke.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/collector-stop-smoke.py",
+      "bytes": 2704,
+      "sha256": "ac7c95b0fdeaec07066bce28a543bfcef63b780b45dacbada2914de99148f141"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/compact-recovery.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/compact-recovery.py",
+      "bytes": 17784,
+      "sha256": "65674cd5c337aa2c8746c18f6d37cb89e12cafb5caa79c928283c29a2a9007c4"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/compare-protocol-phases.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/compare-protocol-phases.py",
+      "bytes": 28930,
+      "sha256": "e7c061c32f70133befe0e25c18ab2015d74d0993cb61a12b7e3c08ced0f1f882"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/host-control.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/host-control.py",
+      "bytes": 17650,
+      "sha256": "73e733dede60d32b2bfa238335575edb9d6f87ab2b53d0c498a4920b44752fdd"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/image-progress.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/image-progress.py",
+      "bytes": 21134,
+      "sha256": "efb8810f913bb0d66fc08e927cba0aa72c31e858692d499f145a8c7eba60ce4e"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measurement-driver.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measurement-driver.py",
+      "bytes": 6654,
+      "sha256": "8c6187e896b3c46d6fc0b5cc18af45092a4a5cdb2963ffdef9d5698a502d692d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/owned-exec.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/owned-exec.py",
+      "bytes": 1744,
+      "sha256": "bba552ebd37c48f030ed6eaaa8091b4d703ef3cd885b5cb7f67c8935b7119328"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/prepare-runtime.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/prepare-runtime.py",
+      "bytes": 4098,
+      "sha256": "d4352f4982fdde7bf72fe345d8391591cb547f60e71f6d4c7e482d3757a82503"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/prepare-windows.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/prepare-windows.py",
+      "bytes": 5133,
+      "sha256": "a1657cdafb42e37f865f5ff99d2b3aadca38b19b8ad53507c3d59d720caec6cc"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/process-guard.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/process-guard.py",
+      "bytes": 5579,
+      "sha256": "088fd71ab7c32922c2d9056056a11422a8c54d354cf9300bbf5e7af8a292acbb"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/report-comparison.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/report-comparison.py",
+      "bytes": 53078,
+      "sha256": "fd5012adc404d1582fe0a55c7bc601e932ec5082070595f58aff6c86a20f759d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/report-protocol-loss.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/report-protocol-loss.py",
+      "bytes": 22226,
+      "sha256": "81a4f0d6edc2b3a026b04cc74d071f81e13c5733a95f691f762f01858c83a896"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/run-comparison.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/run-comparison.py",
+      "bytes": 29357,
+      "sha256": "005790cbc93690f62ffb118993344ef0b3fe3ab1d8521f3a17ed68cd92267471"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/run-protocol-loss.buffered-diagnostic.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/run-protocol-loss.buffered-diagnostic.py",
+      "bytes": 36337,
+      "sha256": "2f3c6b9849c9d146649e5bee3618d1cd0d354b2fd205a509bfbe9df17c863dd5"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/run-protocol-loss.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/run-protocol-loss.py",
+      "bytes": 35528,
+      "sha256": "ac1c787578c77ee2e8e7e3bad1e47322782ef3606837ede5bd5d32b6002f0cd1"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/tcp-diagnostic.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/tcp-diagnostic.py",
+      "bytes": 2623,
+      "sha256": "8e8be2a0d27169785173cf7fe3fabe77160f99c7027c3585b12e75ad960bbea7"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/test-analyze-recovery.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/test-analyze-recovery.py",
+      "bytes": 17914,
+      "sha256": "487e8d3d2e8ce759d85fb3546f9588f3cef9cafce9164a558f8ee5670f801fc1"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/test-compact-recovery.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/test-compact-recovery.py",
+      "bytes": 6992,
+      "sha256": "afe20939a5844c89a857d45e1e0c334739f7564aee480c602b953a72f863099d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/test-image-progress.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/test-image-progress.py",
+      "bytes": 3673,
+      "sha256": "37a1bbf4ec693b81759ded640ec3e59fc8ed25506d26c0642cd1045de4801155"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/test-native-red.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/test-native-red.py",
+      "bytes": 3010,
+      "sha256": "8864d8cdcc88d2dc36f6901388f263d0970b84c9e9915475032a9b8018605867"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/test-native.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/test-native.py",
+      "bytes": 2012,
+      "sha256": "12eb1e5a99f1b562297ba05a68563f529475a854622762ddbb2a55c5353131d3"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/test-phase-comparison.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/test-phase-comparison.py",
+      "bytes": 10104,
+      "sha256": "36c49c249c97172fd4617840d6522f69d0cb8e65f6d0c415abdfd4f2028fa7fd"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/test-process-guard.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/test-process-guard.py",
+      "bytes": 4689,
+      "sha256": "b36601e26268e4244ff8d4807acb47012ed6fb087475c83949d55cae7d529173"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/test-protocol-report.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/test-protocol-report.py",
+      "bytes": 9205,
+      "sha256": "1c9854410325bc054147253e96b919988b10b5b67229c383983808752ab826a9"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/test-report-comparison.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/test-report-comparison.py",
+      "bytes": 11497,
+      "sha256": "0b2dbe8dbabc025315e1982377009938d7387b38390d6852de9fb949740f36a6"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/README.md",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/README.md",
+      "bytes": 8335,
+      "sha256": "8da739149dd319085de17808d3c77cd6290e84dc2d4731727bb083dfa5b45c6a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/runtime-setup.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/runtime-setup.json",
+      "bytes": 18247,
+      "sha256": "fa3b47c7579cdb7276021a9417cb6c2bc99853433a30a54d76123fa79ea5c420"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/linux-packages.tsv",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/linux-packages.tsv",
+      "bytes": 10209,
+      "sha256": "a9d7ad4a285f09fd0ed089d7a4e42403ce7ea0db15bfdf6c21f35b90c871221d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/vm-preflight-identity.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/vm-preflight-identity.json",
+      "bytes": 479,
+      "sha256": "c38ccdbb782fcb444bcc6e791f6a3f182391c331c53adb24cf583922a42bbe1a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/upstream-source.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/upstream-source.json",
+      "bytes": 1665,
+      "sha256": "abade5384d3b43c41690291e4605bbd36e2913b1ca153a76f60e75cec2c6af43"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-selector-freeze.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/network-selector-freeze.json",
+      "bytes": 1302,
+      "sha256": "b056fbadf753ff0a17f50b8715828cb1cc0015b05dbb49e587897a7119d45836"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/baseline-freeze.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/baseline-freeze.json",
+      "bytes": 786,
+      "sha256": "b16e20a2071306de2daaf6bbb5ddb7574fc47fc9eefd64830c7fa1291bec459c"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/harness-freeze.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/harness-freeze.json",
+      "bytes": 904,
+      "sha256": "676077a4d1389a5e70b6043ebb8cec02649404e7a568343b1d3988288818dfda"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/harness-revision-all.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/harness-revision-all.json",
+      "bytes": 255,
+      "sha256": "398d1b8cd42cf59c598d84d364e11a59c2d88ccfd03302cefe5f0aaed6b54e20"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/authentication-preflight.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/authentication-preflight.json",
+      "bytes": 1056,
+      "sha256": "f1f93edb23ffcc653232f78620fb7a4d9c52bda0df1600349b3617f3926eae8d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/graceful-collector-deployment.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/graceful-collector-deployment.json",
+      "bytes": 468,
+      "sha256": "0bd919154f22e5eb33dde324897b73e54f399114304482f76aa5902624ab8a9a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/collector-stop-smoke-receipt.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/collector-stop-smoke-receipt.json",
+      "bytes": 2375,
+      "sha256": "a4d838647208bfde56e1a87109cee847250b01bc7067706177132d3f74b3dc68"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-fix-commit.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/native-fix-commit.json",
+      "bytes": 667,
+      "sha256": "3daac10b064c037c2ec945ab3635828a74021e3f504a7d8dde57146256248647"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/pr-fixed-build.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/pr-fixed-build.json",
+      "bytes": 9996,
+      "sha256": "85853b43662ba6a37d473d960ff185380c1575cd51cb2deef8fe6f50f6ca0466"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/pr-trace-build.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/pr-trace-build.json",
+      "bytes": 9047,
+      "sha256": "3a646344d71db5da14d967013d4823591afd8990e37da08ece92b611c396778d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-red-validation.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/native-red-validation.json",
+      "bytes": 1967,
+      "sha256": "53440b238210d6f2c937d560a9c076e3a47a3f16bbacb27b7006ec6ec9946fdd"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-red-cause-summary.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/native-red-cause-summary.json",
+      "bytes": 961,
+      "sha256": "18f347422ad16b65414ad4fea88246e99ea27ca06eec22a5aab2803443e4909d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-red-live-peer-trace.jsonl",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/native-red-live-peer-trace.jsonl",
+      "bytes": 18688,
+      "sha256": "cf9d94a3be89023e0fc65acad991d8ab50b55ce6ae95bee20810ea4bcc6d96c6"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-red-test.log",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/native-red-test.log",
+      "bytes": 470,
+      "sha256": "b2b19652379b3caf5f19778bb4c62d926746d956d49cef19e847929456e99f3c"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-fixed-validation.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/native-fixed-validation.json",
+      "bytes": 1837,
+      "sha256": "818bf8c1d7e14435381575ef943a5fa6f08e72b184f05682f612eebfd0f60d07"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-fixed-test.log",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/native-fixed-test.log",
+      "bytes": 3605,
+      "sha256": "3264375b71a50584d04a02990f2b0b5eb05ed9126289959eb334a29cd81c71c4"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-trace-validation.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/native-trace-validation.json",
+      "bytes": 1837,
+      "sha256": "9668c658d5466818f43e203f20bb104934eb54aa9567cf46ea6687a4a975d2db"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/native-trace-test.log",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/native-trace-test.log",
+      "bytes": 2851,
+      "sha256": "b2b946e439bdffcf1b62af35fba4af79a5d96cec627b7f2bde8f00fb4e41b23a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/protocol-report-tests-final.log",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/protocol-report-tests-final.log",
+      "bytes": 105,
+      "sha256": "670a39115e7523a8984e4842e16547cb2094b03fad392b037b4b9dc8b2656e62"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/protocol-report-tests-terminal-final.log",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/protocol-report-tests-terminal-final.log",
+      "bytes": 107,
+      "sha256": "55df81c03b1fc09a739803668e8b10b1a1cd87ac7e716666dddb1c968f87bb76"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/phase-comparison-tests-final-preserved-raw.log",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/phase-comparison-tests-final-preserved-raw.log",
+      "bytes": 112,
+      "sha256": "46c74e95e49409273cff5b0d474bb3f780e57977a4af5da2071b99cd4731838f"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/header-analyzer-tests-final.log",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/header-analyzer-tests-final.log",
+      "bytes": 116,
+      "sha256": "9dc643229373b931825a3a7c9965099f844e48cce8c5fa034d23c590b44f2e4a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/compact-analyzer-tests-final.log",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/compact-analyzer-tests-final.log",
+      "bytes": 97,
+      "sha256": "43afb429fdd1be9baec7669820d7d93894604c92c675327428c48e407517b6f5"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/upstream-stop-tests.log",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/upstream-stop-tests.log",
+      "bytes": 142,
+      "sha256": "8c850cdb85b3ce09a777c4eef411413cb024e383155a6809dc3ecd68039e725f"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/udp70-gap-scope-diagnostic.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/udp70-gap-scope-diagnostic.json",
+      "bytes": 1073,
+      "sha256": "932fdd0abddfd48ac166019072e81ac7fa6e83027ff8114a925edd2661b5bb2e"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/all70-gap-scope-diagnostic.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/all70-gap-scope-diagnostic.json",
+      "bytes": 1503,
+      "sha256": "16bc592ca666fd103f5a10b7ae697bdd5552ed4f285af5b955a402686f99df98"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/all8-auth-handoff.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/all8-auth-handoff.json",
+      "bytes": 482,
+      "sha256": "c5fb335a555f4c83914a2659a79e23d6e14f4c541d1009582cf349a4f30f2c52"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/credential-handoff-abort.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/credential-handoff-abort.json",
+      "bytes": 769,
+      "sha256": "8f6276949de6401064d4370a52de7635462f7a4817908de48ed8665ed3db3e56"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/resource-cleanup.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/resource-cleanup.json",
+      "bytes": 2047,
+      "sha256": "9d5899c388cae19808159c12a154c0646022eee5d78f07e8df62bcaa1018c2aa"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/resource-cleanup-verification.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/resource-cleanup-verification.json",
+      "bytes": 347,
+      "sha256": "da706de133e4176205df6eb51d43bb1f00934b49be6c3cb00e181dddb857875e"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-cleanup.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/network-cleanup.json",
+      "bytes": 12426,
+      "sha256": "f14ecbff5b12b5e68040f9f1ad317d9a257709ac6798c036116428d077899a4a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/validation-final.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/validation-final.json",
+      "bytes": 8448,
+      "sha256": "2721d012f563958b0c5e904295cb0ad8e0323c01310ae1fe2592b5fcf35720a6"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/recovery-analysis-udp70-buffered-compact.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/recovery-analysis-udp70-buffered-compact.json",
+      "bytes": 28776,
+      "sha256": "7c6cb4167ef314c934b7760c514d9a53e5d2f84cd263f7e88606e6fefcf6edf7"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/recovery-analysis-all70-compact.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/recovery-analysis-all70-compact.json",
+      "bytes": 29163,
+      "sha256": "82a0fdc55933e4ae2fafa246a8445ed21c10e6f1277fee5c2577ab3d9f9ca163"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/recovery-analysis-udp70-compact.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/recovery-analysis-udp70-compact.json",
+      "bytes": 35298,
+      "sha256": "d593bb9f53414e9a6fa947ebdaad9bdc7f3086a2fd81be9edb2a3378b1493259"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/recovery-analysis-all70-compact.md",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/recovery-analysis-all70-compact.md",
+      "bytes": 3288,
+      "sha256": "0684dfd03040bfb4e8751c47f33e7c8febece1ecc1fd93b0493b08b41ae1c662"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/recovery-analysis-udp70-buffered-compact.md",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/recovery-analysis-udp70-buffered-compact.md",
+      "bytes": 3264,
+      "sha256": "b40654666f9ff4819b2d1d51928e0d58ba557083a1e91498df8c93c71cf6747c"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/recovery-analysis-all70.md",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/recovery-analysis-all70.md",
+      "bytes": 2636,
+      "sha256": "55290833236d41dd8466d900dc15d1c791588625935e5f05b8b0d9051b6a2d01"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/recovery-analysis-udp70-buffered.md",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/recovery-analysis-udp70-buffered.md",
+      "bytes": 2585,
+      "sha256": "dffe75cb79db734a8eebe8851f6a08b481dc277e495f0b101c3e0f1ab270524a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/recovery-analysis-udp70-compact.md",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/recovery-analysis-udp70-compact.md",
+      "bytes": 3519,
+      "sha256": "913191bff98921d6a3137c0300a5a635bcd077a8f674ae8377b706df8016c385"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/recovery-analysis-udp70.md",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/evidence/recovery-analysis-udp70.md",
+      "bytes": 2800,
+      "sha256": "202ddc1b4d5aefbe770e7e1bbe2adc2f271d6c53caf73db28ab9c922abf6c941"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-selector-smoke/SHA256SUMS.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/network-selector-smoke/SHA256SUMS.json",
+      "bytes": 783,
+      "sha256": "e6aa49d5069ae3beaec59f732322f0d658f4b2f9259691f6ed0627b836c11d7c"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-selector-smoke/all.filters.raw.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/network-selector-smoke/all.filters.raw.json",
+      "bytes": 762,
+      "sha256": "ff273ba9d2e6f9fd6bd942b78cef2a2ea454abc85d6dcd3ea1153784f0a154d4"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-selector-smoke/all.qdiscs.raw.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/network-selector-smoke/all.qdiscs.raw.json",
+      "bytes": 749,
+      "sha256": "c560690abeab34ca182529cffd83f73fff59ce00de9bc7e60d1af3f0cce8c76a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-selector-smoke/proof.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/network-selector-smoke/proof.json",
+      "bytes": 27099,
+      "sha256": "09e8247345f7ced55ecc4469a8e351161c95db01220c95fe439518632c4c022a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-selector-smoke/summary.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/network-selector-smoke/summary.json",
+      "bytes": 685,
+      "sha256": "412cfe1bd85c25406dc7ed18e58765eb81530bd100f434f31fa41b30b5592fcd"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-selector-smoke/tcp.filters.raw.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/network-selector-smoke/tcp.filters.raw.json",
+      "bytes": 1225,
+      "sha256": "7c241a20bb1f60a6dfb108903b669f35cdb0510579be7455186ee1da94273d06"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-selector-smoke/tcp.qdiscs.raw.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/network-selector-smoke/tcp.qdiscs.raw.json",
+      "bytes": 908,
+      "sha256": "dae312c78fd0724563fd95717bb3a53247c91a2519c851cbb55a87caa8e5114e"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-selector-smoke/udp.filters.raw.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/network-selector-smoke/udp.filters.raw.json",
+      "bytes": 1227,
+      "sha256": "771b696f07e45f28c03d46a14428101427ac10de435480aeb72fb40732e1bcf4"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/network-selector-smoke/udp.qdiscs.raw.json",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/network-selector-smoke/udp.qdiscs.raw.json",
+      "bytes": 908,
+      "sha256": "dae312c78fd0724563fd95717bb3a53247c91a2519c851cbb55a87caa8e5114e"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/upstream/README.md",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/upstream/README.md",
+      "bytes": 2630,
+      "sha256": "a9bb651f7cc1fb707b282dd900e4f655d653c7f5752940081de60d237b24da78"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/upstream/counters.ps1",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/upstream/counters.ps1",
+      "bytes": 2078,
+      "sha256": "2e8e65a16dd30c06c8154d14ca8ebeb07d2bd91f0c272a558bd6720df7661b46"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/upstream/line.sh",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/upstream/line.sh",
+      "bytes": 1974,
+      "sha256": "122e76218054d11c458f5cfb43019558ea10322d4035210272bb30a76cd08daa"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/upstream/load.ps1",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/upstream/load.ps1",
+      "bytes": 1825,
+      "sha256": "972ff4b0d2fa01d113cec49f823868b9f306dc43bb4c915a4a5c8751fb966ca5"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/upstream/ramp.sh",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/upstream/ramp.sh",
+      "bytes": 907,
+      "sha256": "0da5af9a40be0d8623733801a719a282b83bddd83a5d2259f9a96d33ee112541"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/upstream/session.sh",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/upstream/session.sh",
+      "bytes": 1552,
+      "sha256": "268f26903ec7f372e37fc6b9ee12ce80fac525fc173c71a8783e41e31ad63526"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness/Collect-Counters.ps1",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness/Collect-Counters.ps1",
+      "bytes": 7999,
+      "sha256": "ead48e058e04baa804802e9c4cddde5712f72ca9721cab01530ca3f6ca207edc"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness/host-control.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness/host-control.py",
+      "bytes": 17650,
+      "sha256": "73e733dede60d32b2bfa238335575edb9d6f87ab2b53d0c498a4920b44752fdd"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness/image-progress.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness/image-progress.py",
+      "bytes": 21134,
+      "sha256": "efb8810f913bb0d66fc08e927cba0aa72c31e858692d499f145a8c7eba60ce4e"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness/measurement-driver.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness/measurement-driver.py",
+      "bytes": 6654,
+      "sha256": "8c6187e896b3c46d6fc0b5cc18af45092a4a5cdb2963ffdef9d5698a502d692d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness/owned-exec.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness/owned-exec.py",
+      "bytes": 1744,
+      "sha256": "bba552ebd37c48f030ed6eaaa8091b4d703ef3cd885b5cb7f67c8935b7119328"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness/process-guard.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness/process-guard.py",
+      "bytes": 5579,
+      "sha256": "088fd71ab7c32922c2d9056056a11422a8c54d354cf9300bbf5e7af8a292acbb"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness/run-protocol-loss.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness/run-protocol-loss.py",
+      "bytes": 35483,
+      "sha256": "28bc70f5809a072cefccec506c4934ccfe81fd7c7d2d847508f9219f8a4957e6"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-all/Collect-Counters.ps1",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-all/Collect-Counters.ps1",
+      "bytes": 7999,
+      "sha256": "ead48e058e04baa804802e9c4cddde5712f72ca9721cab01530ca3f6ca207edc"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-all/host-control.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-all/host-control.py",
+      "bytes": 17650,
+      "sha256": "73e733dede60d32b2bfa238335575edb9d6f87ab2b53d0c498a4920b44752fdd"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-all/image-progress.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-all/image-progress.py",
+      "bytes": 21134,
+      "sha256": "efb8810f913bb0d66fc08e927cba0aa72c31e858692d499f145a8c7eba60ce4e"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-all/measurement-driver.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-all/measurement-driver.py",
+      "bytes": 6654,
+      "sha256": "8c6187e896b3c46d6fc0b5cc18af45092a4a5cdb2963ffdef9d5698a502d692d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-all/owned-exec.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-all/owned-exec.py",
+      "bytes": 1744,
+      "sha256": "bba552ebd37c48f030ed6eaaa8091b4d703ef3cd885b5cb7f67c8935b7119328"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-all/process-guard.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-all/process-guard.py",
+      "bytes": 5579,
+      "sha256": "088fd71ab7c32922c2d9056056a11422a8c54d354cf9300bbf5e7af8a292acbb"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-all/run-protocol-loss.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-all/run-protocol-loss.py",
+      "bytes": 35528,
+      "sha256": "ac1c787578c77ee2e8e7e3bad1e47322782ef3606837ede5bd5d32b6002f0cd1"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-baseline/Collect-Counters.ps1",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-baseline/Collect-Counters.ps1",
+      "bytes": 7999,
+      "sha256": "ead48e058e04baa804802e9c4cddde5712f72ca9721cab01530ca3f6ca207edc"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-baseline/host-control.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-baseline/host-control.py",
+      "bytes": 17650,
+      "sha256": "73e733dede60d32b2bfa238335575edb9d6f87ab2b53d0c498a4920b44752fdd"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-baseline/image-progress.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-baseline/image-progress.py",
+      "bytes": 21134,
+      "sha256": "efb8810f913bb0d66fc08e927cba0aa72c31e858692d499f145a8c7eba60ce4e"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-baseline/measurement-driver.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-baseline/measurement-driver.py",
+      "bytes": 6654,
+      "sha256": "8c6187e896b3c46d6fc0b5cc18af45092a4a5cdb2963ffdef9d5698a502d692d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-baseline/owned-exec.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-baseline/owned-exec.py",
+      "bytes": 1744,
+      "sha256": "bba552ebd37c48f030ed6eaaa8091b4d703ef3cd885b5cb7f67c8935b7119328"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-baseline/process-guard.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-baseline/process-guard.py",
+      "bytes": 5579,
+      "sha256": "088fd71ab7c32922c2d9056056a11422a8c54d354cf9300bbf5e7af8a292acbb"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/measured-harness-baseline/run-protocol-loss.py",
+      "repository_path": "tools/rdp-bench/labs/vm-protocol-loss-20261014/measured-harness-baseline/run-protocol-loss.py",
+      "bytes": 35528,
+      "sha256": "ac1c787578c77ee2e8e7e3bad1e47322782ef3606837ede5bd5d32b6002f0cd1"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/campaign-baseline.csv",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-campaign-baseline.csv",
+      "bytes": 4964,
+      "sha256": "86499cb321c70d0ccaf704b18000bea9ac85109d99cc8564c9a6bbef06c765c6"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/campaign-baseline.json",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-campaign-baseline.json",
+      "bytes": 6017926,
+      "sha256": "e91edcfc48ca1018127c5361e9813e0517a2a7f1fae95a9a38962a19ea4a038b"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/campaign-baseline.md",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-campaign-baseline.md",
+      "bytes": 2279,
+      "sha256": "4f47b3e1cc6f16cc6fd617844600011e596eb4ae3e64ea7570edba1bb38d1889"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/campaign-fixed-all.csv",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-campaign-fixed-all.csv",
+      "bytes": 2977,
+      "sha256": "f40ba9600a23fa19a2c939513b828e23927d1c9c2fe95deb7df1ab1bae70e782"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/campaign-fixed-all.json",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-campaign-fixed-all.json",
+      "bytes": 2976138,
+      "sha256": "1925680906e772c4d78747535a834689f37ea8423af9cc736e99584357083c7a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/campaign-fixed-all.md",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-campaign-fixed-all.md",
+      "bytes": 1663,
+      "sha256": "c33edc0970cdd0086d557e714f424396143edf93ec16e2ff2b2f79bac84f4a61"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/campaign-fixed.csv",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-campaign-fixed.csv",
+      "bytes": 4787,
+      "sha256": "2d5dbfa25e6831d92ac30a20a80df7bec508f17c3f30a13290fe7baaa12fe303"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/campaign-fixed.json",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-campaign-fixed.json",
+      "bytes": 5836719,
+      "sha256": "dc30e111bba4530a1a68d78384f9729944b587a7bc0b8a2a89872d84e5e9d42e"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/campaign-fixed.md",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-campaign-fixed.md",
+      "bytes": 2266,
+      "sha256": "48cca0ceddecbeae541fbf4318060deef706a30d1abc49119c048480f62e15d0"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/diagnostic-pr70-all.csv",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-diagnostic-pr70-all.csv",
+      "bytes": 981,
+      "sha256": "e03726ec418a62f27ec10ba1c2323714150817538037f4ed06ddf5ca9290e8b6"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/diagnostic-pr70-all.json",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-diagnostic-pr70-all.json",
+      "bytes": 362918,
+      "sha256": "f4866da4d5f9c67cdfd4729eec3aad7e7aee352015cf93a3785152e8a557f55f"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/diagnostic-pr70-all.md",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-diagnostic-pr70-all.md",
+      "bytes": 1095,
+      "sha256": "99b8687a9f22cb7fc0cd3bb457d42a03fc37475d46e1ff3479357cc4eddf11b9"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/diagnostic-pr70-udp-buffered.csv",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-diagnostic-pr70-udp-buffered.csv",
+      "bytes": 1003,
+      "sha256": "02a6d14084020dec300b4081d547284e79fc470561974a86f0fb30f9bb3bffd0"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/diagnostic-pr70-udp-buffered.json",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-diagnostic-pr70-udp-buffered.json",
+      "bytes": 381317,
+      "sha256": "3a107b583bc79794a4562415c9289d7177674df62476b011ab13f7c8bf75f3a3"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/diagnostic-pr70-udp-buffered.md",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-diagnostic-pr70-udp-buffered.md",
+      "bytes": 1104,
+      "sha256": "224d2d64c8ab78d30ae5e9c453b1d8477ec74f25c941dafcf7a644d4a082d573"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/diagnostic-pr70-udp.csv",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-diagnostic-pr70-udp.csv",
+      "bytes": 986,
+      "sha256": "3782a2cf857751b8a69330b38c022f6c42e9ed3e471eccaa51271915a60d6f48"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/diagnostic-pr70-udp.json",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-diagnostic-pr70-udp.json",
+      "bytes": 380127,
+      "sha256": "38160a6118794ecaf01ba5c0b16c2183553392433eee75ca04df06d0b84a9e38"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/diagnostic-pr70-udp.md",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-diagnostic-pr70-udp.md",
+      "bytes": 1095,
+      "sha256": "f80434507ccba216b7edc5cf4c2a0ddedd37fbfa6d80f1fd0c857db7f486d04a"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/protocol-loss-before-after-20261014-pairs.csv",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-loss-before-after-20261014-pairs.csv",
+      "bytes": 7534,
+      "sha256": "5af9ed9661d8557288fa2bcfae305852290602a58e62d82466ed12c6b362c04e"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/protocol-loss-before-after-20261014.csv",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-loss-before-after-20261014.csv",
+      "bytes": 12784,
+      "sha256": "04ab16d6e5e65cc556e9138a18d90b84d7933312c9fe1578881fa3356edca2ac"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/protocol-loss-before-after-20261014.json",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-loss-before-after-20261014.json",
+      "bytes": 20624678,
+      "sha256": "b243a7ebc9494ab7d8541aa126aee2292df1b07642bf43b5f83fb36ea7e5386d"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/reports/protocol-loss-before-after-20261014.md",
+      "repository_path": "tools/rdp-bench/results/vm-protocol-loss-before-after-20261014.md",
+      "bytes": 6833,
+      "sha256": "a4023ce155fe1c5c670ec1e0cd203425d4a6fe757421441ea981577afbe19eaf"
+    },
+    {
+      "source": "/Users/david/projects/FreeRDP/build/vm-protocol-loss-20261014/PROTOCOL-LOSS-RESULTS-20261014.md",
+      "repository_path": "tools/rdp-bench/docs/PROTOCOL-LOSS-RESULTS-20261014.md",
+      "bytes": 12383,
+      "sha256": "05731bcfd43167707a9a80fa5064687bd5a8b6f2d07f6b60ae966d9233fd4cd7",
+      "repository_report_links_rewritten": true
+    }
+  ],
+  "raw_evidence": "Full per-trial receipts, bounded native JSONL traces and encrypted captures remain in the original lab. The ZIP includes raw receipts/traces and hashed capture omissions.",
+  "path_guide": "Original absolute paths identify measured receipts; map compact result links to the results directory."
+}

@@ -1,0 +1,511 @@
+{
+  "schema_version": 1,
+  "utc": "2026-10-14T13:39:45.156970+00:00",
+  "outcome": "REMOVED",
+  "before": {
+    "schema_version": 2,
+    "utc": "2026-10-14T13:39:45.129855+00:00",
+    "state": {
+      "schema_version": 2,
+      "created_utc": "2026-10-14T13:10:23.639701+00:00",
+      "netns": "net:[4026532558]",
+      "vm_ip": "192.168.64.2",
+      "interface": "eth0",
+      "ingress": "bench_ing",
+      "receive": "bench_rx",
+      "mac": "b6:9f:6e:6b:48:23",
+      "pair_mtu": 1500,
+      "original_interface_mtu": 65535,
+      "ifindices": {
+        "interface": 11,
+        "ingress": 33,
+        "receive": 32
+      },
+      "owner": "freerdp-pr13608:85fcbd901a8b4468aee1fc8c06fe54d4",
+      "original_rp_filter": {
+        "all": "0",
+        "eth0": "0"
+      },
+      "installed_ingress": true,
+      "veth_created": true,
+      "loss_percent": 0.0,
+      "loss_protocol": "all",
+      "method": "upstream ingress loss via veth, not IFB",
+      "rate_cap_mbps": null,
+      "protocol_scope": {
+        "loss_protocol": "all",
+        "selected_ipv4_protocol": null,
+        "direction": "Windows VM to client only",
+        "rate_cap_mbps": null,
+        "selected_treatment": "random loss; packets >=512 bytes also have 1ms delay and 70% reorder",
+        "nonselected_treatment": "none; legacy treatment applies to all IPv4 from VM"
+      },
+      "changed_utc": "2026-10-14T13:33:05.498376+00:00"
+    },
+    "links": {
+      "interface": [
+        {
+          "ifindex": 11,
+          "link_index": 17,
+          "ifname": "eth0",
+          "flags": [
+            "BROADCAST",
+            "MULTICAST",
+            "UP",
+            "LOWER_UP"
+          ],
+          "mtu": 1500,
+          "qdisc": "noqueue",
+          "operstate": "UP",
+          "linkmode": "DEFAULT",
+          "group": "default",
+          "txqlen": 1000,
+          "link_type": "ether",
+          "address": "b6:9f:6e:6b:48:23",
+          "broadcast": "ff:ff:ff:ff:ff:ff",
+          "link_netnsid": 0,
+          "stats64": {
+            "rx": {
+              "bytes": 37511385325,
+              "packets": 30243146,
+              "errors": 0,
+              "dropped": 0,
+              "over_errors": 0,
+              "multicast": 0
+            },
+            "tx": {
+              "bytes": 312032390,
+              "packets": 5100515,
+              "errors": 0,
+              "dropped": 0,
+              "carrier_errors": 0,
+              "collisions": 0
+            }
+          }
+        }
+      ],
+      "ingress": [
+        {
+          "ifindex": 33,
+          "link": "bench_rx",
+          "ifname": "bench_ing",
+          "flags": [
+            "BROADCAST",
+            "MULTICAST",
+            "UP",
+            "LOWER_UP"
+          ],
+          "mtu": 1500,
+          "qdisc": "prio",
+          "operstate": "UP",
+          "linkmode": "DEFAULT",
+          "group": "default",
+          "txqlen": 1000,
+          "link_type": "ether",
+          "address": "46:13:8c:26:88:72",
+          "broadcast": "ff:ff:ff:ff:ff:ff",
+          "ifalias": "freerdp-pr13608:85fcbd901a8b4468aee1fc8c06fe54d4:ingress",
+          "stats64": {
+            "rx": {
+              "bytes": 1076,
+              "packets": 14,
+              "errors": 0,
+              "dropped": 0,
+              "over_errors": 0,
+              "multicast": 0
+            },
+            "tx": {
+              "bytes": 5014602331,
+              "packets": 4120840,
+              "errors": 0,
+              "dropped": 0,
+              "carrier_errors": 0,
+              "collisions": 0
+            }
+          }
+        }
+      ],
+      "receive": [
+        {
+          "ifindex": 32,
+          "link": "bench_ing",
+          "ifname": "bench_rx",
+          "flags": [
+            "BROADCAST",
+            "MULTICAST",
+            "UP",
+            "LOWER_UP"
+          ],
+          "mtu": 1500,
+          "qdisc": "noqueue",
+          "operstate": "UP",
+          "linkmode": "DEFAULT",
+          "group": "default",
+          "txqlen": 1000,
+          "link_type": "ether",
+          "address": "b6:9f:6e:6b:48:23",
+          "broadcast": "ff:ff:ff:ff:ff:ff",
+          "ifalias": "freerdp-pr13608:85fcbd901a8b4468aee1fc8c06fe54d4:receive",
+          "stats64": {
+            "rx": {
+              "bytes": 5014602331,
+              "packets": 4120840,
+              "errors": 0,
+              "dropped": 0,
+              "over_errors": 0,
+              "multicast": 0
+            },
+            "tx": {
+              "bytes": 1076,
+              "packets": 14,
+              "errors": 0,
+              "dropped": 0,
+              "carrier_errors": 0,
+              "collisions": 0
+            }
+          }
+        }
+      ]
+    },
+    "loss_protocol": "all",
+    "protocol_scope": {
+      "loss_protocol": "all",
+      "selected_ipv4_protocol": null,
+      "direction": "Windows VM to client only",
+      "rate_cap_mbps": null,
+      "selected_treatment": "random loss; packets >=512 bytes also have 1ms delay and 70% reorder",
+      "nonselected_treatment": "none; legacy treatment applies to all IPv4 from VM"
+    },
+    "receive_addresses": [
+      {
+        "ifindex": 32,
+        "link": "bench_ing",
+        "ifname": "bench_rx",
+        "flags": [
+          "BROADCAST",
+          "MULTICAST",
+          "UP",
+          "LOWER_UP"
+        ],
+        "mtu": 1500,
+        "qdisc": "noqueue",
+        "operstate": "UP",
+        "group": "default",
+        "txqlen": 1000,
+        "link_type": "ether",
+        "address": "b6:9f:6e:6b:48:23",
+        "broadcast": "ff:ff:ff:ff:ff:ff",
+        "addr_info": [
+          {
+            "family": "inet6",
+            "local": "fe80::b49f:6eff:fe6b:4823",
+            "prefixlen": 64,
+            "scope": "link",
+            "valid_life_time": 4294967295,
+            "preferred_life_time": 4294967295
+          }
+        ]
+      }
+    ],
+    "interface_qdiscs": [
+      {
+        "kind": "noqueue",
+        "handle": "0:",
+        "root": true,
+        "refcnt": 2,
+        "options": {},
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "ingress",
+        "handle": "ffff:",
+        "parent": "ffff:fff1",
+        "options": {},
+        "bytes": 6484031952,
+        "packets": 5375186,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "ingress_filter": [
+      {
+        "protocol": "ip",
+        "pref": 100,
+        "kind": "u32",
+        "chain": 0
+      },
+      {
+        "protocol": "ip",
+        "pref": 100,
+        "kind": "u32",
+        "chain": 0,
+        "options": {
+          "fh": "800:",
+          "ht_divisor": 1
+        }
+      },
+      {
+        "protocol": "ip",
+        "pref": 100,
+        "kind": "u32",
+        "chain": 0,
+        "options": {
+          "fh": "800::800",
+          "order": 2048,
+          "key_ht": "800",
+          "bkt": "0",
+          "not_in_hw": true,
+          "rule_hit": 5375110,
+          "success": [
+            5375110,
+            5375110
+          ],
+          "match": {
+            "value": "c0a84002",
+            "mask": "ffffffff",
+            "offmask": "",
+            "off": 12
+          },
+          "actions": [
+            {
+              "order": 1,
+              "kind": "mirred",
+              "mirred_action": "redirect",
+              "direction": "egress",
+              "to_dev": "bench_ing",
+              "control_action": {
+                "type": "stolen"
+              },
+              "index": 1,
+              "ref": 1,
+              "bind": 1,
+              "installed": 1761,
+              "last_used": 405,
+              "first_used": 1759,
+              "stats": {
+                "bytes": 6484029824,
+                "packets": 5375110,
+                "drops": 0,
+                "overlimits": 0,
+                "requeues": 0,
+                "backlog": 0,
+                "qlen": 0
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "classification_filters": [
+      {
+        "protocol": "ip",
+        "pref": 1,
+        "kind": "u32",
+        "chain": 0
+      },
+      {
+        "protocol": "ip",
+        "pref": 1,
+        "kind": "u32",
+        "chain": 0,
+        "options": {
+          "fh": "800:",
+          "ht_divisor": 1
+        }
+      },
+      {
+        "protocol": "ip",
+        "pref": 1,
+        "kind": "u32",
+        "chain": 0,
+        "options": {
+          "fh": "800::800",
+          "order": 2048,
+          "key_ht": "800",
+          "bkt": "0",
+          "flowid": "1:2",
+          "not_in_hw": true,
+          "rule_hit": 5375110,
+          "success": [
+            238493,
+            238493
+          ],
+          "match": {
+            "value": "0",
+            "mask": "fe00",
+            "offmask": "",
+            "off": 0
+          }
+        }
+      },
+      {
+        "protocol": "ip",
+        "pref": 2,
+        "kind": "u32",
+        "chain": 0
+      },
+      {
+        "protocol": "ip",
+        "pref": 2,
+        "kind": "u32",
+        "chain": 0,
+        "options": {
+          "fh": "801:",
+          "ht_divisor": 1
+        }
+      },
+      {
+        "protocol": "ip",
+        "pref": 2,
+        "kind": "u32",
+        "chain": 0,
+        "options": {
+          "fh": "801::800",
+          "order": 2048,
+          "key_ht": "801",
+          "bkt": "0",
+          "flowid": "1:1",
+          "not_in_hw": true,
+          "rule_hit": 5136617,
+          "success": [
+            5136617,
+            5136617
+          ],
+          "match": {
+            "value": "0",
+            "mask": "0",
+            "offmask": "",
+            "off": 0
+          }
+        }
+      }
+    ],
+    "netem_qdiscs": [
+      {
+        "kind": "prio",
+        "handle": "1:",
+        "root": true,
+        "refcnt": 11,
+        "options": {
+          "bands": 3,
+          "priomap": [
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2
+          ],
+          "multiqueue": false
+        },
+        "bytes": 5014602241,
+        "packets": 4120839,
+        "drops": 1254284,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "netem",
+        "handle": "10:",
+        "parent": "1:1",
+        "options": {
+          "limit": 100000,
+          "delay": {
+            "delay": 0.001,
+            "jitter": 0,
+            "correlation": 0
+          },
+          "reorder": {
+            "reorder": 0.7,
+            "correlation": 0
+          },
+          "ecn": false,
+          "gap": 1
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      },
+      {
+        "kind": "netem",
+        "handle": "20:",
+        "parent": "1:2",
+        "options": {
+          "limit": 100000,
+          "ecn": false,
+          "gap": 0
+        },
+        "bytes": 0,
+        "packets": 0,
+        "drops": 0,
+        "overlimits": 0,
+        "requeues": 0,
+        "backlog": 0,
+        "qlen": 0
+      }
+    ],
+    "netem_counters": {
+      "large": {
+        "transmitted_packets": 0,
+        "dropped_packets": 0,
+        "backlog_packets": 0,
+        "transmitted_bytes": 0,
+        "drop_fraction_completed_attempts": null,
+        "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+      },
+      "small": {
+        "transmitted_packets": 0,
+        "dropped_packets": 0,
+        "backlog_packets": 0,
+        "transmitted_bytes": 0,
+        "drop_fraction_completed_attempts": null,
+        "scope": "all netem drops; excludes pending packets; not inferred random-loss-only"
+      }
+    },
+    "bypass_counters": {
+      "enabled": false,
+      "classid": null,
+      "qdisc_kind": null,
+      "transmitted_packets": null,
+      "dropped_packets": null,
+      "backlog_packets": null,
+      "transmitted_bytes": null,
+      "scope": "not used; all IPv4 from VM is selected by the legacy method"
+    },
+    "rp_filter": {
+      "all": "0",
+      "eth0": "0",
+      "bench_rx": "0"
+    }
+  },
+  "restored_rp_filter": {
+    "all": "0",
+    "eth0": "0"
+  },
+  "restored_interface_mtu": 65535
+}

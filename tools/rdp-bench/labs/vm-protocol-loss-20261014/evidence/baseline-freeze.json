@@ -1,0 +1,33 @@
+{
+  "utc": "2026-10-14T10:41:36.885273+00:00",
+  "coordinator_sha256": "ac1c787578c77ee2e8e7e3bad1e47322782ef3606837ede5bd5d32b6002f0cd1",
+  "sources": "settings.json +runtime-setup.json",
+  "tracing": false,
+  "pcap": false,
+  "conditions": 16,
+  "parameters": {
+    "protocol": [
+      "tcp",
+      "udp"
+    ],
+    "loss_percent": [
+      0,
+      25,
+      50,
+      70
+    ],
+    "clients": [
+      "local79ee",
+      "PRa306"
+    ],
+    "warmup_s": 45,
+    "measured_s": 120,
+    "rate_cap_mbps": null,
+    "large_packet_delay_ms": 1,
+    "large_packet_reorder_percent": 70,
+    "large_packet_threshold_bytes": 512,
+    "return_direction": "clean",
+    "seeds": "unseeded kernel loss/reordering and Windows noise"
+  },
+  "scope": "full baseline matrix; no diagnostic observers"
+}
