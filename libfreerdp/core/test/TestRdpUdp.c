@@ -22,6 +22,7 @@
  * sends back on the wire. */
 
 #include <stdio.h>
+#include <winpr/environment.h>
 #include <string.h>
 
 #include <winpr/wtypes.h>
@@ -36,6 +37,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 #endif
 
 #include "../rdpudp.h"
@@ -61,15 +63,14 @@
 #define SYN_LENGTH 1232
 #define FIRST_SEQUENCE 100
 
-#define CHECK(cond)                                                                 \
-	do                                                                              \
-	{                                                                               \
-		if (!(cond))                                                                \
-		{                                                                           \
-			(void)fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, \
-			              #cond);                                                   \
-			goto fail;                                                              \
-		}                                                                           \
+#define CHECK(cond)                                                                        \
+	do                                                                                     \
+	{                                                                                      \
+		if (!(cond))                                                                       \
+		{                                                                                  \
+			(void)fprintf(stderr, "%s:%d: check failed: %s\n", __FILE__, __LINE__, #cond); \
+			goto fail;                                                                     \
+		}                                                                                  \
 	} while (0)
 
 /* A datagram the client sent, decoded. */
@@ -933,6 +934,296 @@ fail:
 
 /* ---------------------------------------------------------------------------------------- */
 
+#if !defined(_WIN32)
+/* These tests use the public socket/callback API, including the ACK actually emitted on wire.
+ * They test diagnostics only; no private state or production timer policy is changed. */
+static BOOL recovery_trace_records_retention_and_real_ack(void)
+{
+	BOOL rc = FALSE;
+	TestCtx ctx = { .server = INVALID_SOCKET };
+	char path[] = "/tmp/freerdp-recovery-trace-XXXXXX";
+	char arm[] = "/tmp/freerdp-recovery-arm-XXXXXX";
+	FILE* file = nullptr;
+	char* content = nullptr;
+	const int fd = mkstemp(path);
+	CHECK(fd >= 0);
+	(void)close(fd);
+	CHECK(unlink(path) == 0);
+	const int armFd = mkstemp(arm);
+	CHECK(armFd >= 0);
+	(void)close(armFd);
+	CHECK(unlink(arm) == 0);
+	CHECK(SetEnvironmentVariableA("RDPEUDP_RECOVERY_TRACE", path));
+	CHECK(SetEnvironmentVariableA("RDPEUDP_RECOVERY_TRACE_ARM", arm));
+	CHECK(SetEnvironmentVariableA("RDPEUDP_RECOVERY_TRACE_LIMIT", "1024"));
+	CHECK(ctx_connect(&ctx));
+	CHECK(send_data(&ctx, 100, 1, "a"));
+	CHECK(pump(&ctx));
+	CHECK(drain(&ctx, 20));
+	CHECK(access(path, F_OK) != 0); /* no hot-path file output */
+	file = fopen(arm, "wx");
+	CHECK(file);
+	CHECK(fclose(file) == 0);
+	file = nullptr;
+	Sleep(1100); /* bounded one-second ARM polling */
+	const char* secret = "CONFIDENTIAL_PAYLOAD_SENTINEL";
+	CHECK(send_data(&ctx, 102, 3, secret));
+	CHECK(pump(&ctx));
+	CHECK(drain(&ctx, 20));
+	const V3Packet* ack = last_ack(&ctx);
+	CHECK(ack && (ack->flags & V3_ACKVEC) && (ack->vecBase == 101));
+	CHECK((ack->vecLength == 1) && (ack->vec[0] == 2));
+	CHECK(delivered_is(&ctx, "a"));
+	const UINT16 ackBase = ack->vecBase;
+	ctx_free(&ctx); /* single synchronous teardown dump */
+	file = fopen(path, "rb");
+	CHECK(file);
+	CHECK(fseek(file, 0, SEEK_END) == 0);
+	const long size = ftell(file);
+	CHECK((size > 0) && (size < 131072));
+	CHECK(fseek(file, 0, SEEK_SET) == 0);
+	content = calloc((size_t)size + 1, 1);
+	CHECK(content);
+	CHECK(fread(content, 1, (size_t)size, file) == (size_t)size);
+	CHECK(strstr(content, "\"schema\":\"freerdp-pr13608-recovery-v1\""));
+	CHECK(strstr(content, "\"complete_from_arm\":true"));
+	CHECK(strstr(content, "\"retained_sequence_valid\":true"));
+	CHECK(strstr(content, "\"event\":\"rx_data\",\"data_seq\":102,\"channel_seq\":3,\"status\":1"));
+	CHECK(strstr(content, "\"base\":101,\"highest\":102,\"next_channel\":2,\"buffered\":1"));
+	CHECK(!strstr(content, secret));
+	/* Actual wire feedback is retained as an unswapped protected header, never TLS bytes. */
+	const char* tx = strstr(content, "\"event\":\"tx_header\"");
+	CHECK(tx && strstr(tx, "\"status\":0"));
+	const char* hex = strstr(tx, "\"header_fragment_hex\":\"");
+	CHECK(hex);
+	hex += strlen("\"header_fragment_hex\":\"");
+	BYTE wire[192] = { 0 };
+	size_t wireLength = 0;
+	while ((hex[0] != '"') && (wireLength < sizeof(wire)))
+	{
+		unsigned value = 0;
+		CHECK(sscanf(hex, "%2x", &value) == 1);
+		wire[wireLength++] = (BYTE)value;
+		hex += 2;
+	}
+	CHECK(wireLength >= 8);
+	const BYTE eighth = wire[7];
+	wire[7] = wire[0];
+	wire[0] = eighth;
+	V3Packet decoded = { 0 };
+	CHECK(parse_v3(wire, wireLength, &decoded));
+	CHECK((decoded.flags & V3_ACKVEC) && (decoded.vecBase == ackBase));
+	CHECK((decoded.vecLength == 1) && (decoded.vec[0] == 2));
+	rc = TRUE;
+fail:
+	if (file)
+		(void)fclose(file);
+	free(content);
+	ctx_free(&ctx);
+	(void)unlink(path);
+	(void)unlink(arm);
+	(void)SetEnvironmentVariableA("RDPEUDP_RECOVERY_TRACE", nullptr);
+	(void)SetEnvironmentVariableA("RDPEUDP_RECOVERY_TRACE_ARM", nullptr);
+	(void)SetEnvironmentVariableA("RDPEUDP_RECOVERY_TRACE_LIMIT", nullptr);
+	return rc;
+}
+
+static BOOL recovery_trace_overflow_keeps_an_explicit_valid_tail(void)
+{
+	BOOL rc = FALSE;
+	TestCtx ctx = { .server = INVALID_SOCKET };
+	char path[] = "/tmp/freerdp-recovery-tail-XXXXXX";
+	FILE* file = nullptr;
+	char line[16384] = { 0 };
+	const int fd = mkstemp(path);
+	CHECK(fd >= 0);
+	(void)close(fd);
+	CHECK(unlink(path) == 0);
+	CHECK(SetEnvironmentVariableA("RDPEUDP_RECOVERY_TRACE", path));
+	CHECK(SetEnvironmentVariableA("RDPEUDP_RECOVERY_TRACE_LIMIT", "64"));
+	CHECK(ctx_connect(&ctx));
+	UINT16 dataSeq = 100;
+	UINT16 channel = 1;
+	CHECK(stream_ahead(&ctx, &dataSeq, &channel, 100));
+	ctx_free(&ctx);
+	file = fopen(path, "rb");
+	CHECK(file);
+	CHECK(fgets(line, sizeof(line), file));
+	CHECK(strstr(line, "\"capacity\":64"));
+	CHECK(strstr(line, "\"complete_from_arm\":false"));
+	size_t events = 0;
+	UINT64 previousId = 0;
+	UINT64 previousNs = 0;
+	BOOL footer = FALSE;
+	while (fgets(line, sizeof(line), file))
+	{
+		if (strstr(line, "\"kind\":\"event\""))
+		{
+			UINT64 id = 0;
+			UINT64 ns = 0;
+			CHECK(sscanf(line, "{\"kind\":\"event\",\"id\":%" SCNu64 ",\"time_ns\":%" SCNu64, &id,
+			             &ns) == 2);
+			CHECK(!events || ((id == previousId + 1) && (ns >= previousNs)));
+			previousId = id;
+			previousNs = ns;
+			events++;
+		}
+		else if (strstr(line, "\"kind\":\"footer\""))
+		{
+			CHECK(strstr(line, "\"retained_sequence_valid\":true"));
+			CHECK(strstr(line, "\"complete_from_arm\":false"));
+			footer = TRUE;
+		}
+	}
+	CHECK((events == 64) && footer);
+	rc = TRUE;
+fail:
+	if (file)
+		(void)fclose(file);
+	ctx_free(&ctx);
+	(void)unlink(path);
+	(void)SetEnvironmentVariableA("RDPEUDP_RECOVERY_TRACE", nullptr);
+	(void)SetEnvironmentVariableA("RDPEUDP_RECOVERY_TRACE_LIMIT", nullptr);
+	return rc;
+}
+#endif
+
+/* A live reliable peer is allowed to resend a missing stream chunk under a new DataSeq.
+ * Receipt of later chunks and keepalives is not evidence that that chunk is unrecoverable.
+ * This deliberately exceeds the former 16s ordered-progress guard without allowing peer silence. */
+static BOOL live_peer_can_repair_an_ordered_gap_after_16_seconds(void)
+{
+	BOOL rc = FALSE;
+	TestCtx ctx = { .server = INVALID_SOCKET };
+	CHECK(ctx_connect(&ctx));
+	const V3Out future = { .hasAoA = TRUE,
+		                   .aoa = FIRST_SEQUENCE,
+		                   .hasData = TRUE,
+		                   .dataSeq = FIRST_SEQUENCE + 1,
+		                   .channelSeq = 2,
+		                   .payload = (const BYTE*)"b",
+		                   .payloadLength = 1 };
+	CHECK(server_send_v3(&ctx, &future));
+	CHECK(pump(&ctx));
+	CHECK(delivered_is(&ctx, ""));
+	CHECK(drain(&ctx, 20));
+	const V3Packet* firstAck = last_ack(&ctx);
+	CHECK(firstAck && (firstAck->flags & V3_ACKVEC));
+	CHECK((firstAck->vecBase == FIRST_SEQUENCE) && (firstAck->vecLength == 1));
+	CHECK((firstAck->vec[0] & 3) == 2); /* missing first attempt is not acknowledged */
+
+	const UINT64 start = GetTickCount64();
+	const UINT64 repairAt = start + 17500;
+	UINT64 nextKeepalive = start + 1000;
+	UINT16 nextData = FIRST_SEQUENCE + 2;
+	size_t keepalives = 0;
+	while (GetTickCount64() < repairAt)
+	{
+		const UINT64 now = GetTickCount64();
+		if (now >= nextKeepalive)
+		{
+			const V3Out keepalive = {
+				.dummy = TRUE, .hasData = TRUE, .dataSeq = nextData++, .channelSeq = 0
+			};
+			CHECK(server_send_v3(&ctx, &keepalive));
+			nextKeepalive = now + 1000;
+			keepalives++;
+		}
+		/* Mainloop health is serviced throughout, so a false terminal cannot be hidden by
+		 * delivering the late retransmission before running the timers. */
+		CHECK(pump(&ctx));
+		CHECK(rdpudp_get_state(ctx.udp) == RDPUDP_STATE_ESTABLISHED);
+		CHECK(delivered_is(&ctx, ""));
+		CHECK(drain(&ctx, 0));
+		Sleep(25);
+	}
+	CHECK(keepalives >= 16);
+	const V3Out repair = { .hasAoA = TRUE,
+		                   .aoa = nextData,
+		                   .hasData = TRUE,
+		                   .dataSeq = nextData,
+		                   .channelSeq = 1,
+		                   .payload = (const BYTE*)"a",
+		                   .payloadLength = 1 };
+	CHECK(server_send_v3(&ctx, &repair));
+	CHECK(pump(&ctx));
+	CHECK(rdpudp_get_state(ctx.udp) == RDPUDP_STATE_ESTABLISHED);
+	CHECK(delivered_is(&ctx, "ab")); /* Channel2 survived the entire gap and AoA movement */
+	CHECK(drain(&ctx, 20));
+	const V3Packet* ack = last_ack(&ctx);
+	CHECK(ack && (ack->flags & V3_ACK) && (ack->ack == nextData));
+	rc = TRUE;
+fail:
+	ctx_free(&ctx);
+	return rc;
+}
+
+/* Independently preserve the protocol's peer-silence limit. There is no stream hole or buffered
+ * channel here, so failure cannot be attributed to an ordered-progress policy. */
+static BOOL silent_peer_still_fails_after_16_seconds(void)
+{
+	BOOL rc = FALSE;
+	TestCtx ctx = { .server = INVALID_SOCKET };
+	CHECK(ctx_connect(&ctx));
+	CHECK(send_data(&ctx, FIRST_SEQUENCE, 1, "a"));
+	CHECK(pump(&ctx));
+	CHECK(delivered_is(&ctx, "a"));
+	CHECK(drain(&ctx, 20));
+	Sleep(16500);
+	CHECK(!pump(&ctx));
+	CHECK(rdpudp_get_state(ctx.udp) == RDPUDP_STATE_FAILED);
+	CHECK(delivered_is(&ctx, "a"));
+	rc = TRUE;
+fail:
+	ctx_free(&ctx);
+	return rc;
+}
+
+/* The half-space receive range remains bounded even while the peer stays live. A chunk at the
+ * forward limit cannot be stored, so its attempt must stay negative in real wire feedback. */
+static BOOL channel_out_of_reach_is_not_positively_acknowledged(void)
+{
+	BOOL rc = FALSE;
+	TestCtx ctx = { .server = INVALID_SOCKET };
+	CHECK(ctx_connect(&ctx));
+	const V3Out future = { .hasAoA = TRUE,
+		                   .aoa = FIRST_SEQUENCE,
+		                   .hasData = TRUE,
+		                   .dataSeq = FIRST_SEQUENCE + 1,
+		                   .channelSeq = 2,
+		                   .payload = (const BYTE*)"b",
+		                   .payloadLength = 1 };
+	CHECK(server_send_v3(&ctx, &future));
+	CHECK(pump(&ctx));
+	CHECK(drain(&ctx, 20));
+	CHECK(send_data(&ctx, FIRST_SEQUENCE + 2, 32768, "discarded"));
+	CHECK(pump(&ctx));
+	/* One more retained attempt causes a fresh vector covering the rejected attempt too. */
+	const V3Out dummy = { .dummy = TRUE, .hasData = TRUE, .dataSeq = FIRST_SEQUENCE + 3 };
+	CHECK(server_send_v3(&ctx, &dummy));
+	CHECK(pump(&ctx));
+	CHECK(drain(&ctx, 20));
+	const V3Packet* vector = last_ack(&ctx);
+	CHECK(vector && (vector->flags & V3_ACKVEC));
+	CHECK((vector->vecBase == FIRST_SEQUENCE) && (vector->vecLength == 1));
+	CHECK((vector->vec[0] & 0x0F) == 0x0A); /* 100/102 missing, 101/103 received */
+	CHECK(delivered_is(&ctx, ""));
+	const V3Out repair = { .hasAoA = TRUE,
+		                   .aoa = FIRST_SEQUENCE + 4,
+		                   .hasData = TRUE,
+		                   .dataSeq = FIRST_SEQUENCE + 4,
+		                   .channelSeq = 1,
+		                   .payload = (const BYTE*)"a",
+		                   .payloadLength = 1 };
+	CHECK(server_send_v3(&ctx, &repair));
+	CHECK(pump(&ctx));
+	CHECK(delivered_is(&ctx, "ab"));
+	rc = TRUE;
+fail:
+	ctx_free(&ctx);
+	return rc;
+}
+
 typedef struct
 {
 	const char* name;
@@ -940,6 +1231,17 @@ typedef struct
 } TestCase;
 
 static const TestCase cases[] = {
+	{ "live_peer_can_repair_an_ordered_gap_after_16_seconds",
+	  live_peer_can_repair_an_ordered_gap_after_16_seconds },
+	{ "silent_peer_still_fails_after_16_seconds", silent_peer_still_fails_after_16_seconds },
+	{ "channel_out_of_reach_is_not_positively_acknowledged",
+	  channel_out_of_reach_is_not_positively_acknowledged },
+#if !defined(_WIN32)
+	{ "recovery_trace_records_retention_and_real_ack",
+	  recovery_trace_records_retention_and_real_ack },
+	{ "recovery_trace_overflow_keeps_an_explicit_valid_tail",
+	  recovery_trace_overflow_keeps_an_explicit_valid_tail },
+#endif
 	{ "syn_offers_version_3_with_the_cookie_hash", syn_offers_version_3_with_the_cookie_hash },
 	{ "syn_offers_version_2_without_a_cookie_hash", syn_offers_version_2_without_a_cookie_hash },
 	{ "dummy_packets_are_acknowledged_but_not_delivered",
@@ -948,7 +1250,8 @@ static const TestCase cases[] = {
 	  retransmission_is_reordered_back_into_the_stream },
 	{ "ack_of_acks_advances_the_window_without_touching_the_stream",
 	  ack_of_acks_advances_the_window_without_touching_the_stream },
-	{ "retransmitted_packets_are_acknowledged_again", retransmitted_packets_are_acknowledged_again },
+	{ "retransmitted_packets_are_acknowledged_again",
+	  retransmitted_packets_are_acknowledged_again },
 	{ "retransmitted_channel_data_is_not_delivered_twice",
 	  retransmitted_channel_data_is_not_delivered_twice },
 	{ "gap_produces_an_ack_vector_rather_than_a_cumulative_ack",
@@ -958,22 +1261,33 @@ static const TestCase cases[] = {
 	{ "real_server_ack_with_delayed_acks_and_data", real_server_ack_with_delayed_acks_and_data },
 	{ "ack_of_acks_reports_the_oldest_unacknowledged_packet",
 	  ack_of_acks_reports_the_oldest_unacknowledged_packet },
-	{ "acknowledgements_survive_sequence_wraparound", acknowledgements_survive_sequence_wraparound },
+	{ "acknowledgements_survive_sequence_wraparound",
+	  acknowledgements_survive_sequence_wraparound },
 	{ "ack_of_acks_resyncs_after_a_silence", ack_of_acks_resyncs_after_a_silence },
 };
 
 int TestRdpUdp(int argc, char* argv[])
 {
-	WINPR_UNUSED(argc);
-	WINPR_UNUSED(argv);
+	const char* selected = nullptr;
+	if ((argc == 3) && (strcmp(argv[1], "--case") == 0))
+		selected = argv[2];
+	else if (argc != 1)
+	{
+		(void)fprintf(stderr, "usage: TestRdpUdp [--case exact_case_name]\n");
+		return -1;
+	}
 
 	WSADATA wsaData = { 0 };
 	if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
 		return -1;
 
 	int rc = 0;
+	size_t ran = 0;
 	for (size_t x = 0; x < ARRAYSIZE(cases); x++)
 	{
+		if (selected && (strcmp(selected, cases[x].name) != 0))
+			continue;
+		ran++;
 		const BOOL ok = cases[x].fn();
 		(void)printf("%s %s\n", ok ? "ok    " : "FAILED", cases[x].name);
 		if (!ok)
@@ -981,5 +1295,10 @@ int TestRdpUdp(int argc, char* argv[])
 	}
 
 	WSACleanup();
+	if (ran == 0)
+	{
+		(void)fprintf(stderr, "unknown TestRdpUdp case: %s\n", selected ? selected : "");
+		return -1;
+	}
 	return rc;
 }

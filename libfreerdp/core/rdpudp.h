@@ -34,6 +34,13 @@
  * no larger than rdpudp_get_max_payload(), each of which travels in one datagram, and gets the
  * peer's chunks back in order through the receive callback.
  *
+ * Optional diagnostic tracing (disabled by default): RDPEUDP_RECOVERY_TRACE names an exclusive
+ * JSONL output file, RDPEUDP_RECOVERY_TRACE_LIMIT sets 64..1048576 retained events (default
+ * 262144), and RDPEUDP_RECOVERY_TRACE_ARM optionally names a marker checked about once a second.
+ * Only transport headers and sequence/retention state are recorded. A bounded memory ring retains
+ * the latest events; an overwritten prefix forbids claims of complete history or missing traffic.
+ * Failure/teardown writes synchronously once, so traced runs are diagnostic, not performance runs.
+ *
  * Nothing in here is thread safe, the owner serializes all calls.
  */
 typedef struct rdp_udp rdpUdp;
