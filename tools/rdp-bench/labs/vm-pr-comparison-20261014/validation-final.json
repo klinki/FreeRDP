@@ -1,0 +1,25 @@
+{
+  "scope": "Offline final verification only; no extra timed trials",
+  "fixture_count": 24,
+  "tests": [
+    {
+      "script": "test-process-guard.py",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "..........\n----------------------------------------------------------------------\nRan 10 tests in 0.001s\n\nOK\n"
+    },
+    {
+      "script": "test-report-comparison.py",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "........\n----------------------------------------------------------------------\nRan 8 tests in 0.006s\n\nOK\n"
+    },
+    {
+      "script": "test-image-progress.py",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "......\n----------------------------------------------------------------------\nRan 6 tests in 0.001s\n\nOK\n"
+    }
+  ],
+  "real_capture_smoke": "capture-guard-smoke-8842d07c/offline-validation.json"
+}

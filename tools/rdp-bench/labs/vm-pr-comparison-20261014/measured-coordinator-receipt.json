@@ -1,0 +1,14 @@
+{
+  "scope": "Immutable measured coordinator before future-only packet-capture guard repair",
+  "source": "run-comparison.py",
+  "preserved_source": "run-comparison.measured-20261014.py",
+  "sha256": "b7ff06a819f9cbe719528c4cca9d62d0c9355f7e0c6aea70fd97063356cfc936",
+  "campaigns": [
+    "campaign",
+    "campaign-no-pcap"
+  ],
+  "helpers_sha256": {
+    "owned-exec.py": "bba552ebd37c48f030ed6eaaa8091b4d703ef3cd885b5cb7f67c8935b7119328",
+    "measurement-driver.py": "8c6187e896b3c46d6fc0b5cc18af45092a4a5cdb2963ffdef9d5698a502d692d"
+  }
+}

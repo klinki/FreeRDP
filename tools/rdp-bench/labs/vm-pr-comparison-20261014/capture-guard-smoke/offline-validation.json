@@ -1,0 +1,18 @@
+{
+  "scope": "Offline validation of the sole actual1s guard smoke; original producer result remains unchanged",
+  "raw_automated_pass": false,
+  "raw_failure_reason": "plural-only footer matcher missed singular one-packet count",
+  "source_sha256": {
+    "result.json": "2445ae7fd7ff2e073c74938a8f8d36834ba8ee878ffff7627881844e2903d4d7",
+    "capture.log": "1f885f8497df3daffff82057f8a25314b6b1f5b6ca1baf2a4a72731f451e9c03",
+    "loopback.pcap": "68e220f7b1b0801de1d8f4c7087eca647b203c5aec77c9babd59d3f014360358"
+  },
+  "real_uid_drop_exercised": true,
+  "stop_used_pidfd_guard": true,
+  "fixture_nonce_present": true,
+  "exit_code": 0,
+  "no_live_capture": true,
+  "captured_packets": 1,
+  "kernel_drops": 0,
+  "validated_pass": true
+}

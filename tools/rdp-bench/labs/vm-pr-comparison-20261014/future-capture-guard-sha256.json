@@ -1,0 +1,7 @@
+{
+  "run-comparison.py": "005790cbc93690f62ffb118993344ef0b3fe3ab1d8521f3a17ed68cd92267471",
+  "run-comparison.measured-20261014.py": "b7ff06a819f9cbe719528c4cca9d62d0c9355f7e0c6aea70fd97063356cfc936",
+  "process-guard.py": "088fd71ab7c32922c2d9056056a11422a8c54d354cf9300bbf5e7af8a292acbb",
+  "test-process-guard.py": "b36601e26268e4244ff8d4807acb47012ed6fb087475c83949d55cae7d529173",
+  "capture-guard-smoke.py": "c22c6e167509f2e6af4082abfc0bfd63dff2570d96087a922821ae288c40da86"
+}

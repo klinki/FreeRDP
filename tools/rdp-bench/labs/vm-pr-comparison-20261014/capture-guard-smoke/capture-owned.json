@@ -1,0 +1,20 @@
+{
+  "owner": "8842d07c18814de6aae174e24e8edc9c",
+  "pid": 17261,
+  "start_ticks": 602483,
+  "executable": "/usr/bin/tcpdump",
+  "arguments": [
+    "-i",
+    "lo",
+    "-nn",
+    "-U",
+    "-s",
+    "256",
+    "-w",
+    "/bench/capture-guard-smoke-8842d07c/loopback.pcap",
+    "udp and port 40857"
+  ],
+  "started_utc": "2026-10-14T08:45:59.218208+00:00",
+  "linux_unix_s": 1791967559.2182612,
+  "linux_monotonic_ns": 6024855369081
+}

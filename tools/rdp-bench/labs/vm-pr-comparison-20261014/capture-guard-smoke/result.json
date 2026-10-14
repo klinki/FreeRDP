@@ -1,0 +1,56 @@
+{
+  "scope": "one1s local-loopback UDP process-guard smoke; no VM/RDP traffic",
+  "command": [
+    "/usr/bin/python3",
+    "/bench/owned-exec.py",
+    "--owner",
+    "8842d07c18814de6aae174e24e8edc9c",
+    "--receipt",
+    "/bench/capture-guard-smoke-8842d07c/capture-owned.json",
+    "--executable",
+    "/usr/bin/tcpdump",
+    "--",
+    "-i",
+    "lo",
+    "-nn",
+    "-U",
+    "-s",
+    "256",
+    "-w",
+    "/bench/capture-guard-smoke-8842d07c/loopback.pcap",
+    "udp and port 40857"
+  ],
+  "owner": "8842d07c18814de6aae174e24e8edc9c",
+  "port": 40857,
+  "process_guard_sha256": "ec6a99ff5dd75b1a4fb306620896d174f87d0655a8210728cbabf2fc455d7ada",
+  "live_guard": {
+    "alive": true,
+    "outcome": "SAME_OWNED_PROCESS",
+    "pid": 17261,
+    "start_ticks": 602483,
+    "identity_guard": "pidfd + owner + exact birth time + exact argv + tcpdump comm (exe denied after privilege drop)",
+    "executable": "/usr/bin/tcpdump",
+    "executable_access_denied": true
+  },
+  "fixture_received": true,
+  "capture_duration_s": 1.0006454170006691,
+  "stop_guard": {
+    "alive": true,
+    "outcome": "SIGNALED_OWNED_PROCESS",
+    "pid": 17261,
+    "start_ticks": 602483,
+    "identity_guard": "pidfd + owner + exact birth time + exact argv + tcpdump comm (exe denied after privilege drop)",
+    "executable": "/usr/bin/tcpdump",
+    "executable_access_denied": true,
+    "signal": 2
+  },
+  "exit_code": 0,
+  "after_guard": {
+    "alive": false,
+    "outcome": "ALREADY_EXITED",
+    "pid": 17261
+  },
+  "captured_packets": null,
+  "kernel_drops": 0,
+  "pass": false
+}
