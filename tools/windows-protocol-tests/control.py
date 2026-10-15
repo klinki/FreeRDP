@@ -16,6 +16,8 @@ import subprocess
 import threading
 import uuid
 
+from profiles import CaseOptions
+
 MAX_FIELD = 65536
 
 
@@ -59,12 +61,14 @@ class Request:
                 + message + struct.pack("<I", 0))
 
 
-def connection(payload, expected_port):
+def connection(payload, expected_port, allow_fullscreen=False):
     if len(payload) < 16:
         raise ValueError("Truncated connection parameters")
     kind, port, screen, width, height, approach, length = struct.unpack("<I6H", payload[:16])
-    if kind != 1 or screen != 0 or approach != 0:
-        raise ValueError("Only windowed, negotiated parameter connections are supported")
+    if kind != 1 or approach != 0 or screen not in (0, 1):
+        raise ValueError("Only negotiated parameter connections are supported")
+    if screen == 1 and not allow_fullscreen:
+        raise ValueError("This test does not permit a fullscreen connection")
     if len(payload) != 16 + length:
         raise ValueError("Invalid connection address length")
     address = payload[16:].decode("utf-8")
@@ -72,7 +76,10 @@ def connection(payload, expected_port):
         raise ValueError("The smoke adapter only connects to its configured loopback endpoint")
     if not (200 <= width <= 2048 and 200 <= height <= 2048):
         raise ValueError("Unsupported smoke-test desktop size")
-    return [f"/v:{address}:{port}", f"/size:{width}x{height}"]
+    args = [f"/v:{address}:{port}", f"/size:{width}x{height}"]
+    if screen == 1:
+        args.append("/f")
+    return args
 
 
 def stop_process(process):
@@ -88,21 +95,36 @@ def stop_process(process):
 
 
 class Client:
-    def __init__(self, binary, port, directory, fingerprint, mode):
+    def __init__(self, binary, port, directory, fingerprint, mode,
+                 options=CaseOptions(), graphics_mask=None):
         self.binary = str(binary)
         self.port = port
         self.directory = directory
         self.fingerprint = fingerprint
         self.mode = mode
+        self.options = options
+        self.graphics_mask = graphics_mask
+        if options.graphics and graphics_mask != 0x200:
+            raise ValueError("Graphics cases require the verified compatibility mask")
         self.process = self.log = self.bridge = self.worker = None
         self.errors = []
         self.starts = 0
         self.events = []
 
     def start(self, payload):
-        args = connection(payload, self.port)
+        args = connection(payload, self.port, allow_fullscreen=self.options.graphics)
         self.stop()
         args += ["/u:wpts", "/sec:tls", "-auto-reconnect", "-clipboard", "/audio-mode:2"]
+        if self.options.redirect_drive:
+            share = self.directory / "shared-folder"
+            if "," in str(share):
+                raise ValueError("Redirected-drive tests require an output path without commas")
+            share.mkdir(mode=0o700, exist_ok=True)
+            args.append(f"/drive:wpts,{share}")
+        if self.options.video:
+            args.append("/video")
+        if self.options.graphics:
+            args.append(f"/gfx:AVC444,mask:{self.graphics_mask:#x}")
         environment = dict(os.environ, WLOG_LEVEL="INFO")
         # Keep FreeRDP's configuration/certificate files out of the user's profile.
         environment["XDG_CONFIG_HOME"] = str(self.directory / "config")

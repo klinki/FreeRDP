@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Run a bounded Microsoft RDP connection smoke suite against a local SDL client."""
+"""Run the quick or extended Microsoft RDP tests against a local SDL client."""
 
 import argparse
 from datetime import datetime, timezone
+from dataclasses import asdict
 import hashlib
 import json
 import os
@@ -15,9 +16,9 @@ import time
 import xml.etree.ElementTree as ET
 
 from control import Client, ControlServer, stop_process
+from profiles import (ROOT, PIN, CaseOptions, graphics_compatibility_mask,
+                      options_for, profile_cases, select_cases)
 
-ROOT = Path(__file__).resolve().parent
-PIN = json.loads((ROOT / "suite.json").read_text())
 NS = "http://schemas.microsoft.com/windows/ProtocolsTest/2007/07/TestConfig"
 XSI = "http://www.w3.org/2001/XMLSchema-instance"
 ET.register_namespace("", NS)
@@ -40,7 +41,7 @@ def set_property(root, path, value):
     prop.set("value", str(value))
 
 
-def configure(suite, case_dir, port, agent_port, certificate):
+def configure(suite, case_dir, port, agent_port, certificate, options=CaseOptions()):
     path = suite / "Bin/RDP_ClientTestSuite.ptfconfig"
     tree = ET.parse(path)
     root = tree.getroot()
@@ -62,7 +63,9 @@ def configure(suite, case_dir, port, agent_port, certificate):
         ("ServerDomain",): "localhost", ("ServerUserName",): "wpts", ("ServerUserPassword",): "wpts",
         ("CertificatePath",): certificate, ("CertificatePassword",): "wpts",
         ("IsWindowsImplementation",): "false", ("DropConnectionForInvalidRequest",): "true",
-        ("SupportRDPEFS",): "false", ("VerifyRdpbcgrMessage",): "true", ("WaitTime",): 10,
+        ("SupportRDPEFS",): str(options.redirect_drive).lower(),
+        ("Version",): options.rdp_version,
+        ("VerifyRdpbcgrMessage",): "true", ("WaitTime",): 10,
         ("VerifySUTDisplay", "Enable"): "false",
     }
     for key, value in properties.items():
@@ -103,14 +106,20 @@ def result_from_trx(path, expected):
     return True, "Passed"
 
 
-def run_case(binary, suite, mode, case, destination, certificate, fingerprint, timeout):
+def run_case(binary, suite, mode, case, destination, certificate, fingerprint, timeout,
+             *, options=None, graphics_mask=None):
+    options = options if options is not None else options_for(case)
     destination.mkdir()
     with socket.socket() as reservation:
         reservation.bind(("127.0.0.1", 0))
         port = reservation.getsockname()[1]
-    client = Client(binary, port, destination, fingerprint, mode)
+    client = Client(binary, port, destination, fingerprint, mode, options, graphics_mask)
     server = ControlServer(client)
-    configure(suite, destination, port, server.server_address[1], certificate)
+    try:
+        configure(suite, destination, port, server.server_address[1], certificate, options)
+    except Exception:
+        server.server_close()
+        raise
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     process = None
@@ -149,11 +158,14 @@ def run_case(binary, suite, mode, case, destination, certificate, fingerprint, t
                 problems.append("Bridge did not report a connected session")
             if len(terminal) != 1 or not terminal[0].get("hadConnected"):
                 problems.append("Expected one terminal bridge event after a connected session")
-    return dict(case=case, mode=mode, passed=passed and not problems, detail=detail,
+    return dict(case=case, mode=mode, options=asdict(options), graphics_mask=graphics_mask,
+                passed=passed and not problems, detail=detail,
                 errors=problems, seconds=round(time.monotonic() - started, 2))
 
 
 def run(args):
+    cases = select_cases(args.profile, args.case)
+    options = {case: options_for(case) for case in cases}
     binary, source, output = args.client.resolve(), args.suite.resolve(), args.output.resolve()
     if not binary.is_file() or not os.access(binary, os.X_OK):
         raise ValueError(f"Client must be an executable file: {binary}")
@@ -162,6 +174,12 @@ def run(args):
         raise ValueError("Suite provenance does not match suite.json; run prepare.py")
     if output.exists():
         raise ValueError(f"Results directory already exists; choose a new one: {output}")
+    buildconfig = None
+    graphics_mask = None
+    if any(option.graphics for option in options.values()):
+        buildconfig = subprocess.check_output([str(binary), "/buildconfig"], text=True, timeout=10,
+                                             stderr=subprocess.PIPE)
+        graphics_mask = graphics_compatibility_mask(buildconfig)
     output.mkdir(parents=True, mode=0o700)
     suite = output / "suite"
     shutil.copytree(source, suite)
@@ -176,14 +194,19 @@ def run(args):
         client_sha256=client_hash,
         harness_revision=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         harness_dirty=bool(subprocess.check_output(["git", "status", "--porcelain", "--", str(ROOT)], cwd=ROOT)),
-        started=datetime.now(timezone.utc).isoformat(), cases=args.case or PIN["cases"],
+        started=datetime.now(timezone.utc).isoformat(), profile=args.profile, cases=cases,
+        case_options={case: asdict(option) for case, option in options.items()},
+        graphics_compatibility_mask=graphics_mask, client_buildconfig=buildconfig,
     ))
     results = []
+    print(f"Profile {args.profile}: {len(cases)} cases; mode {args.mode}", flush=True)
     for mode in (["standard", "bridge"] if args.mode == "both" else [args.mode]):
-        for index, case in enumerate(args.case or PIN["cases"], 1):
-            print(f"Running {mode}: {case}", flush=True)
+        for index, case in enumerate(cases, 1):
+            print(f"[{index}/{len(cases)}] Running {mode}: {case}", flush=True)
             result = run_case(binary, suite, mode, case, output / f"{mode}-{index}",
-                              certificate, fingerprint, args.timeout)
+                              certificate, fingerprint, args.timeout, options=options[case],
+                              graphics_mask=graphics_mask if options[case].graphics else None)
+            result["profile"] = args.profile
             results.append(result)
             write_json(output / "summary.json", results)
             print(f"{'PASS' if result['passed'] else 'FAIL'} {mode}: {case}", flush=True)
@@ -191,19 +214,37 @@ def run(args):
     return 0 if all(result["passed"] for result in results) else 1
 
 
-if __name__ == "__main__":
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--client", required=True, type=Path)
+    parser.add_argument("--client", type=Path, help="SDL executable (required unless --list is used)")
     parser.add_argument("--suite", type=Path, default=ROOT / ".cache/suite")
     parser.add_argument("--output", type=Path, default=ROOT / "results" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
     parser.add_argument("--mode", choices=("standard", "bridge", "both"), default="standard")
-    parser.add_argument("--case", choices=PIN["cases"], action="append")
+    parser.add_argument("--profile", choices=tuple(PIN["profiles"]), default="quick")
+    parser.add_argument("--list", action="store_true", help="List selected cases without running them")
+    parser.add_argument("--case", action="append", metavar="TEST_NAME",
+                        help="Run a named case from the selected profile (repeatable)")
     parser.add_argument("--timeout", type=int, default=90)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if args.timeout < 10 or args.timeout > 600:
         parser.error("--timeout must be between 10 and 600 seconds")
-    os.umask(0o077)
     try:
-        raise SystemExit(run(args))
+        cases = select_cases(args.profile, args.case)
+        for case in cases:
+            options_for(case)
+        if args.list:
+            print(f"Profile {args.profile}: {len(cases)} cases")
+            for case in cases:
+                overrides = PIN.get("case_options", {}).get(case, {})
+                print(case + (f"  {json.dumps(overrides, sort_keys=True)}" if overrides else ""))
+            return 0
+        if args.client is None:
+            parser.error("--client is required unless --list is used")
+        os.umask(0o077)
+        return run(args)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError, ET.ParseError) as error:
         parser.exit(1, f"{error}\n")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

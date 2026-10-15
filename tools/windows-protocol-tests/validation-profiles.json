@@ -1,0 +1,179 @@
+{
+  "date": "2026-10-15",
+  "environment": {
+    "os": "macOS 27.0.1",
+    "architecture": "arm64",
+    "python": "3.14.5",
+    "dotnet_sdk": "8.0.425",
+    "graphical_session": true
+  },
+  "microsoft": {
+    "repository": "https://github.com/microsoft/WindowsProtocolTestSuites.git",
+    "revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+    "sdk": "8.0.425"
+  },
+  "client_version": "This is FreeRDP version 3.31.2-dev0 (n/a)",
+  "client_sha256": "9582f1aa14e2549abc05ba8c65fe80a2f4a1617b231d75ffcb83a96125d4cf1c",
+  "harness_parent_revision": "b02e53b7cb47bc6e5b4b1566ca24b7fb06f63b30",
+  "harness_files_sha256": {
+    "prepare.py": "2962b32b5a4c36e91eaa96abaf14c73b6dd6643e203abd86fcdffd734ff69878",
+    "run.py": "3f5e5ba2efbcb0d006d2132493ce6080cf9fcbc327b3ef0fb1212621d521b6a5",
+    "control.py": "100397e4b42344207379e19030cbe3e88403c7d4605eecaf477e7a5d30637c57",
+    "profiles.py": "6a6927681384e78c2bab928e194a3494da1c234c3370db425e8670fbc3c474ee",
+    "suite.json": "00ebe917305f0eac0e41672fd30f991ab2b614e9393b5884e1b812ffa0fd6d95",
+    "test_smoke.py": "ca61c9fbbf14fdcda1572b11e68c38ebc2dae5a4cf366b0f17d5bc9723962866"
+  },
+  "profiles": {
+    "default": "quick",
+    "quick_cases": 6,
+    "extended_cases": 92,
+    "extended_includes_quick": true
+  },
+  "harness_regressions": {
+    "passed": 16,
+    "failed": 0
+  },
+  "live_qualification": {
+    "profile": "extended",
+    "executions": 184,
+    "passed": 184,
+    "failed": 0,
+    "modes": {
+      "standard": {
+        "passed": 92,
+        "seconds": 419.86
+      },
+      "bridge": {
+        "passed": 92,
+        "seconds": 423.45
+      }
+    },
+    "quick_subset": {
+      "passed_executions": 12,
+      "note": "The six quick cases passed in both modes as part of the extended run. Default quick selection was separately checked by the harness regressions."
+    },
+    "passed_cases_in_both_modes": [
+      "BVT_ConnectionTest_ConnectionInitiation_PositiveTest",
+      "BVT_ConnectionTest_BasicSettingExchange_PositiveTest_ExtendedClientDataSupported",
+      "BVT_ConnectionTest_CapabilityExchange_PositiveTest",
+      "BVT_ConnectionTest_Disconnection_PositiveTest_ServerInitiated",
+      "S1_ConnectionTest_ConnectionInitiation_NegativeTest_RDPNegotiationFailure",
+      "S1_ConnectionTest_ConnectionInitiation_NegativeTest_InvalidTPKTHeader",
+      "BVT_ConnectionTest_ChannelConnection_PositiveTest",
+      "BVT_ConnectionTest_SecurityExchange_PositiveTest",
+      "BVT_ConnectionTest_ConnectionFinalization_PositiveTest_BitmapHostCacheSupported",
+      "BVT_ReactivationTest_PositiveTest_BitmapHostCacheSupported",
+      "S2_ReactivationTest_PositiveTest_BitmapHostCacheNotSupported",
+      "S6_AutoDetection_ConnectTime_RTT",
+      "S6_AutoDetection_ConnectTime_bandwidth",
+      "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength",
+      "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength",
+      "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidTKPKLength",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCacheHostSupportCapSet_NotPresent",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCapSet_24ColorDepth",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCapSet_DesktopResizeNotSupported",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCapSet_DrawingFlagsNotSet",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCapSet_MaxDesktopHeight",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCapSet_MaxDesktopWidth",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCodecsCapSet_BitmapCodecCount_LargeValue",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCodecsCapSet_BitmapCodecCount_MaxValue",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCodecsCapSet_NoBitmapCodec",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCodecsCapSet_NotPresent",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_NotPresent",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_FontCapSet_NotPresent",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_GeneralCapSet_FPOutputNotSupported",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_GeneralCapSet_OSTypeUnspecified",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_GeneralCapSet_OSTypeWindowsRT",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_GeneralCapSet_RefreshRectNotSupported",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_GeneralCapSet_SuppressOutputNotSupported",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_InputCapSet_OnlySupportScanCodes",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_LargePointerCapSet_LargePointerNotSupport",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_LargePointerCapSet_NotPresent",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_MultifragmentUpdateCapSet_MaxRequestSizeLargeValue",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_MultifragmentUpdateCapSet_NotPresent",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_OrderCapSet_ExtraFlagNotValid",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_OrderCapSet_SolidPatternBrushOnly",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_PointerCapSet_ColorPointerCacheSize_0",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_PointerCapSet_PointerCacheSize_0",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_SurfaceCommandsCapSet_NotPresent",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_SurfaceCommandsCapSet_StreamSurfaceBitsNotSupported",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_VirtualChannelCapSet_CompressionNotSupport",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_VirtualChannelCapSet_MaxVCChunkSize",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_VirtualChannelCapSet_VCChunkSizeNotPresent",
+      "S1_ConnectionTest_BasicSettingExchange_NegativeTest_InvalidClientReaquestedProtocols",
+      "S1_ConnectionTest_BasicSettingExchange_NegativeTest_InvalidEncodedLength",
+      "S1_ConnectionTest_BasicSettingExchange_NegativeTest_InvalidH221NonStandardkey",
+      "S1_ConnectionTest_BasicSettingExchange_NegativeTest_MCSConnectResponseFailure",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_ExtendedClientDataNotSupported",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_MCSChannelIdOfServerMessageChannelData_LessMaxValue",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_MCSChannelIdOfServerMessageChannelData_MaxValue",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_MCSChannelIdOfServerMessageChannelData_ONE",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_MCSChannelIdOfServerMessageChannelData_ZERO",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_MCSChannelIdOfServerNetworkData_LessMaxValue",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_MCSChannelIdOfServerNetworkData_ONE",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_MCSChannelIdOfServerNetworkData_ZERO",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_RnsUdScDynamicDstSupported",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_V10Server",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_V1RnsUdScEdgeActionsSupported",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_V1andV2RnsUdScEdgeActionsSupported",
+      "S1_ConnectionTest_BasicSettingExchange_PositiveTest_V2RnsUdScEdgeActionsSupported",
+      "S1_ConnectionTest_ChannelConnection_NegativeTest_MCSAttachUserConfirm_Failure",
+      "S1_ConnectionTest_ChannelConnection_NegativeTest_MCSAttachUserConfirm_InitiatorNotPresent",
+      "S1_ConnectionTest_ChannelConnection_NegativeTest_MCSAttachUserConfirm_InvalidTPKTLength",
+      "S1_ConnectionTest_ChannelConnection_NegativeTest_MCSChannelJoinConfirm_ChannelIdNotPresent",
+      "S1_ConnectionTest_ChannelConnection_NegativeTest_MCSChannelJoinConfirm_Failure",
+      "S1_ConnectionTest_ChannelConnection_NegativeTest_MCSChannelJoinConfirm_InvalidChannelId",
+      "S1_ConnectionTest_ChannelConnection_NegativeTest_MCSChannelJoinConfirm_InvalidTPKTLength",
+      "S1_ConnectionTest_ConnectionFinalization_PositiveTest_BitmapHostCacheNotSupported",
+      "S1_ConnectionTest_ConnectionFinalization_PositiveTest_BitmapHostCacheSupported_sequenceTest_1",
+      "S1_ConnectionTest_ConnectionFinalization_PositiveTest_BitmapHostCacheSupported_sequenceTest_2",
+      "S1_ConnectionTest_ConnectionFinalization_PositiveTest_BitmapHostCacheSupported_sequenceTest_3",
+      "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "S1_ConnectionTest_ConnectionInitiation_NegativeTest_InvalidRDPNegData",
+      "S1_ConnectionTest_ConnectionInitiation_PositiveTest_FlagsOfRdpNegRsp_SupportAllProtocols",
+      "S1_ConnectionTest_ConnectionInitiation_PositiveTest_RDPNegotiationFailure",
+      "S1_ConnectionTest_SecurityExchange_NegativeTest_LicenseError_InvalidFlag",
+      "S1_ConnectionTest_SecurityExchange_NegativeTest_LicenseError_InvalidMCSLength",
+      "S1_ConnectionTest_SecurityExchange_NegativeTest_LicenseError_InvalidTKPKLength",
+      "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength",
+      "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength",
+      "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTotalLenth",
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_LargePointerCapSet_ExtraLargePointerSupport",
+      "S6_AutoDetection_Continuous_RTT",
+      "S6_AutoDetection_Continuous_bandwidth",
+      "Rdpevor_ProtocolSupportTest_Positive",
+      "RDPEGFX_CapabilityExchange_PositiveTest",
+      "RDPEGFX_H264Codec_PositiveTest_AVC420_BaseProfile"
+    ],
+    "case_options": {
+      "S1_ConnectionTest_CapabilityExchange_PositiveTest_LargePointerCapSet_ExtraLargePointerSupport": {
+        "rdp_version": "10.8"
+      },
+      "S6_AutoDetection_Continuous_RTT": {
+        "redirect_drive": true
+      },
+      "S6_AutoDetection_Continuous_bandwidth": {
+        "redirect_drive": true
+      },
+      "Rdpevor_ProtocolSupportTest_Positive": {
+        "video": true
+      },
+      "RDPEGFX_CapabilityExchange_PositiveTest": {
+        "graphics": true
+      },
+      "RDPEGFX_H264Codec_PositiveTest_AVC420_BaseProfile": {
+        "graphics": true
+      }
+    }
+  },
+  "graphics_compatibility": {
+    "mask": "0x200",
+    "WITH_GFX_AV1": "OFF",
+    "WITH_GFX_AZURE": "OFF",
+    "scope": "Only the two graphics cases filter legacy alias 0x000A0601. Protocol responses and frame acknowledgements were verified; rendered pixels were not compared."
+  },
+  "limitations": "Local macOS qualification only. Excludes NLA, automatic reconnect, UDP, drive file operations, input/display automation and visual/hardware validation. Scratch drive is a prerequisite for continuous network tests, not validation of file redirection.",
+  "evidence_directory": "results/profiles-qualification-20261015 (ignored local artifacts)",
+  "summary_sha256": "185c5efc21d560db4b46ef092b2c4e0ee3e6c192e1e29074beaea94a9301e332"
+}

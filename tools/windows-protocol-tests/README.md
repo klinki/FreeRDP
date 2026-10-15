@@ -1,11 +1,25 @@
-# Microsoft RDP protocol smoke tests
+# Microsoft RDP protocol tests
 
-Run six selected tests from Microsoft's **RDP Client Endpoint Test Suite** against
-the local FreeRDP SDL3 executable. The Microsoft driver acts as the RDP server;
-no Windows VM, remote desktop account, or Sheltie checkout is needed for these
-cases. The client opens short-lived windows in the current graphical session.
+Run selected tests from Microsoft's **RDP Client Endpoint Test Suite** against the
+local FreeRDP SDL3 executable. The Microsoft driver acts as the RDP server; no
+Windows VM, remote desktop account, or Sheltie checkout is needed. The client
+opens short-lived windows in the current graphical session.
 
-`suite.json` pins the upstream source revision and the exact test allowlist:
+Choose one of two profiles; `quick` is the default:
+
+| Profile | Cases | Purpose |
+| --- | ---: | --- |
+| `quick` | 6 | Connection setup, server disconnect and malformed connection responses |
+| `extended` | 92 | Includes quick, 80 additional connection/protocol cases, and six cases with audited settings |
+
+Launch mode is independent: `--mode standard`, `bridge`, or `both`. Both modes
+produce 12 executions for quick and 184 for extended. On the qualification Mac,
+quick took under a minute in both modes; extended takes approximately 13 minutes.
+Timings depend on the machine and failures can take longer.
+
+[`suite.json`](suite.json) pins the Microsoft revision and lists all cases.
+Extended includes quick by reference, so a case is never duplicated. The six
+quick cases are:
 
 | Case | Coverage |
 | --- | --- |
@@ -15,6 +29,28 @@ cases. The client opens short-lived windows in the current graphical session.
 | `BVT_ConnectionTest_Disconnection_PositiveTest_ServerInitiated` | Connected session and server-initiated disconnect |
 | `S1_ConnectionTest_ConnectionInitiation_NegativeTest_RDPNegotiationFailure` | Rejection of failed negotiation |
 | `S1_ConnectionTest_ConnectionInitiation_NegativeTest_InvalidTPKTHeader` | Disconnect after a malformed connection response |
+
+The 80 additional baseline cases cover capability exchange (35), basic settings
+(17), channel setup (8), finalization/reactivation (7), negotiation/licensing/
+disconnect/malformed input (11), and connection-time network detection (2).
+
+Six extended cases have settings applied only for that case:
+
+| Cases | Configuration |
+| --- | --- |
+| Extra-large pointer capabilities | Test-suite RDP version 10.8 |
+| Continuous RTT and bandwidth detection | `SupportRDPEFS=true` and a new empty redirected folder under that case's results |
+| Video-channel protocol support | `/video` |
+| Graphics capability exchange and H.264 AVC420 baseline | Honor fullscreen requests; `/gfx:AVC444,mask:0x200` |
+
+The graphics mask removes only FreeRDP's legacy 10.6 errata alias `0x000A0601`,
+which the pinned Microsoft validator rejects. It is confined to these two
+compatibility tests, not a change to the engine's defaults. Mask bit positions
+depend on build options: these cases require `/buildconfig` to explicitly report
+`WITH_GFX_AV1=OFF` and `WITH_GFX_AZURE=OFF`. Unknown or different configurations
+fail before running; use a supported build or select non-graphics cases.
+The remaining cases keep the normal capability advertisement. The graphics
+tests check protocol responses and frame acknowledgements, not pixel accuracy.
 
 ## Prepare
 
@@ -48,21 +84,41 @@ Build the SDL client using the normal FreeRDP build instructions, with
 
 ## Run
 
+The default quick profile:
+
 ```sh
 python3 tools/windows-protocol-tests/run.py \
   --client build/launcher/client/SDL/SDL3/sdl-freerdp \
   --mode both
 ```
 
+The complete extended profile:
+
+```sh
+python3 tools/windows-protocol-tests/run.py \
+  --client build/launcher/client/SDL/SDL3/sdl-freerdp \
+  --profile extended --mode both
+```
+
+Inspect a profile without a client, prepared Microsoft suite, or network access:
+
+```sh
+python3 tools/windows-protocol-tests/run.py --list
+python3 tools/windows-protocol-tests/run.py --profile extended --list
+```
+
 `standard` (the default) launches the SDL binary directly. `bridge` starts it
 through its private inherited socket and responds to authentication/certificate
-requests. `both` runs the same six tests in each mode, serially. Bridge mode also
+requests. `both` runs the selected profile in each mode, serially. Bridge mode also
 requires a connected state and exactly one terminal event with `hadConnected`
 for the server-disconnect case. It does not run the Swift launcher UI.
 
-To select one case, use `--case` (repeatable). `--suite` selects another prepared
-suite directory; `--output` selects a **new** results directory. Each case has a
-90-second deadline, configurable with `--timeout` from 10 to 600 seconds.
+To select individual cases, use `--case` (repeatable). Cases must belong to the
+selected profile; duplicates and unknown names are errors. Extended-only cases
+require `--profile extended`. `--suite` selects another prepared suite directory;
+`--output` selects a **new** results directory. Each driver invocation has a
+90-second deadline, configurable with `--timeout` from 10 to 600 seconds, followed
+by bounded cleanup.
 
 ```sh
 python3 tools/windows-protocol-tests/run.py \
@@ -72,11 +128,13 @@ python3 tools/windows-protocol-tests/run.py \
 ```
 
 Every run copies the suite into its output directory, so configuration changes
-and PTF logs do not alter the prepared build or another run. Results include:
+and PTF logs do not alter the prepared build or another run. RDP version, drive
+support and client arguments reset between cases. Results include:
 
-- `summary.json`: per-case verdict, errors, mode and elapsed time.
+- `summary.json`: per-case verdict, errors, profile, mode, options and elapsed time.
 - `provenance.json`: pinned Microsoft revision, SDK, executable path/version/hash,
-  selected cases, harness Git revision and working-tree status.
+  selected profile/cases/options, harness Git revision and working-tree status.
+  Graphics runs also record the client build configuration and compatibility mask.
 - Per-case `result.trx`, `driver.log`, client logs, PTF logs and bridge events.
 - The generated test certificate and the configured suite used for reproduction.
 
@@ -101,17 +159,23 @@ and cache directories are isolated under the results directory. Result files
 are created with owner-only permissions. The harness does not install the test
 certificate into a system trust store.
 
-These are connection/protocol regressions, not an interoperability certificate
-or a rendering test. NLA/CredSSP, automatic reconnect, UDP, graphics comparison,
-display changes, clipboard/audio/drives and physical monitor testing are outside
-this initial allowlist. The control adapter deliberately implements only
-start/stop; extending the allowlist requires implementing any additional
-control commands and testing their failure behavior. Upstream test assertions
-remain unchanged, including rejection of malformed responses.
+These are protocol regressions, not an interoperability certificate or a visual
+comparison test. NLA/CredSSP, automatic reconnect, UDP, screenshot comparison,
+display changes, clipboard/audio/drive file operations and physical monitors
+remain outside the allowlists. The scratch drive satisfies the continuous
+network tests' prerequisite; it does not establish that file redirection works.
+
+The audit's two static-channel/drive checks and two reliable-UDP probes still
+need investigation and are excluded. The legacy RDP encryption signature check
+is also excluded: under TLS it returns without exercising the client. Upstream
+test assertions are unchanged. The adapter supports start/stop, including
+fullscreen startup only for graphics cases. Unsupported control commands fail
+explicitly.
 
 The live suite is opt-in and is not a release gate. It has been exercised on an
 Apple Silicon Mac with a logged-in graphical session; other platforms are not
-yet validated. See [validation.json](validation.json) for the recorded run.
+yet validated. See [validation-profiles.json](validation-profiles.json) for profile
+qualification and [validation.json](validation.json) for the original smoke run.
 
 ## Harness regression tests
 
@@ -120,9 +184,10 @@ python3 -m unittest discover -s tools/windows-protocol-tests -p 'test_*.py' -v
 ```
 
 These require local socket access, but no .NET, FreeRDP binary, or external
-network. They check fragmented/truncated control messages, destination
-restrictions, unsupported commands, result validation, configuration scoping,
-and cleanup without terminating another client process.
+network. They check profile selection/inheritance, case-specific arguments and
+configuration reset, graphics preflight, fragmented/truncated control messages,
+destination restrictions, unsupported commands, result validation, and cleanup
+without terminating another client process.
 
 References: [Microsoft suite](https://github.com/microsoft/WindowsProtocolTestSuites),
 [RDP client guide](https://github.com/microsoft/WindowsProtocolTestSuites/blob/29ddb4238a5443b7499e82934c90cc898861c5e7/TestSuites/RDP/Client/docs/RDP_ClientUserGuide.md),
