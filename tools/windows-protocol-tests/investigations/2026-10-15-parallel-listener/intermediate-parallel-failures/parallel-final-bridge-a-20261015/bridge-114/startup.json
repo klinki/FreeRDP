@@ -1,0 +1,25 @@
+{
+  "started": "2026-10-15T13:23:27.700709+00:00",
+  "finished": "2026-10-15T13:24:28.082350+00:00",
+  "runner_pid": 54113,
+  "driver_pid": 61777,
+  "requested_endpoint": {
+    "address": "127.0.0.1",
+    "port": 0
+  },
+  "control_endpoint": {
+    "address": "127.0.0.1",
+    "port": 63583
+  },
+  "listener": {
+    "version": 1,
+    "address": "127.0.0.1",
+    "port": 63607,
+    "pid": 61785
+  },
+  "driver_exit": 1,
+  "deadline_error": "",
+  "client_launches": 1,
+  "adapter_errors": [],
+  "adapter_error_details": []
+}

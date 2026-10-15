@@ -1,0 +1,28 @@
+{
+  "suite_bin": "/private/tmp/wpts-parallel-suite-final-20261015/Bin",
+  "sdk": "8.0.425",
+  "assembly_sha256": {
+    "RDP_ClientAdapter.dll": "2e0d4ab54ca209da942617b56bf47e7ef2b69b75c967792535309fa0dad9805e",
+    "Microsoft.Protocols.TestTools.StackSdk.dll": "0a208c595f1ae43039a8796ce49d1ff13a5c9f7ff6f7310fe87fff840994baeb",
+    "Microsoft.Protocols.TestTools.StackSdk.Transport.dll": "da6cac779e563c32f2d1f8b5659f2d48730ff3796d50dcd97e2feff5b1bc5cb9",
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.dll": "654c9940f5896a8862ed659be5f496b9a1864ef65b2b7490a29a7fba165069a0"
+  },
+  "program_sha256": "18c0b99648fc24647a6b6ee9f31f4d7bc143bfb154064343d02f3940a77505a3",
+  "exit_code": 0,
+  "passed": [
+    "new_connection_before_original_disconnect_is_preserved",
+    "new_connection_packets_are_preserved_for_later_expect_pdu",
+    "unknown_session_events_are_preserved_in_transport_order",
+    "new_connection_alone_does_not_satisfy_disconnect",
+    "racing_connections_preserve_order_and_decoder_failure",
+    "ordinary_packet_requires_timeout",
+    "matching_disconnect_succeeds",
+    "ordinary_packet_then_disconnect_succeeds",
+    "decoder_exception_is_not_disconnect",
+    "other_session_disconnect_is_rejected",
+    "tls_eof_is_disconnect",
+    "tls_connection_reset_is_disconnect"
+  ],
+  "failed": [],
+  "frames": []
+}

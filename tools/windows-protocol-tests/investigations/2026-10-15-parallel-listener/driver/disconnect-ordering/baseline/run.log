@@ -1,0 +1,13 @@
+FAIL new_connection_before_original_disconnect_is_preserved: InvalidOperationException: Unknown object received in transport.
+FAIL new_connection_packets_are_preserved_for_later_expect_pdu: InvalidOperationException: Unknown object received in transport.
+FAIL unknown_session_events_are_preserved_in_transport_order: InvalidOperationException: Unknown object received in transport.
+FAIL new_connection_alone_does_not_satisfy_disconnect: InvalidOperationException: Unknown object received in transport.
+FAIL racing_connections_preserve_order_and_decoder_failure: Exception: Original exception was lost
+PASS ordinary_packet_requires_timeout
+PASS matching_disconnect_succeeds
+PASS ordinary_packet_then_disconnect_succeeds
+PASS decoder_exception_is_not_disconnect
+PASS other_session_disconnect_is_rejected
+PASS tls_eof_is_disconnect
+PASS tls_connection_reset_is_disconnect
+7/12 passed

@@ -16,6 +16,7 @@ import socketserver
 import struct
 import subprocess
 import threading
+import traceback
 import uuid
 
 from profiles import CaseOptions
@@ -84,15 +85,29 @@ def connection(payload, expected_port, allow_fullscreen=False):
     return args
 
 
-def stop_process(process):
-    if process is not None and process.poll() is None:
+def signal_process_group(process, number):
+    try:
+        os.killpg(process.pid, number)
+    except PermissionError as failure:
+        # macOS can return EPERM while an owned child is exiting, before it is
+        # reapable, as well as for its zombie group. Use the existing cleanup
+        # phase deadline to confirm exit; an immediate poll misses that window.
+        # Never suppress a denied signal unless waitpid proves the child exited.
         try:
-            os.killpg(process.pid, signal.SIGTERM)
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
+            raise failure from None
+    except ProcessLookupError:
+        pass  # The bounded wait below must still reap the owned child.
+
+
+def stop_process(process):
+    if process is not None and process.poll() is None:
+        signal_process_group(process, signal.SIGTERM)
+        try:
             process.wait(timeout=5)
-        except ProcessLookupError:
+        except subprocess.TimeoutExpired:
+            signal_process_group(process, signal.SIGKILL)
             process.wait(timeout=5)
 
 
@@ -197,7 +212,8 @@ class ReconnectRelay:
 
 class Client:
     def __init__(self, binary, port, directory, fingerprint, mode,
-                 options=CaseOptions(), graphics_mask=None):
+                 options=CaseOptions(), graphics_mask=None, *, listener=None):
+        self.listener = listener
         self.binary = str(binary)
         self.port = port
         self.directory = directory
@@ -217,6 +233,8 @@ class Client:
         self.graceful_closes = 0
 
     def start(self, payload):
+        if self.listener is not None:
+            self.port = self.listener.read()["port"]
         args = connection(payload, self.port, allow_fullscreen=self.options.graphics)
         self.stop()
         args += ["/u:wpts", "/sec:tls", "-clipboard", "/audio-mode:2"]
@@ -351,7 +369,15 @@ class ControlServer(socketserver.TCPServer):
     def __init__(self, client):
         self.client = client
         self.failures = []
+        self.failure_details = []
         super().__init__(("127.0.0.1", 0), ControlHandler)
+
+    def record_failure(self, error, *, command=None, stage):
+        self.failures.append(str(error))
+        self.failure_details.append(dict(
+            stage=stage, command=command, exception=type(error).__name__,
+            message=str(error), traceback=traceback.format_exc(),
+        ))
 
 
 class ControlHandler(socketserver.BaseRequestHandler):
@@ -360,7 +386,7 @@ class ControlHandler(socketserver.BaseRequestHandler):
         try:
             request = Request.read(self.request)
         except (OSError, ValueError, EOFError) as error:
-            self.server.failures.append(str(error))
+            self.server.record_failure(error, stage="read-request")
             return
         error = ""
         try:
@@ -377,5 +403,8 @@ class ControlHandler(socketserver.BaseRequestHandler):
                 raise ValueError(f"Unsupported SUT command: {request.command}")
         except (OSError, ValueError, subprocess.SubprocessError) as failure:
             error = str(failure)
-            self.server.failures.append(error)
-        self.request.sendall(request.response(error))
+            self.server.record_failure(failure, command=request.command, stage="execute-command")
+        try:
+            self.request.sendall(request.response(error))
+        except OSError as failure:
+            self.server.record_failure(failure, command=request.command, stage="send-response")

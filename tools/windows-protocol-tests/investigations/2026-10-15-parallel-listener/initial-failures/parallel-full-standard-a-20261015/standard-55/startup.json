@@ -1,0 +1,26 @@
+{
+  "started": "2026-10-15T12:44:51.640548+00:00",
+  "finished": "2026-10-15T12:45:07.703590+00:00",
+  "runner_pid": 41742,
+  "driver_pid": 44961,
+  "requested_endpoint": {
+    "address": "127.0.0.1",
+    "port": 0
+  },
+  "control_endpoint": {
+    "address": "127.0.0.1",
+    "port": 54357
+  },
+  "listener": {
+    "version": 1,
+    "address": "127.0.0.1",
+    "port": 54390,
+    "pid": 44965
+  },
+  "driver_exit": 0,
+  "deadline_error": "",
+  "client_launches": 1,
+  "adapter_errors": [
+    "[Errno 1] Operation not permitted"
+  ]
+}

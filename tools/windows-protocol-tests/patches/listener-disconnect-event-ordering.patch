@@ -1,0 +1,77 @@
+diff --git a/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs b/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs
+index 9391de0..f2d828b 100644
+--- a/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs
++++ b/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs
+@@ -51,6 +51,10 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+         //Store the unconsumed disconnect TransportEvent which received from high layer transport.
+         private List<TransportEvent> disconnectTransportEventCache;
+ 
++        // A new connection can race the receive thread's old-session EOF event.
++        // Keep unrelated events for the next normal transport consumer.
++        private readonly Queue<TransportEvent> deferredTransportEvents = new Queue<TransportEvent>();
++
+         private TS_SECURITY_HEADER_flags_Values defaultSecurityHeaderFlag = TS_SECURITY_HEADER_flags_Values.None;
+ 
+         private bool isClientToServerEncrypted;
+@@ -314,7 +318,8 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+                 DateTime deadline = DateTime.UtcNow + timeout;
+                 while (DateTime.UtcNow < deadline)
+                 {
+-                    TransportEvent transportEvent = ExpectTransportEvent(deadline - DateTime.UtcNow);
++                    // Do not consume events deferred by this wait again.
++                    TransportEvent transportEvent = ReadTransportEvent(deadline - DateTime.UtcNow);
+                     if (transportEvent.EventType == EventType.Disconnected)
+                     {
+                         RdpbcgrServerSessionContext session = this.serverContext.LookupSession(transportEvent.EndPoint);
+@@ -333,6 +338,17 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+                         {
+                             session.AddPacketToBuffer((StackPacket)transportEvent.EventObject);
+                         }
++                        else
++                        {
++                            lock (deferredTransportEvents)
++                                deferredTransportEvents.Enqueue(transportEvent);
++                        }
++                    }
++                    else if (transportEvent.EventType == EventType.Connected)
++                    {
++                        // This is not evidence that the requested session closed.
++                        lock (deferredTransportEvents)
++                            deferredTransportEvents.Enqueue(transportEvent);
+                     }
+                     else if (transportEvent.EventType == EventType.Exception)
+                     {
+@@ -340,7 +356,7 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+                     }
+                     else
+                     {
+-                        throw new InvalidOperationException("Unknown object received in transport.");
++                        throw new InvalidOperationException($"Unexpected transport event {transportEvent.EventType} from {transportEvent.EndPoint} while waiting for {sessionContext.Identity} to disconnect.");
+                     }
+                 }
+                 throw new TimeoutException(ConstValue.TIMEOUT_EXCEPTION);
+@@ -3924,6 +3940,16 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+         /// <param name="timeout">Time for expecting transport event.</param>
+         /// <returns></returns>
+         public TransportEvent ExpectTransportEvent(TimeSpan timeout)
++        {
++            lock (deferredTransportEvents)
++            {
++                if (deferredTransportEvents.Count > 0)
++                    return deferredTransportEvents.Dequeue();
++            }
++            return ReadTransportEvent(timeout);
++        }
++
++        private TransportEvent ReadTransportEvent(TimeSpan timeout)
+         {
+             if (timeout.TotalMilliseconds < 0)
+             {
+@@ -4527,6 +4553,7 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+                     }
+ 
+                     disconnectTransportEventCache.Clear();
++                    deferredTransportEvents.Clear();
+                 }
+ 
+                 //Note disposing has been done.

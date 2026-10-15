@@ -1,0 +1,17 @@
+PASS tls_start_is_ready_and_reports_os_port
+PASS negotiated_credssp_listener_readiness
+PASS direct_credssp_listener_readiness_without_authentication
+SOCKET NegotiationTls: AddressAlreadyInUse native=48
+CLEANUP retry and rebind succeeded on 49776
+PASS tls_occupied_port_throws_and_cleans_up_for_retry
+SOCKET NegotiationCredSsp: AddressAlreadyInUse native=48
+CLEANUP retry and rebind succeeded on 49777
+PASS negotiated_credssp_occupied_port_throws_and_cleans_up
+SOCKET DirectCredSsp: AddressAlreadyInUse native=48
+CLEANUP retry and rebind succeeded on 49778
+PASS direct_credssp_occupied_port_throws_and_cleans_up
+PASS fixed_port_stop_restart_keeps_queue_clean
+PARALLEL 32 distinct listeners accepted connections: 49781,49806,49807,49790,49801,49810,49787,49798,49808,49788,49800,49809,49791,49802,49811,49782,49793,49804,49785,49795,49797,49783,49792,49803,49784,49794,49805,49786,49796,49812,49789,49799
+PASS 32_parallel_kernel_selected_listeners_accept
+PASS standard_rdp_fixed_port_remains_ready
+9/9 passed

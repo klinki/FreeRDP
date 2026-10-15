@@ -1,0 +1,43 @@
+[14:44:37:801] [44796:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[14:44:38:638] [44796:6bc8f001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: *************************************************
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: This build is using [experimental] build options:
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: * 'WITH_VAAPI_H264_ENCODING=ON'
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: * 'WITH_VIDEOTOOLBOX=ON'
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: *
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: [experimental] build options might crash the application
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: *************************************************
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: *************************************************
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: This build is using [runtime-check] build options:
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: * 'WITH_VERBOSE_WINPR_ASSERT=ON'
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: *
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: [runtime-check] build options might slow down the application
+[14:44:38:656] [44796:6bc8f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108a70cd0]: *************************************************
+[14:44:38:909] [44796:6bc8f001] [WARN][com.freerdp.crypto] - [verify_cb]: Certificate verification failure 'self-signed certificate (18)' at stack position 0
+[14:44:38:910] [44796:6bc8f001] [WARN][com.freerdp.crypto] - [verify_cb]: CN = localhost
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [x509_utils_from_pem]: BIO_new failed for certificate
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @           WARNING: CERTIFICATE NAME MISMATCH!           @
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: The hostname used for this connection (127.0.0.1:54287) 
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: does not match the name given in the certificate:
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: Common Name (CN):
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: 	localhost
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: A valid certificate for the wrong name should NOT be trusted!
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: The host key for 127.0.0.1:54287 has changed
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: It is also possible that a host key has just been changed.
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: The fingerprint for the host key sent by the remote host is 54:de:75:d7:b4:25:d8:d2:51:b8:2b:01:39:12:26:04:0e:d6:df:9f:6a:c3:a3:b4:5f:8f:ba:ea:df:42:7c:48
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Please contact your system administrator.
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Add correct host key in /Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/results/parallel-full-bridge-b-20261015/bridge-53/config/freerdp/server/127.0.0.1_54287.pem to get rid of this message.
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Host key for 127.0.0.1 has changed and you have requested  checking.
+[14:44:38:912] [44796:6bc8f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Host key verification failed.
+[14:44:47:916] [44796:6bc8f001] [ERROR][com.freerdp.core.connection] - [rdp_client_wait_for_activation]: Timeout waiting for activation
+[14:44:47:916] [44796:6bc8f001] [ERROR][com.freerdp.core] - [rdp_client_wait_for_activation]: ERRCONNECT_ACTIVATION_TIMEOUT [0x0002001C]
+[14:44:47:916] [44796:6bc8f001] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[14:44:38:642] [44796:6bc8f001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[14:44:38:651] [44796:6bc8f001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding

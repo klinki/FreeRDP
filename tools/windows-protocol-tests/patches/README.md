@@ -16,6 +16,12 @@ patch paths and hashes; `run.py` rejects a stale or unpatched suite.
 | `udp-rdpeudp2-driver.patch` | Repair optional ACK handling, ACK-vector offsets without timestamps, and cumulative ACK matching across sequence wraparound. |
 | `udp-listener-shutdown.patch` | Wake the blocking local UDP receive before closing the listener on macOS. |
 | `tpkt-short-length-fixtures.patch` | Repair the disconnect and slow-path zero-length underflow; serialize encrypted slow-path packets once before changing their TPKT length. |
+| `listener-startup-readiness.patch` | Bind/listen synchronously, retain the actual OS-selected loopback port, publish readiness atomically, preserve full socket errors and avoid an idle accept busy loop. |
+| `listener-disconnect-event-ordering.patch` | Preserve retry connections and their packets while waiting for the original session to close; a new connection alone never satisfies disconnect. |
+| `udp-tls-callback-publication.patch` | Initialize the TLS receive buffer before publishing its callback to the UDP receive thread. |
+
+The [parallel investigation](../investigations/2026-10-15-parallel-listener/README.md)
+records startup, cleanup and event-ordering reproductions and concurrency evidence.
 
 The [restoration report](../investigations/2026-10-15-restored-negative-tests/README.md)
 records final native/fixture repairs and full two-mode qualification.

@@ -17,11 +17,12 @@ short description, pinned source link and explanation for every excluded case.
 
 Launch mode is independent: `--mode standard`, `bridge`, or `both`. Both modes
 produce 12 executions for quick and 240 for extended. The current
-[qualification record](validation-restored.json) contains complete passing
-standard and serial bridge runs on the repaired native client and final
-eight-patch driver. An initial parallel bridge attempt failed during listener
-startup before RDP; that attempt and its successful serial requalification are
-preserved in the record.
+[qualification record](validation-parallel.json) contains **480/480 passing
+executions** on the final eleven-patch driver: four concurrent full extended runs,
+two standard and two bridge. The [parallel investigation](investigations/2026-10-15-parallel-listener/README.md)
+records listener readiness, cleanup and event-ordering repairs, with startup
+metadata and a simultaneous four-listener socket snapshot. Earlier failed
+attempts remain preserved separately. The six quick cases passed in every worker.
 
 The [restoration report](investigations/2026-10-15-restored-negative-tests/README.md)
 records the production fixes, native regressions and all five restored cases.
@@ -92,7 +93,8 @@ python3 tools/windows-protocol-tests/prepare.py \
 A prepared suite from before these repairs is rejected by the runner. Rebuild
 and pass `--suite /path/to/new-suite`. The driver repairs fix malformed drive
 prerequisites, false disconnect detection, RDPEUDP2 ACK handling/shutdown, the
-required piggyback fixture, missing reconnect observation and short-TPKT fixtures. Graceful close
+required piggyback fixture, missing reconnect observation, short-TPKT fixtures,
+listener readiness and racing retry-connection events during disconnect checks. Graceful close
 accepts the alternative sequence explicitly permitted by MS-RDPBCGR. None
 changes production FreeRDP behavior or relaxes a required disconnect assertion.
 
@@ -123,9 +125,13 @@ unknown names and duplicates fail. `--suite` selects another prepared build and
 
 `standard` launches SDL directly; `bridge` uses its inherited private socket and
 authentication/certificate messages. It does not run the Swift launcher UI.
-`both` executes modes serially. Each run copies its prepared suite so configuration
+`both` executes modes serially. To run concurrently, launch independent runner
+processes, each with its own results directory (the default creates a unique
+private directory atomically). Each run copies its prepared suite so configuration
 and PTF logs do not alter another run. Results include `summary.json`, provenance,
-exact-name TRX, driver/client/PTF logs and bridge events. Reconnect/close action
+exact-name TRX, driver/client/PTF logs, bridge events and per-case `startup.json`.
+Startup diagnostics retain listener/control endpoints, process IDs, timestamps,
+driver exit status and adapter exception details. Reconnect/close action
 counts are recorded. A pass requires an actual matching TRX Passed result,
 successful driver exit, one client launch and no adapter/bridge errors. Reconnect
 requires the intended interruption and second connection; bridge mode also
@@ -133,11 +139,14 @@ checks reconnect state transitions. Skips, no-test passes and timeouts fail.
 
 ## Environment and limits
 
-The control adapter and reconnect relay bind only loopback and accept only the
-configured test endpoint. They never execute driver-supplied command strings or
-change host interfaces/routes. **Microsoft's upstream RDP listener binds all
-IPv4 interfaces** on an ephemeral port during each case; use a trusted test
-machine/network. No firewall settings are changed.
+The Microsoft RDP listener, control adapter and reconnect relay bind only IPv4
+loopback in this runner. The real Microsoft listener selects and retains an
+OS-assigned port, then atomically publishes readiness after bind/listen succeed.
+The client starts only after validating the case token, endpoint and owned driver
+process group; no TCP readiness probe consumes a connection. This prevents stale
+or cross-case handoffs, but does not isolate processes running as the same OS user.
+The adapter accepts only the published test endpoint and never executes
+driver-supplied command strings or changes host interfaces/routes.
 
 Credentials are synthetic `wpts` / `wpts`. Each run generates a one-day TLS
 certificate, pinned by SHA-256 in standard mode and accepted only once for the

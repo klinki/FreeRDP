@@ -1060,7 +1060,7 @@
   "qualification": {
     "date": "2026-10-15",
     "cases": 120,
-    "executions": 240,
-    "record": "validation-restored.json"
+    "executions": 480,
+    "record": "validation-parallel.json"
   }
 }

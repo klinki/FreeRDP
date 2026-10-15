@@ -1,0 +1,25 @@
+{
+  "suite_bin": "/private/tmp/wpts-parallel-suite-20261015/Bin",
+  "sdk": "8.0.425",
+  "assembly_sha256": {
+    "RDP_ClientAdapter.dll": "1612244dbad40ad78ae973a8ff29906ea79fb233c71e7b700bac7758a19def87",
+    "Microsoft.Protocols.TestTools.StackSdk.dll": "953927bf711ff2dfa399456499f99741a7636702e7c6108fe2b73abfd5d4c428",
+    "Microsoft.Protocols.TestTools.StackSdk.Transport.dll": "96082065cba9588883d438c08f597b40fff734a3a7cfad4efd496c77efaaa51b",
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.dll": "83a876880d4d7c9293dc86c873e2e0a10984a8d5271ec4785a166f2fdcb12b82"
+  },
+  "program_sha256": "c32436ceaf5acf3ab7baa51841cffea5131e2b56e2afe8cb309aa6d680148533",
+  "exit_code": 0,
+  "passed": [
+    "tls_start_is_ready_and_reports_os_port",
+    "negotiated_credssp_listener_readiness",
+    "direct_credssp_listener_readiness_without_authentication",
+    "tls_occupied_port_throws_and_cleans_up_for_retry",
+    "negotiated_credssp_occupied_port_throws_and_cleans_up",
+    "direct_credssp_occupied_port_throws_and_cleans_up",
+    "fixed_port_stop_restart_keeps_queue_clean",
+    "32_parallel_kernel_selected_listeners_accept",
+    "standard_rdp_fixed_port_remains_ready"
+  ],
+  "failed": [],
+  "frames": []
+}

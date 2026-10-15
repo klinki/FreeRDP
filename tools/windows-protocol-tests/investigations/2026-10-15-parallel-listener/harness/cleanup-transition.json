@@ -1,0 +1,30 @@
+{
+  "client": "/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/SDL/SDL3/sdl-freerdp",
+  "client_sha256": "78f30106584cbb9e1fb1ce33ff323809bfaedf27e5f5291a1c12bc5273b4c592",
+  "command": [
+    "/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/SDL/SDL3/sdl-freerdp",
+    "/version"
+  ],
+  "attempts": 100,
+  "outcomes": {
+    "EPERM:poll=0": 97,
+    "EPERM:poll=None": 3
+  },
+  "pending_examples": [
+    {
+      "pid": 58943,
+      "exit_code": 0,
+      "wait_seconds": 0.000112
+    },
+    {
+      "pid": 59051,
+      "exit_code": 0,
+      "wait_seconds": 4.4e-05
+    },
+    {
+      "pid": 59085,
+      "exit_code": 0,
+      "wait_seconds": 0.004578
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+PASS public_callback_retains_order_and_copies_non_auto
+PASS public_callback_retains_order_and_copies_auto
+PASS null_and_empty_receive_do_not_queue_data
+PASS dispose_unsubscribes_socket_callbacks
+PASS send_still_requires_authentication
+PASS null_socket_rejected
+PASS lossy_socket_rejected
+FAIL earliest_callback_buffers_bytes_non_auto: System.NullReferenceException: Object reference not set to an instance of an object.
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpemt.RdpeudpTLSChannel.ReceiveBytes(Byte[] data) in /private/tmp/wpts-listener-driver/source/ProtoSDK/MS-RDPEMT/SecureChannel/RdpeudpTLSChannel.cs:line 478
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpeudp.RdpeudpSocket.ReceiveDataOnHigherLayer(Byte[] data) in /private/tmp/wpts-listener-driver/source/ProtoSDK/MS-RDPEUDP/RdpeudpSocket.Rdpeudp2Forwarder.cs:line 53
+   at Program.Deliver(RdpeudpSocket socket) in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 18
+   at Program.<>c__DisplayClass8_1.<EarliestCallback>b__1() in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 41
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass8_0.<EarliestCallback>b__0(RdpeudpTLSChannel channel) in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 39
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpemt.RdpeudpTLSChannel..ctor(RdpeudpSocket eudpSocket) in /private/tmp/wpts-listener-driver/source/ProtoSDK/MS-RDPEMT/SecureChannel/RdpeudpTLSChannel.cs:line 329
+   at Program.EarliestCallback(Boolean automatic) in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 46
+   at Program.<>c.<Main>b__10_0() in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 89
+   at Program.Main(String[] args) in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 94
+FAIL earliest_callback_buffers_bytes_auto: System.NullReferenceException: Object reference not set to an instance of an object.
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpemt.RdpeudpTLSChannel.ReceiveBytes(Byte[] data) in /private/tmp/wpts-listener-driver/source/ProtoSDK/MS-RDPEMT/SecureChannel/RdpeudpTLSChannel.cs:line 478
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpeudp.RdpeudpSocket.ReceiveDataOnHigherLayer(Byte[] data) in /private/tmp/wpts-listener-driver/source/ProtoSDK/MS-RDPEUDP/RdpeudpSocket.Rdpeudp2Forwarder.cs:line 53
+   at Program.Deliver(RdpeudpSocket socket) in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 18
+   at Program.<>c__DisplayClass8_1.<EarliestCallback>b__1() in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 41
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+--- End of stack trace from previous location ---
+   at System.Threading.ExecutionContext.RunFromThreadPoolDispatchLoop(Thread threadPoolThread, ExecutionContext executionContext, ContextCallback callback, Object state)
+   at System.Threading.Tasks.Task.ExecuteWithThreadLocal(Task& currentTaskSlot, Thread threadPoolThread)
+--- End of stack trace from previous location ---
+   at Program.<>c__DisplayClass8_0.<EarliestCallback>b__0(RdpeudpTLSChannel channel) in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 39
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpemt.RdpeudpTLSChannel..ctor(RdpeudpSocket eudpSocket) in /private/tmp/wpts-listener-driver/source/ProtoSDK/MS-RDPEMT/SecureChannel/RdpeudpTLSChannel.cs:line 329
+   at Program.EarliestCallback(Boolean automatic) in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 46
+   at Program.<>c.<Main>b__10_1() in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 90
+   at Program.Main(String[] args) in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-publication-regression-tvlphg48/Program.cs:line 94
+7/9 passed

@@ -1,0 +1,224 @@
+diff --git a/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs b/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs
+index 59f08a1..9391de0 100644
+--- a/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs
++++ b/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs
+@@ -203,6 +203,7 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+                 this.encryptedProtocol == EncryptedProtocol.NegotiationCredSsp)
+             {
+                 this.directedTransportStack.Start();
++                this.serverPort = this.directedTransportStack.LocalPort;
+             }
+ 
+             else
+diff --git a/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs b/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs
+index d9e8739..8e696b4 100644
+--- a/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs
++++ b/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs
+@@ -400,6 +400,11 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+ 
+ 
+         #region Properties
++        /// <summary>
++        /// The actual TCP port owned by the running listener.
++        /// </summary>
++        public int LocalPort => ((IPEndPoint)listenSock.LocalEndPoint).Port;
++
+         /// <summary>
+         /// The packetQueue.
+         /// </summary>
+@@ -576,14 +581,29 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+                 return;
+             }
+ 
+-            acceptThreadCancellationTokenSource = new CancellationTokenSource();
+-
+-            this.acceptThread = new Thread(new ThreadStart(AcceptLoop));
+-
+-            this.acceptThread.Start();
+-            this.isTcpServerTransportStarted = true;
+-
+-            started = true;
++            // Bind/listen on the caller's thread: returning from Start must mean
++            // that the endpoint exists, and bind failures must retain SocketError.
++            try
++            {
++                listenSock = new Socket(config.LocalIpAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
++                listenSock.Bind(new IPEndPoint(config.LocalIpAddress, config.LocalIpPort));
++                listenSock.Listen(config.MaxConnections);
++                UpdateSocketBlockingMode(listenSock, false);
++                acceptThreadCancellationTokenSource = new CancellationTokenSource();
++                acceptThread = new Thread(new ThreadStart(AcceptLoop));
++                acceptThread.Start();
++                isTcpServerTransportStarted = true;
++                started = true;
++            }
++            catch
++            {
++                listenSock?.Dispose();
++                listenSock = null;
++                acceptThreadCancellationTokenSource?.Dispose();
++                acceptThreadCancellationTokenSource = null;
++                acceptThread = null;
++                throw;
++            }
+         }
+ 
+         /// <summary>
+@@ -602,12 +622,14 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+ 
+             acceptThread.Join();
+ 
++            acceptThreadCancellationTokenSource.Dispose();
+             acceptThreadCancellationTokenSource = null;
+ 
+             acceptThread = null;
+ 
+             listenSock = null;
+ 
++            isTcpServerTransportStarted = false;
+             started = false;
+         }
+ 
+@@ -810,6 +832,14 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+             {
+                 AcceptLoopInternal();
+             }
++            catch (ObjectDisposedException) when (acceptThreadCancellationTokenSource.IsCancellationRequested)
++            {
++                // Stop closes the socket to interrupt accept.
++            }
++            catch (SocketException) when (acceptThreadCancellationTokenSource.IsCancellationRequested)
++            {
++                // Some platforms report the interrupted accept as a socket error.
++            }
+             catch (Exception ex)
+             {
+                 var exceptionEvent = new TransportEvent(EventType.Exception, null, ex);
+@@ -820,18 +850,8 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+ 
+         private void AcceptLoopInternal()
+         {
+-            listenSock = new Socket(config.LocalIpAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+-
+             var streamType = config.StreamType;
+ 
+-            var endPoint = new IPEndPoint(config.LocalIpAddress, config.LocalIpPort);
+-
+-            listenSock.Bind(endPoint);
+-
+-            listenSock.Listen(config.MaxConnections);
+-
+-            UpdateSocketBlockingMode(listenSock, false);
+-
+             while (!acceptThreadCancellationTokenSource.IsCancellationRequested)
+             {
+                 if (this.receivingStreams.Count >= config.MaxConnections)
+@@ -845,6 +865,9 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr
+                 Socket socket = null;
+                 try
+                 {
++                    // Avoid spinning a CPU while a parallel test's client starts.
++                    if (!this.listenSock.Poll(100000, SelectMode.SelectRead))
++                        continue;
+                     socket = this.listenSock.Accept();
+ 
+                     UpdateSocketBlockingMode(socket, true);
+diff --git a/TestSuites/RDP/Client/src/Adapter/ProtocolBasedSUTControlAdapter/ProtocolBasedRdpSUTControlAdapter.cs b/TestSuites/RDP/Client/src/Adapter/ProtocolBasedSUTControlAdapter/ProtocolBasedRdpSUTControlAdapter.cs
+index 93fe140..1a549df 100644
+--- a/TestSuites/RDP/Client/src/Adapter/ProtocolBasedSUTControlAdapter/ProtocolBasedRdpSUTControlAdapter.cs
++++ b/TestSuites/RDP/Client/src/Adapter/ProtocolBasedSUTControlAdapter/ProtocolBasedRdpSUTControlAdapter.cs
+@@ -380,6 +380,15 @@ namespace Microsoft.Protocols.TestSuites.Rdp
+         /// <returns>Return encoded binary of the payload</returns>
+         private byte[] CreateRDPConncectPayload(RDP_Connect_Payload_Type payloadType, string localAddress, uint RDPPort, bool DirectApproach, bool fullScreen)
+         {
++            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("FREERDP_WPTS_LISTENER_FILE")))
++            {
++                // Initialize ran before the listener could select its port.
++                var server = Site.GetAdapter<Microsoft.Protocols.TestSuites.Rdpbcgr.IRdpbcgrAdapter>().ServerStack;
++                if (server == null || server.ServerPort <= 0)
++                    throw new InvalidOperationException("The RDP listener has not published a bound port.");
++                RDPPort = (uint)server.ServerPort;
++                localAddress = IPAddress.Loopback.ToString();
++            }
+             RDP_Connection_Payload payLoad = new RDP_Connection_Payload();
+             payLoad.type = payloadType;
+ 
+diff --git a/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs b/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
+index 4962200..d5c76ce 100644
+--- a/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
++++ b/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
+@@ -229,6 +229,14 @@ namespace Microsoft.Protocols.TestSuites.Rdpbcgr
+         public void StartRDPListening(EncryptedProtocol protocol)
+         {
+             serverConfig.encryptedProtocol = protocol;
++            string listenerFile = Environment.GetEnvironmentVariable("FREERDP_WPTS_LISTENER_FILE");
++            string listenerToken = Environment.GetEnvironmentVariable("FREERDP_WPTS_LISTENER_TOKEN");
++            bool publishEndpoint = !string.IsNullOrEmpty(listenerFile);
++            if (publishEndpoint && (protocol != EncryptedProtocol.NegotiationTls || ipVersion != IpVersion.Ipv4 ||
++                !Path.IsPathFullyQualified(listenerFile) || string.IsNullOrEmpty(listenerToken)))
++            {
++                throw new InvalidOperationException("Listener publication requires an absolute path, token, and negotiated TLS over IPv4.");
++            }
+             X509Certificate2 cert = null;
+             if (protocol != EncryptedProtocol.Rdp)
+             {
+@@ -243,7 +251,49 @@ namespace Microsoft.Protocols.TestSuites.Rdpbcgr
+             {
+                 serverIPAddress = IPAddress.Any;
+             }
+-            rdpbcgrServerStack.Start(serverIPAddress);
++            if (publishEndpoint)
++            {
++                serverIPAddress = IPAddress.Loopback;
++            }
++            try
++            {
++                rdpbcgrServerStack.Start(serverIPAddress);
++                port = rdpbcgrServerStack.ServerPort;
++                if (publishEndpoint)
++                {
++                    // Keep the OS-selected port for reconnects and publish only
++                    // after the real listener owns it. No readiness connection.
++                    string endpoint = System.Text.Json.JsonSerializer.Serialize(new {
++                        version = 1, token = listenerToken, address = serverIPAddress.ToString(),
++                        port = port, pid = Environment.ProcessId
++                    });
++                    if (File.Exists(listenerFile))
++                    {
++                        if (File.ReadAllText(listenerFile) != endpoint)
++                            throw new InvalidOperationException("Listener endpoint changed within a test case.");
++                    }
++                    else
++                    {
++                        string temporary = listenerFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
++                        try
++                        {
++                            File.WriteAllText(temporary, endpoint);
++                            File.Move(temporary, listenerFile);
++                        }
++                        finally
++                        {
++                            if (File.Exists(temporary)) File.Delete(temporary);
++                        }
++                    }
++                }
++            }
++            catch (Exception ex)
++            {
++                site.Log.Add(LogEntryKind.Warning, "RDP listener startup failed on {0}:{1}: {2}", serverIPAddress, port, ex.ToString());
++                rdpbcgrServerStack.Dispose();
++                rdpbcgrServerStack = null;
++                throw;
++            }
+             site.Log.Add(LogEntryKind.Debug, "The IP version is {0}.", ipVersion);
+             site.Log.Add(LogEntryKind.Debug, "RDP server is listening on {0}:{1}.", serverIPAddress.ToString(), port);
+         }
+@@ -304,7 +354,7 @@ namespace Microsoft.Protocols.TestSuites.Rdpbcgr
+                 catch (InvalidOperationException ex)
+                 {
+                     //break;
+-                    site.Log.Add(LogEntryKind.Warning, "Excetpion thrown out when expect Connection. {0}", ex.Message);
++                    site.Log.Add(LogEntryKind.Warning, "Exception when expecting Connection. {0}", ex.ToString());
+                 }
+                 finally
+                 {

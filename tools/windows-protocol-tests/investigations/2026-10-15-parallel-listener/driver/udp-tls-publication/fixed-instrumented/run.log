@@ -1,0 +1,10 @@
+PASS public_callback_retains_order_and_copies_non_auto
+PASS public_callback_retains_order_and_copies_auto
+PASS null_and_empty_receive_do_not_queue_data
+PASS dispose_unsubscribes_socket_callbacks
+PASS send_still_requires_authentication
+PASS null_socket_rejected
+PASS lossy_socket_rejected
+PASS earliest_callback_buffers_bytes_non_auto
+PASS earliest_callback_buffers_bytes_auto
+9/9 passed

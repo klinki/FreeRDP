@@ -1,0 +1,12 @@
+BASELINE Start returned success for occupied port 65081
+BASELINE asynchronous exception: System.InvalidOperationException: There's an exception thrown when receiving a packet.
+ ---> System.Net.Sockets.SocketException (48): Address already in use
+   at System.Net.Sockets.Socket.DoBind(EndPoint endPointSnapshot, SocketAddress socketAddress)
+   at System.Net.Sockets.Socket.Bind(EndPoint localEP)
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.RdpbcgrServerTransportStack.AcceptLoopInternal() in /private/tmp/wpts-build-6wylcpyd/source/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs:line 829
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.RdpbcgrServerTransportStack.AcceptLoop() in /private/tmp/wpts-build-6wylcpyd/source/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs:line 811
+   --- End of inner exception stack trace ---
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.RdpbcgrServerTransportStack.ExpectTransportEvent(TimeSpan timeout) in /private/tmp/wpts-build-6wylcpyd/source/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs:line 749
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.RdpbcgrServer.ExpectTransportEvent(TimeSpan timeout) in /private/tmp/wpts-build-6wylcpyd/source/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs:line 3937
+   at Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.RdpbcgrServer.ExpectConnect(TimeSpan timeout) in /private/tmp/wpts-build-6wylcpyd/source/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs:line 242
+   at Program.Baseline() in /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-listener-regression-y0lgbqi_/Program.cs:line 40

@@ -1,0 +1,43 @@
+{
+  "repository": "https://github.com/microsoft/WindowsProtocolTestSuites.git",
+  "revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+  "patches": [
+    {
+      "path": "patches/drive-static-channel-prerequisites.patch",
+      "sha256": "53e824795e48b0db64e69cfd3f0bb3b796e963d252a3153363f9644bfef8632d"
+    },
+    {
+      "path": "patches/driver-disconnect-verification.patch",
+      "sha256": "fa8c2d5ccc86cc86b0cef0f9ac2d668942e41356b7f0dd3abd6942c64da35101"
+    },
+    {
+      "path": "patches/session-graceful-disconnect.patch",
+      "sha256": "db4a054d5d3e44fcae961623b9549e3fb424fecd4020167866aa2716e78375e9"
+    },
+    {
+      "path": "patches/session-reconnect-observation.patch",
+      "sha256": "06fc3e99842a5a14c97433cdec1f9b8c19a67ea8c7e184a95e70b789951f6aa5"
+    },
+    {
+      "path": "patches/udp-rdpeudp2-driver.patch",
+      "sha256": "615dec2c6ad78ecf234d8dceac281b82091f47ecf1c2a148b55c8add2aec4584"
+    },
+    {
+      "path": "patches/udp-piggyback-ack-fixture.patch",
+      "sha256": "4dcd60ed90b8a25eb7346b240b19f94ff8c99e78e3c83e7d38e77fb5f4f7479a"
+    },
+    {
+      "path": "patches/udp-listener-shutdown.patch",
+      "sha256": "879e3439457e8c2855ceee61909a6669b5dc36261f4509863ec1edb6dfe669e7"
+    },
+    {
+      "path": "patches/tpkt-short-length-fixtures.patch",
+      "sha256": "35d6ab19ff76a524a1c0ca9e001910ea2f082c29c1c9eac9a448ff056365ecf1"
+    },
+    {
+      "path": "patches/listener-startup-readiness.patch",
+      "sha256": "7acb1281ed42f2b5d16928e012cec08684abc4a999a028631584687cc065bfb3"
+    }
+  ],
+  "sdk": "8.0.425"
+}

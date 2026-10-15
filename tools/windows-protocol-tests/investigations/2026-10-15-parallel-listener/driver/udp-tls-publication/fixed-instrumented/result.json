@@ -1,0 +1,28 @@
+{
+  "suite_bin": "/private/tmp/wpts-udp-publication/fixed-instrumented/Bin",
+  "instrumented": true,
+  "sdk": "8.0.425",
+  "assembly_sha256": {
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpemt.dll": "5abcc9a2bec5f6b6150e9a6aa2faeead3e051bbcb73bd4cc9013b2cd649cb5fc",
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpeudp.dll": "e3ffaa9978aea9c231a5e3a0bd73494c60681e055f390cb01ee870595764cfed",
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpeudp2.dll": "33d5d06571c0883973cf713441848194a7a158d7911c8c98450665caa7799ab7",
+    "Microsoft.Protocols.TestTools.StackSdk.dll": "b399dac0026d2c22afc4c8aabcac16f9834d7c1a180d80f898aa1f172456f782",
+    "Microsoft.Protocols.TestTools.StackSdk.Transport.dll": "0b07037f8dc8edcd46e03a836fcd3b391958f42ec03ebfef32bec4fef994fff8",
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.dll": "fe45417593ad9c6d8d043a9e7adefe92e79f6aa575cb05a3ca68960c32a9e9ad"
+  },
+  "program_sha256": "837d85758f3e6ee248305fb2326ff112247f6990fd84fcccba2d2b5067cdd040",
+  "exit_code": 0,
+  "passed": [
+    "public_callback_retains_order_and_copies_non_auto",
+    "public_callback_retains_order_and_copies_auto",
+    "null_and_empty_receive_do_not_queue_data",
+    "dispose_unsubscribes_socket_callbacks",
+    "send_still_requires_authentication",
+    "null_socket_rejected",
+    "lossy_socket_rejected",
+    "earliest_callback_buffers_bytes_non_auto",
+    "earliest_callback_buffers_bytes_auto"
+  ],
+  "failed": [],
+  "frames": []
+}

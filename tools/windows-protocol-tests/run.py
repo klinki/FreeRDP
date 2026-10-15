@@ -9,13 +9,14 @@ import json
 import os
 from pathlib import Path
 import shutil
-import socket
 import subprocess
 import threading
+import tempfile
 import time
 import xml.etree.ElementTree as ET
 
 from control import Client, ControlServer, stop_process
+from listener import ListenerHandshake
 from profiles import (ROOT, PIN, CaseOptions, graphics_compatibility_mask,
                       options_for, profile_cases, select_cases, suite_patches)
 
@@ -110,20 +111,19 @@ def run_case(binary, suite, mode, case, destination, certificate, fingerprint, t
              *, options=None, graphics_mask=None):
     options = options if options is not None else options_for(case)
     destination.mkdir()
-    with socket.socket() as reservation:
-        reservation.bind(("127.0.0.1", 0))
-        port = reservation.getsockname()[1]
-    client = Client(binary, port, destination, fingerprint, mode, options, graphics_mask)
+    listener = ListenerHandshake(destination / "listener-ready.json")
+    client = Client(binary, None, destination, fingerprint, mode, options, graphics_mask,
+                    listener=listener)
     server = ControlServer(client)
     try:
-        configure(suite, destination, port, server.server_address[1], certificate, options)
+        configure(suite, destination, 0, server.server_address[1], certificate, options)
     except Exception:
         server.server_close()
         raise
     thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
     process = None
     started = time.monotonic()
+    started_at = datetime.now(timezone.utc).isoformat()
     error = ""
     code = None
     try:
@@ -132,17 +132,43 @@ def run_case(binary, suite, mode, case, destination, certificate, fingerprint, t
                 "dotnet", "test", str(suite / "Bin/RDP_ClientTestSuite.dll"),
                 "--filter", f"Name={case}", "--logger", "trx;LogFileName=result.trx",
                 "--ResultsDirectory", str(destination),
-            ], cwd=suite, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+            ], cwd=suite, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
+                env=dict(os.environ, **listener.environment))
+            listener.driver_group = process.pid
+            # The bound control socket queues requests until the owned driver
+            # group is known. Start dispatch only after setting that identity.
+            thread.start()
             code = process.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         error = f"Driver exceeded {timeout}s deadline"
     finally:
-        stop_process(process)
-        server.shutdown()
-        server.server_close()
-        thread.join(timeout=5)
-        client.stop()
+        # Every owned resource gets its cleanup attempt, even if an earlier
+        # cleanup fails. Preserve diagnostics from the failed case as well.
+        cleanups = [lambda: stop_process(process)]
+        if thread.ident is not None:
+            cleanups.append(server.shutdown)
+        cleanups.append(server.server_close)
+        if thread.ident is not None:
+            cleanups.append(lambda: thread.join(timeout=5))
+        cleanups.append(client.stop)
+        for cleanup in cleanups:
+            try:
+                cleanup()
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as failure:
+                client.errors.append(f"Cleanup failed: {failure}")
+        if thread.is_alive():
+            client.errors.append("SUT control thread did not stop")
         write_json(destination / "bridge-events.json", client.events)
+        startup = dict(
+            started=started_at, finished=datetime.now(timezone.utc).isoformat(),
+            runner_pid=os.getpid(), driver_pid=process.pid if process is not None else None,
+            requested_endpoint={"address": "127.0.0.1", "port": 0},
+            control_endpoint={"address": server.server_address[0], "port": server.server_address[1]},
+            listener=listener.snapshot(), driver_exit=code, deadline_error=error,
+            client_launches=client.starts, adapter_errors=server.failures + client.errors,
+            adapter_error_details=server.failure_details,
+        )
+        write_json(destination / "startup.json", startup)
     passed, detail = result_from_trx(destination / "result.trx", case)
     problems = ([error] if error else []) + server.failures + client.errors
     if code != 0:
@@ -170,16 +196,30 @@ def run_case(binary, suite, mode, case, destination, certificate, fingerprint, t
             if len(terminal) != 1 or not terminal[0].get("hadConnected"):
                 problems.append("Expected one terminal bridge event after a connected session")
     return dict(case=case, mode=mode, options=asdict(options), graphics_mask=graphics_mask,
+                listener=listener.snapshot(),
                 client_launches=client.starts, reconnects=client.reconnects,
                 relay_connections=client.relay_connections, graceful_closes=client.graceful_closes,
                 passed=passed and not problems, detail=detail,
                 errors=problems, seconds=round(time.monotonic() - started, 2))
 
 
+def create_output_directory(output=None, *, root=ROOT / "results"):
+    if output is None:
+        root.mkdir(parents=True, mode=0o700, exist_ok=True)
+        prefix = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ-")
+        return Path(tempfile.mkdtemp(prefix=prefix, dir=root)).resolve()
+    output = output.resolve()
+    try:
+        output.mkdir(parents=True, mode=0o700)
+    except FileExistsError as error:
+        raise ValueError(f"Results directory already exists; choose a new one: {output}") from error
+    return output
+
+
 def run(args):
     cases = select_cases(args.profile, args.case)
     options = {case: options_for(case) for case in cases}
-    binary, source, output = args.client.resolve(), args.suite.resolve(), args.output.resolve()
+    binary, source = args.client.resolve(), args.suite.resolve()
     if not binary.is_file() or not os.access(binary, os.X_OK):
         raise ValueError(f"Client must be an executable file: {binary}")
     provenance = json.loads((source / "provenance.json").read_text())
@@ -187,15 +227,13 @@ def run(args):
         raise ValueError("Suite provenance does not match suite.json; run prepare.py")
     if provenance.get("patches", []) != suite_patches():
         raise ValueError("Suite driver patches do not match suite.json; rebuild with prepare.py")
-    if output.exists():
-        raise ValueError(f"Results directory already exists; choose a new one: {output}")
     buildconfig = None
     graphics_mask = None
     if any(option.graphics for option in options.values()):
         buildconfig = subprocess.check_output([str(binary), "/buildconfig"], text=True, timeout=10,
                                              stderr=subprocess.PIPE)
         graphics_mask = graphics_compatibility_mask(buildconfig)
-    output.mkdir(parents=True, mode=0o700)
+    output = create_output_directory(args.output)
     suite = output / "suite"
     shutil.copytree(source, suite)
     certificate, fingerprint = make_certificate(output)
@@ -233,7 +271,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--client", type=Path, help="SDL executable (required unless --list is used)")
     parser.add_argument("--suite", type=Path, default=ROOT / ".cache/suite")
-    parser.add_argument("--output", type=Path, default=ROOT / "results" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+    parser.add_argument("--output", type=Path,
+                        help="New results directory (default: unique private directory under results/)")
     parser.add_argument("--mode", choices=("standard", "bridge", "both"), default="standard")
     parser.add_argument("--profile", choices=tuple(PIN["profiles"]), default="quick")
     parser.add_argument("--list", action="store_true", help="List selected cases without running them")

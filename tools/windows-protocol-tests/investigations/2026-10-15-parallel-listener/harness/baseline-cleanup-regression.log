@@ -1,0 +1,27 @@
+test_actual_child_exit_between_poll_and_signal_is_reaped (test_parallel.CleanupRaceTests.test_actual_child_exit_between_poll_and_signal_is_reaped) ... ERROR
+
+======================================================================
+ERROR: test_actual_child_exit_between_poll_and_signal_is_reaped (test_parallel.CleanupRaceTests.test_actual_child_exit_between_poll_and_signal_is_reaped)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/test_parallel.py", line 291, in test_actual_child_exit_between_poll_and_signal_is_reaped
+    stop_process(process)
+    ~~~~~~~~~~~~^^^^^^^^^
+  File "HEAD:control.py", line 90, in stop_process
+  File "/opt/homebrew/Cellar/python@3.14/3.14.5/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1176, in __call__
+    return self._mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.5/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1180, in _mock_call
+    return self._execute_mock_call(*args, **kwargs)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.5/Frameworks/Python.framework/Versions/3.14/lib/python3.14/unittest/mock.py", line 1247, in _execute_mock_call
+    result = effect(*args, **kwargs)
+  File "/Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/test_parallel.py", line 284, in exit_before_signal
+    return real_killpg(pid, number)
+PermissionError: [Errno 1] Operation not permitted
+
+----------------------------------------------------------------------
+Ran 1 test in 0.038s
+
+FAILED (errors=1)
+Expected baseline regression reproduced: True

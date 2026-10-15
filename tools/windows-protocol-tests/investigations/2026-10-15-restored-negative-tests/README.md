@@ -1,5 +1,9 @@
 # Restored negative tests — production repair and qualification
 
+Follow-up: the [parallel listener investigation](../2026-10-15-parallel-listener/README.md)
+records the subsequent startup, cleanup and event-ordering repairs. The failures
+and serial requalification below remain historical evidence.
+
 All five investigated tests are restored to **extended**, bringing it to **120
 cases**. Quick remains **6**. The production client and final eight-patch
 Microsoft driver passed a complete 120-case standard run and a complete 120-case

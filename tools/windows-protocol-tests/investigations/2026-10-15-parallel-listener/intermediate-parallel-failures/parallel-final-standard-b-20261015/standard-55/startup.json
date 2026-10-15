@@ -1,0 +1,35 @@
+{
+  "started": "2026-10-15T13:13:44.390690+00:00",
+  "finished": "2026-10-15T13:13:58.016471+00:00",
+  "runner_pid": 54000,
+  "driver_pid": 57190,
+  "requested_endpoint": {
+    "address": "127.0.0.1",
+    "port": 0
+  },
+  "control_endpoint": {
+    "address": "127.0.0.1",
+    "port": 60926
+  },
+  "listener": {
+    "version": 1,
+    "address": "127.0.0.1",
+    "port": 60938,
+    "pid": 57192
+  },
+  "driver_exit": 0,
+  "deadline_error": "",
+  "client_launches": 1,
+  "adapter_errors": [
+    "[Errno 1] Operation not permitted"
+  ],
+  "adapter_error_details": [
+    {
+      "stage": "execute-command",
+      "command": 2,
+      "exception": "PermissionError",
+      "message": "[Errno 1] Operation not permitted",
+      "traceback": "Traceback (most recent call last):\n  File \"/Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/control.py\", line 397, in handle\n    self.server.client.stop()\n    ~~~~~~~~~~~~~~~~~~~~~~~^^\n  File \"/Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/control.py\", line 349, in stop\n    stop_process(self.process)\n    ~~~~~~~~~~~~^^^^^^^^^^^^^^\n  File \"/Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/control.py\", line 104, in stop_process\n    signal_process_group(process, signal.SIGTERM)\n    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/control.py\", line 90, in signal_process_group\n    os.killpg(process.pid, number)\n    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^\nPermissionError: [Errno 1] Operation not permitted\n"
+    }
+  ]
+}

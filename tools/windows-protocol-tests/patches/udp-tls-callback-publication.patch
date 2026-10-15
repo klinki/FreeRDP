@@ -1,0 +1,17 @@
+diff --git a/ProtoSDK/MS-RDPEMT/SecureChannel/RdpeudpTLSChannel.cs b/ProtoSDK/MS-RDPEMT/SecureChannel/RdpeudpTLSChannel.cs
+index 18f24b9..a7ad669 100644
+--- a/ProtoSDK/MS-RDPEMT/SecureChannel/RdpeudpTLSChannel.cs
++++ b/ProtoSDK/MS-RDPEMT/SecureChannel/RdpeudpTLSChannel.cs
+@@ -323,9 +323,11 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpemt
+                 throw new NotSupportedException("RdpeudpSocket is null or it is a socket for Lossy RDPEUDP connection.");
+             }
+             this.rdpeudpSocket = eudpSocket;
+-            this.rdpeudpSocket.Received += ReceiveBytes;
++            // The UDP receive thread may invoke ReceiveBytes as soon as the
++            // subscription becomes visible. Initialize its buffer first.
+             innerStream = new SSLInnerStream();
+             isAuthenticated = false;
++            this.rdpeudpSocket.Received += ReceiveBytes;
+ 
+             rdpeudpSocket.Disconnected += RdpeudpSocket_Disconnected;
+ 

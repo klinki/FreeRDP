@@ -1,0 +1,15 @@
+test_actual_child_exit_between_poll_and_signal_is_reaped (test_parallel.CleanupRaceTests.test_actual_child_exit_between_poll_and_signal_is_reaped) ... ok
+test_adapter_failure_preserves_command_and_traceback (test_parallel.CleanupRaceTests.test_adapter_failure_preserves_command_and_traceback) ... ok
+test_permission_failure_for_running_child_is_not_ignored (test_parallel.CleanupRaceTests.test_permission_failure_for_running_child_is_not_ignored) ... ok
+test_permission_failure_is_suppressed_only_after_reaping_exited_child (test_parallel.CleanupRaceTests.test_permission_failure_is_suppressed_only_after_reaping_exited_child) ... ok
+test_dynamic_client_accepts_only_the_published_endpoint (test_parallel.ListenerTests.test_dynamic_client_accepts_only_the_published_endpoint) ... ok
+test_explicit_output_directory_cannot_be_reused (test_parallel.ListenerTests.test_explicit_output_directory_cannot_be_reused) ... ok
+test_missing_and_nonregular_records_fail_without_waiting (test_parallel.ListenerTests.test_missing_and_nonregular_records_fail_without_waiting) ... ok
+test_parallel_processes_own_unique_bound_ports_and_output_directories (test_parallel.ListenerTests.test_parallel_processes_own_unique_bound_ports_and_output_directories) ... ok
+test_record_rejects_stale_or_unowned_nonloopback_endpoints (test_parallel.ListenerTests.test_record_rejects_stale_or_unowned_nonloopback_endpoints) ... ok
+test_timed_out_parallel_drivers_release_only_their_owned_listeners (test_parallel.ParallelCleanupTests.test_timed_out_parallel_drivers_release_only_their_owned_listeners) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 1.887s
+
+OK
