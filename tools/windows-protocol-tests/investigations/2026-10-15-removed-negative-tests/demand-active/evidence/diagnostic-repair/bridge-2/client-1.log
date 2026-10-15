@@ -1,0 +1,53 @@
+[12:06:01:359] [94140:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:06:01:623] [94140:6bb0f001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[12:06:01:653] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: *************************************************
+[12:06:01:653] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: This build is using [experimental] build options:
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: * 'WITH_VAAPI_H264_ENCODING=ON'
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: * 'WITH_VIDEOTOOLBOX=ON'
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: *
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: [experimental] build options might crash the application
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: *************************************************
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: *************************************************
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: This build is using [runtime-check] build options:
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: * 'WITH_VERBOSE_WINPR_ASSERT=ON'
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: *
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: [runtime-check] build options might slow down the application
+[12:06:01:654] [94140:6bb0f001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x108c6cb20]: *************************************************
+[12:06:01:850] [94140:6bb0f001] [WARN][com.freerdp.crypto] - [verify_cb]: Certificate verification failure 'self-signed certificate (18)' at stack position 0
+[12:06:01:850] [94140:6bb0f001] [WARN][com.freerdp.crypto] - [verify_cb]: CN = localhost
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [x509_utils_from_pem]: BIO_new failed for certificate
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @           WARNING: CERTIFICATE NAME MISMATCH!           @
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: The hostname used for this connection (127.0.0.1:55425) 
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: does not match the name given in the certificate:
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: Common Name (CN):
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: 	localhost
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: A valid certificate for the wrong name should NOT be trusted!
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: The host key for 127.0.0.1:55425 has changed
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: It is also possible that a host key has just been changed.
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: The fingerprint for the host key sent by the remote host is d5:f4:50:a5:3f:32:11:8e:74:1f:f7:52:5f:45:9b:99:0c:30:36:a0:82:85:81:23:dd:3b:06:a6:09:9b:35:44
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Please contact your system administrator.
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Add correct host key in /private/tmp/wpts-demand-active/repaired/bridge-2/config/freerdp/server/127.0.0.1_55425.pem to get rid of this message.
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Host key for 127.0.0.1 has changed and you have requested  checking.
+[12:06:01:853] [94140:6bb0f001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Host key verification failed.
+[12:06:03:141] [94140:6bb0f001] [ERROR][com.freerdp.core.rdp] - [rdp_client_connect_demand_active][0x108c6cb20]: Diagnostic DemandActive payload mismatch: declared=379 actual=380
+[12:06:03:141] [94140:6bb0f001] [ERROR][com.freerdp.core.rdp] - [rdp_recv_callback_int][0x108c6cb20]: CONNECTION_STATE_CAPABILITIES_EXCHANGE_DEMAND_ACTIVE status STATE_RUN_FAILED [-1]
+[12:06:03:141] [94140:6bb0f001] [ERROR][com.freerdp.core.transport] - [transport_check_fds]: transport_check_fds: transport->ReceiveCallback() - STATE_RUN_FAILED [-1]
+[12:06:03:141] [94140:6bb0f001] [ERROR][com.freerdp.core] - [rdp_client_wait_for_activation]: ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]
+[12:06:03:142] [94140:6bb0f001] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:06:03:143] [94140:6bb0f001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[12:06:03:267] [94140:f0eb7f81] [ERROR][com.freerdp.utils.signal] - [fsig_term_handler]: Caught signal 'Terminated: 15' [15]
+[12:06:03:268] [94140:f0eb7f81] [ERROR][com.freerdp.core] - [freerdp_abort_connect_context]: ERRCONNECT_CONNECT_CANCELLED [0x0002000B]
+[12:06:03:355] [94140:6bb0f001] [ERROR][com.freerdp.core] - [freerdp_connect]: freerdp_post_connect failed
+[12:06:03:355] [94140:6bb0f001] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:06:01:624] [94140:6bb0f001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[12:06:01:639] [94140:6bb0f001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[12:06:03:143] [94140:6bb0f001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[12:06:03:145] [94140:6bb0f001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[12:06:03:268] [94140:f0eb7f81] [INFO][com.freerdp.core] - [sig_abort_connect]: Signal Terminated: 15 [15], terminating session 0x108c6cb20

@@ -1,0 +1,80 @@
+{
+  "date": "2026-10-15",
+  "suite_commit": "0ed6fd412a856a85ea94866e5695fd7dd37b9b0b",
+  "microsoft_revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+  "classifications": [
+    {
+      "name": "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength",
+      "classification": "FreeRDP validation defect",
+      "root_cause": "mcs_payload_boundary",
+      "declared": 130,
+      "actual": 386,
+      "field": "MCS userData length",
+      "report": "demand-active/README.md",
+      "action": "Validate MCS payload consistency, regression-test production framing paths, then restore the original test."
+    },
+    {
+      "name": "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength",
+      "classification": "FreeRDP validation defect",
+      "root_cause": "demand_active_share_boundary",
+      "declared": 385,
+      "actual": 386,
+      "field": "Share Control totalLength",
+      "report": "demand-active/README.md",
+      "action": "Enforce the Demand Active Share Control boundary, regression-test, then restore the original test."
+    },
+    {
+      "name": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "classification": "Microsoft fixture defect",
+      "root_cause": "tpkt_zero_length_underflow",
+      "declared": 65535,
+      "actual": 9,
+      "field": "TPKT packet length",
+      "corrected_declared": 8,
+      "report": "disconnect/investigation.md",
+      "action": "Derive actual serialized length before subtracting one in the Microsoft adapter; qualify the repaired fixture and restore the case."
+    },
+    {
+      "name": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength",
+      "classification": "FreeRDP validation defect",
+      "root_cause": "mcs_payload_boundary",
+      "declared": 25,
+      "actual": 26,
+      "field": "MCS userData length",
+      "report": "slow-path/README.md",
+      "action": "Use the same MCS validation repair as the Demand Active MCS case; regression-test and restore the original test."
+    },
+    {
+      "name": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength",
+      "classification": "Microsoft fixture defect",
+      "root_cause": "tpkt_zero_length_underflow",
+      "declared": 65535,
+      "actual": 40,
+      "field": "TPKT packet length",
+      "corrected_declared": 39,
+      "report": "slow-path/README.md",
+      "action": "Correct the Microsoft serialized TPKT length mutation; qualify the repaired fixture and restore the case."
+    }
+  ],
+  "counts": {
+    "investigated_cases": 5,
+    "freerdp_cases": 3,
+    "freerdp_root_causes": 2,
+    "microsoft_fixture_cases": 2,
+    "diagnostic_executions": 40
+  },
+  "validation": {
+    "demand_active_executions": 12,
+    "slow_path_executions": 8,
+    "disconnect_executions": 20,
+    "all_originals_failed_both_modes": true,
+    "all_relevant_diagnostic_repairs_passed_both_modes": true,
+    "assertions_relaxed": false
+  },
+  "scope": "Investigation and isolated proof-of-cause controls only. Production sources, prepared suite, seven registered patches and 115-case extended membership remain unchanged. Prototype client repair has targeted validation only; no crash, memory corruption or exploit was demonstrated.",
+  "inputs_sha256": {
+    "demand-active/results.json": "14d1739b70f2a2b78c080bbd717e6c69dada2412b6b2fc45d1e6cca34bc83512",
+    "slow-path/results.json": "b3b08961f4353a8e15bdf496077a6683f9ca7d20849f4b59bb63e3994ac575ed",
+    "disconnect/results.json": "28a1babdae7ed11fa16f4b2d2cf7c4cecf9da1648e078595fadbe355834f8593"
+  }
+}

@@ -41,6 +41,11 @@ The old qualification record is historical and does not establish these cases:
 | `S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength` | Required peer-disconnect event not observed with the corrected verifier. |
 | `S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength` | Required peer-disconnect event not observed with the corrected verifier. |
 
+The [follow-up root-cause investigation](../2026-10-15-removed-negative-tests/README.md)
+confirmed that three of these tests expose two FreeRDP validation defects and
+two expose Microsoft fixture underflow. Diagnostic repairs pass in both modes;
+production repairs and profile restoration remain follow-up work.
+
 ## Candidates left out
 
 | Area | Result / reason |

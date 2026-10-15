@@ -1,0 +1,14 @@
+--- a/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
++++ b/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
+@@ -1075,7 +1075,10 @@
+ 
+             if (invalidType.Equals(NegativeType.InvalidTPKTHeader))
+             {
+-                ultimatunPdu.tpktHeader.length--;
++                // The factory leaves length zero for automatic serialization. Derive
++                // the actual encoded size before making it one byte too short.
++                ushort invalidLength = checked((ushort)(ultimatunPdu.ToBytes().Length - 1));
++                ultimatunPdu.tpktHeader.length = (ushort)((invalidLength >> 8) | (invalidLength << 8));
+             }
+             else if (invalidType.Equals(NegativeType.InvalidX224))
+             {

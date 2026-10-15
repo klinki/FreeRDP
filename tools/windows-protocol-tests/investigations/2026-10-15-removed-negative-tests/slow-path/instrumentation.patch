@@ -1,0 +1,20 @@
+--- a/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs
++++ b/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs
+@@ -678,6 +678,17 @@
+             // If we use raw bytes to construct the packet, we send the raw bytes out directly, 
+             // otherwise we convert the packet to bytes and send it out.
+             byte[] writeBytes = (packet.PacketBytes == null) ? packet.ToBytes() : packet.PacketBytes;
++            if (packet is SlowPathOutputPdu)
++            {
++                Console.WriteLine("SLOW_WIRE_ORIGINAL " + packet.GetType().Name + " " + BitConverter.ToString(writeBytes));
++                if (Environment.GetEnvironmentVariable("WPTS_SLOW_TPKT_FIX") == "1" && writeBytes[2] == 0xff && writeBytes[3] == 0xff)
++                {
++                    int declaredLength = writeBytes.Length - 1;
++                    writeBytes[2] = (byte)(declaredLength >> 8);
++                    writeBytes[3] = (byte)declaredLength;
++                }
++                Console.WriteLine("SLOW_WIRE_SENT " + packet.GetType().Name + " " + BitConverter.ToString(writeBytes));
++            }
+             Stream stream = GetStream(ipEndPoint.Address, ipEndPoint.Port);
+ 
+             if (stream == null)

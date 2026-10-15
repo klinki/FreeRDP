@@ -1,0 +1,225 @@
+{
+  "date": "2026-10-15",
+  "scope": "macOS SDL client, TLS profile, standard and bridge modes; no shared production changes or profile restoration",
+  "microsoft_revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+  "freerdp_revision": "0ed6fd412a856a85ea94866e5695fd7dd37b9b0b",
+  "client_sha256": "9582f1aa14e2549abc05ba8c65fe80a2f4a1617b231d75ffcb83a96125d4cf1c",
+  "stock_core_sha256": "c4ea91a69c439d6340b5ad156dd52af525020301778a86c9f355ef68cbc633e5",
+  "private_core_sha256": "6e114b7c91147118a81574bf0908500a1404e76d0c87d8781af778007ec55fbe",
+  "source_sha256": {
+    "libfreerdp/core/rdp.c": "4803d0cf476776173811d58658454788f28ae7cb2264fd77ece1a8ea8b40d0aa",
+    "libfreerdp/core/transport.c": "d467c45ce12f3d1e956276faa3a77b1d2c8502fdcc89b290056a18065191515a",
+    "libfreerdp/core/tpkt.c": "f07261ef3f87299ff39dfb2facfb2e464f088f79169d2586738ad3c473ccbc7f"
+  },
+  "driver_instrumentation_sha256": "64d0ad0a4af7e577b30c32b07c5e7fd29843d66aa983aee997a725aaee19f23f",
+  "cases": [
+    {
+      "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength",
+      "classification": "freerdp_length_validation_defect",
+      "confidence": "confirmed",
+      "summary": "Serialized packet declares25 MCS bytes, contains26; global-channel parser does not enforce the smaller boundary. Both modes reject unchanged packet after private exact-length check.",
+      "recommendation": "Repair MCS payload consistency validation and regression-test before restoring."
+    },
+    {
+      "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength",
+      "classification": "microsoft_test_generator_defect",
+      "confidence": "confirmed",
+      "summary": "Zero TPKT object length underflows to65535; only40 bytes sent. This is incomplete framing, not the intended actual-minus-one case. Correcting serialized length to39 yields strict Pass with stock client in both modes.",
+      "recommendation": "Fix serialized TPKT mutation, then qualify repaired test before restoring."
+    }
+  ],
+  "runs": [
+    {
+      "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid a low-Path output pdu with invalid value of the length field of mcsSDin received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-slow-negative/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength() in /private/tmp/wpts-slow-negative/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S4_SlowPathInputTest.cs:line 122\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 17.44,
+      "variant": "original",
+      "evidence": "evidence/original-mcs-standard"
+    },
+    {
+      "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid invalid Slow-Path output pdu received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-slow-negative/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength() in /private/tmp/wpts-slow-negative/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S4_SlowPathInputTest.cs:line 65\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 16.51,
+      "variant": "original",
+      "evidence": "evidence/original-tpkt-standard"
+    },
+    {
+      "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid a low-Path output pdu with invalid value of the length field of mcsSDin received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-slow-negative/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength() in /private/tmp/wpts-slow-negative/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S4_SlowPathInputTest.cs:line 122\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 16.02,
+      "variant": "original",
+      "evidence": "evidence/original-mcs-bridge"
+    },
+    {
+      "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid invalid Slow-Path output pdu received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-slow-negative/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength() in /private/tmp/wpts-slow-negative/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S4_SlowPathInputTest.cs:line 65\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 15.52,
+      "variant": "original",
+      "evidence": "evidence/original-tpkt-bridge"
+    },
+    {
+      "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 5.43,
+      "variant": "corrected-tpkt",
+      "evidence": "evidence/corrected-tpkt-standard"
+    },
+    {
+      "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.38,
+      "variant": "corrected-tpkt",
+      "evidence": "evidence/corrected-tpkt-bridge"
+    },
+    {
+      "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.31,
+      "variant": "patched-client-mcs",
+      "evidence": "evidence/patched-client-mcs-standard"
+    },
+    {
+      "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.36,
+      "variant": "patched-client-mcs",
+      "evidence": "evidence/patched-client-mcs-bridge"
+    }
+  ]
+}

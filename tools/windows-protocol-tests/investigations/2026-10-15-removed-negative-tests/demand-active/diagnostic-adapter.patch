@@ -1,0 +1,27 @@
+--- a/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
++++ b/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
+@@ -2739,11 +2739,6 @@
+                 this.rdpbcgrServerStack.ExpectDisconnect(sessionContext, timeout);
+                 isReceived = true;
+             }
+-            catch (InvalidOperationException)
+-            {
+-                site.Log.Add(LogEntryKind.Debug, "Underlayer transport throw exception indicates the connection has been terminated.");
+-                return true;
+-            }
+             catch (TimeoutException timeoutEx)
+             {
+                 site.Log.Add(LogEntryKind.Debug, timeoutEx.Message);
+@@ -2865,6 +2860,12 @@
+         /// <param name="packet">The packet to be sent.</param>
+         private void SendPdu(RdpbcgrServerPdu packet, bool isSendTLSHandshakeAfterX224ConnectionConfirmPdu = true)
+         {
++            if (packet is Server_Demand_Active_Pdu) {
++                byte[] bytes = packet.ToBytes();
++                string file = System.Environment.GetEnvironmentVariable("DEMAND_PACKET_OUTPUT");
++                if (!string.IsNullOrEmpty(file)) System.IO.File.WriteAllText(file, System.Convert.ToHexString(bytes));
++                System.Console.WriteLine("DEMAND_PACKET " + System.Convert.ToHexString(bytes));
++            }
+             rdpbcgrServerStack.SendPdu(sessionContext, packet, isSendTLSHandshakeAfterX224ConnectionConfirmPdu);
+             System.Threading.Thread.Sleep(100);//To avoid the combination with other sending request.
+         }

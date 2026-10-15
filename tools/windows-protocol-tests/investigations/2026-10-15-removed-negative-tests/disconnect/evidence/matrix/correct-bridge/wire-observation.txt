@@ -1,0 +1,2 @@
+DISCONNECT_PROBE scenario=correct original=03-00-FF-FF-02-F0-80-21-80 bytes=03-00-00-09-02-F0-80-21-80 firstCount=9 utc=2026-10-15T10:07:06.3503470Z
+DISCONNECT_PROBE first-write-completed utc=2026-10-15T10:07:06.3511660Z

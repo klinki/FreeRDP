@@ -25,7 +25,9 @@ The [latest batch report](investigations/2026-10-15-extended-batches/README.md)
 records 28 additions and 5 removals. The removals correct earlier false
 positives in Microsoft's disconnect verifier; the historical
 [92-case qualification](validation-profiles.json) must not be used as current
-proof for those cases. Quick remains unchanged:
+proof for those cases. The [follow-up investigation](investigations/2026-10-15-removed-negative-tests/README.md)
+attributes three failures to FreeRDP length-validation defects and two to
+Microsoft TPKT-fixture underflow. Quick remains unchanged:
 
 | Case | Coverage |
 | --- | --- |

@@ -1,0 +1,640 @@
+{
+  "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+  "classification": "microsoft-test-generator-bug",
+  "confidence": "confirmed by original byte capture, native parser trace, and minimal generator fix in both modes",
+  "freerdp_bug_exposed": false,
+  "original_wire_hex": "0300ffff02f0802180",
+  "original_announced_length": 65535,
+  "original_written_bytes": 9,
+  "documented_negative_announced_length": 8,
+  "original_assertion": "Client should drop connection within configured WaitTime=10 seconds",
+  "assertion_changed": false,
+  "production_client_changed": false,
+  "profile_changed": false,
+  "recommended_action": "Fix the Microsoft generator to derive actual serialized size before subtracting one; then qualify the original case before adding it back. Keep original strict disconnect verifier.",
+  "limitations": [
+    "EOF controls intentionally close the server SslStream and invalidate the original peer-disconnect assertion; their TRX failures are preserved.",
+    "Client EOF detection is observed in client logs. Bridge terminal cancellation follows harness cleanup and is not proof of autonomous session exit.",
+    "Wire observation logs bytes directly before SslStream.Write and its successful return, not a separate packet capture. Delayed-tail controls demonstrate client reception/reassembly.",
+    "10-second observation is bounded; no claim that the client waits forever."
+  ],
+  "provenance": {
+    "microsoft": {
+      "repository": "https://github.com/microsoft/WindowsProtocolTestSuites.git",
+      "revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+      "patches": [
+        {
+          "path": "patches/drive-static-channel-prerequisites.patch",
+          "sha256": "53e824795e48b0db64e69cfd3f0bb3b796e963d252a3153363f9644bfef8632d"
+        },
+        {
+          "path": "patches/driver-disconnect-verification.patch",
+          "sha256": "fa8c2d5ccc86cc86b0cef0f9ac2d668942e41356b7f0dd3abd6942c64da35101"
+        },
+        {
+          "path": "patches/session-graceful-disconnect.patch",
+          "sha256": "db4a054d5d3e44fcae961623b9549e3fb424fecd4020167866aa2716e78375e9"
+        },
+        {
+          "path": "patches/session-reconnect-observation.patch",
+          "sha256": "06fc3e99842a5a14c97433cdec1f9b8c19a67ea8c7e184a95e70b789951f6aa5"
+        },
+        {
+          "path": "patches/udp-rdpeudp2-driver.patch",
+          "sha256": "615dec2c6ad78ecf234d8dceac281b82091f47ecf1c2a148b55c8add2aec4584"
+        },
+        {
+          "path": "patches/udp-piggyback-ack-fixture.patch",
+          "sha256": "4dcd60ed90b8a25eb7346b240b19f94ff8c99e78e3c83e7d38e77fb5f4f7479a"
+        },
+        {
+          "path": "patches/udp-listener-shutdown.patch",
+          "sha256": "879e3439457e8c2855ceee61909a6669b5dc36261f4509863ec1edb6dfe669e7"
+        }
+      ],
+      "sdk": "8.0.425"
+    },
+    "freerdp_harness_revision": "0ed6fd412a856a85ea94866e5695fd7dd37b9b0b",
+    "engine_source_revision": "dfb1c647b566ee34552c5557af25d59f837f3221",
+    "client_sha256": "9582f1aa14e2549abc05ba8c65fe80a2f4a1617b231d75ffcb83a96125d4cf1c",
+    "run_date": "2026-10-15",
+    "modes": [
+      "standard",
+      "bridge"
+    ],
+    "wait_seconds": 10,
+    "outer_deadline_seconds": 70,
+    "Bin_sha256": {
+      "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.dll": "096c4fb1ba543498259ace783643dfffb5d46470f04fcd0a531e87ae3a03718a",
+      "RDP_ClientAdapter.dll": "b20ae4836885db24d4d8873fafd037fe814c921b0c44a1866e11b0869710fef4",
+      "RDP_ClientTestSuite.dll": "dfe3e2ab9bfddf09e335c376044ada4dcd96026c16a535fd22ca07f7cdd0093f"
+    },
+    "fixed-Bin_sha256": {
+      "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.dll": "096c4fb1ba543498259ace783643dfffb5d46470f04fcd0a531e87ae3a03718a",
+      "RDP_ClientAdapter.dll": "b78a431de5350822d95d1de6547ef7e7e87826e9648a1eccb6c38d1bb3a0d206",
+      "RDP_ClientTestSuite.dll": "dfe3e2ab9bfddf09e335c376044ada4dcd96026c16a535fd22ca07f7cdd0093f"
+    }
+  },
+  "executions": [
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid MCS Disconnect Provider Ultimatum PDU with invalid TPKT length field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength() in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_Connection_DisconnectionTest.cs:line 166\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 17.47,
+      "scenario": "original",
+      "diagnostic_only": false,
+      "server_eof_control": false,
+      "variant": "baseline",
+      "evidence": "evidence/baseline/original-standard",
+      "interpretation": "Original generator announces 65535 bytes and writes 9; strict disconnect assertion times out on an incomplete frame."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid MCS Disconnect Provider Ultimatum PDU with invalid TPKT length field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength() in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_Connection_DisconnectionTest.cs:line 166\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 17.06,
+      "scenario": "original",
+      "diagnostic_only": false,
+      "server_eof_control": false,
+      "variant": "baseline",
+      "evidence": "evidence/baseline/original-bridge",
+      "interpretation": "Original generator announces 65535 bytes and writes 9; strict disconnect assertion times out on an incomplete frame."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid MCS Disconnect Provider Ultimatum PDU with invalid TPKT length field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-disconnect-investigation/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength() in /private/tmp/wpts-disconnect-investigation/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_Connection_DisconnectionTest.cs:line 166\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 15.97,
+      "scenario": "original",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/original-standard",
+      "interpretation": "Original generator announces 65535 bytes and writes 9; strict disconnect assertion times out on an incomplete frame."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid MCS Disconnect Provider Ultimatum PDU with invalid TPKT length field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-disconnect-investigation/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength() in /private/tmp/wpts-disconnect-investigation/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_Connection_DisconnectionTest.cs:line 166\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 15.13,
+      "scenario": "original",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/original-bridge",
+      "interpretation": "Original generator announces 65535 bytes and writes 9; strict disconnect assertion times out on an incomplete frame."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.11,
+      "scenario": "short",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/short-standard",
+      "interpretation": "Documented smaller-than-actual case: declared 8, writes 9; client rejects the incomplete MCS body and disconnects."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 5.89,
+      "scenario": "short",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/short-bridge",
+      "interpretation": "Documented smaller-than-actual case: declared 8, writes 9; client rejects the incomplete MCS body and disconnects."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 5.82,
+      "scenario": "correct",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/correct-standard",
+      "interpretation": "Declared and delivered length 9: ordinary remote logoff, not malformed-frame coverage."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.24,
+      "scenario": "correct",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/correct-bridge",
+      "interpretation": "Declared and delivered length 9: ordinary remote logoff, not malformed-frame coverage."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid MCS Disconnect Provider Ultimatum PDU with invalid TPKT length field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-disconnect-investigation/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength() in /private/tmp/wpts-disconnect-investigation/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_Connection_DisconnectionTest.cs:line 166\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 15.1,
+      "scenario": "long-open",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/long-open-standard",
+      "interpretation": "Declared 10, delivers only 9 and leaves stream open: strict assertion times out while client buffers incomplete frame."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid MCS Disconnect Provider Ultimatum PDU with invalid TPKT length field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-disconnect-investigation/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength() in /private/tmp/wpts-disconnect-investigation/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_Connection_DisconnectionTest.cs:line 166\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 15.32,
+      "scenario": "long-open",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/long-open-bridge",
+      "interpretation": "Declared 10, delivers only 9 and leaves stream open: strict assertion times out while client buffers incomplete frame."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.64,
+      "scenario": "long-filled",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/long-filled-standard",
+      "interpretation": "Declared 10, delivers 9 then one zero byte after 1s: client dispatches logoff only after frame completion; diagnostic only."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.41,
+      "scenario": "long-filled",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/long-filled-bridge",
+      "interpretation": "Declared 10, delivers 9 then one zero byte after 1s: client dispatches logoff only after frame completion; diagnostic only."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Test method Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength threw exception: \r\nSystem.InvalidOperationException: There's an exception thrown when receiving a packet. ---> System.ObjectDisposedException: Cannot access a disposed object.\nObject name: 'System.Net.Security.SslStream'.",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 8.32,
+      "scenario": "original-eof",
+      "diagnostic_only": true,
+      "server_eof_control": true,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/original-eof-standard",
+      "interpretation": "Server closes its own SslStream after 1s; driver gets ObjectDisposedException. Client logs Network disconnect. Not a valid client-rejection assertion."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Test method Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength threw exception: \r\nSystem.InvalidOperationException: There's an exception thrown when receiving a packet. ---> System.ObjectDisposedException: Cannot access a disposed object.\nObject name: 'System.Net.Security.SslStream'.",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 7.83,
+      "scenario": "original-eof",
+      "diagnostic_only": true,
+      "server_eof_control": true,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/original-eof-bridge",
+      "interpretation": "Server closes its own SslStream after 1s; driver gets ObjectDisposedException. Client logs Network disconnect. Not a valid client-rejection assertion."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Test method Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength threw exception: \r\nSystem.InvalidOperationException: There's an exception thrown when receiving a packet. ---> System.ObjectDisposedException: Cannot access a disposed object.\nObject name: 'System.Net.Security.SslStream'.",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 7.77,
+      "scenario": "truncated-eof",
+      "diagnostic_only": true,
+      "server_eof_control": true,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/truncated-eof-standard",
+      "interpretation": "Declared 9 but delivers 8, then server closes its own SslStream after 1s. Driver disposal exception; client logs Network disconnect. Diagnostic only."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": false,
+      "detail": "Test method Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength threw exception: \r\nSystem.InvalidOperationException: There's an exception thrown when receiving a packet. ---> System.ObjectDisposedException: Cannot access a disposed object.\nObject name: 'System.Net.Security.SslStream'.",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 7.51,
+      "scenario": "truncated-eof",
+      "diagnostic_only": true,
+      "server_eof_control": true,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/truncated-eof-bridge",
+      "interpretation": "Declared 9 but delivers 8, then server closes its own SslStream after 1s. Driver disposal exception; client logs Network disconnect. Diagnostic only."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.08,
+      "scenario": "fragmented",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/fragmented-standard",
+      "interpretation": "Declared 9, delivers 8 then final byte after 1s: ordinary remote logoff after reassembly, not malformed-frame coverage."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.97,
+      "scenario": "fragmented",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "matrix",
+      "evidence": "evidence/matrix/fragmented-bridge",
+      "interpretation": "Declared 9, delivers 8 then final byte after 1s: ordinary remote logoff after reassembly, not malformed-frame coverage."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.45,
+      "scenario": "original",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "fixed",
+      "evidence": "evidence/fixed/original-standard",
+      "interpretation": "Minimal adapter generator repair, original test and strict disconnect assertion unchanged: passes with native client unchanged."
+    },
+    {
+      "case": "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.19,
+      "scenario": "original",
+      "diagnostic_only": true,
+      "server_eof_control": false,
+      "variant": "fixed",
+      "evidence": "evidence/fixed/original-bridge",
+      "interpretation": "Minimal adapter generator repair, original test and strict disconnect assertion unchanged: passes with native client unchanged."
+    }
+  ]
+}

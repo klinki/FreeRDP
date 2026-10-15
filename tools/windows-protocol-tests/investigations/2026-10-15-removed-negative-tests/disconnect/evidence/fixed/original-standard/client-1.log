@@ -1,0 +1,55 @@
+[12:07:26:765] [94662:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:07:26:766] [94662:f0eb7f81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]: Using /p is insecure
+[12:07:26:766] [94662:f0eb7f81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]: Passing credentials or secrets via command line might expose these in the process list
+[12:07:26:766] [94662:f0eb7f81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]: Consider using one of the following (more secure) alternatives:
+[12:07:26:766] [94662:f0eb7f81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]:   - /args-from: pipe in arguments from stdin, file, file descriptor or environment variable
+[12:07:26:766] [94662:f0eb7f81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]:   - /from-stdin pass the credential via stdin
+[12:07:26:766] [94662:f0eb7f81] [WARN][com.freerdp.client.common.cmdline] - [warn_credential_args]:   - set environment variable FREERDP_ASKPASS to have a gui tool query for credentials
+[12:07:27:150] [94662:6fc27001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: *************************************************
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: This build is using [experimental] build options:
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: * 'WITH_VAAPI_H264_ENCODING=ON'
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: * 'WITH_VIDEOTOOLBOX=ON'
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: *
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: [experimental] build options might crash the application
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: *************************************************
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: *************************************************
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: This build is using [runtime-check] build options:
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: * 'WITH_VERBOSE_WINPR_ASSERT=ON'
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: *
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: [runtime-check] build options might slow down the application
+[12:07:27:160] [94662:6fc27001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104aa8a30]: *************************************************
+[12:07:28:647] [94662:6fc27001] [WARN][com.winpr.thread] - [SetThreadPriority]: pthread_setschedprio(0) not implemented, requires POSIX 2008 or later
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [Stream_CheckAndLogRequiredLengthWLogExVa]: [mcs_recv_disconnect_provider_ultimatum(libfreerdp/core/mcs.c:1411)] invalid length, got 0, require at least 1 [element size=1]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 0: address=0x100a5ec58 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x100a34000], dli_sname=winpr_unwind_backtrace [0x100a5ebf8]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 1: address=0x100a5cba8 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x100a34000], dli_sname=winpr_log_backtrace_ex [0x100a5cb7c]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 2: address=0x100a5bf40 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x100a34000], dli_sname=Stream_CheckAndLogRequiredLengthWLogExVa [0x100a5be4c]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 3: address=0x100a5c07c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x100a34000], dli_sname=Stream_CheckAndLogRequiredLengthWLogEx [0x100a5c028]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 4: address=0x1010e7190 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/libfreerdp3.3.31.2.dylib [0x101078000], dli_sname=mcs_recv_disconnect_provider_ultimatum [0x1010e712c]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 5: address=0x1011435d8 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/libfreerdp3.3.31.2.dylib [0x101078000], dli_sname=rdp_read_header [0x101143390]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 6: address=0x10112495c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/libfreerdp3.3.31.2.dylib [0x101078000], dli_sname=rdp_recv_get_active_header [0x101124928]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 7: address=0x10112de74 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/libfreerdp3.3.31.2.dylib [0x101078000], dli_sname=rdp_client_connect_demand_active [0x10112de2c]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 8: address=0x101145ec8 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/libfreerdp3.3.31.2.dylib [0x101078000], dli_sname=rdp_recv_callback [0x101145cd4]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 9: address=0x1011535b4 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/libfreerdp3.3.31.2.dylib [0x101078000], dli_sname=transport_check_fds [0x1011534b0]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 10: address=0x101146f20 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/libfreerdp3.3.31.2.dylib [0x101078000], dli_sname=rdp_check_fds [0x101146ec8]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 11: address=0x10111584c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/libfreerdp3.3.31.2.dylib [0x101078000], dli_sname=freerdp_check_fds [0x101115818]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 12: address=0x101115adc dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/libfreerdp3.3.31.2.dylib [0x101078000], dli_sname=freerdp_check_event_handles [0x101115ab8]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 13: address=0x1005ca51c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/SDL/SDL3/sdl-freerdp [0x1005a8000], dli_sname=_ZN10SdlContext12rdpThreadRunEPS_ [0x1005c9ea0]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 14: address=0x1005d20a4 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/SDL/SDL3/sdl-freerdp [0x1005a8000], dli_sname=_ZNSt3__114__thread_proxyB9nqe220106INS_5tupleIJNS_10unique_ptrINS_15__thread_structENS_14default_deleteIS3_EEEEPFjP10SdlContextES8_EEEEEPvSC_ [0x1005d2070]
+[12:07:29:756] [94662:6fc27001] [WARN][com.freerdp.core] - [winpr_log_backtrace_ex]: 15: address=0x18b38dd00 dli_fname=/usr/lib/system/libsystem_pthread.dylib [0x18b387000], dli_sname=_pthread_start [0x18b38dc78]
+[12:07:29:756] [94662:6fc27001] [ERROR][com.freerdp.core.rdp] - [rdp_recv_callback_int][0x104aa8a30]: CONNECTION_STATE_CAPABILITIES_EXCHANGE_DEMAND_ACTIVE status STATE_RUN_FAILED [-1]
+[12:07:29:756] [94662:6fc27001] [ERROR][com.freerdp.core.transport] - [transport_check_fds]: transport_check_fds: transport->ReceiveCallback() - STATE_RUN_FAILED [-1]
+[12:07:29:756] [94662:6fc27001] [ERROR][com.freerdp.core] - [freerdp_check_event_handles]: freerdp_check_fds() failed - 0
+[12:07:29:757] [94662:6fc27001] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:07:29:758] [94662:f0eb7f81] [ERROR][com.freerdp.client.SDL] - [handleShow]: Connection event processing failed without server error information
+[12:07:27:153] [94662:6fc27001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[12:07:27:156] [94662:6fc27001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[12:07:28:643] [94662:f0eb7f81] [INFO][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_RENDER] Created renderer: metal
+[12:07:28:646] [94662:6fc27001] [INFO][com.freerdp.gdi] - [gdi_init_ex]: Local framebuffer format  PIXEL_FORMAT_BGRA32
+[12:07:28:646] [94662:6fc27001] [INFO][com.freerdp.gdi] - [gdi_init_ex]: Remote framebuffer format PIXEL_FORMAT_BGRA32
+[12:07:28:646] [94662:6fc27001] [INFO][com.freerdp.channels.rdpsnd.client] - [rdpsnd_load_device_plugin]: [static] Loaded fake backend for rdpsnd
+[12:07:28:646] [94662:6fc27001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel ainput
+[12:07:28:646] [94662:6fc27001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel rdpgfx
+[12:07:28:646] [94662:6fc27001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel disp
+[12:07:28:646] [94662:6fc27001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel rdpsnd
+[12:07:29:757] [94662:6fc27001] [INFO][com.freerdp.client.common] - [client_auto_reconnect_ex]: Network disconnect!

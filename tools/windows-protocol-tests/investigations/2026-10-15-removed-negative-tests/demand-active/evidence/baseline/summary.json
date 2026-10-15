@@ -1,0 +1,136 @@
+[
+  {
+    "case": "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false,
+      "graceful_close": false
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 0,
+    "relay_connections": 0,
+    "graceful_closes": 0,
+    "passed": false,
+    "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid invalid MCS length in Server Demand Active PDU received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength() in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_ConnectionTest_CapabilityExchange.cs:line 219\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 17.06
+  },
+  {
+    "case": "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false,
+      "graceful_close": false
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 0,
+    "relay_connections": 0,
+    "graceful_closes": 0,
+    "passed": false,
+    "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid invalid pdu length in Server Demand Active pdu received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength() in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_ConnectionTest_CapabilityExchange.cs:line 434\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 16.57
+  },
+  {
+    "case": "BVT_ConnectionTest_CapabilityExchange_PositiveTest",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false,
+      "graceful_close": false
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 0,
+    "relay_connections": 0,
+    "graceful_closes": 0,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 6.82
+  },
+  {
+    "case": "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false,
+      "graceful_close": false
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 0,
+    "relay_connections": 0,
+    "graceful_closes": 0,
+    "passed": false,
+    "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid invalid MCS length in Server Demand Active PDU received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength() in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_ConnectionTest_CapabilityExchange.cs:line 219\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 15.28
+  },
+  {
+    "case": "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false,
+      "graceful_close": false
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 0,
+    "relay_connections": 0,
+    "graceful_closes": 0,
+    "passed": false,
+    "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid invalid pdu length in Server Demand Active pdu received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength() in /private/tmp/wpts-build-5ep1toxo/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_ConnectionTest_CapabilityExchange.cs:line 434\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 14.57
+  },
+  {
+    "case": "BVT_ConnectionTest_CapabilityExchange_PositiveTest",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false,
+      "graceful_close": false
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 0,
+    "relay_connections": 0,
+    "graceful_closes": 0,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 5.33
+  }
+]

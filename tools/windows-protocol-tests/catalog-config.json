@@ -732,52 +732,72 @@
       "implemented_note": "Qualified in both modes with the corrected disconnect verifier and default TLS settings."
     },
     "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength": {
-      "disposition": "Failed qualification",
-      "reason": "Removed from extended after correcting Microsoft’s false-positive disconnect verifier. The required actual connection-close event was not observed during requalification; the earlier nominal pass is insufficient. Investigate the packet mutation and client behavior before enabling again.",
+      "disposition": "Blocked · FreeRDP length validation",
+      "reason": "Confirmed client boundary-validation defect: MCS userData length declares 130 bytes but 386 are parsed. The original test passes in both modes with an isolated native consistency-check repair. Production repair and regression qualification are still required.",
       "evidence": [
         {
-          "label": "Batch qualification · 2026-10-15",
-          "url": "investigations/2026-10-15-extended-batches/README.md"
+          "label": "Root-cause investigation · 2026-10-15",
+          "url": "investigations/2026-10-15-removed-negative-tests/demand-active/README.md"
+        },
+        {
+          "label": "Five-test findings",
+          "url": "investigations/2026-10-15-removed-negative-tests/README.md"
         }
       ]
     },
     "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength": {
-      "disposition": "Failed qualification",
-      "reason": "Removed from extended after correcting Microsoft’s false-positive disconnect verifier. The required actual connection-close event was not observed during requalification; the earlier nominal pass is insufficient. Investigate the packet mutation and client behavior before enabling again.",
+      "disposition": "Blocked · FreeRDP length validation",
+      "reason": "Confirmed client boundary-validation defect: Share Control totalLength declares 385 bytes but 386 are parsed. The original test passes in both modes with an isolated native consistency-check repair. Production repair and regression qualification are still required.",
       "evidence": [
         {
-          "label": "Batch qualification · 2026-10-15",
-          "url": "investigations/2026-10-15-extended-batches/README.md"
+          "label": "Root-cause investigation · 2026-10-15",
+          "url": "investigations/2026-10-15-removed-negative-tests/demand-active/README.md"
+        },
+        {
+          "label": "Five-test findings",
+          "url": "investigations/2026-10-15-removed-negative-tests/README.md"
         }
       ]
     },
     "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength": {
-      "disposition": "Failed qualification",
-      "reason": "Removed from extended after correcting Microsoft’s false-positive disconnect verifier. The required actual connection-close event was not observed during requalification; the earlier nominal pass is insufficient. Investigate the packet mutation and client behavior before enabling again.",
+      "disposition": "Blocked · Microsoft TPKT fixture",
+      "reason": "Confirmed Microsoft fixture defect: a zero TPKT length underflows to 65535 while only 9 bytes are sent. FreeRDP waits for an incomplete frame. Correcting the fixture to its intended length 8 makes the unchanged client pass both modes; integrate and qualify the fixture repair before restoring.",
       "evidence": [
         {
-          "label": "Batch qualification · 2026-10-15",
-          "url": "investigations/2026-10-15-extended-batches/README.md"
+          "label": "Root-cause investigation · 2026-10-15",
+          "url": "investigations/2026-10-15-removed-negative-tests/disconnect/investigation.md"
+        },
+        {
+          "label": "Five-test findings",
+          "url": "investigations/2026-10-15-removed-negative-tests/README.md"
         }
       ]
     },
     "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength": {
-      "disposition": "Failed qualification",
-      "reason": "Removed from extended after correcting Microsoft’s false-positive disconnect verifier. The required actual connection-close event was not observed during requalification; the earlier nominal pass is insufficient. Investigate the packet mutation and client behavior before enabling again.",
+      "disposition": "Blocked · FreeRDP length validation",
+      "reason": "Confirmed client boundary-validation defect: MCS userData length declares 25 bytes but 26 are parsed. The original test passes in both modes with an isolated native consistency-check repair. Production repair and regression qualification are still required.",
       "evidence": [
         {
-          "label": "Batch qualification · 2026-10-15",
-          "url": "investigations/2026-10-15-extended-batches/README.md"
+          "label": "Root-cause investigation · 2026-10-15",
+          "url": "investigations/2026-10-15-removed-negative-tests/slow-path/README.md"
+        },
+        {
+          "label": "Five-test findings",
+          "url": "investigations/2026-10-15-removed-negative-tests/README.md"
         }
       ]
     },
     "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength": {
-      "disposition": "Failed qualification",
-      "reason": "Removed from extended after correcting Microsoft’s false-positive disconnect verifier. The required actual connection-close event was not observed during requalification; the earlier nominal pass is insufficient. Investigate the packet mutation and client behavior before enabling again.",
+      "disposition": "Blocked · Microsoft TPKT fixture",
+      "reason": "Confirmed Microsoft fixture defect: a zero TPKT length underflows to 65535 while only 40 bytes are sent. FreeRDP waits for an incomplete frame. Correcting the fixture to its intended length 39 makes the unchanged client pass both modes; integrate and qualify the fixture repair before restoring.",
       "evidence": [
         {
-          "label": "Batch qualification · 2026-10-15",
-          "url": "investigations/2026-10-15-extended-batches/README.md"
+          "label": "Root-cause investigation · 2026-10-15",
+          "url": "investigations/2026-10-15-removed-negative-tests/slow-path/README.md"
+        },
+        {
+          "label": "Five-test findings",
+          "url": "investigations/2026-10-15-removed-negative-tests/README.md"
         }
       ]
     },

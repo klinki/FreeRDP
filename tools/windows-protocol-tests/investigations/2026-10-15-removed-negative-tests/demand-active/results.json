@@ -1,0 +1,176 @@
+{
+  "classification": "FreeRDP client protocol length-validation defects; Microsoft tests generate genuinely malformed packets and corrected disconnect assertion is valid.",
+  "source_revision": "0ed6fd412a856a85ea94866e5695fd7dd37b9b0b",
+  "microsoft_revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+  "environment": {
+    "security": "TLS",
+    "client_modes": [
+      "standard",
+      "bridge"
+    ],
+    "rdp_version": "10.6",
+    "fixture": "loopback, current prepared seven-patch suite; diagnostic adapter rebuilt from pinned source plus strict disconnect catch removal and packet capture only"
+  },
+  "tests": [
+    {
+      "name": "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength",
+      "classification": "client_defect",
+      "baseline": {
+        "standard": "Failed",
+        "bridge": "Failed"
+      },
+      "diagnostic_repair": {
+        "standard": "Passed",
+        "bridge": "Passed"
+      },
+      "actual_packet": {
+        "tpkt_bytes": 401,
+        "mcs_declared": 130,
+        "mcs_available": 386,
+        "share_declared": 386
+      },
+      "cause": "rdp_read_header checks only available>=declared and does not restrict the stream; full 386-byte DemandActive is parsed despite MCS declaring130.",
+      "generator_note": "Server_Demand_Active_Pdu_Ex decrements byte13 (high PER length byte). 81 82 becomes80 82: difference256, not1. Packet remains correctly negative for length-consistency test."
+    },
+    {
+      "name": "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength",
+      "classification": "client_defect",
+      "baseline": {
+        "standard": "Failed",
+        "bridge": "Failed"
+      },
+      "diagnostic_repair": {
+        "standard": "Passed",
+        "bridge": "Passed"
+      },
+      "actual_packet": {
+        "tpkt_bytes": 401,
+        "mcs_declared": 386,
+        "mcs_available": 386,
+        "share_declared": 385,
+        "share_available": 386
+      },
+      "cause": "rdp_client_connect_demand_active discards the validated Share Control size and passes the unrestricted stream to capability parsing."
+    }
+  ],
+  "control": {
+    "name": "BVT_ConnectionTest_CapabilityExchange_PositiveTest",
+    "baseline": {
+      "standard": "Passed",
+      "bridge": "Passed"
+    },
+    "diagnostic_repair": {
+      "standard": "Passed",
+      "bridge": "Passed"
+    }
+  },
+  "protocol_requirement": {
+    "url": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpbcgr/0108279d-cd8b-4975-993c-a5cb9ee0a888",
+    "section": "3.2.5.3.13.1",
+    "summary": "MCS and Share Control lengths MUST be examined for consistency. A discrepancy SHOULD cause disconnection, not MUST."
+  },
+  "limitations": [
+    "Isolated diagnostic parser repair only; production native source/build unchanged.",
+    "No memory corruption, out-of-bounds allocation access, crash, or exploit demonstrated. The parser reads beyond declared inner payload boundaries but within the physically received401-byte packet.",
+    "No full extended suite, reconnect, batching, legacy security, or external real-server compatibility qualification of diagnostic repair.",
+    "Packet capture serializes immediately before SendPdu; TLS means no internal RDP encryption state is advanced. The SDK serializes the same object again during SendPdu."
+  ],
+  "packets": {
+    "baseline/standard-1.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 130,
+      "share_control_length": 386,
+      "raw_bytes_sha256": "0ebd161cffc8e42e492e10d9099c3db5c8c912d9bc4b28add9b01bf30b562c1a",
+      "prefix_hex": "0300019102f08068000103eb70808282011100ea03"
+    },
+    "baseline/standard-3.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 386,
+      "share_control_length": 386,
+      "raw_bytes_sha256": "517cb099aa610da8e37a6ff859a813bde894a509915a861e345e4ada68b75100",
+      "prefix_hex": "0300019102f08068000103eb70818282011100ea03"
+    },
+    "baseline/standard-2.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 386,
+      "share_control_length": 385,
+      "raw_bytes_sha256": "dd785c8e04135f560f17a7d821b261fa78ce9f5a726fe2d0ec67aef0be05fbee",
+      "prefix_hex": "0300019102f08068000103eb70818281011100ea03"
+    },
+    "baseline/bridge-1.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 130,
+      "share_control_length": 386,
+      "raw_bytes_sha256": "0ebd161cffc8e42e492e10d9099c3db5c8c912d9bc4b28add9b01bf30b562c1a",
+      "prefix_hex": "0300019102f08068000103eb70808282011100ea03"
+    },
+    "baseline/bridge-2.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 386,
+      "share_control_length": 385,
+      "raw_bytes_sha256": "dd785c8e04135f560f17a7d821b261fa78ce9f5a726fe2d0ec67aef0be05fbee",
+      "prefix_hex": "0300019102f08068000103eb70818281011100ea03"
+    },
+    "baseline/bridge-3.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 386,
+      "share_control_length": 386,
+      "raw_bytes_sha256": "517cb099aa610da8e37a6ff859a813bde894a509915a861e345e4ada68b75100",
+      "prefix_hex": "0300019102f08068000103eb70818282011100ea03"
+    },
+    "diagnostic-repair/standard-1.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 130,
+      "share_control_length": 386,
+      "raw_bytes_sha256": "0ebd161cffc8e42e492e10d9099c3db5c8c912d9bc4b28add9b01bf30b562c1a",
+      "prefix_hex": "0300019102f08068000103eb70808282011100ea03"
+    },
+    "diagnostic-repair/standard-3.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 386,
+      "share_control_length": 386,
+      "raw_bytes_sha256": "517cb099aa610da8e37a6ff859a813bde894a509915a861e345e4ada68b75100",
+      "prefix_hex": "0300019102f08068000103eb70818282011100ea03"
+    },
+    "diagnostic-repair/standard-2.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 386,
+      "share_control_length": 385,
+      "raw_bytes_sha256": "dd785c8e04135f560f17a7d821b261fa78ce9f5a726fe2d0ec67aef0be05fbee",
+      "prefix_hex": "0300019102f08068000103eb70818281011100ea03"
+    },
+    "diagnostic-repair/bridge-1.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 130,
+      "share_control_length": 386,
+      "raw_bytes_sha256": "0ebd161cffc8e42e492e10d9099c3db5c8c912d9bc4b28add9b01bf30b562c1a",
+      "prefix_hex": "0300019102f08068000103eb70808282011100ea03"
+    },
+    "diagnostic-repair/bridge-2.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 386,
+      "share_control_length": 385,
+      "raw_bytes_sha256": "dd785c8e04135f560f17a7d821b261fa78ce9f5a726fe2d0ec67aef0be05fbee",
+      "prefix_hex": "0300019102f08068000103eb70818281011100ea03"
+    },
+    "diagnostic-repair/bridge-3.hex": {
+      "bytes": 401,
+      "tpkt_length": 401,
+      "mcs_length": 386,
+      "share_control_length": 386,
+      "raw_bytes_sha256": "517cb099aa610da8e37a6ff859a813bde894a509915a861e345e4ada68b75100",
+      "prefix_hex": "0300019102f08068000103eb70818282011100ea03"
+    }
+  }
+}

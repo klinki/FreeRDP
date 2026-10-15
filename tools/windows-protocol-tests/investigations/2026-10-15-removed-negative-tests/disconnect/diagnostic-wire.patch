@@ -1,0 +1,43 @@
+--- a/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs
++++ b/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServerTransportStack.cs
+@@ -685,6 +685,40 @@
+                 throw new InvalidOperationException("The endPoint is not in the connect list.");
+             }
+ 
++            // Investigation only: preserve the original case and switch only this final wire frame.
++            if (packet is MCS_Disconnect_Provider_Ultimatum_Server_Pdu &&
++                Environment.GetEnvironmentVariable("WPTS_DISCONNECT_SCENARIO") is string scenario)
++            {
++                byte[] originalBytes = (byte[])writeBytes.Clone();
++                int firstCount = writeBytes.Length;
++                int padding = 0;
++                bool eof = false;
++                switch (scenario)
++                {
++                    case "original": break;
++                    case "short": writeBytes[2] = 0; writeBytes[3] = 8; break;
++                    case "correct": writeBytes[2] = 0; writeBytes[3] = 9; break;
++                    case "long-open": writeBytes[2] = 0; writeBytes[3] = 10; break;
++                    case "long-filled": writeBytes[2] = 0; writeBytes[3] = 10; padding = 1; break;
++                    case "original-eof": eof = true; break;
++                    case "truncated-eof": writeBytes[2] = 0; writeBytes[3] = 9; firstCount = 8; eof = true; break;
++                    case "fragmented": writeBytes[2] = 0; writeBytes[3] = 9; firstCount = 8; break;
++                    default: throw new ArgumentException("Unknown disconnect probe scenario " + scenario);
++                }
++                Console.WriteLine("DISCONNECT_PROBE scenario={0} original={1} bytes={2} firstCount={3} utc={4:O}", scenario,
++                    BitConverter.ToString(originalBytes), BitConverter.ToString(writeBytes), firstCount, DateTime.UtcNow);
++                stream.Write(writeBytes, 0, firstCount);
++                Console.WriteLine("DISCONNECT_PROBE first-write-completed utc={0:O}", DateTime.UtcNow);
++                if (padding != 0 || eof || scenario == "fragmented")
++                {
++                    System.Threading.Thread.Sleep(1000);
++                    if (padding != 0) stream.Write(new byte[padding], 0, padding);
++                    else if (scenario == "fragmented") stream.Write(writeBytes, firstCount, writeBytes.Length-firstCount);
++                    else stream.Close();
++                    Console.WriteLine("DISCONNECT_PROBE followup={0} utc={1:O}", eof ? "server-transport-close" : "remaining-bytes", DateTime.UtcNow);
++                }
++                return;
++            }
+             stream.Write(writeBytes, 0, writeBytes.Length);
+         }
+ 
