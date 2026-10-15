@@ -1,0 +1,17 @@
+[
+  {
+    "case": "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": true,
+      "video": false,
+      "graphics": false
+    },
+    "graphics_mask": null,
+    "passed": false,
+    "detail": "Assume.Fail failed. The necessary channel RDPDR has not been created, so stop running this test case.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported() in /private/tmp/wpts-investigation-source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S7_StaticVirtualChannelTest.cs:line 67\n=== End of Stack Trace ===\r\n",
+    "errors": [],
+    "seconds": 5.23
+  }
+]

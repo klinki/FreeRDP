@@ -1,0 +1,555 @@
+{
+  "revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+  "review_date": "2026-10-15",
+  "inventory_count": 432,
+  "inventory_names_sha256": "caebcc99dde0a67072cdc4651f305e6eb841f220525f0ae7efc593cec4bb7354",
+  "groups": [
+    {
+      "file_pattern": "^RDPBCGR/S1_(?!.*CapabilityExchange|.*BasicSettingExchange|.*ChannelConnection|.*ConnectionFinalization|.*Disconnection|.*SecuritySettingExchange).*",
+      "area": "Connection · Negotiation",
+      "disposition": "Not qualified",
+      "reason": "Not yet qualified in both launch modes; review the security prerequisite and run this case before adding it."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S1_.*CapabilityExchange",
+      "area": "Connection · Capabilities",
+      "disposition": "Not qualified",
+      "reason": "Not yet qualified in both launch modes; review the capability prerequisite before adding it."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S1_.*BasicSettingExchange",
+      "area": "Connection · Basic settings",
+      "disposition": "Not qualified",
+      "reason": "Not yet qualified in both launch modes; review the server security mutation and expected disconnect before adding it."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S1_.*ChannelConnection",
+      "area": "Connection · Channels",
+      "disposition": "Not qualified",
+      "reason": "Not yet qualified in both launch modes."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S1_.*ConnectionFinalization",
+      "area": "Connection · Finalization",
+      "disposition": "Not qualified",
+      "reason": "Not yet qualified in both launch modes."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S1_.*Disconnection",
+      "area": "Connection · Disconnection",
+      "disposition": "Not qualified",
+      "reason": "Not yet qualified in both launch modes."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S1_.*SecuritySettingExchange",
+      "area": "Connection · Security and licensing",
+      "disposition": "Not qualified",
+      "reason": "Not yet qualified in both launch modes; review the security prerequisite before adding it."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S2_",
+      "area": "Session · Reactivation",
+      "disposition": "Not qualified",
+      "reason": "Not yet qualified in both launch modes."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S3_",
+      "area": "Session · Reconnection",
+      "disposition": "Adapter missing",
+      "reason": "Requires TriggerClientAutoReconnect and an enabled reconnect profile. The current adapter implements start/stop only and launches with auto-reconnect disabled."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S[45]_",
+      "area": "Input · Keyboard and mouse",
+      "disposition": "Adapter missing",
+      "reason": "Requires TriggerInputEvents to inject and verify keyboard/mouse events. The current adapter has no input command."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S6_",
+      "area": "Network · Auto-detection",
+      "disposition": "Adapter missing",
+      "reason": "This variant requires a controlled reconnect; TriggerClientAutoReconnect is not implemented and auto-reconnect is disabled."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S7_",
+      "area": "Channels · Static / drive",
+      "disposition": "Not qualified",
+      "reason": "Requires a redirected drive and SupportRDPEFS. Static-channel negotiation and chunking must be qualified separately; the existing drive-enabled network probes do not verify drive I/O."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S8_",
+      "area": "Session · Server redirection",
+      "disposition": "Configuration missing",
+      "reason": "Requires a second redirected endpoint with matching credentials and certificate handling. The current adapter restricts client starts to one configured loopback endpoint; redirection has not been qualified."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S9_",
+      "area": "Session · Heartbeat",
+      "disposition": "Configuration missing",
+      "reason": "Requires heartbeat-triggered auto-reconnect and SupportRDPEFS. The current profile disables auto-reconnect; heartbeat recovery has not been qualified."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S10_",
+      "area": "Graphics · Pointer output",
+      "disposition": "Observation missing",
+      "reason": "These positive tests send pointer updates but do not observe the cursor. Add cursor/screen observation before claiming visual correctness; protocol-only execution is still unqualified."
+    },
+    {
+      "file_pattern": "^RDPBCGR/S11_",
+      "area": "Session · RDSTLS authentication",
+      "disposition": "Configuration missing",
+      "reason": "Requires an RDSTLS redirection/authentication scenario and a second endpoint. The current TLS-only, single-endpoint profile does not exercise this scenario."
+    },
+    {
+      "file_pattern": "^RDPEDISP/",
+      "area": "Display · Monitor changes",
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization and resolution/orientation/monitor control commands. The current adapter does not implement the display-control suite; monitor changes need a controlled display fixture."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*CapabilityExchange",
+      "area": "Graphics · GFX capabilities",
+      "disposition": "Not qualified",
+      "reason": "Requires the graphics profile and case-specific capability checks. Only the baseline capability exchange has been qualified; these variants remain untested."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*H264Codec",
+      "area": "Graphics · H.264",
+      "disposition": "Not qualified",
+      "reason": "Requires case-specific AVC420/AVC444/AVC444v2 capability and data checks. Only AVC420 base-profile acknowledgements are qualified; other variants and rendered output remain unverified."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*ClearCodec",
+      "area": "Graphics · ClearCodec",
+      "disposition": "Not qualified",
+      "reason": "ClearCodec fixtures and capability prerequisites have not been qualified. Screenshot comparison is disabled, so rendered correctness would need an observation adapter."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*RfxProgCodec",
+      "area": "Graphics · Progressive RemoteFX",
+      "disposition": "Not qualified",
+      "reason": "Progressive RemoteFX fixtures, capability flags and decoding variants have not been qualified. Screenshot comparison is disabled; frame acknowledgements alone do not prove rendered correctness."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*RemoteFXCodec",
+      "area": "Graphics · GFX RemoteFX",
+      "disposition": "Not qualified",
+      "reason": "GFX RemoteFX codec/data prerequisites have not been qualified. Screenshot comparison is disabled; rendering requires separate observation."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*Compression",
+      "area": "Graphics · Compression",
+      "disposition": "Not qualified",
+      "reason": "GFX compression and persistent dictionary cases have not been qualified with this build. Needs graphics profile and case-specific result checks."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*FrameSegmentation",
+      "area": "Graphics · Frame segmentation",
+      "disposition": "Not qualified",
+      "reason": "Segmented GFX frames, capability prerequisites and fixtures have not been qualified. Screenshot comparison is disabled; rendering requires separate observation."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*SurfaceToCacheToSurface",
+      "area": "Graphics · Surface cache",
+      "disposition": "Not qualified",
+      "reason": "Surface cache operations and cache limits have not been qualified. Needs graphics profile and image verification to validate the rendered result."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*SurfaceToScreen",
+      "area": "Graphics · Surface to screen",
+      "disposition": "Not qualified",
+      "reason": "Surface mapping/scaling cases have not been qualified. Needs graphics profile and screenshot comparison to validate the displayed result."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*SurfaceToSurface",
+      "area": "Graphics · Surface copies",
+      "disposition": "Not qualified",
+      "reason": "Surface-copy operations and format combinations have not been qualified. Needs graphics profile and image verification to validate copied pixels."
+    },
+    {
+      "file_pattern": "^RDPEGFX/.*WireToSurface",
+      "area": "Graphics · Wire to surface",
+      "disposition": "Not qualified",
+      "reason": "Wire-to-surface codec and pixel format combinations have not been qualified. Needs graphics profile and image verification to validate decoded pixels."
+    },
+    {
+      "file_pattern": "^RDPEI/",
+      "area": "Input · Touch",
+      "disposition": "Adapter missing",
+      "reason": "The touch suite/control adapter is not wired into this runner. Touch-event cases require injection commands and a suitable touch/proximity fixture; initialization-only cases still need separate qualification."
+    },
+    {
+      "file_pattern": "^RDPEMT/",
+      "area": "Transport · Multitransport",
+      "disposition": "Not qualified",
+      "reason": "The pinned helper negotiates legacy RDPUDP by default; this FreeRDP fork requires v3 (RDPEUDP2). A v3-capable multitransport fixture must be qualified before these dependent cases can be enabled."
+    },
+    {
+      "file_pattern": "^RDPEUDP/(?!S3_DataTransfer_V2)",
+      "area": "Transport · Legacy UDP",
+      "disposition": "Inapplicable · client transport",
+      "reason": "These cases negotiate RDPUDP v1/v2. This FreeRDP fork intentionally requires v3 (RDPEUDP2), so the legacy handshake is declined; a timeout is not evidence of a v3 defect."
+    },
+    {
+      "file_pattern": "^RDPEUDP/S3_DataTransfer_V2",
+      "area": "Transport · RDPUDP2",
+      "disposition": "Not qualified",
+      "reason": "Explicitly requests RDPUDP v3 (RDPEUDP2). This case has not been run in the audit. A separate v3 receive-data probe established a tunnel but did not complete its test/cleanup; qualify this fixture and each case before enabling."
+    },
+    {
+      "file_pattern": "^RDPEUSB/",
+      "area": "Devices · USB redirection",
+      "disposition": "Hardware / configuration missing",
+      "reason": "Requires the RDPEUSB device profile and redirected USB hardware (OSR FX2 for vendor/I/O cases). The current runner configures neither the device fixture nor USB redirection; all cases are marked DeviceNeeded upstream."
+    },
+    {
+      "file_pattern": "^RDPEVOR/",
+      "area": "Media · Video redirection",
+      "disposition": "Not qualified",
+      "reason": "Requires /video and video/geometry fixtures. Only channel-support negotiation is qualified; presentation, malformed-packet handling and streaming cases remain untested. Rendered video needs observation."
+    },
+    {
+      "file_pattern": "^RDPRFX/",
+      "area": "Graphics · RemoteFX bitmap codec",
+      "disposition": "Not qualified",
+      "reason": "RemoteFX bitmap-codec fixtures and capability/image-mode prerequisites have not been qualified. Image comparison is disabled; protocol-only outcomes cannot establish rendered correctness."
+    }
+  ],
+  "overrides": {
+    "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_IncorrectSignature": {
+      "disposition": "Inapplicable · TLS profile",
+      "reason": "Mutates the Standard RDP Security MAC signature. Under TLS the upstream method returns before launching the client; the runner rejects that nominal pass."
+    },
+    "S1_ConnectionTest_BasicSettingExchange_NegativeTest_InvalidServerRandomLen": {
+      "disposition": "Inapplicable · TLS profile",
+      "reason": "Mutates the Standard RDP Security serverRandomLen. The upstream method returns unless PROTOCOL_RDP is selected; TLS has no such legacy security exchange."
+    },
+    "S1_ConnectionTest_BasicSettingExchange_NegativeTest_InvalidServerCertificate": {
+      "disposition": "Inapplicable · TLS profile",
+      "reason": "Mutates the Standard RDP Security serverCertificate, not the TLS certificate. The upstream method returns unless PROTOCOL_RDP is selected."
+    },
+    "S1_ConnectionTest_BasicSettingExchange_PositiveTest_EncryptionMethodandLevel": {
+      "disposition": "Inapplicable · TLS profile",
+      "reason": "Requires Standard RDP Security with 56-bit encryption and a High encryption level. The method returns under the current TLS profile."
+    },
+    "S1_ConnectionTest_SecurityExchange_NegativeTest_LicenseError_InvalidSignature": {
+      "disposition": "Inapplicable · TLS profile",
+      "reason": "Requires Standard RDP Security at Client Compatible or High level to mutate the encrypted license MAC. The method returns with the current TLS configuration."
+    },
+    "S1_Connection_Initialization_NegativeTest_InitialReliableConnection_RDPEncryption": {
+      "disposition": "Inapplicable · TLS profile",
+      "reason": "Explicitly starts a Standard RDP Security connection to test rejection of multitransport. The adapter only accepts negotiated TLS connections; also depends on legacy reliable UDP."
+    },
+    "S1_Connection_Initialization_NegativeTest_InitialLossyConnection_RDPEncryption": {
+      "disposition": "Inapplicable · TLS profile",
+      "reason": "Explicitly requires Standard RDP Security and lossy UDP/DTLS. The adapter is TLS-only and the pinned Microsoft lossy-transport implementation requires Windows."
+    },
+    "BVT_ConnectionTest_ConnectionInitiation_InvalidAccount_PositiveTest": {
+      "disposition": "Inapplicable · TLS / macOS driver",
+      "reason": "Requires CredSSP/NLA rather than TLS-only security. The pinned Microsoft driver explicitly supports CredSSP transport only on Windows; use a separate Windows-driver/NLA profile.",
+      "area": "Connection · Negotiation",
+      "summary": "Rejects connection initiation with an invalid username under CredSSP."
+    },
+    "S1_ConnectionTest_ConnectionInitiation_PositiveTest_HybridEXSelected": {
+      "disposition": "Inapplicable · TLS / macOS driver",
+      "reason": "Requires CredSSP/NLA rather than TLS-only security. The pinned Microsoft driver explicitly supports CredSSP transport only on Windows; use a separate Windows-driver/NLA profile."
+    },
+    "S1_ConnectionTest_BasicSettingExchange_NegativeTest_InvalidEncryptionMethod": {
+      "disposition": "Not qualified",
+      "reason": "Not qualified in either mode. Upstream labels this a potential technical-documentation issue and mutates legacy server-security fields; unlike nearby cases it has no explicit TLS skip. Verify applicability and expected disconnect before enabling.",
+      "summary": "Rejects an invalid or unsupported encryptionMethod in server security data."
+    },
+    "S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated": {
+      "disposition": "Adapter missing",
+      "reason": "Requires TriggerCloseRDPWindow to produce a client-initiated protocol disconnect. Process termination during cleanup is not that control operation.",
+      "area": "Connection · Disconnection"
+    },
+    "S1_RDPEDISP_ResolutionChange_RestartGraphicsPipeline": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus resolution changes. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "S1_RDPEDISP_ResolutionChange_DeactivationReactivation": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus resolution changes. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "S2_RDPEDISP_OrientationChange_RestartGraphicsPipeline": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus orientation changes and window maximization. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "S2_RDPEDISP_OrientationChange_DeactivationReactivation": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus orientation changes and window maximization. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "S2_RDPEDISP_OrientationAllChange_RestartGraphicsPipeline": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus orientation changes and window maximization. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "S2_RDPEDISP_OrientationAllChange_DeactivationReactivation": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus orientation changes and window maximization. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "S2_RDPEDISP_OrientationAllChange_EnhancedAdapterDemo": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus orientation changes and window maximization. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "S3_RDPEDISP_MonitorAdditionRemoval_RestartGraphicsPipeline": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus monitor addition/removal. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "S3_RDPEDISP_MonitorAdditionRemoval_DeactivationReactivation": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus monitor addition/removal. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "S4_RDPEDISP_MonitorReposition_RestartGraphicsPipeline": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus monitor repositioning. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "S4_RDPEDISP_MonitorReposition_DeactivationReactivation": {
+      "disposition": "Adapter missing",
+      "reason": "Requires display initialization plus monitor repositioning. The current adapter supports client start/stop only; a controlled monitor fixture and display-control commands must be added."
+    },
+    "Rdpei_TouchInputTest_Positive_SingleTouchEvent": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerOneTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchInputTest_Positive_SingleTouchContactPosition": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerPositionSpecifiedTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchInputTest_Positive_MultiTouchEvent": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerMultiTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchInputTest_Positive_ContactStateTransition": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerContinuousTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchInputTest_Positive_DismissHoveringContact": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerDismissHoveringContactPduOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchInputTest_Negative_TouchEventWithoutNegotiation": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerContinuousTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchControlTest_Positive_Suspend": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerContinuousTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchControlTest_Positive_Resume": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerOneTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchControlTest_Negative_InvalidSuspendPduLength": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerOneTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchControlTest_Negative_InvalidResumePduLength": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerContinuousTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchControlTest_Negative_InvalidEventIdInRunningPhase": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerOneTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchControlTest_Negative_DuplicatedSuspend": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerContinuousTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "Rdpei_TouchControlTest_Negative_DuplicatedResume": {
+      "disposition": "Adapter missing",
+      "reason": "Requires touch control operations (TriggerOneTouchEventOnClient). The runner has no touch command implementation or configured touch fixture."
+    },
+    "S1_Connection_Initialization_InitialLossyConnection": {
+      "disposition": "Inapplicable · macOS driver",
+      "reason": "Requires lossy UDP with DTLS. The pinned Microsoft driver explicitly limits this transport to Windows; it needs a separate Windows-driver fixture, as well as compatible UDP negotiation."
+    },
+    "S1_Connection_SoftSync_Lossy": {
+      "disposition": "Inapplicable · macOS driver",
+      "reason": "Requires lossy UDP with DTLS. The pinned Microsoft driver explicitly limits this transport to Windows; it needs a separate Windows-driver fixture, as well as compatible UDP negotiation."
+    },
+    "S2_AutoDetect_RTTMeasure_Lossy": {
+      "disposition": "Inapplicable · macOS driver",
+      "reason": "Requires lossy UDP with DTLS. The pinned Microsoft driver explicitly limits this transport to Windows; it needs a separate Windows-driver fixture, as well as compatible UDP negotiation."
+    },
+    "S2_AutoDetect_LossyBandwidthMeasure": {
+      "disposition": "Inapplicable · macOS driver",
+      "reason": "Requires lossy UDP with DTLS. The pinned Microsoft driver explicitly limits this transport to Windows; it needs a separate Windows-driver fixture, as well as compatible UDP negotiation."
+    },
+    "S2_AutoDetect_NegtiveLossyBandwidthMeasure": {
+      "disposition": "Inapplicable · macOS driver",
+      "reason": "Requires lossy UDP with DTLS. The pinned Microsoft driver explicitly limits this transport to Windows; it needs a separate Windows-driver fixture, as well as compatible UDP negotiation."
+    },
+    "S11_RDSTLSAuthentication_PositiveTest_ServerRedirectionAndAutoReconnectWithCookie": {
+      "disposition": "Adapter / configuration missing",
+      "reason": "Requires RDSTLS redirection with a reconnect cookie, a second endpoint and TriggerClientAutoReconnect. None is configured in the current TLS-only, start/stop adapter."
+    },
+    "Rdpevor_VideoStreamingTest_Positive_OverUDPTransport": {
+      "disposition": "Not qualified",
+      "reason": "Requires /video plus a functioning reliable UDP multitransport fixture. The default upstream helper uses legacy UDP, which this v3-only fork declines. Video rendering also needs observation."
+    },
+    "RDPEGFX_CapabilityExchange_PositiveTest": {
+      "implemented_note": "Qualified in both modes with fullscreen and /gfx:AVC444,mask:0x200. The mask removes a legacy capability alias rejected by the pinned validator. Protocol responses/frame acknowledgements only; screenshots are disabled."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_BaseProfile": {
+      "implemented_note": "Qualified in both modes with fullscreen and /gfx:AVC444,mask:0x200. The mask removes a legacy capability alias rejected by the pinned validator. Protocol responses/frame acknowledgements only; screenshots are disabled."
+    },
+    "Rdpevor_ProtocolSupportTest_Positive": {
+      "implemented_note": "Qualified in both modes with /video. Verifies video-channel support, not rendered video quality."
+    },
+    "S6_AutoDetection_Continuous_RTT": {
+      "implemented_note": "Qualified in both modes with a temporary redirected drive and SupportRDPEFS to satisfy the Microsoft prerequisite. Verifies network auto-detection, not drive I/O."
+    },
+    "S6_AutoDetection_Continuous_bandwidth": {
+      "implemented_note": "Qualified in both modes with a temporary redirected drive and SupportRDPEFS to satisfy the Microsoft prerequisite. Verifies network auto-detection, not drive I/O."
+    },
+    "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported": {
+      "disposition": "Blocked · Microsoft driver",
+      "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. After isolated fixes for that lookup and malformed V1 drive-capability encoding, both launch modes still fail awaiting the device list. Server USER_LOGGEDON capability negotiation also disagrees with the sent PDU; no passing result.",
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    },
+    "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent": {
+      "disposition": "Blocked · Microsoft driver",
+      "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. After isolated fixes for that lookup and malformed V1 drive-capability encoding, both launch modes still fail awaiting the device list. Server USER_LOGGEDON capability negotiation also disagrees with the sent PDU; no passing result.",
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    },
+    "S7_StaticVirtualChannel_PositiveTest_CompressionSupported": {
+      "disposition": "Blocked · Microsoft driver",
+      "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. This positive variant also shares malformed V1 drive-capability encoding. Only the two baseline cases were probed after isolated fixes; this variant remains unqualified.",
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    },
+    "S7_StaticVirtualChannel_PositiveTest_VCChunkSizePresent": {
+      "disposition": "Blocked · Microsoft driver",
+      "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. This positive variant also shares malformed V1 drive-capability encoding. Only the two baseline cases were probed after isolated fixes; this variant remains unqualified.",
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    },
+    "S7_StaticVirtualChannel_NegativeTest_InvalidTPKTLength": {
+      "disposition": "Blocked · Microsoft driver",
+      "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. These malformed Server Announce tests share the lookup failure; their negative-packet behavior has not been requalified after an isolated lookup fix.",
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    },
+    "S7_StaticVirtualChannel_NegativeTest_InvalidMCSLength": {
+      "disposition": "Blocked · Microsoft driver",
+      "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. These malformed Server Announce tests share the lookup failure; their negative-packet behavior has not been requalified after an isolated lookup fix.",
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    },
+    "S7_StaticVirtualChannel_NegativeTest_InvalidSignature": {
+      "disposition": "Inapplicable · TLS profile",
+      "reason": "Requires Standard RDP Security at Client Compatible or High level to corrupt the encrypted static-channel MAC. The method returns under TLS; a separate legacy-security profile is required."
+    },
+    "S1_Connection_Initialization_InitialUDPConnection": {
+      "disposition": "Inapplicable · client transport",
+      "reason": "Investigated: the pinned test negotiates legacy RDPUDP v1, while this FreeRDP fork explicitly requires v3 (RDPEUDP2). Client logs record that rejection; extending the timeout cannot make this legacy probe applicable.",
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    },
+    "S1_Connection_Initialization_InitialReliableConnection": {
+      "disposition": "Inapplicable · client transport",
+      "reason": "Investigated: the pinned test negotiates legacy RDPUDP v1, while this FreeRDP fork explicitly requires v3 (RDPEUDP2). Client logs record that rejection; extending the timeout cannot make this legacy probe applicable.",
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    },
+    "BVT_ConnectionTest_ConnectionInitiation_PositiveTest": {
+      "area": "Connection · Negotiation",
+      "summary": "Negotiates the connection and validates the client’s X.224 request."
+    },
+    "BVT_ConnectionTest_BasicSettingExchange_PositiveTest_ExtendedClientDataSupported": {
+      "area": "Connection · Basic settings",
+      "summary": "Exchanges MCS/GCC settings with extended client data enabled."
+    },
+    "S1_ConnectionTest_BasicSettingExchange_PositiveTest_ExtendedClientDataNotSupported": {
+      "area": "Connection · Basic settings",
+      "summary": "Exchanges MCS/GCC settings without extended client data support."
+    },
+    "BVT_ConnectionTest_ChannelConnection_PositiveTest": {
+      "area": "Connection · Channels",
+      "summary": "Attaches the client user and joins the negotiated channels."
+    },
+    "BVT_ConnectionTest_SecurityExchange_PositiveTest": {
+      "area": "Connection · Security and licensing",
+      "summary": "Exchanges client information and completes the licensing phase."
+    },
+    "BVT_ConnectionTest_CapabilityExchange_PositiveTest": {
+      "area": "Connection · Capabilities",
+      "summary": "Validates client capabilities in the Confirm Active response."
+    },
+    "BVT_ConnectionTest_ConnectionFinalization_PositiveTest_BitmapHostCacheSupported": {
+      "area": "Connection · Finalization",
+      "summary": "Completes session activation with bitmap host caching advertised."
+    },
+    "BVT_ConnectionTest_Disconnection_PositiveTest_ServerInitiated": {
+      "area": "Connection · Disconnection",
+      "summary": "Closes the connection after the server’s disconnect request."
+    },
+    "S3_DataTransfer_V2_ClientReceiveData": {
+      "disposition": "Blocked · driver investigation",
+      "reason": "The standard-mode probe established RDPEUDP2, TLS and a multitransport tunnel, but the data test/cleanup exceeded 80 seconds without a TRX result. Nullable ACK handling is suspected from source; no exception was captured. Both modes remain unqualified.",
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    },
+    "S3_DataTransfer_V2_AcknowledgeLostPacket": {
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    },
+    "S3_DataTransfer_V2_DataPacketWithAck": {
+      "evidence": [
+        {
+          "label": "Investigation and evidence · 2026-10-15",
+          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+        }
+      ]
+    }
+  },
+  "qualification": {
+    "date": "2026-10-15",
+    "cases": 92,
+    "executions": 184,
+    "record": "validation-profiles.json"
+  }
+}

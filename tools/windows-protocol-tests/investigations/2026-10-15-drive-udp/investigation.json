@@ -1,0 +1,294 @@
+{
+  "date": "2026-10-15",
+  "microsoft_revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+  "freerdp_revision": "50193de1cf31bdd1f3b2db1ba6dad6adb85a2e9c",
+  "environment": {
+    "os": "macOS 27.0.1 (26A434)",
+    "architecture": "arm64",
+    "dotnet_sdk": "8.0.425"
+  },
+  "default_manifest_unchanged": true,
+  "default_prepared_microsoft_suite_unchanged": true,
+  "production_freerdp_unchanged": true,
+  "scope": "Two original static-channel cases, source/log diagnosis of two original legacy UDP probes, one supplementary RDPEUDP2 probe. No broad regression run.",
+  "findings": [
+    {
+      "id": "drive-name-lookup",
+      "confidence": "runtime-and-source-confirmed",
+      "owner": "Microsoft test adapter",
+      "description": "Culture-sensitive string IndexOf(\"\\0\") yields index 0 on this macOS runtime, producing padded dictionary keys. Valid rdpdr channel 1004 was negotiated, but key RDPDR\\0\\0 does not match lookup RDPDR.",
+      "repair": "Use the char overload IndexOf('\\0').",
+      "proof": "Original two failures reproduced; diagnostic channel bytes and dictionary keys logged; one-line patch advanced both tests beyond lookup in both modes.",
+      "applies_to": "All seven S7 static-channel tests contain this lookup; only the two BVT cases were run."
+    },
+    {
+      "id": "drive-general-capability",
+      "confidence": "runtime-source-and-spec-confirmed",
+      "owner": "Microsoft RDPEFS SDK",
+      "description": "GENERAL_CAPS_SET V1 uses a fixed 44-byte length and writes V2-only SpecialTypeDeviceCap. FreeRDP rejects its 36-byte payload; V1 requires 32 bytes plus 8-byte header.",
+      "repair": "Version-aware length and optional field encode/decode.",
+      "proof": "Both cases fail in both modes after lookup fix with expected 32, got 36. With both patches, capability response is received and test advances to final device-list wait.",
+      "specification": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpefs/06c7cb30-303d-4fa2-b396-806df8ac1501"
+    },
+    {
+      "id": "drive-user-logon",
+      "confidence": "source-and-runtime-mismatch-confirmed",
+      "owner": "Microsoft driver / remaining negotiation investigation",
+      "description": "Driver omits RDPDR_USER_LOGGEDON_PDU from server capabilities yet sends that packet when client advertises support. FreeRDP logs client supported, server not found and ignores it; final device-list wait times out.",
+      "repair": "Not attempted; first make server advertised capabilities and transmitted logon sequence agree, then rerun without weakening assertions.",
+      "proof": "Both BVT cases still fail in standard and bridge modes after both prerequisite patches.",
+      "disposition": "Keep Not implemented; no overall pass or confirmed client defect."
+    },
+    {
+      "id": "legacy-udp-version",
+      "confidence": "retained-runtime-logs-and-source-confirmed",
+      "owner": "profile/client protocol-version mismatch",
+      "description": "Both original initialization probes negotiate RDPUDP v1. This fork accepts only version 3/RDPEUDP2 and explicitly declines v1/v2.",
+      "cases": [
+        "S1_Connection_Initialization_InitialUDPConnection",
+        "S1_Connection_Initialization_InitialReliableConnection"
+      ],
+      "disposition": "Inapplicable to this fork's current v3-only transport; do not reinterpret v3 replacements as the original tests passing."
+    },
+    {
+      "id": "rdpeudp2-followup",
+      "confidence": "partial-runtime-evidence; nullable-ACK failure inferred from source",
+      "owner": "test-driver follow-up",
+      "description": "S3_DataTransfer_V2_ClientReceiveData establishes RDPEUDP2, TLS and multitransport tunnel, then logs generated DataSeqNum before cleanup and an 80s outer deadline. Source immediately dereferences optional ACK.Value; packet factory can omit ACK. No TRX or exception stack was produced, so the exact failure/cleanup hang remains unconfirmed.",
+      "disposition": "Not implemented; investigate optional ACK handling and cleanup, then rerun actual v3 tests."
+    }
+  ],
+  "execution_results": [
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Assume.Fail failed. The necessary channel RDPDR has not been created, so stop running this test case.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S7_StaticVirtualChannelTest.cs:line 67\n=== End of Stack Trace ===\r\n",
+      "errors": [],
+      "seconds": 5.51,
+      "stage": "baseline-live",
+      "evidence": "baseline-live/standard-1"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Assume.Fail failed. The necessary channel RDPDR has not been created, so stop running this test case.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S7_StaticVirtualChannelTest.cs:line 129\n=== End of Stack Trace ===\r\n",
+      "errors": [],
+      "seconds": 4.86,
+      "stage": "baseline-live",
+      "evidence": "baseline-live/standard-2"
+    },
+    {
+      "case": "S3_DataTransfer_V2_ClientReceiveData",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "No TRX result was produced",
+      "errors": [
+        "Driver exceeded 80s deadline",
+        "Driver exit status: None"
+      ],
+      "seconds": 80.12,
+      "stage": "baseline-live",
+      "evidence": "baseline-live/standard-3"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Assume.Fail failed. The necessary channel RDPDR has not been created, so stop running this test case.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported() in /private/tmp/wpts-investigation-source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S7_StaticVirtualChannelTest.cs:line 67\n=== End of Stack Trace ===\r\n",
+      "errors": [],
+      "seconds": 5.23,
+      "stage": "drive-diagnostic",
+      "evidence": "drive-diagnostic/standard-1"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Test method Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported threw exception: \r\nSystem.IO.IOException: The encryption operation failed, see inner exception. ---> System.ComponentModel.Win32Exception: Bad address",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 5.6,
+      "stage": "drive-patched-standard",
+      "evidence": "drive-patched-standard/standard-1"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Test method Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent threw exception: \r\nSystem.IO.IOException: The encryption operation failed, see inner exception. ---> System.ComponentModel.Win32Exception: Bad address",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 5.15,
+      "stage": "drive-patched-standard",
+      "evidence": "drive-patched-standard/standard-2"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Test method Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported threw exception: \r\nSystem.IO.IOException: The encryption operation failed, see inner exception. ---> System.ComponentModel.Win32Exception: Bad address",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 5.33,
+      "stage": "drive-patched-bridge",
+      "evidence": "drive-patched-bridge/bridge-1"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Test method Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent threw exception: \r\nSystem.IO.IOException: The encryption operation failed, see inner exception. ---> System.ComponentModel.Win32Exception: Bad address",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 5.18,
+      "stage": "drive-patched-bridge",
+      "evidence": "drive-patched-bridge/bridge-2"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Assert.Fail failed. Timeout when expecting Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.Virtual_Channel_RAW_Pdu from channel: 1004\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.WaitForVirtualChannelPdu(UInt16 channelId, Byte[]& virtualChannelData, TimeSpan timeout) in /private/tmp/wpts-investigation-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 2683\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 16.22,
+      "stage": "drive-two-fixes-standard",
+      "evidence": "drive-two-fixes-standard/standard-1"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Assert.Fail failed. Timeout when expecting Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.Virtual_Channel_RAW_Pdu from channel: 1004\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.WaitForVirtualChannelPdu(UInt16 channelId, Byte[]& virtualChannelData, TimeSpan timeout) in /private/tmp/wpts-investigation-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 2683\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 15.61,
+      "stage": "drive-two-fixes-standard",
+      "evidence": "drive-two-fixes-standard/standard-2"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Assert.Fail failed. Timeout when expecting Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.Virtual_Channel_RAW_Pdu from channel: 1004\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.WaitForVirtualChannelPdu(UInt16 channelId, Byte[]& virtualChannelData, TimeSpan timeout) in /private/tmp/wpts-investigation-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 2683\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 15.83,
+      "stage": "drive-two-fixes-bridge",
+      "evidence": "drive-two-fixes-bridge/bridge-1"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": false,
+      "detail": "Assert.Fail failed. Timeout when expecting Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.Virtual_Channel_RAW_Pdu from channel: 1004\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.WaitForVirtualChannelPdu(UInt16 channelId, Byte[]& virtualChannelData, TimeSpan timeout) in /private/tmp/wpts-investigation-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 2683\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 15.65,
+      "stage": "drive-two-fixes-bridge",
+      "evidence": "drive-two-fixes-bridge/bridge-2"
+    }
+  ],
+  "total_targeted_executions_this_investigation": 12,
+  "passes_this_investigation": 0,
+  "patches": [
+    "rdpdr-channel-name.patch",
+    "rdpefs-v1-capability.patch"
+  ],
+  "patch_application_check": "Both git apply --check pass against the clean pinned Microsoft source.",
+  "integration": "No new test cases enabled. quick=6; extended=92."
+}

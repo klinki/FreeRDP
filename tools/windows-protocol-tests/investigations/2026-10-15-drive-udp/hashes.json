@@ -1,0 +1,20 @@
+{
+  "client": {
+    "path": "/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/SDL/SDL3/sdl-freerdp",
+    "sha256": "9582f1aa14e2549abc05ba8c65fe80a2f4a1617b231d75ffcb83a96125d4cf1c"
+  },
+  "source_files": {
+    "TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs": {
+      "original": "d63e8c0130acaf9c9c5275a7c010dd00422ea0c80139769f4d153a8176e51a0f",
+      "patched": "29c6e4ed6c4b16159f70ffbcd47f3d7214d0dae7924202e8c784e70fcd1fe990"
+    },
+    "ProtoSDK/MS-RDPEFS/Types/RdpefsTypes.cs": {
+      "original": "4d328c9b7ef4706041e2844a71c5f51a5ce9218a02e528cd084489edb9551e23",
+      "patched": "dba75e9c35968ca6471a51794a6fbab76200d2941d390866efcd39d482593613"
+    }
+  },
+  "patches": {
+    "rdpefs-v1-capability.patch": "92239ef93fb7abf5d88aad31da1f0c7fe8ae63adfa28abf34558e50bab370e14",
+    "rdpdr-channel-name.patch": "48953379a42dda4343bd7dc0afd2382271bff13341f9f3811461140ab8b8ad4c"
+  }
+}

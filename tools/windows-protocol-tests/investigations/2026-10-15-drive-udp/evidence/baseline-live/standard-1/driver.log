@@ -1,0 +1,8 @@
+VSTest version 17.11.1 (arm64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+  Skipped BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported [3 s]
+Results File: /private/tmp/wpts-investigation-output/baseline-live/standard-1/result.trx
+
+Skipped! - Failed:     0, Passed:     0, Skipped:     1, Total:     1, Duration: 4 s - RDP_ClientTestSuite.dll (net8.0)

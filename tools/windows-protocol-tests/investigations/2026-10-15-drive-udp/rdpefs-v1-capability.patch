@@ -1,0 +1,30 @@
+--- a/ProtoSDK/MS-RDPEFS/Types/RdpefsTypes.cs
++++ b/ProtoSDK/MS-RDPEFS/Types/RdpefsTypes.cs
+@@ -1102,7 +1102,7 @@
+             this.extraFlags1 = extraFlags1_Values.ENABLE_ASYNCIO;
+             // A 32-bit unsigned integer that is currently reserved for future use, and MUST be set to 0.
+             this.extraFlags2 = extraFlags2_Values.V1;
+-            this.Header.CapabilityLength = 44;
++            this.Header.CapabilityLength = (ushort)(ver == CAPABILITY_VERSION.V1 ? 40 : 44);
+         }
+ 
+         /// <summary>
+@@ -1188,7 +1188,8 @@
+             marshaler.WriteUInt32((uint)this.extendedPDU);
+             marshaler.WriteUInt32((uint)this.extraFlags1);
+             marshaler.WriteUInt32((uint)this.extraFlags2);
+-            marshaler.WriteUInt32(this.SpecialTypeDeviceCap);
++            if (this.Header.Version != CAPABILITY_VERSION.V1)
++                marshaler.WriteUInt32(this.SpecialTypeDeviceCap);
+ 
+         }
+ 
+@@ -1205,7 +1206,7 @@
+                 this.extendedPDU = (extendedPDU_Values)marshaler.ReadUInt32();
+                 this.extraFlags1 = (extraFlags1_Values)marshaler.ReadUInt32();
+                 this.extraFlags2 = (extraFlags2_Values)marshaler.ReadUInt32();
+-                this.SpecialTypeDeviceCap = marshaler.ReadUInt32();
++                this.SpecialTypeDeviceCap = this.Header.Version == CAPABILITY_VERSION.V1 ? 0 : marshaler.ReadUInt32();
+             }
+             catch
+             {

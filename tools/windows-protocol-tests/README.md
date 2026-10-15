@@ -5,6 +5,12 @@ local FreeRDP SDL3 executable. The Microsoft driver acts as the RDP server; no
 Windows VM, remote desktop account, or Sheltie checkout is needed. The client
 opens short-lived windows in the current graphical session.
 
+Browse the [interactive Microsoft test catalog](test-catalog.html) for all 432
+RDP Client tests, grouped by area and split into Implemented / Not implemented.
+The offline page filters by Area, Test Suite and Implementation status, with a
+short description, pinned source link, and integration/applicability explanation
+for every case. Here, implemented means included in our runner manifest.
+
 Choose one of two profiles; `quick` is the default:
 
 | Profile | Cases | Purpose |
@@ -51,6 +57,33 @@ depend on build options: these cases require `/buildconfig` to explicitly report
 fail before running; use a supported build or select non-graphics cases.
 The remaining cases keep the normal capability advertisement. The graphics
 tests check protocol responses and frame acknowledgements, not pixel accuracy.
+
+## Catalog maintenance and investigation
+
+The catalog is a self-contained HTML document; open `test-catalog.html` directly
+in a browser. It needs no server or network connection for filtering. Source and
+evidence links are available when their targets can be opened.
+
+Regenerate it from the pinned Microsoft checkout after changing `suite.json` or
+the reviewed rules in `catalog-config.json`:
+
+```sh
+python3 tools/windows-protocol-tests/generate-catalog.py \
+  --source /path/to/WindowsProtocolTestSuites
+python3 tools/windows-protocol-tests/generate-catalog.py \
+  --source /path/to/WindowsProtocolTestSuites --check
+```
+
+The generator reads the pinned Git objects, so local diagnostic patches cannot
+silently change the inventory. It checks unique names, profile membership,
+revision/inventory drift, and a reason for every unassigned case. Current source
+inventory and compiled test discovery both contain exactly 432 methods. The
+HTML separates integration status from dated qualification evidence.
+
+The [drive-channel and UDP investigation](investigations/2026-10-15-drive-udp/investigation.md)
+records the original failures, targeted reproductions, and isolated Microsoft
+compatibility patches. The patches are evidence and are **not applied** by
+`prepare.py`. No extra tests were enabled from that investigation.
 
 ## Prepare
 
@@ -165,10 +198,13 @@ display changes, clipboard/audio/drive file operations and physical monitors
 remain outside the allowlists. The scratch drive satisfies the continuous
 network tests' prerequisite; it does not establish that file redirection works.
 
-The audit's two static-channel/drive checks and two reliable-UDP probes still
-need investigation and are excluded. The legacy RDP encryption signature check
-is also excluded: under TLS it returns without exercising the client. Upstream
-test assertions are unchanged. The adapter supports start/stop, including
+The two static-channel/drive checks remain blocked by Microsoft test-driver/SDK
+issues. The original reliable-UDP probes negotiate legacy v1, which this fork's
+v3-only transport intentionally declines. A separate RDPEUDP2 probe established
+a v3 tunnel but did not complete its data-transfer test, so it is not qualified.
+The catalog also identifies legacy Standard Security cases that do not apply to
+the current TLS profile; some return without exercising a client. Upstream
+assertions in the default prepared suite are unchanged. The adapter supports start/stop, including
 fullscreen startup only for graphics cases. Unsupported control commands fail
 explicitly.
 
@@ -188,6 +224,11 @@ network. They check profile selection/inheritance, case-specific arguments and
 configuration reset, graphics preflight, fragmented/truncated control messages,
 destination restrictions, unsupported commands, result validation, and cleanup
 without terminating another client process.
+
+Catalog tests also check inventory, membership, classification reasons, safe
+inline data, deterministic output, and filter combinations. They do not need a
+Microsoft checkout or .NET. Their JavaScript matching check uses Node when
+available; browser QA separately verifies the real controls and responsive view.
 
 References: [Microsoft suite](https://github.com/microsoft/WindowsProtocolTestSuites),
 [RDP client guide](https://github.com/microsoft/WindowsProtocolTestSuites/blob/29ddb4238a5443b7499e82934c90cc898861c5e7/TestSuites/RDP/Client/docs/RDP_ClientUserGuide.md),

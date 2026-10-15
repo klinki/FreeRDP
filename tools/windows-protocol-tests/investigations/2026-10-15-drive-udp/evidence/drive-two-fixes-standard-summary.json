@@ -1,0 +1,36 @@
+[
+  {
+    "case": "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": true,
+      "video": false,
+      "graphics": false
+    },
+    "graphics_mask": null,
+    "passed": false,
+    "detail": "Assert.Fail failed. Timeout when expecting Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.Virtual_Channel_RAW_Pdu from channel: 1004\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.WaitForVirtualChannelPdu(UInt16 channelId, Byte[]& virtualChannelData, TimeSpan timeout) in /private/tmp/wpts-investigation-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 2683\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 16.22
+  },
+  {
+    "case": "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": true,
+      "video": false,
+      "graphics": false
+    },
+    "graphics_mask": null,
+    "passed": false,
+    "detail": "Assert.Fail failed. Timeout when expecting Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.Virtual_Channel_RAW_Pdu from channel: 1004\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.WaitForVirtualChannelPdu(UInt16 channelId, Byte[]& virtualChannelData, TimeSpan timeout) in /private/tmp/wpts-investigation-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 2683\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 15.61
+  }
+]
