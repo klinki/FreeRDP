@@ -1,0 +1,25 @@
+  Determining projects to restore...
+  Restored /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-regressions-598t6mqm/regressions.csproj (in 103 ms).
+  regressions -> /private/var/folders/02/73hl_4xs0zn02f42tmq9fl0h0000gn/T/wpts-udp-regressions-598t6mqm/bin/Debug/net8.0/regressions.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:03.65
+PASS ACKVEC optional timestamp False
+PASS ACKVEC optional timestamp True
+PASS ACK(7) expected 7: True
+PASS ACK(8) expected 7: True
+PASS ACK(6) expected 7: False
+PASS ACK(0) expected 65535: True
+PASS ACK(65535) expected 0: False
+PASS ACK(32768) expected 0: False
+PASS outgoing DATA without pending ACK is immediate
+PASS piggyback fixture cannot invent an acknowledgement before receiving DATA
+PASS pending incoming DATA is piggyback acknowledged
+PASS piggyback fixture repeats only observed client DATA acknowledgement
+PASS consumed pending DATA is not acknowledged again
+PASS non-ACK packet cannot satisfy acknowledgement expectation
+PASS UDP listener shutdown finishes
+15 checks passed

@@ -1,0 +1,32 @@
+diff --git a/ProtoSDK/TransportStack/Socket/UdpServerListener.cs b/ProtoSDK/TransportStack/Socket/UdpServerListener.cs
+index 9e1846ac..cbc7be6a 100644
+--- a/ProtoSDK/TransportStack/Socket/UdpServerListener.cs
++++ b/ProtoSDK/TransportStack/Socket/UdpServerListener.cs
+@@ -240,7 +240,26 @@ namespace Microsoft.Protocols.TestTools.StackSdk.Transport
+         /// </summary>
+         private void Unblock()
+         {
+-            this.listener.Close();
++            // On macOS closing an unconnected UDP socket can wait for its
++            // synchronous Receive to finish. Wake that receive after ShouldExit
++            // has been set, before closing the listener and joining its thread.
++            var endpoint = (IPEndPoint)this.listener.Client.LocalEndPoint;
++            var address = endpoint.Address;
++            if (address.Equals(IPAddress.Any))
++                address = IPAddress.Loopback;
++            else if (address.Equals(IPAddress.IPv6Any))
++                address = IPAddress.IPv6Loopback;
++            try
++            {
++                using (var wakeup = new UdpClient(this.listener.Client.AddressFamily))
++                {
++                    wakeup.Send(Array.Empty<byte>(), 0, new IPEndPoint(address, endpoint.Port));
++                }
++            }
++            finally
++            {
++                this.listener.Close();
++            }
+         }
+ 
+         #endregion

@@ -1,0 +1,72 @@
+[10:58:27:916] [74621:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[10:58:28:392] [74621:6fe73001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: *************************************************
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: This build is using [experimental] build options:
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: * 'WITH_VAAPI_H264_ENCODING=ON'
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: * 'WITH_VIDEOTOOLBOX=ON'
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: *
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: [experimental] build options might crash the application
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: *************************************************
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: *************************************************
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: This build is using [runtime-check] build options:
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: * 'WITH_VERBOSE_WINPR_ASSERT=ON'
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: *
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: [runtime-check] build options might slow down the application
+[10:58:28:401] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x103d5cb00]: *************************************************
+[10:58:28:621] [74621:6fe73001] [WARN][com.freerdp.crypto] - [verify_cb]: Certificate verification failure 'self-signed certificate (18)' at stack position 0
+[10:58:28:621] [74621:6fe73001] [WARN][com.freerdp.crypto] - [verify_cb]: CN = localhost
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [x509_utils_from_pem]: BIO_new failed for certificate
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @           WARNING: CERTIFICATE NAME MISMATCH!           @
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: The hostname used for this connection (127.0.0.1:63017) 
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: does not match the name given in the certificate:
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: Common Name (CN):
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: 	localhost
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: A valid certificate for the wrong name should NOT be trusted!
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: The host key for 127.0.0.1:63017 has changed
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: It is also possible that a host key has just been changed.
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: The fingerprint for the host key sent by the remote host is 59:d1:33:d1:49:dc:65:c6:5c:c7:cd:43:53:51:e2:3f:cf:f1:05:de:a0:94:3b:67:96:14:86:3c:6f:cc:3f:bb
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Please contact your system administrator.
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Add correct host key in /private/tmp/wpts-session-reconnect-observation-mutant/bridge-1/config/freerdp/server/127.0.0.1_63017.pem to get rid of this message.
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Host key for 127.0.0.1 has changed and you have requested  checking.
+[10:58:28:623] [74621:6fe73001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Host key verification failed.
+[10:58:29:986] [74621:6fe73001] [WARN][com.winpr.thread] - [SetThreadPriority]: pthread_setschedprio(0) not implemented, requires POSIX 2008 or later
+[10:58:31:214] [74621:6fe73001] [ERROR][com.freerdp.core.transport] - [transport_read_layer]: BIO_read retries exceeded
+[10:58:31:215] [74621:6fe73001] [ERROR][com.freerdp.core] - [transport_read_layer]: ERRCONNECT_CONNECT_TRANSPORT_FAILED [0x0002000D]
+[10:58:31:216] [74621:6fe73001] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[10:58:31:235] [74621:6fe73001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[10:58:32:757] [74621:6fe73001] [WARN][com.winpr.thread] - [SetThreadPriority]: pthread_setschedprio(0) not implemented, requires POSIX 2008 or later
+[10:58:33:715] [74621:6fe73001] [WARN][com.freerdp.core.rdp] - [rdp_recv_server_auto_reconnect_status_pdu][0x103d5cb00]: AutoReconnectStatus: 0x00000000
+[10:58:34:790] [74621:f0eb7f81] [ERROR][com.freerdp.utils.signal] - [fsig_term_handler]: Caught signal 'Terminated: 15' [15]
+[10:58:34:790] [74621:f0eb7f81] [ERROR][com.freerdp.core] - [freerdp_abort_connect_context]: ERRCONNECT_CONNECT_CANCELLED [0x0002000B]
+[10:58:34:791] [74621:6fe73001] [WARN][com.freerdp.client.common] - [client_auto_reconnect_ex]: Connection aborted by user
+[10:58:34:791] [74621:6fe73001] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[10:58:28:393] [74621:6fe73001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[10:58:28:396] [74621:6fe73001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[10:58:29:981] [74621:f0eb7f81] [INFO][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_RENDER] Created renderer: metal
+[10:58:29:985] [74621:6fe73001] [INFO][com.freerdp.gdi] - [gdi_init_ex]: Local framebuffer format  PIXEL_FORMAT_BGRA32
+[10:58:29:985] [74621:6fe73001] [INFO][com.freerdp.gdi] - [gdi_init_ex]: Remote framebuffer format PIXEL_FORMAT_BGRA32
+[10:58:29:986] [74621:6fe73001] [INFO][com.freerdp.channels.rdpsnd.client] - [rdpsnd_load_device_plugin]: [static] Loaded fake backend for rdpsnd
+[10:58:29:986] [74621:6fe73001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel ainput
+[10:58:29:986] [74621:6fe73001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel rdpgfx
+[10:58:29:986] [74621:6fe73001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel disp
+[10:58:29:986] [74621:6fe73001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel rdpsnd
+[10:58:30:987] [74621:6fe73001] [INFO][com.freerdp.client.common] - [client_common_save_session_info]: Logon Info V2 [(null)\wpt [0]]
+[10:58:31:108] [74621:6fe73001] [INFO][com.freerdp.client.common] - [client_common_save_session_info]: Logon Extended Info [cookie: TRUE, LogonId: 1, errorInfo: FALSE, notifyType: 0, notifyData: 0]
+[10:58:31:215] [74621:6fe73001] [INFO][com.freerdp.client.common] - [client_auto_reconnect_ex]: Network disconnect!
+[10:58:31:215] [74621:6fe73001] [INFO][com.freerdp.client.common] - [client_auto_reconnect_ex]: Attempting reconnect (0 of 3)
+[10:58:31:236] [74621:6fe73001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[10:58:31:238] [74621:6fe73001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[10:58:32:756] [74621:6fe73001] [INFO][com.freerdp.channels.rdpsnd.client] - [rdpsnd_load_device_plugin]: [static] Loaded fake backend for rdpsnd
+[10:58:32:756] [74621:6fe73001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel ainput
+[10:58:32:756] [74621:6fe73001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel rdpgfx
+[10:58:32:757] [74621:6fe73001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel disp
+[10:58:32:757] [74621:6fe73001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel rdpsnd
+[10:58:34:790] [74621:f0eb7f81] [INFO][com.freerdp.core] - [sig_abort_connect]: Signal Terminated: 15 [15], terminating session 0x103d5cb00
+[10:58:34:791] [74621:6fe73001] [INFO][com.freerdp.client.common] - [client_auto_reconnect_ex]: Network disconnect!

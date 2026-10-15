@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><EnablePreviewFeatures>true</EnablePreviewFeatures><NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.Protocols.TestTools.StackSdk"><HintPath>$(SuiteBin)/Microsoft.Protocols.TestTools.StackSdk.dll</HintPath></Reference>
+    <Reference Include="Microsoft.Protocols.TestTools.StackSdk.Transport"><HintPath>$(SuiteBin)/Microsoft.Protocols.TestTools.StackSdk.Transport.dll</HintPath></Reference>
+    <Reference Include="Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr"><HintPath>$(SuiteBin)/Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

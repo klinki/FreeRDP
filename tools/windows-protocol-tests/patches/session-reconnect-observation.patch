@@ -1,0 +1,16 @@
+--- a/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S3_AutoReconnectTest.cs
++++ b/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S3_AutoReconnectTest.cs
+@@ -176,6 +176,13 @@
+             this.TestSite.Log.Add(LogEntryKind.Comment, "Sending Auto-Reconnect Status PDU to SUT to notify the auto-reconnection attempt has failed.");
+             this.rdpbcgrAdapter.ServerAutoReconnectStatusPdu();
+ 
++            // Complete step 6: status delivery alone does not prove the client
++            // keeps the reconnected transport alive after the failure status.
++            this.TestSite.Log.Add(LogEntryKind.Comment,
++                "Observing the reconnected session for {0} seconds after Auto-Reconnect Status.", waitTime.TotalSeconds);
++            this.TestSite.Assert.IsFalse(this.rdpbcgrAdapter.WaitForDisconnection(waitTime),
++                "SUT must not disconnect during the observation interval after Auto-Reconnect Status.");
++
+             #endregion
+                        
+             #endregion

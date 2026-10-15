@@ -1,0 +1,73 @@
+[10:44:28:405] [68151:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[10:44:28:728] [68151:6fd33001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: *************************************************
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: This build is using [experimental] build options:
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: * 'WITH_VAAPI_H264_ENCODING=ON'
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: * 'WITH_VIDEOTOOLBOX=ON'
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: *
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: [experimental] build options might crash the application
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: *************************************************
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: *************************************************
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: This build is using [runtime-check] build options:
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: * 'WITH_VERBOSE_WINPR_ASSERT=ON'
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: *
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: [runtime-check] build options might slow down the application
+[10:44:28:859] [68151:6fd33001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x104d98b20]: *************************************************
+[10:44:29:101] [68151:6fd33001] [WARN][com.freerdp.crypto] - [verify_cb]: Certificate verification failure 'self-signed certificate (18)' at stack position 0
+[10:44:29:101] [68151:6fd33001] [WARN][com.freerdp.crypto] - [verify_cb]: CN = localhost
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [x509_utils_from_pem]: BIO_new failed for certificate
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @           WARNING: CERTIFICATE NAME MISMATCH!           @
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: The hostname used for this connection (127.0.0.1:57763) 
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: does not match the name given in the certificate:
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: Common Name (CN):
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: 	localhost
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_certificate_name_mismatch_error]: A valid certificate for the wrong name should NOT be trusted!
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: The host key for 127.0.0.1:57763 has changed
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: It is also possible that a host key has just been changed.
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: The fingerprint for the host key sent by the remote host is e6:5e:42:67:37:9c:50:59:7c:e7:6c:67:33:de:87:48:f8:1a:a4:be:eb:20:b6:84:ff:f5:ae:32:65:05:6e:76
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Please contact your system administrator.
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Add correct host key in /private/tmp/wpts-drive-batch-output/strict/bridge-7/config/freerdp/server/127.0.0.1_57763.pem to get rid of this message.
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Host key for 127.0.0.1 has changed and you have requested  checking.
+[10:44:29:102] [68151:6fd33001] [ERROR][com.freerdp.crypto] - [tls_print_new_certificate_warn]: Host key verification failed.
+[10:44:30:342] [68151:6fd33001] [WARN][com.winpr.thread] - [SetThreadPriority]: pthread_setschedprio(0) not implemented, requires POSIX 2008 or later
+[10:44:31:585] [68151:7021f001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[10:44:31:585] [68151:7021f001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[10:44:31:755] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [Stream_CheckAndLogRequiredLengthWLogExVa]: [rdpgfx_read_header(channels/rdpgfx/rdpgfx_common.c:57)] invalid length, got 9, require at least 12 [element size=1]
+[10:44:31:755] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [winpr_log_backtrace_ex]: 0: address=0x1009d6c58 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1009ac000], dli_sname=winpr_unwind_backtrace [0x1009d6bf8]
+[10:44:31:755] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [winpr_log_backtrace_ex]: 1: address=0x1009d4ba8 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1009ac000], dli_sname=winpr_log_backtrace_ex [0x1009d4b7c]
+[10:44:31:755] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [winpr_log_backtrace_ex]: 2: address=0x1009d3f40 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1009ac000], dli_sname=Stream_CheckAndLogRequiredLengthWLogExVa [0x1009d3e4c]
+[10:44:31:755] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [winpr_log_backtrace_ex]: 3: address=0x1009d407c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1009ac000], dli_sname=Stream_CheckAndLogRequiredLengthWLogEx [0x1009d4028]
+[10:44:31:755] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [winpr_log_backtrace_ex]: 4: address=0x10084b008 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/common/libfreerdp-client3.3.31.2.dylib [0x1007f8000], dli_sname=rdpgfx_read_header [0x10084ae0c]
+[10:44:31:755] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [winpr_log_backtrace_ex]: 5: address=0x100843ea0 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/common/libfreerdp-client3.3.31.2.dylib [0x1007f8000], dli_sname=rdpgfx_on_data_received [0x100843d8c]
+[10:44:31:755] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [winpr_log_backtrace_ex]: 6: address=0x10081ac60 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/common/libfreerdp-client3.3.31.2.dylib [0x1007f8000], dli_sname=drdynvc_order_recv [0x10081a6b4]
+[10:44:31:755] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [winpr_log_backtrace_ex]: 7: address=0x10081a59c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/common/libfreerdp-client3.3.31.2.dylib [0x1007f8000], dli_sname=drdynvc_virtual_channel_client_thread [0x10081a504]
+[10:44:31:756] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [winpr_log_backtrace_ex]: 8: address=0x1009ef9cc dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1009ac000], dli_sname=thread_launcher [0x1009ef7e4]
+[10:44:31:756] [68151:7021f001] [WARN][com.freerdp.channels.rdpgfx.client] - [winpr_log_backtrace_ex]: 9: address=0x18b38dd00 dli_fname=/usr/lib/system/libsystem_pthread.dylib [0x18b387000], dli_sname=_pthread_start [0x18b38dc78]
+[10:44:31:756] [68151:7021f001] [ERROR][com.freerdp.channels.rdpgfx.client] - [rdpgfx_recv_pdu]: rdpgfx_read_header failed with error 13!
+[10:44:31:756] [68151:7021f001] [ERROR][com.freerdp.channels.rdpgfx.client] - [rdpgfx_on_data_received]: rdpgfx_recv_pdu failed with error 13!
+[10:44:42:793] [68151:f0eb7f81] [ERROR][com.freerdp.utils.signal] - [fsig_term_handler]: Caught signal 'Terminated: 15' [15]
+[10:44:42:793] [68151:f0eb7f81] [ERROR][com.freerdp.core] - [freerdp_abort_connect_context]: ERRCONNECT_CONNECT_CANCELLED [0x0002000B]
+[10:44:42:795] [68151:6fd33001] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[10:44:28:726] [68151:6fd33001] [INFO][com.freerdp.client.SDL] - [preConnect]: Update size to 3840x2160
+[10:44:28:731] [68151:6fd33001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[10:44:28:855] [68151:6fd33001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[10:44:30:330] [68151:f0eb7f81] [INFO][com.freerdp.client.SDL] - [winpr_LogOutputFunction]: [SDL_LOG_CATEGORY_RENDER] Created renderer: metal
+[10:44:30:331] [68151:6fd33001] [INFO][com.freerdp.gdi] - [gdi_init_ex]: Local framebuffer format  PIXEL_FORMAT_BGRA32
+[10:44:30:331] [68151:6fd33001] [INFO][com.freerdp.gdi] - [gdi_init_ex]: Remote framebuffer format PIXEL_FORMAT_BGRA32
+[10:44:30:341] [68151:6fd33001] [INFO][com.freerdp.channels.rdpsnd.client] - [rdpsnd_load_device_plugin]: [static] Loaded fake backend for rdpsnd
+[10:44:30:341] [68151:6fd33001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel ainput
+[10:44:30:341] [68151:6fd33001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel rdpgfx
+[10:44:30:341] [68151:6fd33001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel disp
+[10:44:30:341] [68151:6fd33001] [INFO][com.freerdp.channels.drdynvc.client] - [dvcman_load_addin]: Loading Dynamic Virtual Channel rdpsnd
+[10:44:31:358] [68151:6fd33001] [INFO][com.freerdp.client.common] - [client_common_save_session_info]: Logon Info V2 [(null)\wpt [0]]
+[10:44:31:586] [68151:7021f001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[10:44:31:616] [68151:7021f001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[10:44:42:793] [68151:f0eb7f81] [INFO][com.freerdp.core] - [sig_abort_connect]: Signal Terminated: 15 [15], terminating session 0x104d98b20
+[10:44:42:794] [68151:6fd33001] [INFO][com.freerdp.client.common] - [client_auto_reconnect_ex]: Network disconnect!

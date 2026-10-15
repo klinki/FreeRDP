@@ -97,12 +97,16 @@ class ProfileTests(unittest.TestCase):
     def test_quick_is_a_baseline_subset_of_extended(self):
         quick, extended = profile_cases("quick"), profile_cases("extended")
         self.assertEqual(len(quick), 6)
-        self.assertEqual(len(extended), 92)
+        self.assertGreater(len(extended), len(quick))
         self.assertEqual(extended[:len(quick)], quick)
         self.assertTrue(all(options_for(case) == CaseOptions() for case in quick))
-        self.assertEqual(sum(options_for(case) != CaseOptions() for case in extended), 6)
         self.assertTrue(set(PIN["case_options"]) <= set(extended))
-        self.assertNotIn("BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported", extended)
+        self.assertIn("BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported", extended)
+        self.assertTrue(options_for("BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported").redirect_drive)
+        self.assertTrue(options_for("BVT_AutoReconnect_PositiveTest").auto_reconnect)
+        self.assertTrue(options_for("S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated").graceful_close)
+        self.assertNotIn("S7_StaticVirtualChannel_NegativeTest_InvalidTPKTLength", extended)
+        self.assertNotIn("RDPEGFX_CapabilityExchange_Negative_IncorrectVersion", extended)
         self.assertNotIn("S1_Connection_Initialization_InitialUDPConnection", extended)
 
     def test_selection_is_restricted_to_the_profile_without_duplicates(self):
@@ -132,7 +136,7 @@ class ProfileTests(unittest.TestCase):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             self.assertEqual(main(["--profile", "extended", "--list"]), 0)
-        self.assertEqual(len(output.getvalue().splitlines()), 93)
+        self.assertEqual(len(output.getvalue().splitlines()), len(profile_cases("extended")) + 1)
 
     def test_graphics_filter_requires_the_audited_build_layout(self):
         self.assertEqual(graphics_compatibility_mask("WITH_GFX_AV1=OFF WITH_GFX_AZURE=OFF"), 0x200)

@@ -1,0 +1,72 @@
+--- a/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs
++++ b/ProtoSDK/MS-RDPBCGR/Server/RdpbcgrServer.cs
+@@ -310,29 +310,39 @@
+                 }
+ 
+ 
+-                TransportEvent transportEvent = ExpectTransportEvent(timeout);
+-
+-                if (transportEvent.EventType == EventType.Disconnected)
++                DateTime deadline = DateTime.UtcNow + timeout;
++                while (DateTime.UtcNow < deadline)
+                 {
+-                    RdpbcgrServerSessionContext session = this.serverContext.LookupSession(transportEvent.EndPoint);
+-
+-                    if (session != sessionContext)
++                    TransportEvent transportEvent = ExpectTransportEvent(deadline - DateTime.UtcNow);
++                    if (transportEvent.EventType == EventType.Disconnected)
+                     {
+-                        throw new InvalidOperationException("Unwanted disconnection received in transport.");
++                        RdpbcgrServerSessionContext session = this.serverContext.LookupSession(transportEvent.EndPoint);
++                        if (session != sessionContext)
++                        {
++                            throw new InvalidOperationException("Unwanted disconnection received in transport.");
++                        }
++                        this.serverContext.RemoveSession(session);
++                        return;
++                    }
++                    else if (transportEvent.EventType == EventType.ReceivedPacket)
++                    {
++                        // Ordinary client traffic is not evidence of a disconnection.
++                        RdpbcgrServerSessionContext session = this.serverContext.LookupSession(transportEvent.EndPoint);
++                        if (session != null)
++                        {
++                            session.AddPacketToBuffer((StackPacket)transportEvent.EventObject);
++                        }
++                    }
++                    else if (transportEvent.EventType == EventType.Exception)
++                    {
++                        throw transportEvent.EventObject as Exception;
+                     }
+                     else
+                     {
+-                        this.serverContext.RemoveSession(session);
++                        throw new InvalidOperationException("Unknown object received in transport.");
+                     }
+                 }
+-                else if (transportEvent.EventType == EventType.Exception)
+-                {
+-                    throw transportEvent.EventObject as Exception;
+-                }
+-                else
+-                {
+-                    throw new InvalidOperationException("Unknown object received in transport.");
+-                }
++                throw new TimeoutException(ConstValue.TIMEOUT_EXCEPTION);
+             }
+         }
+ 
+--- a/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
++++ b/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
+@@ -2739,11 +2739,6 @@
+                 this.rdpbcgrServerStack.ExpectDisconnect(sessionContext, timeout);
+                 isReceived = true;
+             }
+-            catch (InvalidOperationException)
+-            {
+-                site.Log.Add(LogEntryKind.Debug, "Underlayer transport throw exception indicates the connection has been terminated.");
+-                return true;
+-            }
+             catch (TimeoutException timeoutEx)
+             {
+                 site.Log.Add(LogEntryKind.Debug, timeoutEx.Message);

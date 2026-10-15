@@ -1,0 +1,490 @@
+[
+  {
+    "case": "BVT_AutoReconnect_PositiveTest",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true
+    },
+    "graphics_mask": null,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 11.0,
+    "reconnect_requests": 1,
+    "relay_connections": 2,
+    "evidence": "evidence/reconnect-standard-1"
+  },
+  {
+    "case": "S3_AutoReconnection_NegativeTest_AutoReconnectionFailed",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true
+    },
+    "graphics_mask": null,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 10.35,
+    "reconnect_requests": 1,
+    "relay_connections": 2,
+    "evidence": "evidence/reconnect-standard-2",
+    "qualification_note": "Superseded by reconnect-observed evidence: the original upstream method did not check continued connection after failure status."
+  },
+  {
+    "case": "S6_AutoDetection_NetworkCharacteristicsSync_After_AutoReconnect",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true
+    },
+    "graphics_mask": null,
+    "passed": false,
+    "detail": "Assert.Fail failed. Expect responseType is RDP_NETCHAR_SYNC, but receive responseType: RDP_RTT_RESPONSE\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.CheckAutoDetectResponse(NETWORK_DETECTION_RESPONSE autodetectRspPduData, AUTO_DETECT_RESPONSE_TYPE responseType, UInt16 sequenceNumber) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 2074\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.CheckAutoDetectResponsePdu(AUTO_DETECT_RESPONSE_TYPE responseType, UInt16 sequenceNumber) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 2061\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 10.12,
+    "reconnect_requests": 1,
+    "relay_connections": 2,
+    "evidence": "evidence/reconnect-standard-3"
+  },
+  {
+    "case": "BVT_HealthMonitoring_PositiveTest_SendHeartbeat",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": true,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true
+    },
+    "graphics_mask": null,
+    "passed": false,
+    "detail": "Assert.Fail failed. Timeout when expecting Connection\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 288\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 15.57,
+    "reconnect_requests": 0,
+    "relay_connections": 1,
+    "evidence": "evidence/reconnect-standard-4"
+  },
+  {
+    "case": "BVT_AutoReconnect_PositiveTest",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true
+    },
+    "graphics_mask": null,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 7.95,
+    "reconnect_requests": 1,
+    "relay_connections": 2,
+    "evidence": "evidence/reconnect-bridge-1"
+  },
+  {
+    "case": "S3_AutoReconnection_NegativeTest_AutoReconnectionFailed",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true
+    },
+    "graphics_mask": null,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 7.96,
+    "reconnect_requests": 1,
+    "relay_connections": 2,
+    "evidence": "evidence/reconnect-bridge-2",
+    "qualification_note": "Superseded by reconnect-observed evidence: the original upstream method did not check continued connection after failure status."
+  },
+  {
+    "case": "S6_AutoDetection_NetworkCharacteristicsSync_After_AutoReconnect",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true
+    },
+    "graphics_mask": null,
+    "passed": false,
+    "detail": "Assert.Fail failed. Expect responseType is RDP_NETCHAR_SYNC, but receive responseType: RDP_RTT_RESPONSE\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.CheckAutoDetectResponse(NETWORK_DETECTION_RESPONSE autodetectRspPduData, AUTO_DETECT_RESPONSE_TYPE responseType, UInt16 sequenceNumber) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 2074\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.CheckAutoDetectResponsePdu(AUTO_DETECT_RESPONSE_TYPE responseType, UInt16 sequenceNumber) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 2061\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 9.01,
+    "reconnect_requests": 1,
+    "relay_connections": 2,
+    "evidence": "evidence/reconnect-bridge-3"
+  },
+  {
+    "case": "BVT_HealthMonitoring_PositiveTest_SendHeartbeat",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": true,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true
+    },
+    "graphics_mask": null,
+    "passed": false,
+    "detail": "Assert.Fail failed. Timeout when expecting Connection\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 288\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 15.33,
+    "reconnect_requests": 0,
+    "relay_connections": 1,
+    "evidence": "evidence/reconnect-bridge-4"
+  },
+  {
+    "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidEncryptFlag",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false
+    },
+    "graphics_mask": null,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 5.98,
+    "reconnect_requests": 0,
+    "relay_connections": 0,
+    "evidence": "evidence/slowpath-standard-1",
+    "qualification_note": "Provisional: repeat with strict transport-disconnect driver patch before integration."
+  },
+  {
+    "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidSignature",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false
+    },
+    "graphics_mask": null,
+    "passed": false,
+    "detail": "Passed",
+    "errors": [
+      "Expected one client launch, observed 0"
+    ],
+    "seconds": 2.26,
+    "reconnect_requests": 0,
+    "relay_connections": 0,
+    "evidence": "evidence/slowpath-standard-2"
+  },
+  {
+    "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidEncryptFlag",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false
+    },
+    "graphics_mask": null,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 5.14,
+    "reconnect_requests": 0,
+    "relay_connections": 0,
+    "evidence": "evidence/slowpath-bridge-1",
+    "qualification_note": "Provisional: repeat with strict transport-disconnect driver patch before integration."
+  },
+  {
+    "case": "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidSignature",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false
+    },
+    "graphics_mask": null,
+    "passed": false,
+    "detail": "Passed",
+    "errors": [
+      "Expected one client launch, observed 0",
+      "No bridge hello received"
+    ],
+    "seconds": 3.31,
+    "reconnect_requests": 0,
+    "relay_connections": 0,
+    "evidence": "evidence/slowpath-bridge-2"
+  },
+  {
+    "case": "S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false,
+      "graceful_close": true
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 0,
+    "relay_connections": 0,
+    "graceful_closes": 1,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 5.22,
+    "reconnect_requests": 0,
+    "evidence": "evidence/close-standard",
+    "driver_patches": [
+      {
+        "path": "patches/session-graceful-disconnect.patch",
+        "sha256": "db4a054d5d3e44fcae961623b9549e3fb424fecd4020167866aa2716e78375e9"
+      }
+    ]
+  },
+  {
+    "case": "S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false,
+      "graceful_close": true
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 0,
+    "relay_connections": 0,
+    "graceful_closes": 1,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 5.13,
+    "reconnect_requests": 0,
+    "evidence": "evidence/close-bridge",
+    "driver_patches": [
+      {
+        "path": "patches/session-graceful-disconnect.patch",
+        "sha256": "db4a054d5d3e44fcae961623b9549e3fb424fecd4020167866aa2716e78375e9"
+      }
+    ]
+  },
+  {
+    "case": "S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false,
+      "graceful_close": true
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 0,
+    "relay_connections": 0,
+    "graceful_closes": 1,
+    "passed": false,
+    "detail": "Test method Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated threw exception: \r\nSystem.TimeoutException: It is time out when receiving an obj.",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 18.23,
+    "reconnect_requests": 0,
+    "evidence": "evidence/transport-only-mutant-standard",
+    "expected_pass": false,
+    "fixture": "Negative oracle control: the test client exits abruptly without sending the MCS disconnect PDU.",
+    "driver_patches": [
+      {
+        "path": "patches/session-graceful-disconnect.patch",
+        "sha256": "db4a054d5d3e44fcae961623b9549e3fb424fecd4020167866aa2716e78375e9"
+      }
+    ]
+  },
+  {
+    "case": "S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": false,
+      "graceful_close": true
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 0,
+    "relay_connections": 0,
+    "graceful_closes": 1,
+    "passed": false,
+    "detail": "Test method Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated threw exception: \r\nSystem.TimeoutException: It is time out when receiving an obj.",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 18.38,
+    "reconnect_requests": 0,
+    "evidence": "evidence/transport-only-mutant-bridge",
+    "expected_pass": false,
+    "fixture": "Negative oracle control: the test client exits abruptly without sending the MCS disconnect PDU.",
+    "driver_patches": [
+      {
+        "path": "patches/session-graceful-disconnect.patch",
+        "sha256": "db4a054d5d3e44fcae961623b9549e3fb424fecd4020167866aa2716e78375e9"
+      }
+    ]
+  },
+  {
+    "case": "S3_AutoReconnection_NegativeTest_AutoReconnectionFailed",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true,
+      "graceful_close": false
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 1,
+    "relay_connections": 2,
+    "graceful_closes": 0,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 19.49,
+    "reconnect_requests": 1,
+    "evidence": "evidence/reconnect-observed-standard",
+    "driver_patches": [
+      {
+        "path": "patches/session-graceful-disconnect.patch",
+        "sha256": "db4a054d5d3e44fcae961623b9549e3fb424fecd4020167866aa2716e78375e9"
+      },
+      {
+        "path": "patches/driver-disconnect-verification.patch",
+        "sha256": "fa8c2d5ccc86cc86b0cef0f9ac2d668942e41356b7f0dd3abd6942c64da35101"
+      },
+      {
+        "path": "patches/session-reconnect-observation.patch",
+        "sha256": "06fc3e99842a5a14c97433cdec1f9b8c19a67ea8c7e184a95e70b789951f6aa5"
+      }
+    ],
+    "observation_seconds": 10
+  },
+  {
+    "case": "S3_AutoReconnection_NegativeTest_AutoReconnectionFailed",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true,
+      "graceful_close": false
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 1,
+    "relay_connections": 2,
+    "graceful_closes": 0,
+    "passed": true,
+    "detail": "Passed",
+    "errors": [],
+    "seconds": 20.52,
+    "reconnect_requests": 1,
+    "evidence": "evidence/reconnect-observed-bridge",
+    "driver_patches": [
+      {
+        "path": "patches/session-graceful-disconnect.patch",
+        "sha256": "db4a054d5d3e44fcae961623b9549e3fb424fecd4020167866aa2716e78375e9"
+      },
+      {
+        "path": "patches/driver-disconnect-verification.patch",
+        "sha256": "fa8c2d5ccc86cc86b0cef0f9ac2d668942e41356b7f0dd3abd6942c64da35101"
+      },
+      {
+        "path": "patches/session-reconnect-observation.patch",
+        "sha256": "06fc3e99842a5a14c97433cdec1f9b8c19a67ea8c7e184a95e70b789951f6aa5"
+      }
+    ],
+    "observation_seconds": 10
+  },
+  {
+    "case": "S3_AutoReconnection_NegativeTest_AutoReconnectionFailed",
+    "mode": "bridge",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false,
+      "auto_reconnect": true,
+      "graceful_close": false
+    },
+    "graphics_mask": null,
+    "client_launches": 1,
+    "reconnects": 1,
+    "relay_connections": 2,
+    "graceful_closes": 0,
+    "passed": false,
+    "detail": "Assert.IsFalse failed. SUT must not disconnect during the observation interval after Auto-Reconnect Status.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S3_AutoReconnection_NegativeTest_AutoReconnectionFailed() in /private/tmp/wpts-session-graceful/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S3_AutoReconnectTest.cs:line 183\n=== End of Stack Trace ===\r\n",
+    "errors": [
+      "Driver exit status: 1"
+    ],
+    "seconds": 11.87,
+    "early_disconnect_injected": true,
+    "reconnect_requests": 1,
+    "evidence": "evidence/reconnect-early-disconnect-mutant-bridge",
+    "driver_patches": [
+      {
+        "path": "patches/session-graceful-disconnect.patch",
+        "sha256": "db4a054d5d3e44fcae961623b9549e3fb424fecd4020167866aa2716e78375e9"
+      },
+      {
+        "path": "patches/driver-disconnect-verification.patch",
+        "sha256": "fa8c2d5ccc86cc86b0cef0f9ac2d668942e41356b7f0dd3abd6942c64da35101"
+      },
+      {
+        "path": "patches/session-reconnect-observation.patch",
+        "sha256": "06fc3e99842a5a14c97433cdec1f9b8c19a67ea8c7e184a95e70b789951f6aa5"
+      }
+    ],
+    "observation_seconds": 10,
+    "expected_pass": false,
+    "fixture": "Negative oracle control: deliberately close the owned client two seconds after its second connected event."
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "suite_bin": "/private/tmp/wpts-qualified-suite-20261015/Bin",
+  "assembly_sha256": {
+    "Microsoft.Protocols.TestTools.StackSdk.dll": "d0b9e57412a062959bce6ee215e7f436d42d91d25ae4001434b46598e5b78b7f",
+    "Microsoft.Protocols.TestTools.StackSdk.Transport.dll": "1e9739c9f3b12c6d233a0b79562dd6d845347304adbbe0622648c7f1dae56714",
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.dll": "8893fbc94645eeed3ec4b575a60337274b37c7443bd0ff3bd3d2010085f7502a"
+  },
+  "program_sha256": "e6056f052f5522aa45bae200d440bcaebc78ffb19aaacd449d34d139d77d8c01",
+  "exit_code": 0,
+  "passed": [
+    "ordinary_packet_requires_timeout",
+    "matching_disconnect_succeeds",
+    "ordinary_packet_then_disconnect_succeeds",
+    "decoder_exception_is_not_disconnect",
+    "other_session_disconnect_is_rejected",
+    "tls_eof_is_disconnect",
+    "tls_connection_reset_is_disconnect"
+  ],
+  "failed": []
+}

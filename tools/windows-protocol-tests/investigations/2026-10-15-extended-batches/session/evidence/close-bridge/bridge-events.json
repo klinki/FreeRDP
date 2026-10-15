@@ -1,0 +1,98 @@
+[
+  {
+    "capabilities": [
+      "auth",
+      "certificate",
+      "focus",
+      "retry",
+      "display_uuid",
+      "per_monitor_scaling",
+      "dynamic_resolution",
+      "multimon",
+      "close_confirmation",
+      "session_thumbnail",
+      "dock_accessory",
+      "primary_monitor",
+      "reverse_mouse_wheel",
+      "performance_monitoring",
+      "performance_overlay_styles",
+      "tls_keylog"
+    ],
+    "displays": [
+      {
+        "height": 1080.0,
+        "id": 1.0,
+        "name": "OSXRDP Virtual Display (1)",
+        "pixelHeight": 2160.0,
+        "pixelWidth": 3840.0,
+        "scale": 1.0,
+        "uuid": "560CC0E4-2FC9-4379-AA59-DC23B0BBD1CD",
+        "width": 1920.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "height": 1080.0,
+        "id": 2.0,
+        "name": "OSXRDP Virtual Display (2)",
+        "pixelHeight": 1080.0,
+        "pixelWidth": 1920.0,
+        "scale": 1.0,
+        "uuid": "77A6CB1B-0E09-4FBC-9E0C-9AFC5D74D003",
+        "width": 1920.0,
+        "x": -1920.0,
+        "y": 0.0
+      }
+    ],
+    "engineVersion": "3.31.2-dev0",
+    "sessionId": "a821dec5-93ea-4134-a5a3-d5b7d062341a",
+    "type": "hello",
+    "v": 1.0
+  },
+  {
+    "phase": "connecting",
+    "sessionId": "a821dec5-93ea-4134-a5a3-d5b7d062341a",
+    "type": "state",
+    "v": 1.0
+  },
+  {
+    "domain": "",
+    "reason": 1.0,
+    "rejected": false,
+    "requestId": "a821dec5-93ea-4134-a5a3-d5b7d062341a:1",
+    "sessionId": "a821dec5-93ea-4134-a5a3-d5b7d062341a",
+    "target": "127.0.0.1",
+    "type": "auth_request",
+    "username": "wpts",
+    "v": 1.0
+  },
+  {
+    "commonName": "localhost",
+    "fingerprint": "5b:6a:2d:6b:cd:0f:d3:f2:1c:47:f0:57:8b:ad:21:17:b9:62:c6:ea:ef:41:f5:51:59:2e:ec:1e:9b:0a:22:5c",
+    "host": "127.0.0.1",
+    "issuer": "CN = localhost",
+    "kind": "unknown",
+    "port": 60764.0,
+    "requestId": "a821dec5-93ea-4134-a5a3-d5b7d062341a:2",
+    "sessionId": "a821dec5-93ea-4134-a5a3-d5b7d062341a",
+    "subject": "CN = localhost",
+    "type": "certificate_request",
+    "v": 1.0
+  },
+  {
+    "phase": "connected",
+    "sessionId": "a821dec5-93ea-4134-a5a3-d5b7d062341a",
+    "type": "state",
+    "v": 1.0
+  },
+  {
+    "detail": "Terminate with SUCCESS due to ERROR_INFO ERRINFO_SUCCESS [0x00000000]: Success.",
+    "errorCode": 131083.0,
+    "errorInfo": 0.0,
+    "hadConnected": true,
+    "outcome": "cancelled",
+    "sessionId": "a821dec5-93ea-4134-a5a3-d5b7d062341a",
+    "type": "ended",
+    "v": 1.0
+  }
+]

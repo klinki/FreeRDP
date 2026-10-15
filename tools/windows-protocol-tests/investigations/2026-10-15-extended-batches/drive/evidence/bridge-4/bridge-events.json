@@ -1,0 +1,104 @@
+[
+  {
+    "capabilities": [
+      "auth",
+      "certificate",
+      "focus",
+      "retry",
+      "display_uuid",
+      "per_monitor_scaling",
+      "dynamic_resolution",
+      "multimon",
+      "close_confirmation",
+      "session_thumbnail",
+      "dock_accessory",
+      "primary_monitor",
+      "reverse_mouse_wheel",
+      "performance_monitoring",
+      "performance_overlay_styles",
+      "tls_keylog"
+    ],
+    "displays": [
+      {
+        "height": 1080.0,
+        "id": 1.0,
+        "name": "OSXRDP Virtual Display (1)",
+        "pixelHeight": 2160.0,
+        "pixelWidth": 3840.0,
+        "scale": 1.0,
+        "uuid": "560CC0E4-2FC9-4379-AA59-DC23B0BBD1CD",
+        "width": 1920.0,
+        "x": 0.0,
+        "y": 0.0
+      },
+      {
+        "height": 1080.0,
+        "id": 2.0,
+        "name": "OSXRDP Virtual Display (2)",
+        "pixelHeight": 1080.0,
+        "pixelWidth": 1920.0,
+        "scale": 1.0,
+        "uuid": "77A6CB1B-0E09-4FBC-9E0C-9AFC5D74D003",
+        "width": 1920.0,
+        "x": -1920.0,
+        "y": 0.0
+      }
+    ],
+    "engineVersion": "3.31.2-dev0",
+    "sessionId": "2220b7ca-2c76-4dca-a4d6-781a435a74ee",
+    "type": "hello",
+    "v": 1.0
+  },
+  {
+    "phase": "connecting",
+    "sessionId": "2220b7ca-2c76-4dca-a4d6-781a435a74ee",
+    "type": "state",
+    "v": 1.0
+  },
+  {
+    "domain": "",
+    "reason": 1.0,
+    "rejected": false,
+    "requestId": "2220b7ca-2c76-4dca-a4d6-781a435a74ee:1",
+    "sessionId": "2220b7ca-2c76-4dca-a4d6-781a435a74ee",
+    "target": "127.0.0.1",
+    "type": "auth_request",
+    "username": "wpts",
+    "v": 1.0
+  },
+  {
+    "commonName": "localhost",
+    "fingerprint": "04:21:66:7a:aa:12:b7:f3:d1:ac:e4:a4:c5:55:c5:3d:37:2f:12:64:0c:3f:d7:aa:bf:05:26:83:c8:ce:7e:72",
+    "host": "127.0.0.1",
+    "issuer": "CN = localhost",
+    "kind": "unknown",
+    "port": 56265.0,
+    "requestId": "2220b7ca-2c76-4dca-a4d6-781a435a74ee:2",
+    "sessionId": "2220b7ca-2c76-4dca-a4d6-781a435a74ee",
+    "subject": "CN = localhost",
+    "type": "certificate_request",
+    "v": 1.0
+  },
+  {
+    "phase": "connected",
+    "sessionId": "2220b7ca-2c76-4dca-a4d6-781a435a74ee",
+    "type": "state",
+    "v": 1.0
+  },
+  {
+    "phase": "reconnecting",
+    "sessionId": "2220b7ca-2c76-4dca-a4d6-781a435a74ee",
+    "type": "state",
+    "v": 1.0
+  },
+  {
+    "detail": "The connection was cancelled.",
+    "errorCode": 131083.0,
+    "errorInfo": 0.0,
+    "hadConnected": true,
+    "outcome": "cancelled",
+    "sessionId": "2220b7ca-2c76-4dca-a4d6-781a435a74ee",
+    "type": "ended",
+    "v": 1.0
+  }
+]

@@ -1,0 +1,260 @@
+{
+  "date": "2026-10-15",
+  "microsoft_revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+  "freerdp_revision": "1d10fcd162fdb0ff618be0fc1b189dccd7217aa9",
+  "client_sha256": "9582f1aa14e2549abc05ba8c65fe80a2f4a1617b231d75ffcb83a96125d4cf1c",
+  "microsoft_patch": {
+    "path": "patches/drive-static-channel-prerequisites.patch",
+    "sha256": "53e824795e48b0db64e69cfd3f0bb3b796e963d252a3153363f9644bfef8632d"
+  },
+  "patched_assembly_sha256": {
+    "RDP_ClientTestSuite.dll": "1dee4d95ff7a40960a127a15b502f783c54efb7dd58178aaead05acaf3d42e62",
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpefs.dll": "03ab74a3afd0e9664e0cf37b93d0ab43981a7d431287320ee98b08f43fca198b"
+  },
+  "summary": {
+    "cases": 6,
+    "executions": 12,
+    "passed": 12,
+    "failed": 0,
+    "modes": [
+      "standard",
+      "bridge"
+    ]
+  },
+  "extended_candidates": [
+    "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+    "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent",
+    "S7_StaticVirtualChannel_PositiveTest_CompressionSupported",
+    "S7_StaticVirtualChannel_PositiveTest_VCChunkSizePresent",
+    "S7_StaticVirtualChannel_NegativeTest_InvalidTPKTLength",
+    "S7_StaticVirtualChannel_NegativeTest_InvalidMCSLength"
+  ],
+  "case_options": {
+    "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported": {
+      "redirect_drive": true
+    },
+    "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent": {
+      "redirect_drive": true
+    },
+    "S7_StaticVirtualChannel_PositiveTest_CompressionSupported": {
+      "redirect_drive": true
+    },
+    "S7_StaticVirtualChannel_PositiveTest_VCChunkSizePresent": {
+      "redirect_drive": true
+    },
+    "S7_StaticVirtualChannel_NegativeTest_InvalidTPKTLength": {
+      "redirect_drive": true
+    },
+    "S7_StaticVirtualChannel_NegativeTest_InvalidMCSLength": {
+      "redirect_drive": true
+    }
+  },
+  "excluded": [
+    {
+      "case": "S7_StaticVirtualChannel_NegativeTest_InvalidSignature",
+      "reason": "Requires Standard RDP Security signature fields; the current TLS profile does not exercise these fields and the Microsoft case returns before launching a client."
+    }
+  ],
+  "coverage_limits": [
+    "Positive tests exercise static-channel RDPEFS announce/name/capability/device-list traffic with an empty redirected scratch folder; no file read/write operations are performed.",
+    "Upstream positive cases do not explicitly assert compression flags or chunk-size boundaries, and ignore DecodeClientPdu return values. Their original assertions are preserved; these are protocol exchange smoke tests, not full compression or filesystem conformance.",
+    "Negative TPKT/MCS length cases preserve the original malformed packet and disconnect assertions."
+  ],
+  "results": [
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.34,
+      "evidence": "evidence/standard-1"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.35,
+      "evidence": "evidence/standard-2"
+    },
+    {
+      "case": "S7_StaticVirtualChannel_PositiveTest_CompressionSupported",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.86,
+      "evidence": "evidence/standard-3"
+    },
+    {
+      "case": "S7_StaticVirtualChannel_PositiveTest_VCChunkSizePresent",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.99,
+      "evidence": "evidence/standard-4"
+    },
+    {
+      "case": "S7_StaticVirtualChannel_NegativeTest_InvalidTPKTLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 4.87,
+      "evidence": "evidence/standard-5"
+    },
+    {
+      "case": "S7_StaticVirtualChannel_NegativeTest_InvalidMCSLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 5.82,
+      "evidence": "evidence/standard-6"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.53,
+      "evidence": "evidence/bridge-1"
+    },
+    {
+      "case": "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.57,
+      "evidence": "evidence/bridge-2"
+    },
+    {
+      "case": "S7_StaticVirtualChannel_PositiveTest_CompressionSupported",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.35,
+      "evidence": "evidence/bridge-3"
+    },
+    {
+      "case": "S7_StaticVirtualChannel_PositiveTest_VCChunkSizePresent",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.46,
+      "evidence": "evidence/bridge-4"
+    },
+    {
+      "case": "S7_StaticVirtualChannel_NegativeTest_InvalidTPKTLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 5.3,
+      "evidence": "evidence/bridge-5"
+    },
+    {
+      "case": "S7_StaticVirtualChannel_NegativeTest_InvalidMCSLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": true,
+        "video": false,
+        "graphics": false
+      },
+      "graphics_mask": null,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.14,
+      "evidence": "evidence/bridge-6"
+    }
+  ],
+  "evidence_policy": "Raw driver/client logs, exact-name TRX and bridge events retained. Temporary certificates, private keys, copied suites and binaries omitted.",
+  "qualification_superseded": true,
+  "superseded_reason": "The upstream disconnect verifier accepts arbitrary InvalidOperationException as success. See strict qualification.json; initial InvalidTPKTLength passes are invalid evidence of a disconnect."
+}

@@ -1,0 +1,1110 @@
+{
+  "date": "2026-10-15",
+  "phase": "Initial graphics qualification; negative nominal passes are not accepted because the Microsoft disconnect verifier was defective.",
+  "provenance": {
+    "microsoft": {
+      "repository": "https://github.com/microsoft/WindowsProtocolTestSuites.git",
+      "revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+      "sdk": "8.0.425"
+    },
+    "client_sha256": "9582f1aa14e2549abc05ba8c65fe80a2f4a1617b231d75ffcb83a96125d4cf1c",
+    "client_buildconfig": "This is FreeRDP version [/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/SDL/SDL3/sdl-freerdp] 3.31.2-dev0 (n/a)\n[/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/client/SDL/SDL3/sdl-freerdp] Build configuration: BUILD_TESTING=OFF BUILD_TESTING_INTERNAL=OFF BUILD_TESTING_INTERNAL_AVAILABLE=1 BUILD_TESTING_NO_H264=OFF BUILD_TESTING_NO_H264_AVAILABLE=0 WINPR_HAVE_ACCEPT4= WINPR_HAVE_AIO_H=1 WINPR_HAVE_EXECINFO_BACKTRACE=1 WINPR_HAVE_EXECINFO_BACKTRACE_SYMBOLS=1 WINPR_HAVE_EXECINFO_BACKTRACE_SYMBOLS_FD=1 WINPR_HAVE_EXECINFO_HEADER=1 WINPR_HAVE_FCNTL_H=1 WINPR_HAVE_GETLOGIN_R=1 WINPR_HAVE_GETPWUID_R=1 WINPR_HAVE_INTTYPES_H=1 WINPR_HAVE_LINUX_MSDOS_FS_H= WINPR_HAVE_PIPE2=OFF WINPR_HAVE_POLL_H=1 WINPR_HAVE_PTHREAD_MUTEX_TIMEDLOCK_LIB= WINPR_HAVE_PTHREAD_MUTEX_TIMEDLOCK_LIBS= WINPR_HAVE_PTHREAD_MUTEX_TIMEDLOCK_SYMBOL= WINPR_HAVE_REGCOMP= WINPR_HAVE_REGEXEC= WINPR_HAVE_REGFREE= WINPR_HAVE_STDBOOL_H=1 WINPR_HAVE_STDINT_H=1 WINPR_HAVE_STRERROR_R=1 WINPR_HAVE_STRNDUP=1 WINPR_HAVE_STRNSTR=1 WINPR_HAVE_SYSLOG_H=1 WINPR_HAVE_SYS_EVENTFD_H= WINPR_HAVE_SYS_FILIO_H=1 WINPR_HAVE_SYS_SELECT_H=1 WINPR_HAVE_SYS_SOCKIO_H=1 WINPR_HAVE_SYS_TIMERFD_H= WINPR_HAVE_SYS_XATTR_H= WINPR_HAVE_TM_GMTOFF=1 WINPR_HAVE_UNISTD_H=1 WINPR_HAVE_UNWIND_H=1 WITHOUT_FREERDP_3x_DEPRECATED=OFF WITHOUT_WINPR_3x_DEPRECATED=OFF WITH_AAD=ON WITH_ABSOLUTE_PLUGIN_LOAD_PATHS=ON WITH_AOM=OFF WITH_AVX2=ON WITH_BINARY_VERSIONING=OFF WITH_CAIRO=OFF WITH_CCACHE=OFF WITH_CHANNELS=ON WITH_CJSON_REQUIRED=OFF WITH_CLANG_FORMAT=ON WITH_CLIENT=ON WITH_CLIENT_AVAILABLE=1 WITH_CLIENT_CHANNELS=ON WITH_CLIENT_CHANNELS_AVAILABLE=1 WITH_CLIENT_COMMON=ON WITH_CLIENT_INTERFACE=OFF WITH_CLIENT_MAC=OFF WITH_CLIENT_SDL=ON WITH_CLIENT_SDL2=OFF WITH_CLIENT_SDL3=ON WITH_CLIENT_SDL_AVAILABLE=1 WITH_CLIENT_SDL_VERSIONED=OFF WITH_CUPS=ON WITH_CURSOR_DUMP=OFF WITH_CWALK=OFF WITH_DAV1D=OFF WITH_DEBUG_ALL=OFF WITH_DEBUG_CAPABILITIES=OFF WITH_DEBUG_CERTIFICATE=OFF WITH_DEBUG_CHANNELS=OFF WITH_DEBUG_CLIPRDR=OFF WITH_DEBUG_CODECS=OFF WITH_DEBUG_DVC=OFF WITH_DEBUG_EVENTS=OFF WITH_DEBUG_KBD=OFF WITH_DEBUG_LICENSE=OFF WITH_DEBUG_MUTEX=OFF WITH_DEBUG_NEGO=OFF WITH_DEBUG_NLA=OFF WITH_DEBUG_NTLM=OFF WITH_DEBUG_RAIL=OFF WITH_DEBUG_RDP=OFF WITH_DEBUG_RDPDR=OFF WITH_DEBUG_RDPEI=OFF WITH_DEBUG_REDIR=OFF WITH_DEBUG_RFX=OFF WITH_DEBUG_RINGBUFFER=OFF WITH_DEBUG_SCARD=OFF WITH_DEBUG_SCHANNEL=OFF WITH_DEBUG_SDL_KBD_EVENTS=OFF WITH_DEBUG_SND=OFF WITH_DEBUG_SVC=OFF WITH_DEBUG_SYMBOLS=OFF WITH_DEBUG_THREADS=OFF WITH_DEBUG_TIMEZONE=OFF WITH_DEBUG_TRANSPORT=OFF WITH_DEBUG_TSG=OFF WITH_DEBUG_TSMF=OFF WITH_DEBUG_TSMF_AVAILABLE=0 WITH_DEBUG_URBDRC=OFF WITH_DEBUG_UTILS_CMDLINE_DUMP=OFF WITH_DEBUG_WND=OFF WITH_DOCUMENTATION=OFF WITH_DSP_EXPERIMENTAL=OFF WITH_DSP_FFMPEG=ON WITH_DSP_FFMPEG_AVAILABLE=1 WITH_EMBEDDED_CLI_IN_RDP_FILES=OFF WITH_FAAC=OFF WITH_FAAD2=OFF WITH_FDK_AAC=OFF WITH_FFMPEG=ON WITH_FREERDP_DEPRECATED=OFF WITH_FREERDP_DEPRECATED_COMMANDLINE=OFF WITH_FULL_CONFIG_PATH=OFF WITH_FUSE=OFF WITH_GFX_AV1=OFF WITH_GFX_AZURE=OFF WITH_GFX_FRAME_DUMP=OFF WITH_GFX_H264=ON WITH_GPROF=OFF WITH_GSM=OFF WITH_INSTALL_CLIENT_DESKTOP_FILES=OFF WITH_INTERNAL_MD4=OFF WITH_INTERNAL_MD5=OFF WITH_INTERNAL_RC4=OFF WITH_JANSSON_REQUIRED=OFF WITH_JPEG=OFF WITH_JSONC_REQUIRED=OFF WITH_JSON_DISABLED=OFF WITH_KEYBOARD_LAYOUT_FROM_FILE=OFF WITH_KRB5=OFF WITH_LAME=OFF WITH_LAUNCHER_BRIDGE=ON WITH_LIBRARY_SOVERSIONING=ON WITH_LIBRARY_VERSIONING=ON WITH_LIBRESSL=OFF WITH_LODEPNG=OFF WITH_MACAUDIO=ON WITH_MACAUDIO_AVAILABLE=1 WITH_MANPAGES=ON WITH_MBEDTLS=OFF WITH_NATIVE_SSPI=OFF WITH_NO_UNDEFINED=OFF WITH_OPENCL=OFF WITH_OPENH264=OFF WITH_OPENSSL=ON WITH_OPUS=OFF WITH_PCSC=ON WITH_PKCS11=ON WITH_POLL=ON WITH_PROFILER=OFF WITH_PROXY=OFF WITH_RDTK=OFF WITH_RESOURCE_VERSIONING=OFF WITH_SAMPLE=OFF WITH_SANITIZE_ADDRESS=OFF WITH_SANITIZE_ADDRESS_AVAILABLE=1 WITH_SANITIZE_MEMORY=OFF WITH_SANITIZE_MEMORY_AVAILABLE=1 WITH_SANITIZE_THREAD=OFF WITH_SANITIZE_THREAD_AVAILABLE=1 WITH_SDL_IMAGE_DIALOGS=OFF WITH_SDL_LINK_SHARED=ON WITH_SERVER=OFF WITH_SERVER_INTERFACE=ON WITH_SHADOW=OFF WITH_SIMD=ON WITH_SMARTCARD_EMULATE=ON WITH_SMARTCARD_INSPECT=OFF WITH_SMARTCARD_PCSC=ON WITH_SOXR=OFF WITH_SSO_MIB=OFF WITH_STREAMPOOL_DEBUG=OFF WITH_SWSCALE=ON WITH_SWSCALE_LOADING=OFF WITH_SYSTEMD=OFF WITH_THIRD_PARTY=OFF WITH_TIMEZONE_COMPILED=ON WITH_TIMEZONE_FROM_FILE=OFF WITH_TIMEZONE_ICU=OFF WITH_TLS_DATA_LIMIT=OFF WITH_UNICODE_BUILTIN=OFF WITH_URIPARSER=ON WITH_VAAPI=OFF WITH_VAAPI_AVAILABLE=1 WITH_VAAPI_H264_ENCODING=ON WITH_VAAPI_H264_ENCODING_AVAILABLE=1 WITH_VALGRIND_MEMCHECK=OFF WITH_VALGRIND_MEMCHECK_AVAILABLE=1 WITH_VERBOSE_WINPR_ASSERT=ON WITH_VIDEOTOOLBOX=ON WITH_VIDEOTOOLBOX_AVAILABLE=1 WITH_VIDEO_FFMPEG=ON WITH_VIDEO_FFMPEG_AVAILABLE=1 WITH_WEBVIEW=OFF WITH_WINPR_DEPRECATED=OFF WITH_WINPR_JSON=ON WITH_WINPR_TOOLS=ON WITH_WINPR_TOOLS_CLI=ON WITH_WIN_CONSOLE=ON WITH_X11=OFF WITH_YUV=OFF\nBuild type:          Release\nCFLAGS:               -fvisibility=hidden -fno-omit-frame-pointer -Wredundant-decls -fsigned-char -Wimplicit-function-declaration -Wno-jump-misses-init -Wno-c++-keyword -fvisibility=hidden -O3 -DNDEBUG\nCompiler:            AppleClang, 21.0.0.21000334\nTarget architecture: ARM\n",
+    "graphics_mask": 512,
+    "cases": [
+      "RDPEGFX_CapabilityExchange_Negative_IncorrectVersion",
+      "RDPEGFX_CapabilityExchange_Negative_IncorrectCapsDataLength",
+      "RDPEGFX_Compression_PositiveTest",
+      "RDPEGFX_Compression_Negative_IncorrectCompressFlag",
+      "RDPEGFX_Compression_Negative_IncorrectCompressType",
+      "RDPEGFX_Compression_Negative_InvalidCompressPdu",
+      "RDPEGFX_Segmentation_Positive_MultipleSegmentedPacking",
+      "RDPEGFX_Segmentation_Negative_UncompressedNoSegmentHeader",
+      "RDPEGFX_Segmentation_Positive_UncompressedSegmentHeader",
+      "RDPEGFX_Segmentation_Negative_CompressedNoSegmentHeader",
+      "RDPEGFX_Segmentation_Negative_IncorrectSegmentDescriptor",
+      "RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentCount",
+      "RDPEGFX_Segmentation_Negative_SingleSegmentWithUncompressedSize",
+      "RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentArray",
+      "RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentCount",
+      "RDPEGFX_Segmentation_Negative_MultiSegmentNoUncompressedSize",
+      "RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentArray",
+      "RDPEGFX_H264Codec_PositiveTest_H264Support",
+      "RDPEGFX_H264Codec_PositiveTest_AVC420_HighProfile",
+      "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile",
+      "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile_CABACEnabled",
+      "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_ISliceOnly",
+      "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_BaseProfile",
+      "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile",
+      "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_CABACEnabled",
+      "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_LargeSize",
+      "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_HighProfile",
+      "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Separated_MainProfile",
+      "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile",
+      "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile_LargeSize",
+      "RDPEGFX_H264Codec_PositiveTest_AVC444v2"
+    ]
+  },
+  "cases": 31,
+  "executions": 62,
+  "extended_candidates": [
+    "RDPEGFX_Compression_PositiveTest",
+    "RDPEGFX_Segmentation_Positive_MultipleSegmentedPacking",
+    "RDPEGFX_Segmentation_Positive_UncompressedSegmentHeader",
+    "RDPEGFX_H264Codec_PositiveTest_H264Support",
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_HighProfile",
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile",
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile_CABACEnabled",
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_ISliceOnly",
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_BaseProfile",
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile",
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_CABACEnabled",
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_LargeSize",
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_HighProfile",
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile",
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile_LargeSize",
+    "RDPEGFX_H264Codec_PositiveTest_AVC444v2"
+  ],
+  "case_options": {
+    "RDPEGFX_Compression_PositiveTest": {
+      "graphics": true
+    },
+    "RDPEGFX_Segmentation_Positive_MultipleSegmentedPacking": {
+      "graphics": true
+    },
+    "RDPEGFX_Segmentation_Positive_UncompressedSegmentHeader": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_H264Support": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_HighProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile_CABACEnabled": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_ISliceOnly": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_BaseProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_CABACEnabled": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_LargeSize": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_HighProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile_LargeSize": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444v2": {
+      "graphics": true
+    }
+  },
+  "excluded": [
+    "RDPEGFX_CapabilityExchange_Negative_IncorrectVersion",
+    "RDPEGFX_CapabilityExchange_Negative_IncorrectCapsDataLength",
+    "RDPEGFX_Compression_Negative_IncorrectCompressFlag",
+    "RDPEGFX_Compression_Negative_IncorrectCompressType",
+    "RDPEGFX_Compression_Negative_InvalidCompressPdu",
+    "RDPEGFX_Segmentation_Negative_UncompressedNoSegmentHeader",
+    "RDPEGFX_Segmentation_Negative_CompressedNoSegmentHeader",
+    "RDPEGFX_Segmentation_Negative_IncorrectSegmentDescriptor",
+    "RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentCount",
+    "RDPEGFX_Segmentation_Negative_SingleSegmentWithUncompressedSize",
+    "RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentArray",
+    "RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentCount",
+    "RDPEGFX_Segmentation_Negative_MultiSegmentNoUncompressedSize",
+    "RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentArray",
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Separated_MainProfile"
+  ],
+  "results": [
+    {
+      "case": "RDPEGFX_CapabilityExchange_Negative_IncorrectVersion",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.34
+    },
+    {
+      "case": "RDPEGFX_CapabilityExchange_Negative_IncorrectCapsDataLength",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 12.3
+    },
+    {
+      "case": "RDPEGFX_Compression_PositiveTest",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.83
+    },
+    {
+      "case": "RDPEGFX_Compression_Negative_IncorrectCompressFlag",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 13.86
+    },
+    {
+      "case": "RDPEGFX_Compression_Negative_IncorrectCompressType",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.04
+    },
+    {
+      "case": "RDPEGFX_Compression_Negative_InvalidCompressPdu",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.04
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Positive_MultipleSegmentedPacking",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.66
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_UncompressedNoSegmentHeader",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.57
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Positive_UncompressedSegmentHeader",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.23
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_CompressedNoSegmentHeader",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid capability confirm message without segment header received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_CompressedNoSegmentHeader() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 191\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 19.52
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_IncorrectSegmentDescriptor",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 10.65
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentCount",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.89
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_SingleSegmentWithUncompressedSize",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.33
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentArray",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid capability confirm message with single segment with SegmentArray field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentArray() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 334\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 18.17
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentCount",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid a large size bitmap using multipart datapacking but without SegmentCount field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentCount() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 377\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 19.35
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_MultiSegmentNoUncompressedSize",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid a large size bitmap using multipart datapacking but without SegmentCount field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_MultiSegmentNoUncompressedSize() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 420\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 19.14
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentArray",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid a large size bitmap using multipart datapacking but without SegmentArray field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentArray() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 467\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 18.68
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_H264Support",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.34
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC420_HighProfile",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.47
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.13
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile_CABACEnabled",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.26
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_ISliceOnly",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.25
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_BaseProfile",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.76
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.15
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_CABACEnabled",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.3
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_LargeSize",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.85
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_HighProfile",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.58
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Separated_MainProfile",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsNotNull failed. RDPGFX_FRAME_ACKNOWLEDGE (frameId: 2) is received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxAdapter.ExpectFrameAck(UInt32 fid) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/Adapter/RDPEGFX/RdpegfxAdapter.cs:line 1222\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 17.82
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.15
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile_LargeSize",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.73
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444v2",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.75
+    },
+    {
+      "case": "RDPEGFX_CapabilityExchange_Negative_IncorrectVersion",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid capability confirm message with an incorrect capability version received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_CapabilityExchange_Negative_IncorrectVersion() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxCapabilityExchangeTest.cs:line 82\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 17.8
+    },
+    {
+      "case": "RDPEGFX_CapabilityExchange_Negative_IncorrectCapsDataLength",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid capability confirm message with incorrect CapsDataLength received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_CapabilityExchange_Negative_IncorrectCapsDataLength() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxCapabilityExchangeTest.cs:line 118\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 18.02
+    },
+    {
+      "case": "RDPEGFX_Compression_PositiveTest",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.43
+    },
+    {
+      "case": "RDPEGFX_Compression_Negative_IncorrectCompressFlag",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid CreateSurface message and MapSurfaceToOutPut message with incorrect compress flag received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Compression_Negative_IncorrectCompressFlag() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RDPegfxCompressionTest.cs:line 84\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 17.77
+    },
+    {
+      "case": "RDPEGFX_Compression_Negative_IncorrectCompressType",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid CreateSurface message and MapSurfaceToOutPut message with incorrect compress type received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Compression_Negative_IncorrectCompressType() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RDPegfxCompressionTest.cs:line 111\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 16.93
+    },
+    {
+      "case": "RDPEGFX_Compression_Negative_InvalidCompressPdu",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid CreateSurface message and MapSurfaceToOutPut message with compress flag and uncompressed payload received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Compression_Negative_InvalidCompressPdu() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RDPegfxCompressionTest.cs:line 138\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 16.49
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Positive_MultipleSegmentedPacking",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.25
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_UncompressedNoSegmentHeader",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid capability confirm message without RDP 8.0 compression technology without segment header received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_UncompressedNoSegmentHeader() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 101\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 20.15
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Positive_UncompressedSegmentHeader",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.53
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_CompressedNoSegmentHeader",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid capability confirm message without segment header received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_CompressedNoSegmentHeader() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 191\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 17.42
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_IncorrectSegmentDescriptor",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid capability confirm message with segment descriptor is neither 0xE0 nor 0xE1 received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_IncorrectSegmentDescriptor() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 226\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 18.05
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentCount",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid capability confirm message with single segment with segmentCount field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentCount() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 262\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 16.42
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_SingleSegmentWithUncompressedSize",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid capability confirm message with single segment with UncompressedSize field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_SingleSegmentWithUncompressedSize() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 298\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 16.16
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentArray",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid capability confirm message with single segment with SegmentArray field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentArray() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 334\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 17.86
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentCount",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid a large size bitmap using multipart datapacking but without SegmentCount field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentCount() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 377\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 20.93
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_MultiSegmentNoUncompressedSize",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid a large size bitmap using multipart datapacking but without SegmentCount field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_MultiSegmentNoUncompressedSize() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 420\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 18.32
+    },
+    {
+      "case": "RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentArray",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsTrue failed. RDP client should terminate the connection when invalid a large size bitmap using multipart datapacking but without SegmentArray field received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdp.RdpTestClassBase.RDPClientTryDropConnection(String requestDesc) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RdpTestClassBase.cs:line 752\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxTestSuite.RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentArray() in /private/tmp/wpts-source/TestSuites/RDP/Client/src/TestSuite/RDPEGFX/RdpegfxFrameSegmentationTest.cs:line 467\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 18.04
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_H264Support",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 6.26
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC420_HighProfile",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.81
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.0
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile_CABACEnabled",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.87
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_ISliceOnly",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.21
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_BaseProfile",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.85
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.51
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_CABACEnabled",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 13.2
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_LargeSize",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.04
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_HighProfile",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 10.73
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Separated_MainProfile",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": false,
+      "detail": "Assert.IsNotNull failed. RDPGFX_FRAME_ACKNOWLEDGE (frameId: 2) is received.\r\n===== Stack Trace =====\r\n   at Microsoft.Protocols.TestSuites.Rdpegfx.RdpegfxAdapter.ExpectFrameAck(UInt32 fid) in /private/tmp/wpts-source/TestSuites/RDP/Client/src/Adapter/RDPEGFX/RdpegfxAdapter.cs:line 1222\n=== End of Stack Trace ===\r\n",
+      "errors": [
+        "Driver exit status: 1"
+      ],
+      "seconds": 18.91
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.35
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile_LargeSize",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.95
+    },
+    {
+      "case": "RDPEGFX_H264Codec_PositiveTest_AVC444v2",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": true
+      },
+      "graphics_mask": 512,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 10.23
+    }
+  ],
+  "raw_results": "/private/tmp/wpts-graphics-batch-20261015",
+  "summary_sha256": "2b85534d0b98e42957367ca89fdb198beb095374e245aea90674807393836179"
+}

@@ -103,8 +103,8 @@
     {
       "file_pattern": "^RDPEDISP/",
       "area": "Display · Monitor changes",
-      "disposition": "Adapter missing",
-      "reason": "Requires display initialization and resolution/orientation/monitor control commands. The current adapter does not implement the display-control suite; monitor changes need a controlled display fixture."
+      "disposition": "Fixture unavailable",
+      "reason": "Requires controlled resolution/orientation/monitor changes and corresponding SUT commands. This environment has no isolated topology fixture or permitted native UI controls; no physical display settings were changed."
     },
     {
       "file_pattern": "^RDPEGFX/.*CapabilityExchange",
@@ -262,7 +262,14 @@
     "S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated": {
       "disposition": "Adapter missing",
       "reason": "Requires TriggerCloseRDPWindow to produce a client-initiated protocol disconnect. Process termination during cleanup is not that control operation.",
-      "area": "Connection · Disconnection"
+      "area": "Connection · Disconnection",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes; verifies the legal MCS user-requested disconnect reason and actual peer closure. Abrupt process-exit controls fail."
     },
     "S1_RDPEDISP_ResolutionChange_RestartGraphicsPipeline": {
       "disposition": "Adapter missing",
@@ -408,48 +415,52 @@
       "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. After isolated fixes for that lookup and malformed V1 drive-capability encoding, both launch modes still fail awaiting the device list. Server USER_LOGGEDON capability negotiation also disagrees with the sent PDU; no passing result.",
       "evidence": [
         {
-          "label": "Investigation and evidence · 2026-10-15",
-          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Qualified in both modes with the repaired Microsoft driver and an empty scratch drive. Positive cases cover RDPEFS exchange, not file I/O or explicit chunk/compression assertions."
     },
     "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent": {
       "disposition": "Blocked · Microsoft driver",
       "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. After isolated fixes for that lookup and malformed V1 drive-capability encoding, both launch modes still fail awaiting the device list. Server USER_LOGGEDON capability negotiation also disagrees with the sent PDU; no passing result.",
       "evidence": [
         {
-          "label": "Investigation and evidence · 2026-10-15",
-          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Qualified in both modes with the repaired Microsoft driver and an empty scratch drive. Positive cases cover RDPEFS exchange, not file I/O or explicit chunk/compression assertions."
     },
     "S7_StaticVirtualChannel_PositiveTest_CompressionSupported": {
       "disposition": "Blocked · Microsoft driver",
       "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. This positive variant also shares malformed V1 drive-capability encoding. Only the two baseline cases were probed after isolated fixes; this variant remains unqualified.",
       "evidence": [
         {
-          "label": "Investigation and evidence · 2026-10-15",
-          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Qualified in both modes with the repaired Microsoft driver and an empty scratch drive. Positive cases cover RDPEFS exchange, not file I/O or explicit chunk/compression assertions."
     },
     "S7_StaticVirtualChannel_PositiveTest_VCChunkSizePresent": {
       "disposition": "Blocked · Microsoft driver",
       "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. This positive variant also shares malformed V1 drive-capability encoding. Only the two baseline cases were probed after isolated fixes; this variant remains unqualified.",
       "evidence": [
         {
-          "label": "Investigation and evidence · 2026-10-15",
-          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Qualified in both modes with the repaired Microsoft driver and an empty scratch drive. Positive cases cover RDPEFS exchange, not file I/O or explicit chunk/compression assertions."
     },
     "S7_StaticVirtualChannel_NegativeTest_InvalidTPKTLength": {
-      "disposition": "Blocked · Microsoft driver",
-      "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. These malformed Server Announce tests share the lookup failure; their negative-packet behavior has not been requalified after an isolated lookup fix.",
+      "disposition": "Failed qualification",
+      "reason": "Failed in both modes after the drive prerequisites and disconnect verifier were repaired: the client did not produce the required connection-close event. Its earlier nominal pass was a driver false positive.",
       "evidence": [
         {
-          "label": "Investigation and evidence · 2026-10-15",
-          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
         }
       ]
     },
@@ -458,10 +469,11 @@
       "reason": "Blocked by the pinned Microsoft driver: culture-sensitive NUL trimming misidentifies the negotiated rdpdr channel on macOS. These malformed Server Announce tests share the lookup failure; their negative-packet behavior has not been requalified after an isolated lookup fix.",
       "evidence": [
         {
-          "label": "Investigation and evidence · 2026-10-15",
-          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Qualified in both modes with the repaired Microsoft driver and an empty scratch drive. Positive cases cover RDPEFS exchange, not file I/O or explicit chunk/compression assertions."
     },
     "S7_StaticVirtualChannel_NegativeTest_InvalidSignature": {
       "disposition": "Inapplicable · TLS profile",
@@ -524,32 +536,496 @@
       "reason": "The standard-mode probe established RDPEUDP2, TLS and a multitransport tunnel, but the data test/cleanup exceeded 80 seconds without a TRX result. Nullable ACK handling is suspected from source; no exception was captured. Both modes remain unqualified.",
       "evidence": [
         {
-          "label": "Investigation and evidence · 2026-10-15",
-          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Qualified in both modes with repaired RDPEUDP2 ACK decoding and shutdown. The DATA-with-ACK case requires an ACK derived from observed client DATA; loss detection and recovery retain their assertions."
     },
     "S3_DataTransfer_V2_AcknowledgeLostPacket": {
       "evidence": [
         {
-          "label": "Investigation and evidence · 2026-10-15",
-          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Qualified in both modes with repaired RDPEUDP2 ACK decoding and shutdown. The DATA-with-ACK case requires an ACK derived from observed client DATA; loss detection and recovery retain their assertions."
     },
     "S3_DataTransfer_V2_DataPacketWithAck": {
       "evidence": [
         {
-          "label": "Investigation and evidence · 2026-10-15",
-          "url": "investigations/2026-10-15-drive-udp/investigation.md"
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with repaired RDPEUDP2 ACK decoding and shutdown. The DATA-with-ACK case requires an ACK derived from observed client DATA; loss detection and recovery retain their assertions."
+    },
+    "RDPEGFX_Compression_PositiveTest": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_Segmentation_Positive_MultipleSegmentedPacking": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_Segmentation_Positive_UncompressedSegmentHeader": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_H264Support": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_HighProfile": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile_CABACEnabled": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_ISliceOnly": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_BaseProfile": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_CABACEnabled": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_LargeSize": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_HighProfile": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile_LargeSize": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444v2": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the graphics compatibility mask. Checks protocol/capability responses and frame acknowledgements; pixels are not compared."
+    },
+    "BVT_AutoReconnect_PositiveTest": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes using one controlled loopback interruption, one client process and two TCP connections. Failure-status case additionally observes no disconnect for ten seconds."
+    },
+    "S3_AutoReconnection_NegativeTest_AutoReconnectionFailed": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes using one controlled loopback interruption, one client process and two TCP connections. Failure-status case additionally observes no disconnect for ten seconds."
+    },
+    "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidEncryptFlag": {
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ],
+      "implemented_note": "Qualified in both modes with the corrected disconnect verifier and default TLS settings."
+    },
+    "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength": {
+      "disposition": "Failed qualification",
+      "reason": "Removed from extended after correcting Microsoft’s false-positive disconnect verifier. The required actual connection-close event was not observed during requalification; the earlier nominal pass is insufficient. Investigate the packet mutation and client behavior before enabling again.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength": {
+      "disposition": "Failed qualification",
+      "reason": "Removed from extended after correcting Microsoft’s false-positive disconnect verifier. The required actual connection-close event was not observed during requalification; the earlier nominal pass is insufficient. Investigate the packet mutation and client behavior before enabling again.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength": {
+      "disposition": "Failed qualification",
+      "reason": "Removed from extended after correcting Microsoft’s false-positive disconnect verifier. The required actual connection-close event was not observed during requalification; the earlier nominal pass is insufficient. Investigate the packet mutation and client behavior before enabling again.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength": {
+      "disposition": "Failed qualification",
+      "reason": "Removed from extended after correcting Microsoft’s false-positive disconnect verifier. The required actual connection-close event was not observed during requalification; the earlier nominal pass is insufficient. Investigate the packet mutation and client behavior before enabling again.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength": {
+      "disposition": "Failed qualification",
+      "reason": "Removed from extended after correcting Microsoft’s false-positive disconnect verifier. The required actual connection-close event was not observed during requalification; the earlier nominal pass is insufficient. Investigate the packet mutation and client behavior before enabling again.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_CapabilityExchange_Negative_IncorrectVersion": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_CapabilityExchange_Negative_IncorrectCapsDataLength": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Compression_Negative_IncorrectCompressFlag": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Compression_Negative_IncorrectCompressType": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Compression_Negative_InvalidCompressPdu": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Segmentation_Negative_UncompressedNoSegmentHeader": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Segmentation_Negative_CompressedNoSegmentHeader": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Segmentation_Negative_IncorrectSegmentDescriptor": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentCount": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Segmentation_Negative_SingleSegmentWithUncompressedSize": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Segmentation_Negative_SingleSegmentWithSegmentArray": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentCount": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Segmentation_Negative_MultiSegmentNoUncompressedSize": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_Segmentation_Negative_MultiSegmentNoSegmentArray": {
+      "disposition": "Failed qualification",
+      "reason": "Did not pass in both modes: the original required connection-disconnect assertion failed. Initial nominal passes were unreliable because the Microsoft verifier accepted ordinary incoming data. Both capability-negative cases also fail with the repaired verifier; other variants remain excluded pending diagnosis.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Separated_MainProfile": {
+      "disposition": "Failed qualification",
+      "reason": "Failed in standard and bridge: frame 2 was not acknowledged for the separated luma/chroma AVC444 Main-profile stream. Cause remains unconfirmed; do not substitute pixel-free success or omit the ACK assertion.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidSignature": {
+      "disposition": "Inapplicable · TLS profile",
+      "reason": "Requires Standard RDP Security signature mutation. Under TLS the Microsoft method returns before starting a client; the runner rejects its nominal Passed result.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "BVT_ClientInputTest_FastPath": {
+      "disposition": "Fixture unavailable",
+      "reason": "Needs a real input-injection fixture. This environment reports no macOS Accessibility/event-posting permission; start/stop and reconnect controls cannot substitute for keyboard/mouse input.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "BVT_ClientInputTest_SlowPath": {
+      "disposition": "Fixture unavailable",
+      "reason": "Needs a real input-injection fixture. This environment reports no macOS Accessibility/event-posting permission; start/stop and reconnect controls cannot substitute for keyboard/mouse input.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "S6_AutoDetection_NetworkCharacteristicsSync_After_AutoReconnect": {
+      "disposition": "Failed qualification",
+      "reason": "The controlled reconnect succeeds, but the case receives RTT_RESPONSE instead of the required NETCHAR_SYNC. Failed qualification; investigate protocol behavior before enabling.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "BVT_HealthMonitoring_PositiveTest_SendHeartbeat": {
+      "disposition": "Failed qualification",
+      "reason": "Connected-session probe times out waiting for heartbeat-triggered reconnect. The SDL client does not register the required heartbeat timeout callback. This remains an observed failure, not an inapplicable test.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "S1_Connection_SoftSync_Reliable": {
+      "disposition": "Inapplicable · client transport",
+      "reason": "Source review confirms the same automatic legacy RDPUDP v1 handshake as the original reliable probe. This fork requires v3/RDPEUDP2. A separately named v3 scenario would be needed; do not relabel the legacy test as passing.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "S2_AutoDetect_RTTMeasure_Reliable": {
+      "disposition": "Inapplicable · client transport",
+      "reason": "Source review confirms the same automatic legacy RDPUDP v1 handshake as the original reliable probe. This fork requires v3/RDPEUDP2. A separately named v3 scenario would be needed; do not relabel the legacy test as passing.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "S2_AutoDetect_ReliableBandwidthMeasure": {
+      "disposition": "Inapplicable · client transport",
+      "reason": "Source review confirms the same automatic legacy RDPUDP v1 handshake as the original reliable probe. This fork requires v3/RDPEUDP2. A separately named v3 scenario would be needed; do not relabel the legacy test as passing.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
+        }
+      ]
+    },
+    "S3_Tunneling_StaticVirtualChannel_PositiveTest": {
+      "disposition": "Not qualified",
+      "reason": "Uses an RDPEFS dynamic channel without explicitly establishing or asserting a UDP tunnel. Requires separate channel/fixture qualification and cannot be counted as modern UDP coverage.",
+      "evidence": [
+        {
+          "label": "Batch qualification · 2026-10-15",
+          "url": "investigations/2026-10-15-extended-batches/README.md"
         }
       ]
     }
   },
   "qualification": {
     "date": "2026-10-15",
-    "cases": 92,
-    "executions": 184,
-    "record": "validation-profiles.json"
+    "cases": 115,
+    "executions": 230,
+    "record": "validation-batches.json"
   }
 }

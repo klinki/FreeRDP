@@ -1,0 +1,121 @@
+diff --git a/ProtoSDK/MS-RDPEUDP2/Rdpeudp2ProtocolHandler.cs b/ProtoSDK/MS-RDPEUDP2/Rdpeudp2ProtocolHandler.cs
+index 9f78ef42..75238bc6 100644
+--- a/ProtoSDK/MS-RDPEUDP2/Rdpeudp2ProtocolHandler.cs
++++ b/ProtoSDK/MS-RDPEUDP2/Rdpeudp2ProtocolHandler.cs
+@@ -453,7 +453,10 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpeudp2
+ 
+             static Func<Rdpeudp2Packet, bool> IsAckedExpectedSeqNum(uint seqNum) => (Rdpeudp2Packet packet) =>
+             {
+-                return IsAckPacket(packet) && packet.ACK.Value.GetAckedSeq().Contains(seqNum);
++                // MS-RDPEUDP2 3.1.5.6: ACK also confirms all lower sequence
++                // numbers. Compare in the 16-bit window, including wraparound.
++                return IsAckPacket(packet) &&
++                    unchecked((ushort)(packet.ACK.Value.SeqNum - (ushort)seqNum)) < 0x8000;
+             };
+         }
+ 
+@@ -552,7 +555,17 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpeudp2
+         /// <returns>The ACK payload can be sent currently.</returns>
+         private AcknowledgementPayload? CreateAckPayloadFromUnprocessedPacketBuffer()
+         {
+-            var dataPacket = ExpectDataPacket(SocketConfig.Timeout);
++            Rdpeudp2Packet dataPacket;
++            lock (unprocessedPacketBuffer)
++            {
++                // Piggyback only already received data; outgoing DATA must not
++                // wait for a new incoming packet merely to attach an optional ACK.
++                dataPacket = unprocessedPacketBuffer.FirstOrDefault(packet =>
++                    packet.Header.Flags.HasFlag(Rdpeudp2PacketHeaderFlags.DATA) &&
++                    packet.DataHeader.HasValue && packet.DataBody.HasValue);
++                if (dataPacket != null)
++                    unprocessedPacketBuffer.Remove(dataPacket);
++            }
+ 
+             if (dataPacket == null)
+             {
+diff --git a/ProtoSDK/MS-RDPEUDP2/Types/AcknowledgementVectorPayload.cs b/ProtoSDK/MS-RDPEUDP2/Types/AcknowledgementVectorPayload.cs
+index cbeb3b51..45da5d08 100644
+--- a/ProtoSDK/MS-RDPEUDP2/Types/AcknowledgementVectorPayload.cs
++++ b/ProtoSDK/MS-RDPEUDP2/Types/AcknowledgementVectorPayload.cs
+@@ -64,7 +64,8 @@ namespace Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpeudp2.Types
+ 
+             if (codedAckVecSize > 0)
+             {
+-                codedAckVector = data[7..(7 + codedAckVecSize)].ToArray();
++                var vectorOffset = TimeStampPresent ? 7 : 3;
++                codedAckVector = data[vectorOffset..(vectorOffset + codedAckVecSize)].ToArray();
+             }
+             else
+             {
+diff --git a/TestSuites/RDP/Client/src/TestSuite/RDPEUDP/S3_DataTransfer_V2.cs b/TestSuites/RDP/Client/src/TestSuite/RDPEUDP/S3_DataTransfer_V2.cs
+index da98088c..15f82246 100644
+--- a/TestSuites/RDP/Client/src/TestSuite/RDPEUDP/S3_DataTransfer_V2.cs
++++ b/TestSuites/RDP/Client/src/TestSuite/RDPEUDP/S3_DataTransfer_V2.cs
+@@ -45,16 +45,19 @@ namespace Microsoft.Protocols.TestSuites.Rdpeudp
+             this.TestSite.Log.Add(LogEntryKind.Comment, "In the RDP-UDP connection, test suite prepare one RDPUDP2 Packet with the packet values given in the Data Example Sending Data Packet piggybacked with ACK section of the RDPEUDP2 document.");
+             var nextUdpPacket = this.GetNextValidUdp2Packet();
+             this.TestSite.Log.Add(LogEntryKind.Debug, $"The DataSeqNum of next valid RDPEUDP2 packet is {nextUdpPacket.DataHeader.Value.DataSeqNum}.");
+-            this.TestSite.Log.Add(LogEntryKind.Debug, $"The ACK payload of next valid RDPEUDP2 packet is to acknowledge {nextUdpPacket.ACK.Value.SeqNum}.");
++            if (nextUdpPacket.ACK.HasValue)
++            {
++                this.TestSite.Log.Add(LogEntryKind.Debug, $"The ACK payload of next valid RDPEUDP2 packet is to acknowledge {nextUdpPacket.ACK.Value.SeqNum}.");
++            }
+ 
+             this.SendPacket(nextUdpPacket);
+ 
+             this.TestSite.Log.Add(LogEntryKind.Comment, "Expect a RDPUDP2 Packet to acknowledge the receipt of the RDPUDP2 Packet and check if the Sequence Number is equal to the ACK packet Sequence Number.");
+             var ackPacket = rdpeudpSocketR.Rdpeudp2Handler.ExpectAckPacket(this.waitTime, nextUdpPacket.DataHeader.Value.DataSeqNum);
++            Site.Assert.IsNotNull(ackPacket, "Client should send an ACK to acknowledge the receipt of data packet. Transport mode is {0}.", rdpeudp2TransportMode);
+             var dataSeqNum = ackPacket.ACK.Value.SeqNum;
+ 
+             this.TestSite.Log.Add(LogEntryKind.Debug, $"The recvied ACK packet is to acknowledge DataSeqNum {dataSeqNum}.");
+-            Site.Assert.IsNotNull(ackPacket, "Client should send an ACK to acknowledge the receipt of data packet. Transport mode is {0}.", rdpeudp2TransportMode);
+         }
+ 
+         [TestMethod]
+@@ -88,7 +91,10 @@ namespace Microsoft.Protocols.TestSuites.Rdpeudp
+             this.TestSite.Log.Add(LogEntryKind.Comment, "In the RDP-UDP connection, test suite prepare one RDPUDP2 Packet with the packet values given in the Data Example Sending Data Packet piggybacked with ACK section of the RDPEUDP2 document.");
+             var nextUdpPacket = this.GetNextValidUdp2Packet();
+             this.TestSite.Log.Add(LogEntryKind.Debug, $"The DataSeqNum of next valid RDPEUDP2 packet is {nextUdpPacket.DataHeader.Value.DataSeqNum}.");
+-            this.TestSite.Log.Add(LogEntryKind.Debug, $"The ACK payload of next valid RDPEUDP2 packet is to acknowledge {nextUdpPacket.ACK.Value.SeqNum}.");
++            if (nextUdpPacket.ACK.HasValue)
++            {
++                this.TestSite.Log.Add(LogEntryKind.Debug, $"The ACK payload of next valid RDPEUDP2 packet is to acknowledge {nextUdpPacket.ACK.Value.SeqNum}.");
++            }
+ 
+             this.TestSite.Log.Add(LogEntryKind.Comment, $"Attach an AckOfAcks payload with the SeqNum {nextUdpPacket.DataHeader.Value.DataSeqNum} to infer the receiver to update the receiver window lower bound.");
+             var aoaPaylaod = new AckOfAcksPayload();
+@@ -100,10 +106,10 @@ namespace Microsoft.Protocols.TestSuites.Rdpeudp
+ 
+             this.TestSite.Log.Add(LogEntryKind.Comment, "Expect a RDPUDP2 Packet to acknowledge the receipt of all RDPUDP2 Packets.");
+             var ackPacket = rdpeudpSocketR.Rdpeudp2Handler.ExpectAckPacket(this.waitTime, nextUdpPacket.DataHeader.Value.DataSeqNum);
++            Site.Assert.IsNotNull(ackPacket, "Client should send an ACK to acknowledge the receipt of data packet. Transport mode is {0}.", rdpeudp2TransportMode);
+             var dataSeqNum = ackPacket.ACK.Value.SeqNum;
+             var delayedAcksNum = ackPacket.ACK.Value.numDelayedAcks;
+             this.TestSite.Log.Add(LogEntryKind.Debug, $"The recvied ACK packet is to acknowledge DataSeqNum {dataSeqNum} and previous {delayedAcksNum} DataSeqNums.");
+-            Site.Assert.IsNotNull(ackPacket, "Client should send an ACK to acknowledge the receipt of data packet. Transport mode is {0}.", rdpeudp2TransportMode);
+         }
+ 
+         [TestMethod]
+@@ -152,9 +158,9 @@ namespace Microsoft.Protocols.TestSuites.Rdpeudp
+             this.TestSite.Log.Add(LogEntryKind.Comment, "Expect a RDPUDP2 Receiver to send in an acknowledgement vector, showing that an RDPUDP2 Packet is missing. Sending Data Packets with One Packet Lost in the Middle Section");
+             var ackVECPacket = rdpeudpSocketR.Rdpeudp2Handler.ExpectAckVecPacket(this.waitTime);
+ 
++            Site.Assert.IsNotNull(ackVECPacket, "Client should send an ACKVEC packet to acknowledge the presence of a lost packet. Transport mode is {0}.", rdpeudp2TransportMode);
+             var BaseSeqNum = ackVECPacket.ACKVEC.Value.BaseSeqNum;
+ 
+-            Site.Assert.IsNotNull(ackVECPacket, "Client should send an ACKVEC packet to acknowledge the presence of a lost packet. Transport mode is {0}.", rdpeudp2TransportMode);
+             Site.Assert.AreEqual<ushort>(nextUdpPackets[1].DataHeader.Value.DataSeqNum, BaseSeqNum, $"The DataSeqNum({nextUdpPackets[1].DataHeader.Value.DataSeqNum}) of the missing packet must be equal to the BaseSeqNum({BaseSeqNum}) of the Acknowledgement Vector, showing the sequence number of the missing packet. Section 4.3.2, number 3");
+ 
+             //Send second packet and confirm acknowledgement receipt
+@@ -162,9 +168,9 @@ namespace Microsoft.Protocols.TestSuites.Rdpeudp
+ 
+             this.TestSite.Log.Add(LogEntryKind.Comment, "Expect an acknowledge packet showing the receipt of missing RDPUDP2 Packet.");
+             var ackPacket = rdpeudpSocketR.Rdpeudp2Handler.ExpectAckPacket(this.waitTime, nextUdpPackets[1].DataHeader.Value.DataSeqNum);
++            Site.Assert.IsNotNull(ackPacket, "Client should send an ACK to acknowledge the receipt of data packet. Transport mode is {0}.", rdpeudp2TransportMode);
+             var dataSeqNum = ackPacket.ACK.Value.SeqNum;
+             this.TestSite.Log.Add(LogEntryKind.Debug, $"The recvied ACK packet is to acknowledge DataSeqNum {dataSeqNum}.");
+-            Site.Assert.IsNotNull(ackPacket, "Client should send an ACK to acknowledge the receipt of data packet. Transport mode is {0}.", rdpeudp2TransportMode);
+         }
+ 
+         private byte[] GetByteData()

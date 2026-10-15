@@ -1,0 +1,7 @@
+VSTest version 17.11.1 (arm64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+Results File: /private/tmp/wpts-session-reconnect-observed/standard-1/result.trx
+
+Passed!  - Failed:     0, Passed:     1, Skipped:     0, Total:     1, Duration: 18 s - RDP_ClientTestSuite.dll (net8.0)

@@ -1,5 +1,7 @@
 # Static drive-channel and reliable-UDP investigation
 
+> Historical investigation at the revision below. The [subsequent batches](../2026-10-15-extended-batches/README.md) repair the driver and qualify selected drive/UDP cases; the original failures remain preserved here.
+
 Date: 2026-10-15. Microsoft source: `29ddb4238a5443b7499e82934c90cc898861c5e7`. FreeRDP branch: `codex/windows-protocol-smoke`, revision `50193de1cf31bdd1f3b2db1ba6dad6adb85a2e9c`. Environment: macOS 27.0.1 arm64, .NET SDK 8.0.425. Binary and source hashes are in [hashes.json](hashes.json).
 
 No tests were added to quick or extended. The default Microsoft source, prepared suite and production FreeRDP code were unchanged. The patches below are isolated investigation artifacts, not applied by `prepare.py`. The investigation ran 12 targeted executions; none passed end to end. Intermediate fixes eliminated specific driver faults but do not establish successful drive testing.

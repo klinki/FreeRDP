@@ -1,0 +1,20 @@
+[
+  {
+    "case": "S3_DataTransfer_V2_ClientReceiveData",
+    "mode": "standard",
+    "options": {
+      "rdp_version": "10.6",
+      "redirect_drive": false,
+      "video": false,
+      "graphics": false
+    },
+    "graphics_mask": null,
+    "passed": false,
+    "detail": "No TRX result was produced",
+    "errors": [
+      "Driver exceeded 80s deadline",
+      "Driver exit status: None"
+    ],
+    "seconds": 80.51
+  }
+]

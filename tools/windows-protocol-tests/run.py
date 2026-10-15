@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 
 from control import Client, ControlServer, stop_process
 from profiles import (ROOT, PIN, CaseOptions, graphics_compatibility_mask,
-                      options_for, profile_cases, select_cases)
+                      options_for, profile_cases, select_cases, suite_patches)
 
 NS = "http://schemas.microsoft.com/windows/ProtocolsTest/2007/07/TestConfig"
 XSI = "http://www.w3.org/2001/XMLSchema-instance"
@@ -149,7 +149,18 @@ def run_case(binary, suite, mode, case, destination, certificate, fingerprint, t
         problems.append(f"Driver exit status: {code}")
     if client.starts != 1:
         problems.append(f"Expected one client launch, observed {client.starts}")
+    if options.graceful_close and client.graceful_closes != 1:
+        problems.append("Expected one graceful client-close request")
+    if options.auto_reconnect:
+        if client.reconnects != 1 or client.relay_connections != 2:
+            problems.append("Expected one network interruption and two connections from the same client")
     if mode == "bridge":
+        if options.auto_reconnect:
+            phases = [event.get("phase") for event in client.events]
+            if "reconnecting" not in phases:
+                problems.append("Bridge did not report reconnecting")
+            if case == "BVT_AutoReconnect_PositiveTest" and phases.count("connected") != 2:
+                problems.append("Bridge did not report both connected sessions")
         if not any(event["type"] == "hello" for event in client.events):
             problems.append("No bridge hello received")
         if case == "BVT_ConnectionTest_Disconnection_PositiveTest_ServerInitiated":
@@ -159,6 +170,8 @@ def run_case(binary, suite, mode, case, destination, certificate, fingerprint, t
             if len(terminal) != 1 or not terminal[0].get("hadConnected"):
                 problems.append("Expected one terminal bridge event after a connected session")
     return dict(case=case, mode=mode, options=asdict(options), graphics_mask=graphics_mask,
+                client_launches=client.starts, reconnects=client.reconnects,
+                relay_connections=client.relay_connections, graceful_closes=client.graceful_closes,
                 passed=passed and not problems, detail=detail,
                 errors=problems, seconds=round(time.monotonic() - started, 2))
 
@@ -172,6 +185,8 @@ def run(args):
     provenance = json.loads((source / "provenance.json").read_text())
     if provenance.get("revision") != PIN["revision"] or provenance.get("repository") != PIN["repository"]:
         raise ValueError("Suite provenance does not match suite.json; run prepare.py")
+    if provenance.get("patches", []) != suite_patches():
+        raise ValueError("Suite driver patches do not match suite.json; rebuild with prepare.py")
     if output.exists():
         raise ValueError(f"Results directory already exists; choose a new one: {output}")
     buildconfig = None

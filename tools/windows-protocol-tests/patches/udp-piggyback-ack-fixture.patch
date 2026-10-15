@@ -1,0 +1,68 @@
+--- a/ProtoSDK/MS-RDPEUDP2/Rdpeudp2ProtocolHandler.cs
++++ b/ProtoSDK/MS-RDPEUDP2/Rdpeudp2ProtocolHandler.cs
+@@ -195,6 +195,8 @@
+         #region Properties
+ 
+         private bool autoHandle = false;
++        private AcknowledgementPayload? lastAcknowledgement;
++        private long lastAcknowledgementCreatedAt;
+ 
+         /// <summary>
+         /// Whether the RDPEUDP2 Socket is auto-handle.
+@@ -584,8 +586,31 @@
+             ack.delayAckTimeAdditions = new byte[0];
+ 
+             receivedAtBuffer.Remove(dataHeader.DataSeqNum);
++            lock (processedPackets)
++            {
++                lastAcknowledgement = ack;
++                lastAcknowledgementCreatedAt = stopwatch.ElapsedMilliseconds;
++            }
+ 
+             return ack;
++        }
++
++        /// <summary>
++        /// Repeat a previously constructed ACK for observed peer DATA. Used by
++        /// fixtures that require a piggyback ACK after the handshake has drained
++        /// all pending acknowledgements; never invent a peer sequence number.
++        /// </summary>
++        public AcknowledgementPayload? CreateRepeatedAckPayload()
++        {
++            lock (processedPackets)
++            {
++                if (!lastAcknowledgement.HasValue)
++                    return null;
++                var ack = lastAcknowledgement.Value;
++                ack.sendAckTimeGap = (byte)Math.Min(255,
++                    ack.sendAckTimeGap + stopwatch.ElapsedMilliseconds - lastAcknowledgementCreatedAt);
++                return ack;
++            }
+         }
+ 
+         /// <summary>
+@@ -623,6 +648,8 @@
+ 
+                         processedPackets.Remove(key);
+ 
++                        lastAcknowledgement = ack;
++                        lastAcknowledgementCreatedAt = stopwatch.ElapsedMilliseconds;
+                         acks.Add(ack);
+                         if (acks.Count == maxCount)
+                         {
+--- a/TestSuites/RDP/Client/src/TestSuite/RDPEUDP/S3_DataTransfer_V2.cs
++++ b/TestSuites/RDP/Client/src/TestSuite/RDPEUDP/S3_DataTransfer_V2.cs
+@@ -90,6 +90,13 @@
+ 
+             this.TestSite.Log.Add(LogEntryKind.Comment, "In the RDP-UDP connection, test suite prepare one RDPUDP2 Packet with the packet values given in the Data Example Sending Data Packet piggybacked with ACK section of the RDPEUDP2 document.");
+             var nextUdpPacket = this.GetNextValidUdp2Packet();
++            if (!nextUdpPacket.ACK.HasValue)
++            {
++                nextUdpPacket.ACK = rdpeudpSocketR.Rdpeudp2Handler.CreateRepeatedAckPayload();
++            }
++            Site.Assert.IsTrue(nextUdpPacket.ACK.HasValue,
++                "The DATA-with-ACK fixture must piggyback an acknowledgement of observed client DATA.");
++            nextUdpPacket.Header.Flags |= Rdpeudp2PacketHeaderFlags.ACK;
+             this.TestSite.Log.Add(LogEntryKind.Debug, $"The DataSeqNum of next valid RDPEUDP2 packet is {nextUdpPacket.DataHeader.Value.DataSeqNum}.");
+             if (nextUdpPacket.ACK.HasValue)
+             {

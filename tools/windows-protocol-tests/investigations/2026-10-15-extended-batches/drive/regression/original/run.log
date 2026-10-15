@@ -1,0 +1,8 @@
+FAIL ordinary_packet_requires_timeout: InvalidOperationException: Unknown object received in transport.
+PASS matching_disconnect_succeeds
+FAIL ordinary_packet_then_disconnect_succeeds: InvalidOperationException: Unknown object received in transport.
+PASS decoder_exception_is_not_disconnect
+PASS other_session_disconnect_is_rejected
+PASS tls_eof_is_disconnect
+PASS tls_connection_reset_is_disconnect
+5/7 passed

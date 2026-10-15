@@ -1,0 +1,21 @@
+{
+  "suite_bin": "/Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/.cache/suite/Bin",
+  "assembly_sha256": {
+    "Microsoft.Protocols.TestTools.StackSdk.dll": "55ad0b923291a0b844f5f0ef185c00182c583ec6a33c97fd537a07e50f10c86f",
+    "Microsoft.Protocols.TestTools.StackSdk.Transport.dll": "c0d3431ab151d5b06bce54346b1a4825d5e046fc1dd0d6fe030422555afdc137",
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.dll": "3f047bbf2fa1760e32b4f11058daae8b14910201bb03cac33de42decfcaf10f0"
+  },
+  "program_sha256": "e6056f052f5522aa45bae200d440bcaebc78ffb19aaacd449d34d139d77d8c01",
+  "exit_code": 1,
+  "passed": [
+    "matching_disconnect_succeeds",
+    "decoder_exception_is_not_disconnect",
+    "other_session_disconnect_is_rejected",
+    "tls_eof_is_disconnect",
+    "tls_connection_reset_is_disconnect"
+  ],
+  "failed": [
+    "ordinary_packet_requires_timeout: InvalidOperationException: Unknown object received in transport.",
+    "ordinary_packet_then_disconnect_succeeds: InvalidOperationException: Unknown object received in transport."
+  ]
+}

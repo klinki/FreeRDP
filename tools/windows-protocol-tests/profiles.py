@@ -1,6 +1,7 @@
 """Test selection and the small, audited per-case configuration differences."""
 
 from dataclasses import dataclass
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -15,11 +16,13 @@ class CaseOptions:
     redirect_drive: bool = False
     video: bool = False
     graphics: bool = False
+    auto_reconnect: bool = False
+    graceful_close: bool = False
 
     def __post_init__(self):
         if self.rdp_version not in ("10.6", "10.7", "10.8"):
             raise ValueError(f"Unsupported test RDP version: {self.rdp_version}")
-        for name in ("redirect_drive", "video", "graphics"):
+        for name in ("redirect_drive", "video", "graphics", "auto_reconnect", "graceful_close"):
             if type(getattr(self, name)) is not bool:
                 raise ValueError(f"Case option {name} must be a boolean")
 
@@ -73,3 +76,20 @@ def graphics_compatibility_mask(buildconfig):
                 "select non-graphics cases or use the audited build configuration"
             )
     return 0x200
+
+
+def suite_patches(manifest=PIN, root=ROOT):
+    """Verify the exact reviewed driver patches used by prepared assemblies."""
+    records = []
+    for item in manifest.get("patches", []):
+        path = item["path"]
+        if not re.fullmatch(r"patches/[a-z0-9-]+\.patch", path):
+            raise ValueError(f"Invalid Microsoft patch path: {path}")
+        digest = hashlib.sha256((root / path).read_bytes()).hexdigest()
+        if digest != item["sha256"]:
+            raise ValueError(f"Microsoft patch hash mismatch: {path}")
+        record = dict(path=path, sha256=digest)
+        if record in records:
+            raise ValueError(f"Duplicate Microsoft patch: {path}")
+        records.append(record)
+    return records

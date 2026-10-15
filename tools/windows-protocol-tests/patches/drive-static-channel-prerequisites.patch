@@ -1,0 +1,52 @@
+--- a/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
++++ b/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
+@@ -668,7 +668,7 @@
+                 int maxIdx = Math.Min(clientRequestedChannelDefList.Length, connectRespPdu.mcsCrsp.gccPdu.serverNetworkData.channelIdArray.Length);
+                 for (int i = 0; i < maxIdx; i++)
+                 {
+-                    int len = clientRequestedChannelDefList[i].name.IndexOf("\0");
++                    int len = clientRequestedChannelDefList[i].name.IndexOf('\0');
+                     if (len <= 0)
+                         len = clientRequestedChannelDefList[i].name.Length - 1;
+                     svcNameIdDic.Add(clientRequestedChannelDefList[i].name.ToUpper().Substring(0, len), connectRespPdu.mcsCrsp.gccPdu.serverNetworkData.channelIdArray[i]);
+--- a/ProtoSDK/MS-RDPEFS/Types/RdpefsTypes.cs
++++ b/ProtoSDK/MS-RDPEFS/Types/RdpefsTypes.cs
+@@ -1102,7 +1102,7 @@
+             this.extraFlags1 = extraFlags1_Values.ENABLE_ASYNCIO;
+             // A 32-bit unsigned integer that is currently reserved for future use, and MUST be set to 0.
+             this.extraFlags2 = extraFlags2_Values.V1;
+-            this.Header.CapabilityLength = 44;
++            this.Header.CapabilityLength = (ushort)(ver == CAPABILITY_VERSION.V1 ? 40 : 44);
+         }
+ 
+         /// <summary>
+@@ -1188,7 +1188,8 @@
+             marshaler.WriteUInt32((uint)this.extendedPDU);
+             marshaler.WriteUInt32((uint)this.extraFlags1);
+             marshaler.WriteUInt32((uint)this.extraFlags2);
+-            marshaler.WriteUInt32(this.SpecialTypeDeviceCap);
++            if (this.Header.Version != CAPABILITY_VERSION.V1)
++                marshaler.WriteUInt32(this.SpecialTypeDeviceCap);
+ 
+         }
+ 
+@@ -1205,7 +1206,7 @@
+                 this.extendedPDU = (extendedPDU_Values)marshaler.ReadUInt32();
+                 this.extraFlags1 = (extraFlags1_Values)marshaler.ReadUInt32();
+                 this.extraFlags2 = (extraFlags2_Values)marshaler.ReadUInt32();
+-                this.SpecialTypeDeviceCap = marshaler.ReadUInt32();
++                this.SpecialTypeDeviceCap = this.Header.Version == CAPABILITY_VERSION.V1 ? 0 : marshaler.ReadUInt32();
+             }
+             catch
+             {
+--- a/TestSuites/RDP/Client/src/Adapter/RDPEFS/RdpefsAdapter.cs
++++ b/TestSuites/RDP/Client/src/Adapter/RDPEFS/RdpefsAdapter.cs
+@@ -271,7 +271,7 @@
+             generalCapability.osVersion = osVersion_Values.V1;
+             generalCapability.protocolMinorVersion = DR_CORE_SERVER_CLIENTID_CONFIRM_VersionMinor_Values.V1;
+             generalCapability.ioCode1 = (ioCode1_Values)0x0000FFFF;
+-            generalCapability.extendedPDU = extendedPDU_Values.RDPDR_DEVICE_REMOVE_PDUS | extendedPDU_Values.RDPDR_CLIENT_DISPLAY_NAME_PDU;
++            generalCapability.extendedPDU = extendedPDU_Values.RDPDR_DEVICE_REMOVE_PDUS | extendedPDU_Values.RDPDR_CLIENT_DISPLAY_NAME_PDU | extendedPDU_Values.RDPDR_USER_LOGGEDON_PDU;
+             generalCapability.SpecialTypeDeviceCap = 2;
+             capabilitySet.Add(generalCapability);
+ 

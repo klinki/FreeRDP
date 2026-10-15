@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-15",
+  "microsoft_revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+  "client_sha256": "9582f1aa14e2549abc05ba8c65fe80a2f4a1617b231d75ffcb83a96125d4cf1c",
+  "input_permission_preflight": {
+    "AXIsProcessTrusted": false,
+    "CGPreflightPostEventAccess": false
+  },
+  "notes": [
+    "Input privilege checks are non-prompting read-only checks in this execution context.",
+    "Only test-generated credentials/certificates were used. Private certificate keys and binaries are not included.",
+    "Initial reconnect/slow-path records used the original pinned Microsoft assembly; later graceful-close records identify their driver patch explicitly."
+  ]
+}

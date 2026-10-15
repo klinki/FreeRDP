@@ -1,7 +1,8 @@
 """Minimal Microsoft SUT control protocol adapter for a local SDL client.
 
 Wire format: WindowsProtocolTestSuites/TestSuites/RDP/RDPSUTControlAgent/Docs/.
-Only start/stop are implemented. Unsupported commands fail explicitly.
+Start/stop and opt-in network interruption are implemented.
+Unsupported commands fail explicitly.
 """
 
 from dataclasses import dataclass
@@ -9,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import select
 import socket
 import socketserver
 import struct
@@ -94,6 +96,105 @@ def stop_process(process):
             process.wait(timeout=5)
 
 
+class ReconnectRelay:
+    """Forward opaque TLS bytes to one configured loopback endpoint.
+
+    The SUT reconnect command drops only the current accepted pair. The listener
+    remains available so the same process can reconnect with its saved cookie.
+    This does not modify host routes, interfaces, or TLS authentication.
+    """
+
+    def __init__(self, destination_port):
+        self.destination_port = destination_port
+        self.listener = socket.socket()
+        self.listener.bind(("127.0.0.1", 0))
+        self.listener.listen(4)
+        self.listener.settimeout(0.2)
+        self.port = self.listener.getsockname()[1]
+        self.lock = threading.Lock()
+        self.closed = threading.Event()
+        self.pair = None
+        self.connections = 0
+        self.interruptions = 0
+        self.errors = []
+        self.worker = threading.Thread(target=self._run, daemon=True)
+        self.worker.start()
+
+    @staticmethod
+    def _close_pair(pair):
+        if pair:
+            for stream in pair:
+                try:
+                    stream.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
+                stream.close()
+
+    def _run(self):
+        while not self.closed.is_set():
+            try:
+                downstream, _ = self.listener.accept()
+            except socket.timeout:
+                continue
+            except OSError:
+                return
+            upstream = None
+            pair = None
+            try:
+                upstream = socket.create_connection(("127.0.0.1", self.destination_port), 5)
+                upstream.settimeout(5)
+                downstream.settimeout(5)
+                pair = (downstream, upstream)
+                with self.lock:
+                    if self.closed.is_set():
+                        return
+                    self.pair = pair
+                    self.connections += 1
+                while not self.closed.is_set():
+                    readable, _, _ = select.select(pair, [], [], 0.2)
+                    if not readable:
+                        continue
+                    for stream in readable:
+                        data = stream.recv(65536)
+                        if not data:
+                            break
+                        (upstream if stream is downstream else downstream).sendall(data)
+                    else:
+                        continue
+                    break
+            except (OSError, ValueError) as error:
+                # Closing the owned sockets is expected during interruption and
+                # shutdown. Unexpected relay failures must fail the test.
+                with self.lock:
+                    if not self.closed.is_set() and (pair is None or self.pair is pair):
+                        self.errors.append(str(error))
+            finally:
+                with self.lock:
+                    if self.pair is pair:
+                        self.pair = None
+                self._close_pair((downstream, upstream) if upstream else (downstream,))
+
+    def interrupt(self):
+        with self.lock:
+            if self.closed.is_set() or self.pair is None:
+                raise ValueError("No active test connection to interrupt")
+            if self.interruptions:
+                raise ValueError("Only one network interruption is allowed per test")
+            pair, self.pair = self.pair, None
+            self.interruptions += 1
+            self._close_pair(pair)
+
+    def close(self):
+        self.closed.set()
+        self.listener.close()
+        with self.lock:
+            pair, self.pair = self.pair, None
+            self._close_pair(pair)
+        self.worker.join(timeout=6)
+        if self.worker.is_alive():
+            raise RuntimeError("Reconnect relay did not stop")
+
+
 class Client:
     def __init__(self, binary, port, directory, fingerprint, mode,
                  options=CaseOptions(), graphics_mask=None):
@@ -110,11 +211,21 @@ class Client:
         self.errors = []
         self.starts = 0
         self.events = []
+        self.relay = None
+        self.reconnects = 0
+        self.relay_connections = 0
+        self.graceful_closes = 0
 
     def start(self, payload):
         args = connection(payload, self.port, allow_fullscreen=self.options.graphics)
         self.stop()
-        args += ["/u:wpts", "/sec:tls", "-auto-reconnect", "-clipboard", "/audio-mode:2"]
+        args += ["/u:wpts", "/sec:tls", "-clipboard", "/audio-mode:2"]
+        if self.options.auto_reconnect:
+            self.relay = ReconnectRelay(self.port)
+            args[0] = f"/v:127.0.0.1:{self.relay.port}"
+            args += ["+auto-reconnect", "/auto-reconnect-max-retries:3"]
+        else:
+            args.append("-auto-reconnect")
         if self.options.redirect_drive:
             share = self.directory / "shared-folder"
             if "," in str(share):
@@ -194,8 +305,37 @@ class Client:
         except (OSError, ValueError, KeyError) as error:
             self.errors.append(str(error))
 
+    def close_connection(self):
+        if not self.options.graceful_close:
+            raise ValueError("This test does not permit protocol close")
+        # The same upstream command is used for cleanup before/after a test.
+        # Count only the actual request to a running client; run.py checks it.
+        if self.process is None or self.process.poll() is not None or self.graceful_closes:
+            return
+        if self.mode == "bridge":
+            self.send("cancel")
+        else:
+            # SDL registers sdl_term_handler: abort the session and enqueue quit.
+            # Success requires the server to observe the user-requested MCS PDU
+            # and transport close. A raw process exit cannot satisfy that test.
+            self.process.send_signal(signal.SIGTERM)
+        self.graceful_closes += 1
+
+    def reconnect(self):
+        if not self.options.auto_reconnect or self.relay is None:
+            raise ValueError("This test does not permit network interruption")
+        if self.process is None or self.process.poll() is not None:
+            raise ValueError("Cannot reconnect a client that is not running")
+        self.relay.interrupt()
+        self.reconnects += 1
+
     def stop(self):
         stop_process(self.process)
+        if self.relay is not None:
+            self.relay.close()
+            self.relay_connections += self.relay.connections
+            self.errors.extend(self.relay.errors)
+            self.relay = None
         if self.worker is not None:
             self.worker.join(timeout=5)
         if self.bridge is not None:
@@ -227,7 +367,12 @@ class ControlHandler(socketserver.BaseRequestHandler):
             if request.command == 1:
                 self.server.client.start(request.payload)
             elif request.command == 2 and not request.payload:
-                self.server.client.stop()
+                if self.server.client.options.graceful_close:
+                    self.server.client.close_connection()
+                else:
+                    self.server.client.stop()
+            elif request.command == 3 and not request.payload:
+                self.server.client.reconnect()
             else:
                 raise ValueError(f"Unsupported SUT command: {request.command}")
         except (OSError, ValueError, subprocess.SubprocessError) as failure:

@@ -1,0 +1,194 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="8c7911af-7042-401c-8442-ce6abd6521fe" name="@Davids-MacBook-Air 2026-10-15 10:41:24" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-15T10:41:24.5016550+02:00" queuing="2026-10-15T10:41:24.5016550+02:00" start="2026-10-15T10:41:21.6447560+02:00" finish="2026-10-15T10:41:24.5190470+02:00" />
+  <TestSettings name="default" id="e95b989e-dae7-4341-9f86-1cecc783409a">
+    <Deployment runDeploymentRoot="_Davids-MacBook-Air_2026-10-15_10_41_24" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="0b9380da-751b-4d2e-948e-657db20156d2" testId="22d20546-1cdd-2aaa-cfc8-9f8e85bafa60" testName="S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidSignature" computerName="Davids-MacBook-Air" duration="00:00:00.5392333" startTime="2026-10-15T10:41:22.0898910+02:00" endTime="2026-10-15T10:41:24.3067500+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0b9380da-751b-4d2e-948e-657db20156d2">
+      <Output>
+        <StdOut>2026-10-15 10:41:23.767 [TestInProgress] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidSignature&#xD;
+2026-10-15 10:41:23.884 [Comment] Adapter Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter implements Microsoft.Protocols.TestSuites.Rdpbcgr.IRdpbcgrAdapter&#xD;
+2026-10-15 10:41:23.910 [Comment] Adapter Microsoft.Protocols.TestSuites.Rdp.ProtocolBasedRdpSUTControlAdapter implements Microsoft.Protocols.TestSuites.Rdp.IRdpSutControlAdapter&#xD;
+2026-10-15 10:41:23.936 [CheckSucceeded] Assume.IsTrue succeeded. When TLS is used as the security protocol, Protocol is set to 'TLS', Negotiation must be true.&#xD;
+2026-10-15 10:41:24.049 [Debug] isClientSupportFastPathInput = True;
+                isClientSuportAutoReconnect = True;
+                isClientSupportRDPEFS = False;
+                isClientSupportServerRedirection = True;
+                isClientSupportEmptyRdpNegData = False;
+                isClientSupportSoftSync = True
+                isClientSupportTunnelingStaticVCTraffic = True&#xD;
+2026-10-15 10:41:24.060 [Debug] Start to invoke target method add_ConfirmActiveRequest, timeout: 2&#xD;
+2026-10-15 10:41:24.061 [Debug] Complete invoke target method add_ConfirmActiveRequest.&#xD;
+2026-10-15 10:41:24.087 [Debug] Start to invoke target method SetCompressionValue, timeout: 2&#xD;
+2026-10-15 10:41:24.087 [Debug] Complete invoke target method SetCompressionValue.&#xD;
+2026-10-15 10:41:24.120 [Debug] Start to invoke target method TurnVerificationOff, timeout: 2&#xD;
+2026-10-15 10:41:24.121 [Debug] Complete invoke target method TurnVerificationOff.&#xD;
+2026-10-15 10:41:24.150 [Debug] This case requires using RDP encrypted protocol&#xD;
+2026-10-15 10:41:24.163 [Comment] Trigger client to close all RDP connections for clean up.&#xD;
+2026-10-15 10:41:24.165 [Debug] Start to invoke target method TriggerClientDisconnectAll, timeout: 2&#xD;
+2026-10-15 10:41:24.190 [Comment] RDP SUT Control Protocol Adapter: CommandId is 2: Success, agent: 127.0.0.1:56981.&#xD;
+2026-10-15 10:41:24.191 [Debug] Complete invoke target method TriggerClientDisconnectAll.&#xD;
+2026-10-15 10:41:24.193 [Debug] The result of TriggerClientDisconnectAll is 1.&#xD;
+2026-10-15 10:41:24.194 [Comment] Stop RDP listening.&#xD;
+2026-10-15 10:41:24.194 [Debug] Start to invoke target method StopRDPListening, timeout: 2&#xD;
+2026-10-15 10:41:24.195 [Debug] Complete invoke target method StopRDPListening.&#xD;
+2026-10-15 10:41:24.205 [TestPassed] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidSignature&#xD;
+2026-10-15 10:41:24.266 [Comment] Actual time taken for the test suite execution (in seconds) is: 2.16392&#xD;
+2026-10-15 10:41:24.271 [Settings] Test finished, begin output configuration properties.&#xD;
+2026-10-15 10:41:24.271 [Settings] PTFConfigProperties.SUTControl.AgentAddress: 127.0.0.1:56981&#xD;
+2026-10-15 10:41:24.271 [Settings] PTFConfigProperties.SUTControl.TransportType: TCP&#xD;
+2026-10-15 10:41:24.271 [Settings] PTFConfigProperties.SUTControl.ClientSupportRDPFile: false&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.SUTControl.AlwaysNeedResponse: true&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.Security.Negotiation: True&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.Security.Protocol: TLS&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.Security.Encryption.Level: None&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.Security.Encryption.Method: None&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.Security.IsClientToServerEncrypted: true&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.VerifySUTDisplay.Enable: false&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.VerifySUTDisplay.BitmapSavePath: ../../ScreenShot/&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.VerifySUTDisplay.IQA.Algorithm: MS-SSIM&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.VerifySUTDisplay.IQA.AssessValueThreshold: 0.98&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.VerifySUTDisplay.ShiftX: 0&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.VerifySUTDisplay.ShiftY: 0&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.AdapterInvokeTimeout: 2&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.TestName: RDP Client Endpoint Test&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.ProtocolName: RDP&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.Version: 10.6&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.ServerPort: 56980&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.IpVersion: Ipv4&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.IsWindowsImplementation: false&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.DropConnectionForInvalidRequest: true&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.ServerDomain: localhost&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.ServerUserName: wpts&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.ServerUserPassword: wpts&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.CertificatePath: /private/tmp/wpts-session-input-negative/server.pfx&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.CertificatePassword: wpts&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.VerifyRdpbcgrMessage: true&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.SUTName: RDPClient&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.SUTUserName: administrator&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.SUTUserPassword: Password01!&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.SUTRedirectionGuid: RDSTLSForTestSuite&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.DriverComputerFullQualifiedDomainName: RDPServer.CONTOSO.com&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.DriverComputerNetBiosName: RDPServer&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.SUTSystemDrive: C&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.RDPConnectWithNegotiationApproach_Task: Negotiate_RDPConnect&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.RDPConnectWithNegotiationApproachInvalidAccount_Task: Negotiate_InvalidAccount_RDPConnect&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.RDPConnectWithDirectCredSSPInvalidAccount_Task: DirectCredSSP_InvalidAccount_RDPConnect&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.RDPConnectWithDirectCredSSP_Task: DirectCredSSP_RDPConnect&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.RDPConnectWithNegotiationApproachFullScreen_Task: Negotiate_FullScreen_RDPConnect&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.RDPConnectWithDirectCredSSPFullScreen_Task: DirectCredSSP_FullScreen_RDPConnect&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.TriggerClientAutoReconnect_Task: TriggerNetworkFailure&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.TriggerInputEvents_Task: TriggerInputEvents&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.TriggerClientDisconnectAll_Task: DisconnectAll&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.TriggerCloseRDPWindow_Task: TriggerCloseRDPWindow&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.CredentialManagerAddInvalidAccount_Task: CredentialManager_Invalid&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.CredentialManagerReverseInvalidAccount_Task: CredentialManager_InvalidAccount_Reverse&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.TriggerOneTouchEvent_Task: TriggerOneTouchEvent&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.TriggerMultiTouchEvent_Task: TriggerMultiTouchEvent&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.TriggerSingleTouchPositionEvent_Task: TriggerSingleTouchPositionEvent&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.TriggerContinuousTouchEvent_Task: TriggerContinuousTouchEvent&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.TriggerTouchHoverEvent_Task: TriggerTouchHoverEvent&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.MaximizeRDPClientWindow_Task: MaximizeMstsc&#xD;
+2026-10-15 10:41:24.272 [Settings] PTFConfigProperties.SupportFastPathInput: true&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.SupportAutoReconnect: true&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.SupportRDPEFS: false&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.SupportServerRedirection: true&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.WaitTime: 10&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.RDPRFXImage: ../TestData/Rdprfx.bmp&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.RDPRFXVideoModeImage: ../TestData/RdprfxVideoMode.bmp&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.TurnOffRDPBCGRVerification: false&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.TurnOffRDPEGFXVerification: false&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.TurnOffRDPEIVerification: false&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.TurnOffRDPEUSBVerification: false&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.TurnOffRDPRFXVerification: false&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.OriginalDesktopWidth: 1024&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.OriginalDesktopHeight: 768&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.ChangedDesktopWidth: 1152&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.ChangedDesktopHeight: 864&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.OriginalMonitorNumber: 1&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.ChangedMonitorNumber: 2&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.ProxyIP: 127.0.0.1&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.RdpevorTestDataPath: ../TestData/RdpevorTestData.xml&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.ClearCodecImage: ../TestData/RdpegfxClearCodecTestImage.bmp&#xD;
+2026-10-15 10:41:24.273 [Settings] PTFConfigProperties.RfxProgressiveCodecImage: ../TestData/RdpegfxRfxProgressiveCodecTestImage.bmp&#xD;
+2026-10-15 10:41:24.293 [Settings] PTFConfigProperties.RdpegfxH264TestDataPath: ../TestData/&#xD;
+2026-10-15 10:41:24.293 [Settings] PTFConfigProperties.RdpedispTestImage: ../TestData/RdpedispTestImage.bmp&#xD;
+2026-10-15 10:41:24.293 [Settings] PTFConfigProperties.RdpedispEndImage: ../TestData/End.png&#xD;
+2026-10-15 10:41:24.293 [Settings] PTFConfigProperties.RdpedispOrientationChange1Image: ../TestData/OrientationChange1.png&#xD;
+2026-10-15 10:41:24.293 [Settings] PTFConfigProperties.RdpedispOrientationChange2Image: ../TestData/OrientationChange2.png&#xD;
+2026-10-15 10:41:24.293 [Settings] PTFConfigProperties.RdpedispOrientationChange3Image: ../TestData/OrientationChange3.png&#xD;
+2026-10-15 10:41:24.293 [Settings] PTFConfigProperties.RdpedispOrientationChange4Image: ../TestData/OrientationChange4.png&#xD;
+2026-10-15 10:41:24.293 [Settings] PTFConfigProperties.RdpedispMonitorAddImage: ../TestData/MonitorAdd.png&#xD;
+2026-10-15 10:41:24.294 [Settings] PTFConfigProperties.RdpedispMonitorRemoveImage: ../TestData/MonitorRemove.png&#xD;
+2026-10-15 10:41:24.294 [Settings] PTFConfigProperties.SupportSoftSync: true&#xD;
+2026-10-15 10:41:24.294 [Settings] PTFConfigProperties.SupportTunnelingStaticVCTraffic: true&#xD;
+2026-10-15 10:41:24.294 [Settings] PTFConfigProperties.SupportEUSBDevice: false&#xD;
+2026-10-15 10:41:24.294 [Settings] PTFConfigProperties.SupportCompression: false&#xD;
+2026-10-15 10:41:24.294 [Settings] PTFConfigProperties.LinuxScreenshotCaptureCommand: gnome-screenshot --file={{fileName}}&#xD;
+2026-10-15 10:41:24.294 [Settings] PTFConfigProperties.SupportRemoteFX: false&#xD;
+2026-10-15 10:41:24.294 [Settings] PTFConfigProperties.ClientName: Davids-MacBook-Air.local&#xD;
+2026-10-15 10:41:24.294 [Settings] PTFConfigProperties.ClientOS: Unix 27.0.1&#xD;
+2026-10-15 10:41:24.295 [Comment] begin output test statistics.&#xD;
+2026-10-15 10:41:24.298 [Comment] PTFTestResult.TestsExecuted: 1&#xD;
+2026-10-15 10:41:24.301 [Comment] PTFTestResult.TestsPassed: 1</StdOut>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidSignature" storage="/private/tmp/wpts-session-input-negative/suite/bin/rdp_clienttestsuite.dll" priority="1" id="22d20546-1cdd-2aaa-cfc8-9f8e85bafa60">
+      <TestCategory>
+        <TestCategoryItem TestCategory="BasicFeature" />
+        <TestCategoryItem TestCategory="RDP7.0" />
+        <TestCategoryItem TestCategory="RDPBCGR" />
+        <TestCategoryItem TestCategory="BasicRequirement" />
+      </TestCategory>
+      <Execution id="0b9380da-751b-4d2e-948e-657db20156d2" />
+      <TestMethod codeBase="/private/tmp/wpts-session-input-negative/suite/Bin/RDP_ClientTestSuite.dll" adapterTypeName="executor://mstestadapter/v2" className="Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite" name="S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidSignature" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="22d20546-1cdd-2aaa-cfc8-9f8e85bafa60" executionId="0b9380da-751b-4d2e-948e-657db20156d2" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="1" executed="1" passed="1" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>2026-10-15 10:41:23.622 [Comment] Expected execution time of the test suite (in seconds) is: 
+2026-10-15 10:41:23.622 [Comment] Expected execution time of the test suite (in seconds) is: 
+2026-10-15 10:41:23.884 [Comment] Adapter Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter implements Microsoft.Protocols.TestSuites.Rdpbcgr.IRdpbcgrAdapter
+2026-10-15 10:41:23.910 [Comment] Adapter Microsoft.Protocols.TestSuites.Rdp.ProtocolBasedRdpSUTControlAdapter implements Microsoft.Protocols.TestSuites.Rdp.IRdpSutControlAdapter
+2026-10-15 10:41:24.049 [Debug] isClientSupportFastPathInput = True;
+                isClientSuportAutoReconnect = True;
+                isClientSupportRDPEFS = False;
+                isClientSupportServerRedirection = True;
+                isClientSupportEmptyRdpNegData = False;
+                isClientSupportSoftSync = True
+                isClientSupportTunnelingStaticVCTraffic = True
+2026-10-15 10:41:24.060 [Debug] Start to invoke target method add_ConfirmActiveRequest, timeout: 2
+2026-10-15 10:41:24.061 [Debug] Complete invoke target method add_ConfirmActiveRequest.
+2026-10-15 10:41:24.087 [Debug] Start to invoke target method SetCompressionValue, timeout: 2
+2026-10-15 10:41:24.087 [Debug] Complete invoke target method SetCompressionValue.
+2026-10-15 10:41:24.120 [Debug] Start to invoke target method TurnVerificationOff, timeout: 2
+2026-10-15 10:41:24.121 [Debug] Complete invoke target method TurnVerificationOff.
+2026-10-15 10:41:24.150 [Debug] This case requires using RDP encrypted protocol
+2026-10-15 10:41:24.163 [Comment] Trigger client to close all RDP connections for clean up.
+2026-10-15 10:41:24.165 [Debug] Start to invoke target method TriggerClientDisconnectAll, timeout: 2
+2026-10-15 10:41:24.190 [Comment] RDP SUT Control Protocol Adapter: CommandId is 2: Success, agent: 127.0.0.1:56981.
+2026-10-15 10:41:24.191 [Debug] Complete invoke target method TriggerClientDisconnectAll.
+2026-10-15 10:41:24.193 [Debug] The result of TriggerClientDisconnectAll is 1.
+2026-10-15 10:41:24.194 [Comment] Stop RDP listening.
+2026-10-15 10:41:24.194 [Debug] Start to invoke target method StopRDPListening, timeout: 2
+2026-10-15 10:41:24.195 [Debug] Complete invoke target method StopRDPListening.
+2026-10-15 10:41:24.205 [TestPassed] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidSignature
+2026-10-15 10:41:24.266 [Comment] Actual time taken for the test suite execution (in seconds) is: 2.16392
+2026-10-15 10:41:24.295 [Comment] begin output test statistics.
+2026-10-15 10:41:24.298 [Comment] PTFTestResult.TestsExecuted: 1
+2026-10-15 10:41:24.301 [Comment] PTFTestResult.TestsPassed: 1
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

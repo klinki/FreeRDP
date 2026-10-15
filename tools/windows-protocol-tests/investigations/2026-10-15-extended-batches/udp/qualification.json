@@ -1,0 +1,161 @@
+{
+  "date": "2026-10-15",
+  "microsoft_repository": "https://github.com/microsoft/WindowsProtocolTestSuites.git",
+  "microsoft_revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+  "freerdp_revision": "1d10fcd162fdb0ff618be0fc1b189dccd7217aa9",
+  "sdk": "8.0.425",
+  "runtime": "8.0.31",
+  "patches_sha256": {
+    "udp-piggyback-ack-fixture.patch": "4dcd60ed90b8a25eb7346b240b19f94ff8c99e78e3c83e7d38e77fb5f4f7479a",
+    "udp-rdpeudp2-driver.patch": "615dec2c6ad78ecf234d8dceac281b82091f47ecf1c2a148b55c8add2aec4584",
+    "udp-listener-shutdown.patch": "879e3439457e8c2855ceee61909a6669b5dc36261f4509863ec1edb6dfe669e7"
+  },
+  "client_sha256": "9582f1aa14e2549abc05ba8c65fe80a2f4a1617b231d75ffcb83a96125d4cf1c",
+  "assemblies_sha256": {
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpeudp2.dll": "d5d853415b2aac245a1438d0f1e152a4c36c6b7df1dd60c3072c8f1a571e7160",
+    "RDP_ClientTestSuite.dll": "b746c08ef0af06ab3b81792bedb41107d1a7945b577c01f8d43c7e02ca107654",
+    "Microsoft.Protocols.TestTools.StackSdk.Transport.dll": "43fd1964bb5effc802838a6281ea42abd6bed53a9eb24a9e568a9f78b22078d5"
+  },
+  "profile": "extended",
+  "case_options": {},
+  "passing_cases": [
+    "S3_DataTransfer_V2_AcknowledgeLostPacket",
+    "S3_DataTransfer_V2_ClientReceiveData",
+    "S3_DataTransfer_V2_DataPacketWithAck"
+  ],
+  "results": [
+    {
+      "case": "S3_DataTransfer_V2_ClientReceiveData",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.75
+    },
+    {
+      "case": "S3_DataTransfer_V2_DataPacketWithAck",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 8.72
+    },
+    {
+      "case": "S3_DataTransfer_V2_AcknowledgeLostPacket",
+      "mode": "standard",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.97
+    },
+    {
+      "case": "S3_DataTransfer_V2_ClientReceiveData",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 9.47
+    },
+    {
+      "case": "S3_DataTransfer_V2_DataPacketWithAck",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.77
+    },
+    {
+      "case": "S3_DataTransfer_V2_AcknowledgeLostPacket",
+      "mode": "bridge",
+      "options": {
+        "rdp_version": "10.6",
+        "redirect_drive": false,
+        "video": false,
+        "graphics": false,
+        "auto_reconnect": false,
+        "graceful_close": false
+      },
+      "graphics_mask": null,
+      "client_launches": 1,
+      "reconnects": 0,
+      "relay_connections": 0,
+      "graceful_closes": 0,
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 7.54
+    }
+  ],
+  "regression_checks_passed": 15,
+  "production_client_changes": false,
+  "patch_order": [
+    "udp-rdpeudp2-driver.patch",
+    "udp-listener-shutdown.patch",
+    "udp-piggyback-ack-fixture.patch"
+  ]
+}

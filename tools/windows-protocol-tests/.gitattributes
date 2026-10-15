@@ -1,6 +1,7 @@
 # Preserve diagnostic output and unified-diff context exactly as captured.
 investigations/**/evidence/** -text -whitespace
 investigations/**/*.patch -text -whitespace
+patches/*.patch -text -whitespace
 
 # The readable source is catalog-template.html plus the generator/config.
 test-catalog.html linguist-generated=true

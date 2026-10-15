@@ -24,8 +24,6 @@
         "S2_ReactivationTest_PositiveTest_BitmapHostCacheNotSupported",
         "S6_AutoDetection_ConnectTime_RTT",
         "S6_AutoDetection_ConnectTime_bandwidth",
-        "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength",
-        "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength",
         "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidTKPKLength",
         "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCacheHostSupportCapSet_NotPresent",
         "S1_ConnectionTest_CapabilityExchange_PositiveTest_BitmapCapSet_24ColorDepth",
@@ -87,22 +85,47 @@
         "S1_ConnectionTest_ConnectionFinalization_PositiveTest_BitmapHostCacheSupported_sequenceTest_1",
         "S1_ConnectionTest_ConnectionFinalization_PositiveTest_BitmapHostCacheSupported_sequenceTest_2",
         "S1_ConnectionTest_ConnectionFinalization_PositiveTest_BitmapHostCacheSupported_sequenceTest_3",
-        "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
         "S1_ConnectionTest_ConnectionInitiation_NegativeTest_InvalidRDPNegData",
         "S1_ConnectionTest_ConnectionInitiation_PositiveTest_FlagsOfRdpNegRsp_SupportAllProtocols",
         "S1_ConnectionTest_ConnectionInitiation_PositiveTest_RDPNegotiationFailure",
         "S1_ConnectionTest_SecurityExchange_NegativeTest_LicenseError_InvalidFlag",
         "S1_ConnectionTest_SecurityExchange_NegativeTest_LicenseError_InvalidMCSLength",
         "S1_ConnectionTest_SecurityExchange_NegativeTest_LicenseError_InvalidTKPKLength",
-        "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength",
-        "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength",
         "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTotalLenth",
         "S1_ConnectionTest_CapabilityExchange_PositiveTest_LargePointerCapSet_ExtraLargePointerSupport",
         "S6_AutoDetection_Continuous_RTT",
         "S6_AutoDetection_Continuous_bandwidth",
         "Rdpevor_ProtocolSupportTest_Positive",
         "RDPEGFX_CapabilityExchange_PositiveTest",
-        "RDPEGFX_H264Codec_PositiveTest_AVC420_BaseProfile"
+        "RDPEGFX_H264Codec_PositiveTest_AVC420_BaseProfile",
+        "RDPEGFX_Compression_PositiveTest",
+        "RDPEGFX_Segmentation_Positive_MultipleSegmentedPacking",
+        "RDPEGFX_Segmentation_Positive_UncompressedSegmentHeader",
+        "RDPEGFX_H264Codec_PositiveTest_H264Support",
+        "RDPEGFX_H264Codec_PositiveTest_AVC420_HighProfile",
+        "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile",
+        "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile_CABACEnabled",
+        "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_ISliceOnly",
+        "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_BaseProfile",
+        "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile",
+        "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_CABACEnabled",
+        "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_LargeSize",
+        "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_HighProfile",
+        "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile",
+        "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile_LargeSize",
+        "RDPEGFX_H264Codec_PositiveTest_AVC444v2",
+        "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported",
+        "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent",
+        "S7_StaticVirtualChannel_PositiveTest_CompressionSupported",
+        "S7_StaticVirtualChannel_PositiveTest_VCChunkSizePresent",
+        "S7_StaticVirtualChannel_NegativeTest_InvalidMCSLength",
+        "S3_DataTransfer_V2_ClientReceiveData",
+        "S3_DataTransfer_V2_AcknowledgeLostPacket",
+        "BVT_AutoReconnect_PositiveTest",
+        "S3_AutoReconnection_NegativeTest_AutoReconnectionFailed",
+        "S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated",
+        "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidEncryptFlag",
+        "S3_DataTransfer_V2_DataPacketWithAck"
       ]
     }
   },
@@ -124,6 +147,108 @@
     },
     "RDPEGFX_H264Codec_PositiveTest_AVC420_BaseProfile": {
       "graphics": true
+    },
+    "RDPEGFX_Compression_PositiveTest": {
+      "graphics": true
+    },
+    "RDPEGFX_Segmentation_Positive_MultipleSegmentedPacking": {
+      "graphics": true
+    },
+    "RDPEGFX_Segmentation_Positive_UncompressedSegmentHeader": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_H264Support": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_HighProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC420_MainProfile_CABACEnabled": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_ISliceOnly": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_BaseProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_CABACEnabled": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_MainProfile_LargeSize": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Only_HighProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444_YUV420Chroma420Together_MainProfile_LargeSize": {
+      "graphics": true
+    },
+    "RDPEGFX_H264Codec_PositiveTest_AVC444v2": {
+      "graphics": true
+    },
+    "BVT_StaticVirtualChannel_PositiveTest_CompressionNotSupported": {
+      "redirect_drive": true
+    },
+    "BVT_StaticVirtualChannel_PositiveTest_VCChunkSizeNotPresent": {
+      "redirect_drive": true
+    },
+    "S7_StaticVirtualChannel_PositiveTest_CompressionSupported": {
+      "redirect_drive": true
+    },
+    "S7_StaticVirtualChannel_PositiveTest_VCChunkSizePresent": {
+      "redirect_drive": true
+    },
+    "S7_StaticVirtualChannel_NegativeTest_InvalidMCSLength": {
+      "redirect_drive": true
+    },
+    "BVT_AutoReconnect_PositiveTest": {
+      "auto_reconnect": true
+    },
+    "S3_AutoReconnection_NegativeTest_AutoReconnectionFailed": {
+      "auto_reconnect": true
+    },
+    "S1_ConnectionTest_Disconnection_PositiveTest_ClientInitiated": {
+      "graceful_close": true
     }
-  }
+  },
+  "patches": [
+    {
+      "path": "patches/drive-static-channel-prerequisites.patch",
+      "sha256": "53e824795e48b0db64e69cfd3f0bb3b796e963d252a3153363f9644bfef8632d"
+    },
+    {
+      "path": "patches/driver-disconnect-verification.patch",
+      "sha256": "fa8c2d5ccc86cc86b0cef0f9ac2d668942e41356b7f0dd3abd6942c64da35101"
+    },
+    {
+      "path": "patches/session-graceful-disconnect.patch",
+      "sha256": "db4a054d5d3e44fcae961623b9549e3fb424fecd4020167866aa2716e78375e9"
+    },
+    {
+      "path": "patches/session-reconnect-observation.patch",
+      "sha256": "06fc3e99842a5a14c97433cdec1f9b8c19a67ea8c7e184a95e70b789951f6aa5"
+    },
+    {
+      "path": "patches/udp-rdpeudp2-driver.patch",
+      "sha256": "615dec2c6ad78ecf234d8dceac281b82091f47ecf1c2a148b55c8add2aec4584"
+    },
+    {
+      "path": "patches/udp-piggyback-ack-fixture.patch",
+      "sha256": "4dcd60ed90b8a25eb7346b240b19f94ff8c99e78e3c83e7d38e77fb5f4f7479a"
+    },
+    {
+      "path": "patches/udp-listener-shutdown.patch",
+      "sha256": "879e3439457e8c2855ceee61909a6669b5dc36261f4509863ec1edb6dfe669e7"
+    }
+  ]
 }
