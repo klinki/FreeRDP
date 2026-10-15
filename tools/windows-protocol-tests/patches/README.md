@@ -15,7 +15,10 @@ patch paths and hashes; `run.py` rejects a stale or unpatched suite.
 | `udp-piggyback-ack-fixture.patch` | Require a real piggyback ACK derived from observed peer data in the specifically named DATA-with-ACK scenario. Apply after the RDPEUDP2 repair. |
 | `udp-rdpeudp2-driver.patch` | Repair optional ACK handling, ACK-vector offsets without timestamps, and cumulative ACK matching across sequence wraparound. |
 | `udp-listener-shutdown.patch` | Wake the blocking local UDP receive before closing the listener on macOS. |
+| `tpkt-short-length-fixtures.patch` | Repair the disconnect and slow-path zero-length underflow; serialize encrypted slow-path packets once before changing their TPKT length. |
 
+The [restoration report](../investigations/2026-10-15-restored-negative-tests/README.md)
+records final native/fixture repairs and full two-mode qualification.
 The [batch investigation](../investigations/2026-10-15-extended-batches/README.md)
 records the individual qualifications, negative controls, and remaining limits.
 Tests retain their original protocol scenarios; added checks strengthen missing

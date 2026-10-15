@@ -1,5 +1,7 @@
 # Extended protocol batches — 2026-10-15
 
+> Follow-up: the [production repairs and restoration](../2026-10-15-restored-negative-tests/README.md) are complete. Extended now has 120 cases; this document preserves the earlier investigation and qualification state.
+
 Extended now contains **115 cases**; quick remains **6**. We added **28** cases
 and removed **5** earlier false positives. Every enabled case passed in
 standard and bridge modes. No production FreeRDP source was changed.

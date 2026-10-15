@@ -1,0 +1,36 @@
+{
+  "suite_bin": "/private/tmp/wpts-restored-suite-final-20261015/Bin",
+  "sdk": "8.0.425",
+  "assembly_sha256": {
+    "RDP_ClientAdapter.dll": "7f3028852aad230d89e1e0bccb44d31cf559cc6c65f725dd96d50aeed221d62b",
+    "Microsoft.Protocols.TestTools.StackSdk.dll": "fd33cc19a63df9247547cc8d9c4e2545a5208dbc0098cdae41b220cc60a68e5d",
+    "Microsoft.Protocols.TestTools.StackSdk.Transport.dll": "c87f9c177388e47e5e823393b09b6c3ede4a0f7d29bb7b540f8bcef37f2e29d6",
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.dll": "02afb36d43c6b8c935e8438d387bb49b9acab36bdb9fbd96e065476045f10754"
+  },
+  "program_sha256": "c0ad6458ea8e70963b667d651a3b2f55b2ea32c57d068d035b586e18dbe7f544",
+  "exit_code": 0,
+  "passed": [
+    "disconnect_positive_remains_9_bytes",
+    "disconnect_negative_declares_8_of_9_bytes",
+    "provider_disconnect_positive_remains_9_bytes",
+    "provider_disconnect_negative_declares_8_of_9_bytes",
+    "pointer_positive_remains_40_bytes",
+    "pointer_negative_declares_39_of_40_bytes",
+    "pointer_mcs_negative_remains_independent",
+    "encrypted_pointer_serializes_once_and_only_tpkt_length_changes",
+    "pointer_x224_negative_remains_independent"
+  ],
+  "failed": [],
+  "frames": [
+    "actual=9 declared=9 hex=0300000902F0802180",
+    "actual=9 declared=8 hex=0300000802F0802180",
+    "actual=9 declared=9 hex=0300000902F0802080",
+    "actual=9 declared=8 hex=0300000802F0802080",
+    "actual=40 declared=40 hex=0300002802F08068000103EB701A1A001700EA030000000000021A001B0000000300000032003200",
+    "actual=40 declared=39 hex=0300002702F08068000103EB701A1A001700EA030000000000021A001B0000000300000032003200",
+    "actual=40 declared=40 hex=0300002802F08068000103EB70191A001700EA030000000000021A001B0000000300000032003200",
+    "actual=52 declared=52 hex=0300003402F08068000103EB702608000000C5D7988A22CC454F4EABADD37E2F26FBE8637A0C92EFF177EC0957ADB18341454786",
+    "actual=52 declared=51 hex=0300003302F08068000103EB702608000000C5D7988A22CC454F4EABADD37E2F26FBE8637A0C92EFF177EC0957ADB18341454786",
+    "actual=40 declared=40 hex=0300002801F08068000103EB701A1A001700EA030000000000021A001B0000000300000032003200"
+  ]
+}

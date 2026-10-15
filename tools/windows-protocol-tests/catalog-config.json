@@ -732,9 +732,11 @@
       "implemented_note": "Qualified in both modes with the corrected disconnect verifier and default TLS settings."
     },
     "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength": {
-      "disposition": "Blocked · FreeRDP length validation",
-      "reason": "Confirmed client boundary-validation defect: MCS userData length declares 130 bytes but 386 are parsed. The original test passes in both modes with an isolated native consistency-check repair. Production repair and regression qualification are still required.",
       "evidence": [
+        {
+          "label": "Production repair and full qualification",
+          "url": "investigations/2026-10-15-restored-negative-tests/README.md"
+        },
         {
           "label": "Root-cause investigation · 2026-10-15",
           "url": "investigations/2026-10-15-removed-negative-tests/demand-active/README.md"
@@ -743,12 +745,15 @@
           "label": "Five-test findings",
           "url": "investigations/2026-10-15-removed-negative-tests/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Restored after FreeRDP began checking MCS payload length against its enclosing TPKT boundary before decryption. Valid Share Control batching is preserved. Both modes pass the original negative test."
     },
     "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength": {
-      "disposition": "Blocked · FreeRDP length validation",
-      "reason": "Confirmed client boundary-validation defect: Share Control totalLength declares 385 bytes but 386 are parsed. The original test passes in both modes with an isolated native consistency-check repair. Production repair and regression qualification are still required.",
       "evidence": [
+        {
+          "label": "Production repair and full qualification",
+          "url": "investigations/2026-10-15-restored-negative-tests/README.md"
+        },
         {
           "label": "Root-cause investigation · 2026-10-15",
           "url": "investigations/2026-10-15-removed-negative-tests/demand-active/README.md"
@@ -757,12 +762,15 @@
           "label": "Five-test findings",
           "url": "investigations/2026-10-15-removed-negative-tests/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Restored after FreeRDP began enforcing the Demand Active Share Control boundary after decryption. Native RC4/FIPS and valid-flow regressions pass; both live modes pass the original negative test."
     },
     "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength": {
-      "disposition": "Blocked · Microsoft TPKT fixture",
-      "reason": "Confirmed Microsoft fixture defect: a zero TPKT length underflows to 65535 while only 9 bytes are sent. FreeRDP waits for an incomplete frame. Correcting the fixture to its intended length 8 makes the unchanged client pass both modes; integrate and qualify the fixture repair before restoring.",
       "evidence": [
+        {
+          "label": "Production repair and full qualification",
+          "url": "investigations/2026-10-15-restored-negative-tests/README.md"
+        },
         {
           "label": "Root-cause investigation · 2026-10-15",
           "url": "investigations/2026-10-15-removed-negative-tests/disconnect/investigation.md"
@@ -771,12 +779,15 @@
           "label": "Five-test findings",
           "url": "investigations/2026-10-15-removed-negative-tests/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Restored after repairing Microsoft’s zero-length underflow. The fixture now emits an actual-minus-one TPKT length; slow-path encryption is serialized once. Both launch modes pass the unchanged strict disconnect assertion."
     },
     "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength": {
-      "disposition": "Blocked · FreeRDP length validation",
-      "reason": "Confirmed client boundary-validation defect: MCS userData length declares 25 bytes but 26 are parsed. The original test passes in both modes with an isolated native consistency-check repair. Production repair and regression qualification are still required.",
       "evidence": [
+        {
+          "label": "Production repair and full qualification",
+          "url": "investigations/2026-10-15-restored-negative-tests/README.md"
+        },
         {
           "label": "Root-cause investigation · 2026-10-15",
           "url": "investigations/2026-10-15-removed-negative-tests/slow-path/README.md"
@@ -785,12 +796,15 @@
           "label": "Five-test findings",
           "url": "investigations/2026-10-15-removed-negative-tests/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Restored after FreeRDP began checking MCS payload length against its enclosing TPKT boundary before decryption. Valid Share Control batching is preserved. Both modes pass the original negative test."
     },
     "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength": {
-      "disposition": "Blocked · Microsoft TPKT fixture",
-      "reason": "Confirmed Microsoft fixture defect: a zero TPKT length underflows to 65535 while only 40 bytes are sent. FreeRDP waits for an incomplete frame. Correcting the fixture to its intended length 39 makes the unchanged client pass both modes; integrate and qualify the fixture repair before restoring.",
       "evidence": [
+        {
+          "label": "Production repair and full qualification",
+          "url": "investigations/2026-10-15-restored-negative-tests/README.md"
+        },
         {
           "label": "Root-cause investigation · 2026-10-15",
           "url": "investigations/2026-10-15-removed-negative-tests/slow-path/README.md"
@@ -799,7 +813,8 @@
           "label": "Five-test findings",
           "url": "investigations/2026-10-15-removed-negative-tests/README.md"
         }
-      ]
+      ],
+      "implemented_note": "Restored after repairing Microsoft’s zero-length underflow. The fixture now emits an actual-minus-one TPKT length; slow-path encryption is serialized once. Both launch modes pass the unchanged strict disconnect assertion."
     },
     "RDPEGFX_CapabilityExchange_Negative_IncorrectVersion": {
       "disposition": "Failed qualification",
@@ -1044,8 +1059,8 @@
   },
   "qualification": {
     "date": "2026-10-15",
-    "cases": 115,
-    "executions": 230,
-    "record": "validation-batches.json"
+    "cases": 120,
+    "executions": 240,
+    "record": "validation-restored.json"
   }
 }

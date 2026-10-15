@@ -1,0 +1,12 @@
+{
+  "Program.cs": "c0ad6458ea8e70963b667d651a3b2f55b2ea32c57d068d035b586e18dbe7f544",
+  "README.md": "072480577b962e483ff827682b48cac473f6a7ce9ffdd63d84008f7f6a976abc",
+  "Regression.csproj": "e5d6d1a3991f519d1d4beac13d0cffd4dd8e736e1267341e0b9e6c6c94a94ac6",
+  "baseline/build.log": "7d303c8da638a544dea7b671add773d931874dca98e061e1ec71b5757dfe89ff",
+  "baseline/result.json": "a75a05cd6220ac85175c887d77f3a5ba0d5e29de5f12aad5c13301fe03d55cbe",
+  "baseline/run.log": "366c38d623fe064b712fe943819f28e723d37fdb0c7cf3ad12b2d579d3d8c71d",
+  "patched/build.log": "6bccad8fb4f477ca5b161ecdd85a92cb40c6a28f3748957745e974116a6a2139",
+  "patched/result.json": "01a9430d3efa2b43fe158f295a31c275cfffef92391f53f4577beb2d95bc48e3",
+  "patched/run.log": "39c30f2034d2c5c0ca00d41cbb9d4364ccb9db7918f06e17118087eeb4d1fd14",
+  "run.py": "e4483205d64f7d5f2a47e452da43eab3eb3369e358f50121042e828d02dd1762"
+}

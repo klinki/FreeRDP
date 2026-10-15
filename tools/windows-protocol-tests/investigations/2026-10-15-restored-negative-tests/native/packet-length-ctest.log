@@ -1,0 +1,7 @@
+Test project /Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/core/test
+    Start 8: TestRdpPacketLengths
+1/1 Test #8: TestRdpPacketLengths .............   Passed    0.31 sec
+
+100% tests passed out of 1
+
+Total Test time (real) =   0.31 sec

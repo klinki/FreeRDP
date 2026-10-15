@@ -13,21 +13,23 @@ short description, pinned source link and explanation for every excluded case.
 | Profile | Cases | Purpose |
 | --- | ---: | --- |
 | `quick` (default) | 6 | Connection setup, disconnect and malformed negotiation responses |
-| `extended` | 115 | Includes quick, connection/capability checks, graphics, static drive channels, RDPEUDP2 and session recovery |
+| `extended` | 120 | Includes quick, connection/capability checks, graphics, static drive channels, RDPEUDP2 and session recovery |
 
 Launch mode is independent: `--mode standard`, `bridge`, or `both`. Both modes
-produce 12 executions for quick and 230 for extended. The latest qualification
-was performed in [documented batches](validation-batches.json), not one full run
-of the final seven-patch build. Every enabled case passed in both modes; the
-last batch repeated every case affected by the final two driver patches.
+produce 12 executions for quick and 240 for extended. The current
+[qualification record](validation-restored.json) contains complete passing
+standard and serial bridge runs on the repaired native client and final
+eight-patch driver. An initial parallel bridge attempt failed during listener
+startup before RDP; that attempt and its successful serial requalification are
+preserved in the record.
 
-The [latest batch report](investigations/2026-10-15-extended-batches/README.md)
-records 28 additions and 5 removals. The removals correct earlier false
-positives in Microsoft's disconnect verifier; the historical
-[92-case qualification](validation-profiles.json) must not be used as current
-proof for those cases. The [follow-up investigation](investigations/2026-10-15-removed-negative-tests/README.md)
-attributes three failures to FreeRDP length-validation defects and two to
-Microsoft TPKT-fixture underflow. Quick remains unchanged:
+The [restoration report](investigations/2026-10-15-restored-negative-tests/README.md)
+records the production fixes, native regressions and all five restored cases.
+The [earlier batches](investigations/2026-10-15-extended-batches/README.md) and
+[root-cause investigation](investigations/2026-10-15-removed-negative-tests/README.md)
+remain historical evidence. The original [92-case qualification](validation-profiles.json)
+used the old disconnect verifier and cannot establish the removed cases' validity.
+Quick remains unchanged:
 
 | Case | Coverage |
 | --- | --- |
@@ -90,7 +92,7 @@ python3 tools/windows-protocol-tests/prepare.py \
 A prepared suite from before these repairs is rejected by the runner. Rebuild
 and pass `--suite /path/to/new-suite`. The driver repairs fix malformed drive
 prerequisites, false disconnect detection, RDPEUDP2 ACK handling/shutdown, the
-required piggyback fixture and missing reconnect observation. Graceful close
+required piggyback fixture, missing reconnect observation and short-TPKT fixtures. Graceful close
 accepts the alternative sequence explicitly permitted by MS-RDPBCGR. None
 changes production FreeRDP behavior or relaxes a required disconnect assertion.
 

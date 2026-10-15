@@ -1,0 +1,163 @@
+2026-10-15 12:38:35.034 [Comment] Expected execution time of the test suite (in seconds) is: 
+2026-10-15 12:38:35.055 [EnterMethod] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength
+2026-10-15 12:38:35.070    [Comment] Adapter Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter implements Microsoft.Protocols.TestSuites.Rdpbcgr.IRdpbcgrAdapter
+2026-10-15 12:38:35.081    [Comment] Adapter Microsoft.Protocols.TestSuites.Rdp.ProtocolBasedRdpSUTControlAdapter implements Microsoft.Protocols.TestSuites.Rdp.IRdpSutControlAdapter
+2026-10-15 12:38:35.085    [CheckSucceeded] Assume.IsTrue succeeded. When TLS is used as the security protocol, Protocol is set to 'TLS', Negotiation must be true.
+2026-10-15 12:38:35.118    [Debug] isClientSupportFastPathInput = True;
+                isClientSuportAutoReconnect = True;
+                isClientSupportRDPEFS = False;
+                isClientSupportServerRedirection = True;
+                isClientSupportEmptyRdpNegData = False;
+                isClientSupportSoftSync = True
+                isClientSupportTunnelingStaticVCTraffic = True
+2026-10-15 12:38:35.119    [Debug] Start to invoke target method add_ConfirmActiveRequest, timeout: 2
+2026-10-15 12:38:35.119    [Debug] Complete invoke target method add_ConfirmActiveRequest.
+2026-10-15 12:38:35.120    [Debug] Start to invoke target method SetCompressionValue, timeout: 2
+2026-10-15 12:38:35.120    [Debug] Complete invoke target method SetCompressionValue.
+2026-10-15 12:38:35.122    [Debug] Start to invoke target method TurnVerificationOff, timeout: 2
+2026-10-15 12:38:35.122    [Debug] Complete invoke target method TurnVerificationOff.
+2026-10-15 12:38:35.123    [Comment] Starting RDP listening with transport protocol: NegotiationTls
+2026-10-15 12:38:35.123    [Debug] Start to invoke target method StartRDPListening, timeout: 2
+2026-10-15 12:38:35.280    [Debug] The IP version is Ipv4.
+2026-10-15 12:38:35.280    [Debug] RDP server is listening on 0.0.0.0:58728.
+2026-10-15 12:38:35.280    [Debug] Complete invoke target method StartRDPListening.
+2026-10-15 12:38:35.282    [Comment] Triggering SUT to initiate a RDP connection to server.
+2026-10-15 12:38:35.286    [Debug] Start to invoke target method RDPConnectWithNegotiationApproach, timeout: 2
+2026-10-15 12:38:35.293    [Comment] Preparing RDP Connection To Server.
+2026-10-15 12:38:35.308    [Comment] RDP SUT Control Protocol Adapter: CommandId is 1: Success, agent: 127.0.0.1:58729.
+2026-10-15 12:38:35.308    [Comment] Complete RDP Connection To Server.
+2026-10-15 12:38:35.310    [Debug] Complete invoke target method RDPConnectWithNegotiationApproach.
+2026-10-15 12:38:35.312    [CheckSucceeded] Assert.IsTrue succeeded. SUT Control Adapter: RDPConnectWithNegotiationApproach should be successful: 1.
+2026-10-15 12:38:35.312    [Comment] Expecting SUT to start a transport layer connection request (TCP).
+2026-10-15 12:38:35.313    [Debug] Start to invoke target method ExpectTransportConnection, timeout: 2
+2026-10-15 12:38:35.934    [Debug] A RDP client initiates a connection. The local endpoint is 127.0.0.1:58728. The remote endpoint is 127.0.0.1:58744
+2026-10-15 12:38:35.934    [Debug] Complete invoke target method ExpectTransportConnection.
+2026-10-15 12:38:35.935    [Comment] Expecting SUT to send a Client X.224 Connection Request PDU
+2026-10-15 12:38:35.935    [Debug] Start to invoke target method ExpectPacket, timeout: 2
+2026-10-15 12:38:35.937    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_X_224_Connection_Request_Pdu
+2026-10-15 12:38:35.939    [Debug] CheckX224ConnectionRequestPdu
+2026-10-15 12:38:35.939    [CheckSucceeded] Assert.AreEqual succeeded. [In Client X.224 Connection Request PDU] x224Crq (7 bytes): An X.224 Class 0 Connection Request transport protocol data unit (TPDU), as specified in [X224] section 13.3.
+2026-10-15 12:38:35.940    [CheckSucceeded] Assert.AreEqual succeeded. [In RDP Negotiation Request] type ( 1 byte): it MUST be set to 0x01 (TYPE_RDP_NEG_REQ) to indicate that the packet is a Negotiation Request.
+2026-10-15 12:38:35.940    [CheckSucceeded] Assert.IsTrue succeeded. [In RDP Negotiation Request] flags (1 byte): An 8-bit, unsigned integer that contains protocol flags. this flags field  MUST be set to 0x00 or CORRELATION_INFO_PRESENT(0x08).
+2026-10-15 12:38:35.941    [CheckSucceeded] Assert.AreEqual succeeded. [In RDP Negotiation Request] length (2 bytes): length MUST be set to 0x0008 (8 bytes).
+2026-10-15 12:38:35.941    [CheckSucceeded] Assert.IsTrue succeeded. In RDP Negotiation Request the requestedProtocols can take combining of the following flags. 1. PROTOCOL_RDP_FLAG 0x00000000 Legacy RDP encryption 2. PROTOCOL_SSL_FLAG 0x00000001  TLS 1.0. 3. PROTOCOL_HYBRID_FLAG 0x00000002  CredSSP.  4. PROTOCOL_RDSTLS 0x00000004  RDSTLS.
+2026-10-15 12:38:35.942    [Debug] Complete invoke target method ExpectPacket.
+2026-10-15 12:38:35.943    [Comment] Sending Server X.224 Connection Confirm PDU to SUT. Selected protocol: PROTOCOL_SSL_FLAG; Extended Client Data supported: true
+2026-10-15 12:38:35.949    [Debug] Start to invoke target method Server_X_224_Connection_Confirm, timeout: 2
+2026-10-15 12:38:36.101    [Debug] Complete invoke target method Server_X_224_Connection_Confirm.
+2026-10-15 12:38:36.102    [Comment] Expecting SUT to send a Client MCS Connect Initial PDU.
+2026-10-15 12:38:36.102    [Debug] Start to invoke target method ExpectPacket, timeout: 2
+2026-10-15 12:38:36.118    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_MCS_Connect_Initial_Pdu_with_GCC_Conference_Create_Request
+2026-10-15 12:38:36.119    [Debug] CheckMCSConnectInitialPdu
+2026-10-15 12:38:36.119    [Checkpoint] @Capture Succeed: [In RDP Negotiation Request] The RDP Negotiation Request structure is used by a client to advertise the security protocols which it supports.
+2026-10-15 12:38:36.119    [CheckSucceeded] Assert.IsTrue succeeded. In TS_UD_HEADER, the type field can take one of the following values: CS_CORE 0xC001,CS_SECURITY 0xC002,CS_NET 0xC003,CS_CLUSTER 0xC004,SC_CORE 0x0C01,SC_SECURITY 0x0C02,SC_NET 0xOC03
+2026-10-15 12:38:36.120    [CheckSucceeded] Assert.AreEqual succeeded. In TS_UD_HEADER, if the type is CS_CORE0xC001 then the data block which follows User Data Header (TS_UD_HEADER) contains Client Core Data
+2026-10-15 12:38:36.120    [CheckSucceeded] Assert.AreEqual succeeded. In TS_UD_HEADER, if the type is CS_SECURITY 0xC002 then the data block which follows User Data Header (TS_UD_HEADER) contains Client Security Data
+2026-10-15 12:38:36.120    [CheckSucceeded] Assert.AreEqual succeeded. In TS_UD_HEADER, if the type is CS_NET 0xC003 then the data block which follows contains User Data Header (TS_UD_HEADER) Client Network Data.
+2026-10-15 12:38:36.120    [CheckSucceeded] Assert.AreEqual succeeded. In TS_UD_HEADER, if the type is CS_CLUSTER 0xC004 then the data block which follows User Data Header (TS_UD_HEADER) contains Client Cluster Data.
+2026-10-15 12:38:36.122    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data, The User Data Header type field MUST be set to CS_CORE (0xC001).
+2026-10-15 12:38:36.123    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data, RDP client version number should be one of: 00080001, 00080004, 00080005, 00080006, 00080007, 00080008, 00080009, 0008000A, 0008000B, 0008000C, 0008000D, 0008000E, 0008000F, 00080010, 00080011.
+2026-10-15 12:38:36.123    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data, desktopWidth must be positive.
+2026-10-15 12:38:36.124    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data, desktopHeight must be positive.
+2026-10-15 12:38:36.124    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data (TS_UD_CS_CORE), colorDepth (2 bytes): colorDepth field can have the following values :\r\n1.RNS_UD_COLOR_4BPP 0xCA00.\r\n2.RNS_UD_COLOR_8BPP 0xCA01.
+2026-10-15 12:38:36.124    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data, SASSequence SHOULD be set to RNS_UD_SAS_DEL (0xAA03).
+2026-10-15 12:38:36.124    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data,  clientName field contains up to 15 Unicode characters plus a null terminator.
+2026-10-15 12:38:36.124    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data,  keyboardType can take one of the following values:
+2026-10-15 12:38:36.124    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data, the imeFileName field contains up to 31 Unicode characters plus a null terminator.
+2026-10-15 12:38:36.124    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data, postBeta2ColorDepth can take one of the following values: RNS_UD_COLOR_4BPP 0xCA00, RNS_UD_COLOR_8BPP 0xCA01, RNS_UD_COLOR_16BPP_555 0xCA02, RNS_UD_COLOR_16BPP_565 0xCA03, RNS_UD_COLOR_24BPP 0xCA04
+2026-10-15 12:38:36.124    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data,  clientProductId SHOULD be initialized to 1.
+2026-10-15 12:38:36.125    [CheckSucceeded] Assert.AreEqual succeeded. In Client Core Data, serialNumber SHOULD be initialized to 0. 
+2026-10-15 12:38:36.125    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data, highColorDepth can have one of the following values 4,8,15,16,24
+2026-10-15 12:38:36.125    [CheckSucceeded] Assert.IsTrue succeeded. In Client Core Data, supportedColorDepths can have one of the following values RNS_UD_24BPP_SUPPORT 0x0001, RNS_UD_16BPP_SUPPORT 0x0002, RNS_UD_15BPP_SUPPORT 0x0004, RNS_UD_32BPP_SUPPORT 0x0008
+2026-10-15 12:38:36.125    [CheckSucceeded] Assert.IsTrue succeeded. [In Client Core Data (TS_UD_CS_CORE)] earlyCapabilityFlags (2 bytes):In Client Core Data, the earlyCapabilityFlags can be any of the following values: RNS_UD_CS_SUPPORT_ERRINFO_PDU 0x0001, RNS_UD_CS_WANT_32BPP_SESSION 0x0002, RNS_UD_CS_SUPPORT_STATUSINFO_PDU 0x0004, RNS_UD_CS_STRONG_ASYMMETRIC_KEYS 0x0008, RNS_UD_CS_VALID_CONNECTION_TYPE 0x0020, RNS_UD_CS_SUPPORT_MONITOR_LAYOUT_PDU 0x0040
+2026-10-15 12:38:36.126    [CheckSucceeded] Assert.AreEqual succeeded. In Client Security Data (TS_UD_CS_SEC), User Data Header type field MUST be set to CS_SECURITY (0xC002).
+2026-10-15 12:38:36.126    [CheckSucceeded] Assert.IsTrue succeeded. In French locale clients, encryptionMethods MUST be set to zero and extEncryptionMethods MUST be specified at least one of the following values:\r\n40BIT_ENCRYPTION_FLAG 0x00000001,\r\n128BIT_ENCRYPTION_FLAG 0x0000000,\r\n256BIT_ENCRYPTION_FLAG 0x00000008,\r\nFIPS_ENCRYPTION_FLAG 0x00000010
+2026-10-15 12:38:36.126    [CheckSucceeded] Assert.AreEqual succeeded. In Client Network Data (TS_UD_CS_NET), the User Data Header type field MUST be set to CS_NET (0xC003).
+2026-10-15 12:38:36.126    [CheckSucceeded] Assert.IsTrue succeeded. [In Client Network Data (TS_UD_CS_NET)]channelCount (4 bytes): In Client Network Data, the maximum allowed value for channelCount is 31.
+2026-10-15 12:38:36.126    [CheckSucceeded] Assert.AreEqual succeeded. In Client Network Data, the number of CHANNEL_DEF structures which follows is given by the channelCount field.
+2026-10-15 12:38:36.127    [CheckSucceeded] Assert.IsTrue succeeded. In Channel Definition Structure (CHANNEL_DEF), the options field can take one of the following values CHANNEL_OPTION_INITIALIZED 0x80000000, CHANNEL_OPTION_ENCRYPT_RDP 0x40000000, CHANNEL_OPTION_ENCRYPT_SC 0x20000000, CHANNEL_OPTION_ENCRYPT_CS 0x10000000, CHANNEL_OPTION_PRI_HIGH 0x08000000, CHANNEL_OPTION_PRI_MED 0x04000000,CHANNEL_OPTION_PRI_LOW 0x02000000, CHANNEL_OPTION_COMPRESS_RDP 0x00800000, CHANNEL_OPTION_COMPRESS 0x00400000, CHANNEL_OPTION_SHOW_PROTOCOL 0x00200000, REMOTE_CONTROL_PERSISTENT 0x00100000
+2026-10-15 12:38:36.127    [CheckSucceeded] Assert.IsTrue succeeded. In Channel Definition Structure (CHANNEL_DEF), the options field can take one of the following values CHANNEL_OPTION_INITIALIZED 0x80000000, CHANNEL_OPTION_ENCRYPT_RDP 0x40000000, CHANNEL_OPTION_ENCRYPT_SC 0x20000000, CHANNEL_OPTION_ENCRYPT_CS 0x10000000, CHANNEL_OPTION_PRI_HIGH 0x08000000, CHANNEL_OPTION_PRI_MED 0x04000000,CHANNEL_OPTION_PRI_LOW 0x02000000, CHANNEL_OPTION_COMPRESS_RDP 0x00800000, CHANNEL_OPTION_COMPRESS 0x00400000, CHANNEL_OPTION_SHOW_PROTOCOL 0x00200000, REMOTE_CONTROL_PERSISTENT 0x00100000
+2026-10-15 12:38:36.127    [CheckSucceeded] Assert.IsTrue succeeded. In Channel Definition Structure (CHANNEL_DEF), the options field can take one of the following values CHANNEL_OPTION_INITIALIZED 0x80000000, CHANNEL_OPTION_ENCRYPT_RDP 0x40000000, CHANNEL_OPTION_ENCRYPT_SC 0x20000000, CHANNEL_OPTION_ENCRYPT_CS 0x10000000, CHANNEL_OPTION_PRI_HIGH 0x08000000, CHANNEL_OPTION_PRI_MED 0x04000000,CHANNEL_OPTION_PRI_LOW 0x02000000, CHANNEL_OPTION_COMPRESS_RDP 0x00800000, CHANNEL_OPTION_COMPRESS 0x00400000, CHANNEL_OPTION_SHOW_PROTOCOL 0x00200000, REMOTE_CONTROL_PERSISTENT 0x00100000
+2026-10-15 12:38:36.127    [CheckSucceeded] Assert.AreEqual succeeded. In Client Cluster Data (TS_UD_CS_CLUSTER), the User Data Header type field MUST be set to CS_CLUSTER (0xC004).
+2026-10-15 12:38:36.127    [CheckSucceeded] Assert.IsTrue succeeded. In Client Cluster Data (TS_UD_CS_CLUSTER), the flags field can take any of the following values: REDIRECTION_SUPPORTED 0x00000001, ServerSessionRedirectionVersionMask 0x0000003C, REDIRECTED_SESSIONID_FIELD_VALID 0x00000002, REDIRECTED_SMARTCARD 0x00000040
+2026-10-15 12:38:36.130    [Debug] Complete invoke target method ExpectPacket.
+2026-10-15 12:38:36.130    [Comment] Sending Server MCS Connect Response PDU to SUT. Encryption Method ENCRYPTION_METHOD_NONE; Encryption Level: ENCRYPTION_LEVEL_NONE; RDP Version Code: V2.
+2026-10-15 12:38:36.131    [Debug] Start to invoke target method Server_MCS_Connect_Response, timeout: 2
+2026-10-15 12:38:36.304    [Debug] Complete invoke target method Server_MCS_Connect_Response.
+2026-10-15 12:38:36.304    [Comment] Expecting SUT to send a Client MCS Erect Domain Request PDU.
+2026-10-15 12:38:36.304    [Debug] Start to invoke target method ExpectPacket, timeout: 2
+2026-10-15 12:38:36.305    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_MCS_Erect_Domain_Request
+2026-10-15 12:38:36.305    [Debug] Complete invoke target method ExpectPacket.
+2026-10-15 12:38:36.305    [Comment] Expecting SUT to send a Client MCS Attach User Request PDU.
+2026-10-15 12:38:36.305    [Debug] Start to invoke target method ExpectPacket, timeout: 2
+2026-10-15 12:38:36.305    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_MCS_Attach_User_Request
+2026-10-15 12:38:36.305    [Debug] Complete invoke target method ExpectPacket.
+2026-10-15 12:38:36.306    [Comment] Sending Server MCS Channel Join Confirm PDU to SUT.
+2026-10-15 12:38:36.306    [Debug] Start to invoke target method MCSAttachUserConfirm, timeout: 2
+2026-10-15 12:38:36.411    [Debug] Complete invoke target method MCSAttachUserConfirm.
+2026-10-15 12:38:36.412    [Comment] Expect SUT to start the  channel join sequence.
+2026-10-15 12:38:36.412    [Debug] Start to invoke target method ChannelJoinRequestAndConfirm, timeout: 2
+2026-10-15 12:38:36.413    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_MCS_Channel_Join_Request
+2026-10-15 12:38:36.519    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_MCS_Channel_Join_Request
+2026-10-15 12:38:36.623    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_MCS_Channel_Join_Request
+2026-10-15 12:38:36.727    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_MCS_Channel_Join_Request
+2026-10-15 12:38:36.830    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_MCS_Channel_Join_Request
+2026-10-15 12:38:36.934    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_MCS_Channel_Join_Request
+2026-10-15 12:38:37.038    [Debug] Complete invoke target method ChannelJoinRequestAndConfirm.
+2026-10-15 12:38:37.042    [Comment] Expecting SUT to send Client a Client Info PDU.
+2026-10-15 12:38:37.042    [Debug] Start to invoke target method ExpectPacket, timeout: 2
+2026-10-15 12:38:37.043    [CheckSucceeded] Assert.IsInstanceOfType succeeded. Receiving Client_Info_Pdu
+2026-10-15 12:38:37.044    [CheckSucceeded] Assert.IsTrue succeeded. [In Client Info PDU Data (CLIENT_INFO_PDU)]securityHeader (variable):   This field MUST contain one of the following headers:[Basic Security Header,Non-FIPS Security Header, FIPS Security Header ].
+2026-10-15 12:38:37.044    [CheckSucceeded] Assert.IsTrue succeeded. The securityHeader in CLIENT_INFO_PDU structure is a Basic Security Header if the Encryption Level  selected by the server is ENCRYPTION_LEVEL_NONE (0).
+2026-10-15 12:38:37.045    [CheckSucceeded] Assert.AreEqual succeeded. In the TS_INFO_PACKET structure, cbDomain represents the size in bytes of the character data in the Domain field. This size excludes the length of the mandatory null terminator.
+2026-10-15 12:38:37.045    [CheckSucceeded] Assert.AreEqual succeeded. In the TS_INFO_PACKET structure, cbUserName represents the size in bytes of the character data in the UserName field. This size excludes the length of the mandatory null terminator.
+2026-10-15 12:38:37.045    [CheckSucceeded] Assert.AreEqual succeeded. In the TS_INFO_PACKET structure, cbPassword represents the size in bytes of the character data in the Password field. This size excludes the length of the mandatory null terminator.
+2026-10-15 12:38:37.046    [CheckSucceeded] Assert.AreEqual succeeded. In the TS_INFO_PACKET structure, cbAlternateShell represents the size in bytes of the character data in the AlternateShell field. This size excludes the length of the mandatory null terminator.
+2026-10-15 12:38:37.046    [CheckSucceeded] Assert.AreEqual succeeded. In the TS_INFO_PACKET structure, cbWorkingDir represents the size in bytes of the character data in the WorkingDir field. This size excludes the length of the mandatory null terminator.
+2026-10-15 12:38:37.048    [CheckSucceeded] Assert.IsTrue succeeded. In the TS_INFO_PACKET structure, Domain field MUST contain at least a null terminator character in ANSI or Unicode format (depending on the presence of the INFO_UNICODE flag)
+2026-10-15 12:38:37.048    [CheckSucceeded] Assert.IsTrue succeeded. In the TS_INFO_PACKET structure, UserName field MUST contain at least a null terminator character in ANSI or Unicode format (depending on the presence of the INFO_UNICODE flag)
+2026-10-15 12:38:37.048    [CheckSucceeded] Assert.IsTrue succeeded. In the TS_INFO_PACKET structure, Password field MUST contain at least a null terminator character in ANSI or Unicode format (depending on the presence of the INFO_UNICODE flag)
+2026-10-15 12:38:37.048    [CheckSucceeded] Assert.IsTrue succeeded. In the TS_INFO_PACKET structure, for AlternateShell, the maximum allowed length is 512 bytes (including the mandatory null terminator).
+2026-10-15 12:38:37.048    [CheckSucceeded] Assert.IsTrue succeeded. In the TS_INFO_PACKET structure, AlternateShell field MUST contain at least a null terminator character in ANSI or Unicode format (depending on the presence of the INFO_UNICODE flag)
+2026-10-15 12:38:37.048    [CheckSucceeded] Assert.IsTrue succeeded. In the TS_INFO_PACKET structure, WorkingDir field MUST contain at least a null terminator character in ANSI or Unicode format (depending on the presence of the INFO_UNICODE flag)
+2026-10-15 12:38:37.048    [CheckSucceeded] Assert.IsTrue succeeded. [In Extended Info Packet (TS_EXTENDED_INFO_PACKET)]clientAddressFamily (2 bytes):clientAddressFamily can have the following values: 1.AF_INET 0x00002 2.AF_INET6 0x0017
+2026-10-15 12:38:37.049    [CheckSucceeded] Assert.IsTrue succeeded. [In Extended Info Packet (TS_EXTENDED_INFO_PACKET)] clientDir (variable):The maximum allowed length is 512 bytes (including the mandatory null terminator).
+2026-10-15 12:38:37.049    [CheckSucceeded] Assert.IsTrue succeeded. [Extended Info Packet (TS_EXTENDED_INFO_PACKET)]autoReconnectCookie (28 bytes):the maximum allowed length is 128 bytes.
+2026-10-15 12:38:37.050    [Debug] Complete invoke target method ExpectPacket.
+2026-10-15 12:38:37.050    [Comment] Sending a Server License Error Pdu - Valid Client to SUT.
+2026-10-15 12:38:37.051    [Debug] Start to invoke target method Server_License_Error_Pdu_Valid_Client, timeout: 2
+2026-10-15 12:38:37.167    [Debug] Complete invoke target method Server_License_Error_Pdu_Valid_Client.
+2026-10-15 12:38:37.168    [Comment] Setting Server Capability.
+2026-10-15 12:38:37.169    [Debug] Start to invoke target method SetServerCapability, timeout: 2
+2026-10-15 12:38:37.169    [Comment] SetServerCapability(
+                supportServerBitmapCacheHost = True;
+                supportFastPathInput = True;
+                supportScancode = True;
+                supportExtendedMouse = True;
+                supportUnicodeKeyboard = True;
+                supportAutoReconnect = True;
+                supportRefreshRect = True;
+                supportSuppressOoutput = True;
+                supportVCComression = True;
+                presentVCChunksize = True).
+2026-10-15 12:38:37.170    [Debug] Complete invoke target method SetServerCapability.
+2026-10-15 12:38:37.170    [Comment] Sending a Server Demand Active PDU to SUT.
+2026-10-15 12:38:37.172    [Debug] Start to invoke target method Server_Demand_Active, timeout: 2
+2026-10-15 12:38:37.295    [Debug] Complete invoke target method Server_Demand_Active.
+2026-10-15 12:38:37.296    [Comment] Expect RDP client to drop the connection
+2026-10-15 12:38:37.297    [Debug] Start to invoke target method WaitForDisconnection, timeout: 2
+2026-10-15 12:38:37.298    [Debug] Complete invoke target method WaitForDisconnection.
+2026-10-15 12:38:37.304    [Comment] Trigger client to close all RDP connections for clean up.
+2026-10-15 12:38:37.305    [Debug] Start to invoke target method TriggerClientDisconnectAll, timeout: 2
+2026-10-15 12:38:37.441    [Comment] RDP SUT Control Protocol Adapter: CommandId is 2: Success, agent: 127.0.0.1:58729.
+2026-10-15 12:38:37.441    [Debug] Complete invoke target method TriggerClientDisconnectAll.
+2026-10-15 12:38:37.442    [Debug] The result of TriggerClientDisconnectAll is 1.
+2026-10-15 12:38:37.443    [Comment] Stop RDP listening.
+2026-10-15 12:38:37.445    [Debug] Start to invoke target method StopRDPListening, timeout: 2
+2026-10-15 12:38:37.447    [Debug] Complete invoke target method StopRDPListening.
+2026-10-15 12:38:37.450    [TestPassed] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength
+2026-10-15 12:38:37.450 [ExitMethod] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength
+2026-10-15 12:38:37.511 [Comment] Actual time taken for the test suite execution (in seconds) is: 3.547267
+2026-10-15 12:38:37.520 [Comment] begin output test statistics.
+2026-10-15 12:38:37.521 [Comment] PTFTestResult.TestsExecuted: 1
+2026-10-15 12:38:37.523 [Comment] PTFTestResult.TestsPassed: 1

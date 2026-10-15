@@ -1,0 +1,37 @@
+{
+  "suite_bin": "/Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/.cache/suite/Bin",
+  "sdk": "8.0.425",
+  "assembly_sha256": {
+    "RDP_ClientAdapter.dll": "3610731e6f608e7a81659c5c5392f44bd914edb55df3ac899248e2a09cd65b2b",
+    "Microsoft.Protocols.TestTools.StackSdk.dll": "d0b9e57412a062959bce6ee215e7f436d42d91d25ae4001434b46598e5b78b7f",
+    "Microsoft.Protocols.TestTools.StackSdk.Transport.dll": "1e9739c9f3b12c6d233a0b79562dd6d845347304adbbe0622648c7f1dae56714",
+    "Microsoft.Protocols.TestTools.StackSdk.RemoteDesktop.Rdpbcgr.dll": "8893fbc94645eeed3ec4b575a60337274b37c7443bd0ff3bd3d2010085f7502a"
+  },
+  "program_sha256": "c0ad6458ea8e70963b667d651a3b2f55b2ea32c57d068d035b586e18dbe7f544",
+  "exit_code": 1,
+  "passed": [
+    "disconnect_positive_remains_9_bytes",
+    "provider_disconnect_positive_remains_9_bytes",
+    "pointer_positive_remains_40_bytes",
+    "pointer_mcs_negative_remains_independent",
+    "pointer_x224_negative_remains_independent"
+  ],
+  "failed": [
+    "disconnect_negative_declares_8_of_9_bytes: System.Exception: Expected declared size 8, got 65535",
+    "provider_disconnect_negative_declares_8_of_9_bytes: System.Exception: Expected declared size 8, got 65535",
+    "pointer_negative_declares_39_of_40_bytes: System.Exception: Expected declared size 39, got 65535",
+    "encrypted_pointer_serializes_once_and_only_tpkt_length_changes: System.Exception: Expected declared size 51, got 65535"
+  ],
+  "frames": [
+    "actual=9 declared=9 hex=0300000902F0802180",
+    "actual=9 declared=65535 hex=0300FFFF02F0802180",
+    "actual=9 declared=9 hex=0300000902F0802080",
+    "actual=9 declared=65535 hex=0300FFFF02F0802080",
+    "actual=40 declared=40 hex=0300002802F08068000103EB701A1A001700EA030000000000021A001B0000000300000032003200",
+    "actual=40 declared=65535 hex=0300FFFF02F08068000103EB701A1A001700EA030000000000021A001B0000000300000032003200",
+    "actual=40 declared=40 hex=0300002802F08068000103EB70191A001700EA030000000000021A001B0000000300000032003200",
+    "actual=52 declared=52 hex=0300003402F08068000103EB702608000000C5D7988A22CC454F4EABADD37E2F26FBE8637A0C92EFF177EC0957ADB18341454786",
+    "actual=52 declared=65535 hex=0300FFFF02F08068000103EB702608000000C5D7988A22CC454F4EABADD37E2F26FBE8637A0C92EFF177EC0957ADB18341454786",
+    "actual=40 declared=40 hex=0300002801F08068000103EB701A1A001700EA030000000000021A001B0000000300000032003200"
+  ]
+}

@@ -9,7 +9,9 @@ from profiles import PIN, options_for, profile_cases, suite_patches
 
 class QualificationTests(unittest.TestCase):
     def test_every_enabled_case_has_passing_evidence_for_its_actual_options(self):
-        record = json.loads((Path(__file__).parent/'validation-batches.json').read_text())
+        root = Path(__file__).parent
+        config = json.loads((root/'catalog-config.json').read_text())
+        record = json.loads((root/config['qualification']['record']).read_text())
         selected = profile_cases('extended')
         self.assertEqual(set(record['qualification']['passed_cases_in_both_modes']), set(selected))
         self.assertEqual(record['profiles']['extended_cases'], len(selected))

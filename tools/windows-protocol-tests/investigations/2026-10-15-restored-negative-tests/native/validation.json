@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-15",
+  "source_parent_revision": "ca4493273d0717c05be3374e42b78f02ff2ad881",
+  "os": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0.1\nBuildVersion:\t\t26A434\n",
+  "core_ctests": {
+    "passed": 8,
+    "failed": 0
+  },
+  "packet_length_scenarios": 84,
+  "original_code_controls": {
+    "rdp": "Failed as expected",
+    "connection": "Failed as expected",
+    "rdp_connection": "Failed as expected"
+  },
+  "artifacts_sha256": {
+    "libfreerdp/core/rdp.c": "ea80a0cc541aaaae183271ef345ec008a77ee947a56327a771fe0f4d8c610f9a",
+    "libfreerdp/core/connection.c": "31836b4b8c5d5a8617fbedfbbb07fc2683f155f3d3e720534d913083bd52b7ad",
+    "libfreerdp/core/test/TestRdpPacketLengths.c": "cecc8ad6e09ee7ae9957fb55a25676d060e28a11475035ff7dcf74d4c0a7157e",
+    "libfreerdp/core/test/CMakeLists.txt": "69666b99157e0720f333b7ba4d31929a94c75740b1d148fa074d63e519009980",
+    "build/protocol-tests/client/SDL/SDL3/sdl-freerdp": "78f30106584cbb9e1fb1ce33ff323809bfaedf27e5f5291a1c12bc5273b4c592",
+    "build/protocol-tests/libfreerdp/libfreerdp3.3.31.2.dylib": "6fbdc2ba8e314eb4c58d50591ec83d7b9aac24c5689a5f23bbc9870a4ed73372",
+    "build/protocol-tests/client/common/libfreerdp-client3.3.31.2.dylib": "a29a4859a79cdc997539601fbc091549a75bdfdd170e448b6adc9aff453a00df",
+    "build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib": "c39d7b2ed60ea335ae17b18fd96f473a9a8b3d80500c42db4c7fcd65cf2ff076"
+  },
+  "test_configuration": {
+    "BUILD_TESTING": "OFF",
+    "BUILD_TESTING_INTERNAL": "ON",
+    "WITH_GFX_AV1": "OFF",
+    "WITH_GFX_AZURE": "OFF"
+  }
+}

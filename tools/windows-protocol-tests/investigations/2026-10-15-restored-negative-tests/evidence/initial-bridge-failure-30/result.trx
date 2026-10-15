@@ -1,0 +1,299 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="d8a26a21-014e-4ab6-9eb4-62d0d295a22c" name="@Davids-MacBook-Air 2026-10-15 12:41:16" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-15T12:41:16.6031790+02:00" queuing="2026-10-15T12:41:16.6031800+02:00" start="2026-10-15T12:41:04.2526000+02:00" finish="2026-10-15T12:41:16.6114390+02:00" />
+  <TestSettings name="default" id="e6966e9d-3433-4b22-829a-b23f014b2efb">
+    <Deployment runDeploymentRoot="_Davids-MacBook-Air_2026-10-15_12_41_16" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="6e7f1694-f79e-4f8b-8ba6-61a14c90adcb" testId="9b1e4072-97bb-723a-fd44-8f289690b1f8" testName="S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport" computerName="Davids-MacBook-Air" duration="00:00:10.4368965" startTime="2026-10-15T12:41:04.9292270+02:00" endTime="2026-10-15T12:41:16.4964200+02:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="6e7f1694-f79e-4f8b-8ba6-61a14c90adcb">
+      <Output>
+        <StdOut>2026-10-15 12:41:06.036 [TestInProgress] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport&#xD;
+2026-10-15 12:41:06.062 [Comment] Adapter Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter implements Microsoft.Protocols.TestSuites.Rdpbcgr.IRdpbcgrAdapter&#xD;
+2026-10-15 12:41:06.076 [Comment] Adapter Microsoft.Protocols.TestSuites.Rdp.ProtocolBasedRdpSUTControlAdapter implements Microsoft.Protocols.TestSuites.Rdp.IRdpSutControlAdapter&#xD;
+2026-10-15 12:41:06.083 [CheckSucceeded] Assume.IsTrue succeeded. When TLS is used as the security protocol, Protocol is set to 'TLS', Negotiation must be true.&#xD;
+2026-10-15 12:41:06.129 [Debug] isClientSupportFastPathInput = True;
+                isClientSuportAutoReconnect = True;
+                isClientSupportRDPEFS = False;
+                isClientSupportServerRedirection = True;
+                isClientSupportEmptyRdpNegData = False;
+                isClientSupportSoftSync = True
+                isClientSupportTunnelingStaticVCTraffic = True&#xD;
+2026-10-15 12:41:06.133 [Debug] Start to invoke target method add_ConfirmActiveRequest, timeout: 2&#xD;
+2026-10-15 12:41:06.133 [Debug] Complete invoke target method add_ConfirmActiveRequest.&#xD;
+2026-10-15 12:41:06.134 [Debug] Start to invoke target method SetCompressionValue, timeout: 2&#xD;
+2026-10-15 12:41:06.134 [Debug] Complete invoke target method SetCompressionValue.&#xD;
+2026-10-15 12:41:06.134 [Debug] Start to invoke target method TurnVerificationOff, timeout: 2&#xD;
+2026-10-15 12:41:06.135 [Debug] Complete invoke target method TurnVerificationOff.&#xD;
+2026-10-15 12:41:06.135 [Comment] Setting Server Capability.&#xD;
+2026-10-15 12:41:06.135 [Debug] Start to invoke target method SetServerCapability, timeout: 2&#xD;
+2026-10-15 12:41:06.136 [Comment] SetServerCapability(
+                supportServerBitmapCacheHost = True;
+                supportFastPathInput = True;
+                supportScancode = True;
+                supportExtendedMouse = True;
+                supportUnicodeKeyboard = True;
+                supportAutoReconnect = True;
+                supportRefreshRect = True;
+                supportSuppressOoutput = True;
+                supportVCComression = True;
+                presentVCChunksize = True).&#xD;
+2026-10-15 12:41:06.136 [Debug] Complete invoke target method SetServerCapability.&#xD;
+2026-10-15 12:41:06.136 [Comment] Generate Capability sets,CompDeskSupportLevel of TS_COMPDESK_CAPABILITYSET is set to COMPDESK_NOT_SUPPORTED (0x0000)..&#xD;
+2026-10-15 12:41:06.136 [Debug] Start to invoke target method GenerateServerCapSet, timeout: 2&#xD;
+2026-10-15 12:41:06.139 [Debug] Complete invoke target method GenerateServerCapSet.&#xD;
+2026-10-15 12:41:06.140 [Comment] Establish RDP connection to test capability sets.&#xD;
+2026-10-15 12:41:06.141 [Comment] Starting RDP listening with transport protocol: NegotiationTls&#xD;
+2026-10-15 12:41:06.141 [Debug] Start to invoke target method StartRDPListening, timeout: 2&#xD;
+2026-10-15 12:41:06.274 [Debug] The IP version is Ipv4.&#xD;
+2026-10-15 12:41:06.275 [Debug] RDP server is listening on 0.0.0.0:59164.&#xD;
+2026-10-15 12:41:06.275 [Debug] Complete invoke target method StartRDPListening.&#xD;
+2026-10-15 12:41:06.275 [Comment] Triggering SUT to initiate a RDP connection to server.&#xD;
+2026-10-15 12:41:06.276 [Debug] Start to invoke target method RDPConnectWithNegotiationApproach, timeout: 2&#xD;
+2026-10-15 12:41:06.278 [Comment] Preparing RDP Connection To Server.&#xD;
+2026-10-15 12:41:06.285 [Comment] RDP SUT Control Protocol Adapter: CommandId is 1: Success, agent: 127.0.0.1:59165.&#xD;
+2026-10-15 12:41:06.285 [Comment] Complete RDP Connection To Server.&#xD;
+2026-10-15 12:41:06.285 [Debug] Complete invoke target method RDPConnectWithNegotiationApproach.&#xD;
+2026-10-15 12:41:06.285 [CheckSucceeded] Assert.IsTrue succeeded. SUT Control Adapter: RDPConnectWithNegotiationApproach should be successful: 1.&#xD;
+2026-10-15 12:41:06.285 [Comment] Expecting SUT to start a transport layer connection request (TCP).&#xD;
+2026-10-15 12:41:06.286 [Debug] Start to invoke target method ExpectTransportConnection, timeout: 2&#xD;
+2026-10-15 12:41:06.287 [Warning] Excetpion thrown out when expect Connection. There's an exception thrown when receiving a packet.&#xD;
+2026-10-15 12:41:16.287 [CheckFailed] Assert.Fail failed. Timeout when expecting Connection&#xD;
+2026-10-15 12:41:16.296 [Comment]    at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 288
+&#xD;
+2026-10-15 12:41:16.401 [Debug] Microsoft.VisualStudio.TestTools.UnitTesting.AssertFailedException: Assert.Fail failed. Timeout when expecting Connection&#xD;
+===== Stack Trace =====&#xD;
+   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 288
+=== End of Stack Trace ===&#xD;
+
+   at Microsoft.Protocols.TestTools.AsynchronousErrorProcessor.Process()
+   at Microsoft.Protocols.TestTools.AsynchronousErrorProcessor.ReportAsyncException(Exception checkerException)
+   at Microsoft.Protocols.TestTools.Checking.DefaultChecker`2.GenerateException(CheckResult checkResult, String message, Object[] parameters)
+   at Microsoft.Protocols.TestTools.Checking.DefaultChecker`2.Fail(String message, Object[] parameters)
+   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 302
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)&#xD;
+2026-10-15 12:41:16.408 [Comment] Trigger client to close all RDP connections for clean up.&#xD;
+2026-10-15 12:41:16.409 [Debug] Start to invoke target method TriggerClientDisconnectAll, timeout: 2&#xD;
+2026-10-15 12:41:16.411 [Comment] RDP SUT Control Protocol Adapter: CommandId is 2: Success, agent: 127.0.0.1:59165.&#xD;
+2026-10-15 12:41:16.411 [Debug] Complete invoke target method TriggerClientDisconnectAll.&#xD;
+2026-10-15 12:41:16.412 [Debug] The result of TriggerClientDisconnectAll is 1.&#xD;
+2026-10-15 12:41:16.412 [Comment] Stop RDP listening.&#xD;
+2026-10-15 12:41:16.412 [Debug] Start to invoke target method StopRDPListening, timeout: 2&#xD;
+2026-10-15 12:41:16.414 [Debug] Complete invoke target method StopRDPListening.&#xD;
+2026-10-15 12:41:16.415 [TestFailed] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport&#xD;
+2026-10-15 12:41:16.474 [Comment] Actual time taken for the test suite execution (in seconds) is: 11.528071&#xD;
+2026-10-15 12:41:16.475 [Settings] Test finished, begin output configuration properties.&#xD;
+2026-10-15 12:41:16.476 [Settings] PTFConfigProperties.SUTControl.AgentAddress: 127.0.0.1:59165&#xD;
+2026-10-15 12:41:16.476 [Settings] PTFConfigProperties.SUTControl.TransportType: TCP&#xD;
+2026-10-15 12:41:16.476 [Settings] PTFConfigProperties.SUTControl.ClientSupportRDPFile: false&#xD;
+2026-10-15 12:41:16.476 [Settings] PTFConfigProperties.SUTControl.AlwaysNeedResponse: true&#xD;
+2026-10-15 12:41:16.476 [Settings] PTFConfigProperties.Security.Negotiation: True&#xD;
+2026-10-15 12:41:16.476 [Settings] PTFConfigProperties.Security.Protocol: TLS&#xD;
+2026-10-15 12:41:16.476 [Settings] PTFConfigProperties.Security.Encryption.Level: None&#xD;
+2026-10-15 12:41:16.476 [Settings] PTFConfigProperties.Security.Encryption.Method: None&#xD;
+2026-10-15 12:41:16.476 [Settings] PTFConfigProperties.Security.IsClientToServerEncrypted: true&#xD;
+2026-10-15 12:41:16.476 [Settings] PTFConfigProperties.VerifySUTDisplay.Enable: false&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.VerifySUTDisplay.BitmapSavePath: ../../ScreenShot/&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.VerifySUTDisplay.IQA.Algorithm: MS-SSIM&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.VerifySUTDisplay.IQA.AssessValueThreshold: 0.98&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.VerifySUTDisplay.ShiftX: 0&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.VerifySUTDisplay.ShiftY: 0&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.AdapterInvokeTimeout: 2&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.TestName: RDP Client Endpoint Test&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.ProtocolName: RDP&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.Version: 10.6&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.ServerPort: 59164&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.IpVersion: Ipv4&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.IsWindowsImplementation: false&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.DropConnectionForInvalidRequest: true&#xD;
+2026-10-15 12:41:16.486 [Settings] PTFConfigProperties.ServerDomain: localhost&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.ServerUserName: wpts&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.ServerUserPassword: wpts&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.CertificatePath: /Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/results/restored-full-bridge-20261015/server.pfx&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.CertificatePassword: wpts&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.VerifyRdpbcgrMessage: true&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.SUTName: RDPClient&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.SUTUserName: administrator&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.SUTUserPassword: Password01!&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.SUTRedirectionGuid: RDSTLSForTestSuite&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.DriverComputerFullQualifiedDomainName: RDPServer.CONTOSO.com&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.DriverComputerNetBiosName: RDPServer&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.SUTSystemDrive: C&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.RDPConnectWithNegotiationApproach_Task: Negotiate_RDPConnect&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.RDPConnectWithNegotiationApproachInvalidAccount_Task: Negotiate_InvalidAccount_RDPConnect&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.RDPConnectWithDirectCredSSPInvalidAccount_Task: DirectCredSSP_InvalidAccount_RDPConnect&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.RDPConnectWithDirectCredSSP_Task: DirectCredSSP_RDPConnect&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.RDPConnectWithNegotiationApproachFullScreen_Task: Negotiate_FullScreen_RDPConnect&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.RDPConnectWithDirectCredSSPFullScreen_Task: DirectCredSSP_FullScreen_RDPConnect&#xD;
+2026-10-15 12:41:16.487 [Settings] PTFConfigProperties.TriggerClientAutoReconnect_Task: TriggerNetworkFailure&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.TriggerInputEvents_Task: TriggerInputEvents&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.TriggerClientDisconnectAll_Task: DisconnectAll&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.TriggerCloseRDPWindow_Task: TriggerCloseRDPWindow&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.CredentialManagerAddInvalidAccount_Task: CredentialManager_Invalid&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.CredentialManagerReverseInvalidAccount_Task: CredentialManager_InvalidAccount_Reverse&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.TriggerOneTouchEvent_Task: TriggerOneTouchEvent&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.TriggerMultiTouchEvent_Task: TriggerMultiTouchEvent&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.TriggerSingleTouchPositionEvent_Task: TriggerSingleTouchPositionEvent&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.TriggerContinuousTouchEvent_Task: TriggerContinuousTouchEvent&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.TriggerTouchHoverEvent_Task: TriggerTouchHoverEvent&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.MaximizeRDPClientWindow_Task: MaximizeMstsc&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.SupportFastPathInput: true&#xD;
+2026-10-15 12:41:16.488 [Settings] PTFConfigProperties.SupportAutoReconnect: true&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.SupportRDPEFS: false&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.SupportServerRedirection: true&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.WaitTime: 10&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.RDPRFXImage: ../TestData/Rdprfx.bmp&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.RDPRFXVideoModeImage: ../TestData/RdprfxVideoMode.bmp&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.TurnOffRDPBCGRVerification: false&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.TurnOffRDPEGFXVerification: false&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.TurnOffRDPEIVerification: false&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.TurnOffRDPEUSBVerification: false&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.TurnOffRDPRFXVerification: false&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.OriginalDesktopWidth: 1024&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.OriginalDesktopHeight: 768&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.ChangedDesktopWidth: 1152&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.ChangedDesktopHeight: 864&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.OriginalMonitorNumber: 1&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.ChangedMonitorNumber: 2&#xD;
+2026-10-15 12:41:16.489 [Settings] PTFConfigProperties.ProxyIP: 127.0.0.1&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RdpevorTestDataPath: ../TestData/RdpevorTestData.xml&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.ClearCodecImage: ../TestData/RdpegfxClearCodecTestImage.bmp&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RfxProgressiveCodecImage: ../TestData/RdpegfxRfxProgressiveCodecTestImage.bmp&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RdpegfxH264TestDataPath: ../TestData/&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RdpedispTestImage: ../TestData/RdpedispTestImage.bmp&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RdpedispEndImage: ../TestData/End.png&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RdpedispOrientationChange1Image: ../TestData/OrientationChange1.png&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RdpedispOrientationChange2Image: ../TestData/OrientationChange2.png&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RdpedispOrientationChange3Image: ../TestData/OrientationChange3.png&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RdpedispOrientationChange4Image: ../TestData/OrientationChange4.png&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RdpedispMonitorAddImage: ../TestData/MonitorAdd.png&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.RdpedispMonitorRemoveImage: ../TestData/MonitorRemove.png&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.SupportSoftSync: true&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.SupportTunnelingStaticVCTraffic: true&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.SupportEUSBDevice: false&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.SupportCompression: false&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.LinuxScreenshotCaptureCommand: gnome-screenshot --file={{fileName}}&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.SupportRemoteFX: false&#xD;
+2026-10-15 12:41:16.490 [Settings] PTFConfigProperties.ClientName: Davids-MacBook-Air.local&#xD;
+2026-10-15 12:41:16.491 [Settings] PTFConfigProperties.ClientOS: Unix 27.0.1&#xD;
+2026-10-15 12:41:16.491 [Comment] begin output test statistics.&#xD;
+2026-10-15 12:41:16.491 [Comment] PTFTestResult.TestsExecuted: 1&#xD;
+2026-10-15 12:41:16.493 [Comment] PTFTestResult.TestsFailed: 1</StdOut>
+        <ErrorInfo>
+          <Message>Assert.Fail failed. Timeout when expecting Connection&#xD;
+===== Stack Trace =====&#xD;
+   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 288
+=== End of Stack Trace ===&#xD;
+</Message>
+          <StackTrace>   at Microsoft.Protocols.TestTools.ManagedAdapterProxy.ExecuteMethod(MethodInfo targetMethod, Object[] args)
+   at Microsoft.Protocols.TestTools.AdapterProxyBase.Invoke(MethodInfo targetMethod, Object[] args)
+   at generatedProxy_1.ExpectTransportConnection(RDPSessionType)
+   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.TestCapabilitySets(Collection`1 capSetCollection) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_ConnectionTest_CapabilityExchange.cs:line 1937
+   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport() in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/TestSuite/RDPBCGR/S1_ConnectionTest_CapabilityExchange.cs:line 1633
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)
+</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport" storage="/users/david/projects/freerdp-protocol-tests/tools/windows-protocol-tests/results/restored-full-bridge-20261015/suite/bin/rdp_clienttestsuite.dll" priority="2" id="9b1e4072-97bb-723a-fd44-8f289690b1f8">
+      <TestCategory>
+        <TestCategoryItem TestCategory="RDP7.0" />
+        <TestCategoryItem TestCategory="BasicRequirement" />
+        <TestCategoryItem TestCategory="RDPBCGR" />
+        <TestCategoryItem TestCategory="BasicFeature" />
+      </TestCategory>
+      <Execution id="6e7f1694-f79e-4f8b-8ba6-61a14c90adcb" />
+      <TestMethod codeBase="/Users/david/projects/FreeRDP-protocol-tests/tools/windows-protocol-tests/results/restored-full-bridge-20261015/suite/Bin/RDP_ClientTestSuite.dll" adapterTypeName="executor://mstestadapter/v2" className="Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite" name="S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="9b1e4072-97bb-723a-fd44-8f289690b1f8" executionId="6e7f1694-f79e-4f8b-8ba6-61a14c90adcb" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="1" executed="1" passed="0" failed="1" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>2026-10-15 12:41:06.018 [Comment] Expected execution time of the test suite (in seconds) is: 
+2026-10-15 12:41:06.062 [Comment] Adapter Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter implements Microsoft.Protocols.TestSuites.Rdpbcgr.IRdpbcgrAdapter
+2026-10-15 12:41:06.076 [Comment] Adapter Microsoft.Protocols.TestSuites.Rdp.ProtocolBasedRdpSUTControlAdapter implements Microsoft.Protocols.TestSuites.Rdp.IRdpSutControlAdapter
+2026-10-15 12:41:06.129 [Debug] isClientSupportFastPathInput = True;
+                isClientSuportAutoReconnect = True;
+                isClientSupportRDPEFS = False;
+                isClientSupportServerRedirection = True;
+                isClientSupportEmptyRdpNegData = False;
+                isClientSupportSoftSync = True
+                isClientSupportTunnelingStaticVCTraffic = True
+2026-10-15 12:41:06.133 [Debug] Start to invoke target method add_ConfirmActiveRequest, timeout: 2
+2026-10-15 12:41:06.133 [Debug] Complete invoke target method add_ConfirmActiveRequest.
+2026-10-15 12:41:06.134 [Debug] Start to invoke target method SetCompressionValue, timeout: 2
+2026-10-15 12:41:06.134 [Debug] Complete invoke target method SetCompressionValue.
+2026-10-15 12:41:06.134 [Debug] Start to invoke target method TurnVerificationOff, timeout: 2
+2026-10-15 12:41:06.135 [Debug] Complete invoke target method TurnVerificationOff.
+2026-10-15 12:41:06.135 [Comment] Setting Server Capability.
+2026-10-15 12:41:06.135 [Debug] Start to invoke target method SetServerCapability, timeout: 2
+2026-10-15 12:41:06.136 [Comment] SetServerCapability(
+                supportServerBitmapCacheHost = True;
+                supportFastPathInput = True;
+                supportScancode = True;
+                supportExtendedMouse = True;
+                supportUnicodeKeyboard = True;
+                supportAutoReconnect = True;
+                supportRefreshRect = True;
+                supportSuppressOoutput = True;
+                supportVCComression = True;
+                presentVCChunksize = True).
+2026-10-15 12:41:06.136 [Debug] Complete invoke target method SetServerCapability.
+2026-10-15 12:41:06.136 [Comment] Generate Capability sets,CompDeskSupportLevel of TS_COMPDESK_CAPABILITYSET is set to COMPDESK_NOT_SUPPORTED (0x0000)..
+2026-10-15 12:41:06.136 [Debug] Start to invoke target method GenerateServerCapSet, timeout: 2
+2026-10-15 12:41:06.139 [Debug] Complete invoke target method GenerateServerCapSet.
+2026-10-15 12:41:06.140 [Comment] Establish RDP connection to test capability sets.
+2026-10-15 12:41:06.141 [Comment] Starting RDP listening with transport protocol: NegotiationTls
+2026-10-15 12:41:06.141 [Debug] Start to invoke target method StartRDPListening, timeout: 2
+2026-10-15 12:41:06.274 [Debug] The IP version is Ipv4.
+2026-10-15 12:41:06.275 [Debug] RDP server is listening on 0.0.0.0:59164.
+2026-10-15 12:41:06.275 [Debug] Complete invoke target method StartRDPListening.
+2026-10-15 12:41:06.275 [Comment] Triggering SUT to initiate a RDP connection to server.
+2026-10-15 12:41:06.276 [Debug] Start to invoke target method RDPConnectWithNegotiationApproach, timeout: 2
+2026-10-15 12:41:06.278 [Comment] Preparing RDP Connection To Server.
+2026-10-15 12:41:06.285 [Comment] RDP SUT Control Protocol Adapter: CommandId is 1: Success, agent: 127.0.0.1:59165.
+2026-10-15 12:41:06.285 [Comment] Complete RDP Connection To Server.
+2026-10-15 12:41:06.285 [Debug] Complete invoke target method RDPConnectWithNegotiationApproach.
+2026-10-15 12:41:06.285 [Comment] Expecting SUT to start a transport layer connection request (TCP).
+2026-10-15 12:41:06.286 [Debug] Start to invoke target method ExpectTransportConnection, timeout: 2
+2026-10-15 12:41:06.287 [Warning] Excetpion thrown out when expect Connection. There's an exception thrown when receiving a packet.
+2026-10-15 12:41:16.287 [CheckFailed] Assert.Fail failed. Timeout when expecting Connection
+2026-10-15 12:41:16.296 [Comment]    at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 288
+2026-10-15 12:41:16.401 [Debug] Microsoft.VisualStudio.TestTools.UnitTesting.AssertFailedException: Assert.Fail failed. Timeout when expecting Connection
+===== Stack Trace =====
+   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 288
+=== End of Stack Trace ===
+   at Microsoft.Protocols.TestTools.AsynchronousErrorProcessor.Process()
+   at Microsoft.Protocols.TestTools.AsynchronousErrorProcessor.ReportAsyncException(Exception checkerException)
+   at Microsoft.Protocols.TestTools.Checking.DefaultChecker`2.GenerateException(CheckResult checkResult, String message, Object[] parameters)
+   at Microsoft.Protocols.TestTools.Checking.DefaultChecker`2.Fail(String message, Object[] parameters)
+   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 302
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+2026-10-15 12:41:16.408 [Comment] Trigger client to close all RDP connections for clean up.
+2026-10-15 12:41:16.409 [Debug] Start to invoke target method TriggerClientDisconnectAll, timeout: 2
+2026-10-15 12:41:16.411 [Comment] RDP SUT Control Protocol Adapter: CommandId is 2: Success, agent: 127.0.0.1:59165.
+2026-10-15 12:41:16.411 [Debug] Complete invoke target method TriggerClientDisconnectAll.
+2026-10-15 12:41:16.412 [Debug] The result of TriggerClientDisconnectAll is 1.
+2026-10-15 12:41:16.412 [Comment] Stop RDP listening.
+2026-10-15 12:41:16.412 [Debug] Start to invoke target method StopRDPListening, timeout: 2
+2026-10-15 12:41:16.414 [Debug] Complete invoke target method StopRDPListening.
+2026-10-15 12:41:16.415 [TestFailed] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport
+2026-10-15 12:41:16.474 [Comment] Actual time taken for the test suite execution (in seconds) is: 11.528071
+2026-10-15 12:41:16.491 [Comment] begin output test statistics.
+2026-10-15 12:41:16.491 [Comment] PTFTestResult.TestsExecuted: 1
+2026-10-15 12:41:16.493 [Comment] PTFTestResult.TestsFailed: 1
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

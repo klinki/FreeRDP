@@ -1,0 +1,21 @@
+Test project /Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/libfreerdp/core/test
+    Start 1: TestVersion
+1/8 Test #1: TestVersion ......................   Passed    0.07 sec
+    Start 2: TestSettings
+2/8 Test #2: TestSettings .....................   Passed   11.57 sec
+    Start 3: TestUtils
+3/8 Test #3: TestUtils ........................   Passed    0.11 sec
+    Start 4: TestRdpeUdp
+4/8 Test #4: TestRdpeUdp ......................   Passed    8.02 sec
+    Start 5: TestStreamDump
+5/8 Test #5: TestStreamDump ...................   Passed    0.06 sec
+    Start 6: TestRdstls
+6/8 Test #6: TestRdstls .......................   Passed    0.06 sec
+    Start 7: TestServerChannels
+7/8 Test #7: TestServerChannels ...............   Passed    0.08 sec
+    Start 8: TestRdpPacketLengths
+8/8 Test #8: TestRdpPacketLengths .............   Passed    0.17 sec
+
+100% tests passed out of 8
+
+Total Test time (real) =  20.16 sec

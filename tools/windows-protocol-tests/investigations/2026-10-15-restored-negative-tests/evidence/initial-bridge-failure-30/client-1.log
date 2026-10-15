@@ -1,0 +1,23 @@
+[12:41:06:341] [11219:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:41:06:820] [11219:6d8d3001] [WARN][com.freerdp.codec.nsc.neon] - [nsc_init_neon_int]: TODO: Implement neon optimized version of this function
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: *************************************************
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: This build is using [experimental] build options:
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: * 'WITH_VAAPI_H264_ENCODING=ON'
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: * 'WITH_VIDEOTOOLBOX=ON'
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: *
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: [experimental] build options might crash the application
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: *************************************************
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: *************************************************
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: This build is using [runtime-check] build options:
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: * 'WITH_VERBOSE_WINPR_ASSERT=ON'
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: *
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: [runtime-check] build options might slow down the application
+[12:41:06:828] [11219:6d8d3001] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x106e9ce10]: *************************************************
+[12:41:06:841] [11219:6d8d3001] [WARN][com.freerdp.core] - [freerdp_tcp_connect_timeout]: connect to localhost:59164 failed with error: Connection refused [61]
+[12:41:06:841] [11219:6d8d3001] [ERROR][com.freerdp.core] - [get_next_addrinfo]: ERRCONNECT_CONNECT_FAILED [0x00020006]
+[12:41:06:841] [11219:6d8d3001] [ERROR][com.freerdp.core] - [freerdp_tcp_default_connect]: Couldn't get socket ip address
+[12:41:06:841] [11219:6d8d3001] [ERROR][com.freerdp.core.transport] - [transport_connect_layer]: ConnectLayer 127.0.0.1:59164 [15000ms] failed
+[12:41:06:841] [11219:6d8d3001] [ERROR][com.freerdp.core.nego] - [nego_connect]: Failed to connect
+[12:41:06:842] [11219:6d8d3001] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:41:06:823] [11219:6d8d3001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding
+[12:41:06:825] [11219:6d8d3001] [INFO][com.freerdp.codec] - [libavcodec_init]: Using VideoToolbox for accelerated H264 decoding

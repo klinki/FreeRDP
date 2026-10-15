@@ -1,0 +1,109 @@
+[12:33:07:055] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:07:056] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 25 is inconsistent with TPKT length 40 and header length 14
+[12:33:07:056] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 27 is inconsistent with TPKT length 40 and header length 14
+[12:33:07:057] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 130 is inconsistent with TPKT length 401 and header length 15
+[12:33:07:057] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 387 is inconsistent with TPKT length 401 and header length 15
+[12:33:07:057] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 1 is inconsistent with TPKT length 14 and header length 14
+[12:33:07:057] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 0 is inconsistent with TPKT length 15 and header length 14
+[12:33:07:057] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 25 is inconsistent with TPKT length 40 and header length 14
+[12:33:07:057] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 27 is inconsistent with TPKT length 40 and header length 14
+[12:33:07:057] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 130 is inconsistent with TPKT length 401 and header length 15
+[12:33:07:058] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 387 is inconsistent with TPKT length 401 and header length 15
+[12:33:07:058] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 1 is inconsistent with TPKT length 14 and header length 14
+[12:33:07:058] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 0 is inconsistent with TPKT length 15 and header length 14
+[12:33:07:058] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 25 is inconsistent with TPKT length 40 and header length 14
+[12:33:07:058] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 27 is inconsistent with TPKT length 40 and header length 14
+[12:33:07:058] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 130 is inconsistent with TPKT length 401 and header length 15
+[12:33:07:059] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 387 is inconsistent with TPKT length 401 and header length 15
+[12:33:07:059] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 1 is inconsistent with TPKT length 14 and header length 14
+[12:33:07:059] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 0 is inconsistent with TPKT length 15 and header length 14
+[12:33:07:059] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 25 is inconsistent with TPKT length 40 and header length 14
+[12:33:07:059] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 27 is inconsistent with TPKT length 40 and header length 14
+[12:33:07:059] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 130 is inconsistent with TPKT length 401 and header length 15
+[12:33:07:060] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 387 is inconsistent with TPKT length 401 and header length 15
+[12:33:07:060] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 1 is inconsistent with TPKT length 14 and header length 14
+[12:33:07:060] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 0 is inconsistent with TPKT length 15 and header length 14
+[12:33:07:211] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+Demand Active security=0, share delta=-1, MCS delta=0 failed
+[12:33:07:337] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:07:339] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 21 is inconsistent with TPKT length 36 and header length 14
+[12:33:07:447] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:07:582] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:07:583] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [Stream_CheckAndLogRequiredLengthWLogExVa][0x106d44c60]: [rdp_read_share_control_header(libfreerdp/core/rdp.c:322)] invalid length, got 16, require at least 17 [element size=1]
+[12:33:07:584] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x106d44c60]: 0: address=0x1030dac58 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=winpr_unwind_backtrace [0x1030dabf8]
+[12:33:07:584] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x106d44c60]: 1: address=0x1030d8ba8 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=winpr_log_backtrace_ex [0x1030d8b7c]
+[12:33:07:585] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x106d44c60]: 2: address=0x1030d7f40 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=Stream_CheckAndLogRequiredLengthWLogExVa [0x1030d7e4c]
+[12:33:07:585] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x106d44c60]: 3: address=0x1030d807c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=Stream_CheckAndLogRequiredLengthWLogEx [0x1030d8028]
+[12:33:07:585] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x106d44c60]: 4: address=0x103304dc4 dli_fname=/private/tmp/freerdp-lengths-baseline/connection/libfreerdp3.3.dylib [0x103234000], dli_sname=rdp_read_share_control_header [0x1033046fc]
+[12:33:07:585] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x106d44c60]: 5: address=0x1032ef0a8 dli_fname=/private/tmp/freerdp-lengths-baseline/connection/libfreerdp3.3.dylib [0x103234000], dli_sname=rdp_client_connect_demand_active [0x1032eefc0]
+[12:33:07:586] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x106d44c60]: 6: address=0x102d07a7c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=test_demand_active [0x102d079ac]
+[12:33:07:586] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x106d44c60]: 7: address=0x102d076d4 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=TestRdpPacketLengths [0x102d07228]
+[12:33:07:587] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x106d44c60]: 8: address=0x102cf9b50 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=main [0x102cf9798]
+[12:33:07:733] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:07:734] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x106d44c60]: MCS userData length 23 is inconsistent with TPKT length 36 and header length 14
+[12:33:07:891] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:08:007] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:08:097] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:08:208] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+Demand Active security=1, share delta=-1, MCS delta=0 failed
+[12:33:08:380] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:08:381] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x7b8ec50000]: MCS userData length 25 is inconsistent with TPKT length 40 and header length 14
+[12:33:08:523] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:08:648] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:08:652] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [Stream_CheckAndLogRequiredLengthWLogExVa][0x7b8ec50000]: [rdp_read_share_control_header(libfreerdp/core/rdp.c:322)] invalid length, got 16, require at least 17 [element size=1]
+[12:33:08:653] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 0: address=0x1030dac58 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=winpr_unwind_backtrace [0x1030dabf8]
+[12:33:08:654] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 1: address=0x1030d8ba8 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=winpr_log_backtrace_ex [0x1030d8b7c]
+[12:33:08:654] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 2: address=0x1030d7f40 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=Stream_CheckAndLogRequiredLengthWLogExVa [0x1030d7e4c]
+[12:33:08:655] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 3: address=0x1030d807c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=Stream_CheckAndLogRequiredLengthWLogEx [0x1030d8028]
+[12:33:08:657] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 4: address=0x103304dc4 dli_fname=/private/tmp/freerdp-lengths-baseline/connection/libfreerdp3.3.dylib [0x103234000], dli_sname=rdp_read_share_control_header [0x1033046fc]
+[12:33:08:657] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 5: address=0x1032ef0a8 dli_fname=/private/tmp/freerdp-lengths-baseline/connection/libfreerdp3.3.dylib [0x103234000], dli_sname=rdp_client_connect_demand_active [0x1032eefc0]
+[12:33:08:658] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 6: address=0x102d07a7c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=test_demand_active [0x102d079ac]
+[12:33:08:658] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 7: address=0x102d0778c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=TestRdpPacketLengths [0x102d07228]
+[12:33:08:659] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 8: address=0x102cf9b50 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=main [0x102cf9798]
+[12:33:09:144] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:09:145] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x7b8ec50000]: MCS userData length 27 is inconsistent with TPKT length 40 and header length 14
+[12:33:09:300] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:09:471] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:09:622] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:09:773] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+Demand Active security=2, share delta=-1, MCS delta=0 failed
+[12:33:09:909] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:09:910] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x7b8ec50000]: MCS userData length 33 is inconsistent with TPKT length 48 and header length 14
+[12:33:10:061] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:10:190] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:10:190] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [Stream_CheckAndLogRequiredLengthWLogExVa][0x7b8ec50000]: [rdp_read_share_control_header(libfreerdp/core/rdp.c:322)] invalid length, got 16, require at least 17 [element size=1]
+[12:33:10:191] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 0: address=0x1030dac58 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=winpr_unwind_backtrace [0x1030dabf8]
+[12:33:10:191] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 1: address=0x1030d8ba8 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=winpr_log_backtrace_ex [0x1030d8b7c]
+[12:33:10:191] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 2: address=0x1030d7f40 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=Stream_CheckAndLogRequiredLengthWLogExVa [0x1030d7e4c]
+[12:33:10:191] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 3: address=0x1030d807c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=Stream_CheckAndLogRequiredLengthWLogEx [0x1030d8028]
+[12:33:10:191] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 4: address=0x103304dc4 dli_fname=/private/tmp/freerdp-lengths-baseline/connection/libfreerdp3.3.dylib [0x103234000], dli_sname=rdp_read_share_control_header [0x1033046fc]
+[12:33:10:192] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 5: address=0x1032ef0a8 dli_fname=/private/tmp/freerdp-lengths-baseline/connection/libfreerdp3.3.dylib [0x103234000], dli_sname=rdp_client_connect_demand_active [0x1032eefc0]
+[12:33:10:192] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 6: address=0x102d07a7c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=test_demand_active [0x102d079ac]
+[12:33:10:192] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 7: address=0x102d07844 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=TestRdpPacketLengths [0x102d07228]
+[12:33:10:192] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 8: address=0x102cf9b50 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=main [0x102cf9798]
+[12:33:10:362] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:10:363] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x7b8ec50000]: MCS userData length 35 is inconsistent with TPKT length 48 and header length 14
+[12:33:10:536] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:10:716] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:10:874] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:11:029] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+Demand Active security=3, share delta=-1, MCS delta=0 failed
+[12:33:11:162] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:11:164] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x7b8ec50000]: MCS userData length 39 is inconsistent with TPKT length 54 and header length 14
+[12:33:11:315] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:11:464] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:11:465] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [Stream_CheckAndLogRequiredLengthWLogExVa][0x7b8ec50000]: [rdp_read_share_control_header(libfreerdp/core/rdp.c:322)] invalid length, got 16, require at least 17 [element size=1]
+[12:33:11:466] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 0: address=0x1030dac58 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=winpr_unwind_backtrace [0x1030dabf8]
+[12:33:11:466] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 1: address=0x1030d8ba8 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=winpr_log_backtrace_ex [0x1030d8b7c]
+[12:33:11:466] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 2: address=0x1030d7f40 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=Stream_CheckAndLogRequiredLengthWLogExVa [0x1030d7e4c]
+[12:33:11:466] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 3: address=0x1030d807c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/winpr/libwinpr/libwinpr3.3.31.2.dylib [0x1030b0000], dli_sname=Stream_CheckAndLogRequiredLengthWLogEx [0x1030d8028]
+[12:33:11:466] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 4: address=0x103304dc4 dli_fname=/private/tmp/freerdp-lengths-baseline/connection/libfreerdp3.3.dylib [0x103234000], dli_sname=rdp_read_share_control_header [0x1033046fc]
+[12:33:11:466] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 5: address=0x1032ef0a8 dli_fname=/private/tmp/freerdp-lengths-baseline/connection/libfreerdp3.3.dylib [0x103234000], dli_sname=rdp_client_connect_demand_active [0x1032eefc0]
+[12:33:11:466] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 6: address=0x102d07a7c dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=test_demand_active [0x102d079ac]
+[12:33:11:466] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 7: address=0x102d078fc dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=TestRdpPacketLengths [0x102d07228]
+[12:33:11:467] [8345:f0eb7f81] [WARN][com.freerdp.core.rdp] - [winpr_log_backtrace_ex][0x7b8ec50000]: 8: address=0x102cf9b50 dli_fname=/Users/david/projects/FreeRDP-protocol-tests/build/protocol-tests/Testing/TestCore [0x102cf8000], dli_sname=main [0x102cf9798]
+[12:33:11:592] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:11:593] [8345:f0eb7f81] [ERROR][com.freerdp.core.rdp] - [rdp_read_header][0x7b8ec50000]: MCS userData length 41 is inconsistent with TPKT length 54 and header length 14
+[12:33:11:706] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:11:830] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented
+[12:33:11:982] [8345:f0eb7f81] [ERROR][com.winpr.synch.event] - [CreateEventA]: auto-reset events not yet implemented

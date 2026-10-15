@@ -1,0 +1,80 @@
+2026-10-15 12:41:06.018 [Comment] Expected execution time of the test suite (in seconds) is: 
+2026-10-15 12:41:06.036 [EnterMethod] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport
+2026-10-15 12:41:06.062    [Comment] Adapter Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter implements Microsoft.Protocols.TestSuites.Rdpbcgr.IRdpbcgrAdapter
+2026-10-15 12:41:06.076    [Comment] Adapter Microsoft.Protocols.TestSuites.Rdp.ProtocolBasedRdpSUTControlAdapter implements Microsoft.Protocols.TestSuites.Rdp.IRdpSutControlAdapter
+2026-10-15 12:41:06.083    [CheckSucceeded] Assume.IsTrue succeeded. When TLS is used as the security protocol, Protocol is set to 'TLS', Negotiation must be true.
+2026-10-15 12:41:06.129    [Debug] isClientSupportFastPathInput = True;
+                isClientSuportAutoReconnect = True;
+                isClientSupportRDPEFS = False;
+                isClientSupportServerRedirection = True;
+                isClientSupportEmptyRdpNegData = False;
+                isClientSupportSoftSync = True
+                isClientSupportTunnelingStaticVCTraffic = True
+2026-10-15 12:41:06.133    [Debug] Start to invoke target method add_ConfirmActiveRequest, timeout: 2
+2026-10-15 12:41:06.133    [Debug] Complete invoke target method add_ConfirmActiveRequest.
+2026-10-15 12:41:06.134    [Debug] Start to invoke target method SetCompressionValue, timeout: 2
+2026-10-15 12:41:06.134    [Debug] Complete invoke target method SetCompressionValue.
+2026-10-15 12:41:06.134    [Debug] Start to invoke target method TurnVerificationOff, timeout: 2
+2026-10-15 12:41:06.135    [Debug] Complete invoke target method TurnVerificationOff.
+2026-10-15 12:41:06.135    [Comment] Setting Server Capability.
+2026-10-15 12:41:06.135    [Debug] Start to invoke target method SetServerCapability, timeout: 2
+2026-10-15 12:41:06.136    [Comment] SetServerCapability(
+                supportServerBitmapCacheHost = True;
+                supportFastPathInput = True;
+                supportScancode = True;
+                supportExtendedMouse = True;
+                supportUnicodeKeyboard = True;
+                supportAutoReconnect = True;
+                supportRefreshRect = True;
+                supportSuppressOoutput = True;
+                supportVCComression = True;
+                presentVCChunksize = True).
+2026-10-15 12:41:06.136    [Debug] Complete invoke target method SetServerCapability.
+2026-10-15 12:41:06.136    [Comment] Generate Capability sets,CompDeskSupportLevel of TS_COMPDESK_CAPABILITYSET is set to COMPDESK_NOT_SUPPORTED (0x0000)..
+2026-10-15 12:41:06.136    [Debug] Start to invoke target method GenerateServerCapSet, timeout: 2
+2026-10-15 12:41:06.139    [Debug] Complete invoke target method GenerateServerCapSet.
+2026-10-15 12:41:06.140    [Comment] Establish RDP connection to test capability sets.
+2026-10-15 12:41:06.141    [Comment] Starting RDP listening with transport protocol: NegotiationTls
+2026-10-15 12:41:06.141    [Debug] Start to invoke target method StartRDPListening, timeout: 2
+2026-10-15 12:41:06.274    [Debug] The IP version is Ipv4.
+2026-10-15 12:41:06.275    [Debug] RDP server is listening on 0.0.0.0:59164.
+2026-10-15 12:41:06.275    [Debug] Complete invoke target method StartRDPListening.
+2026-10-15 12:41:06.275    [Comment] Triggering SUT to initiate a RDP connection to server.
+2026-10-15 12:41:06.276    [Debug] Start to invoke target method RDPConnectWithNegotiationApproach, timeout: 2
+2026-10-15 12:41:06.278    [Comment] Preparing RDP Connection To Server.
+2026-10-15 12:41:06.285    [Comment] RDP SUT Control Protocol Adapter: CommandId is 1: Success, agent: 127.0.0.1:59165.
+2026-10-15 12:41:06.285    [Comment] Complete RDP Connection To Server.
+2026-10-15 12:41:06.285    [Debug] Complete invoke target method RDPConnectWithNegotiationApproach.
+2026-10-15 12:41:06.285    [CheckSucceeded] Assert.IsTrue succeeded. SUT Control Adapter: RDPConnectWithNegotiationApproach should be successful: 1.
+2026-10-15 12:41:06.285    [Comment] Expecting SUT to start a transport layer connection request (TCP).
+2026-10-15 12:41:06.286    [Debug] Start to invoke target method ExpectTransportConnection, timeout: 2
+2026-10-15 12:41:06.287    [Warning] Excetpion thrown out when expect Connection. There's an exception thrown when receiving a packet.
+2026-10-15 12:41:16.287    [CheckFailed] Assert.Fail failed. Timeout when expecting Connection
+2026-10-15 12:41:16.296    [Comment]    at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 288
+
+2026-10-15 12:41:16.401    [Debug] Microsoft.VisualStudio.TestTools.UnitTesting.AssertFailedException: Assert.Fail failed. Timeout when expecting Connection
+===== Stack Trace =====
+   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 288
+=== End of Stack Trace ===
+
+   at Microsoft.Protocols.TestTools.AsynchronousErrorProcessor.Process()
+   at Microsoft.Protocols.TestTools.AsynchronousErrorProcessor.ReportAsyncException(Exception checkerException)
+   at Microsoft.Protocols.TestTools.Checking.DefaultChecker`2.GenerateException(CheckResult checkResult, String message, Object[] parameters)
+   at Microsoft.Protocols.TestTools.Checking.DefaultChecker`2.Fail(String message, Object[] parameters)
+   at Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrAdapter.ExpectTransportConnection(RDPSessionType sessionType) in /private/tmp/wpts-build-6wylcpyd/source/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs:line 302
+   at System.RuntimeMethodHandle.InvokeMethod(Object target, Void** arguments, Signature sig, Boolean isConstructor)
+   at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+2026-10-15 12:41:16.408    [Comment] Trigger client to close all RDP connections for clean up.
+2026-10-15 12:41:16.409    [Debug] Start to invoke target method TriggerClientDisconnectAll, timeout: 2
+2026-10-15 12:41:16.411    [Comment] RDP SUT Control Protocol Adapter: CommandId is 2: Success, agent: 127.0.0.1:59165.
+2026-10-15 12:41:16.411    [Debug] Complete invoke target method TriggerClientDisconnectAll.
+2026-10-15 12:41:16.412    [Debug] The result of TriggerClientDisconnectAll is 1.
+2026-10-15 12:41:16.412    [Comment] Stop RDP listening.
+2026-10-15 12:41:16.412    [Debug] Start to invoke target method StopRDPListening, timeout: 2
+2026-10-15 12:41:16.414    [Debug] Complete invoke target method StopRDPListening.
+2026-10-15 12:41:16.415    [TestFailed] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport
+2026-10-15 12:41:16.415 [ExitMethod] Microsoft.Protocols.TestSuites.Rdpbcgr.RdpbcgrTestSuite.S1_ConnectionTest_CapabilityExchange_PositiveTest_DesktopCompositionCapSet_CompositionNotSupport
+2026-10-15 12:41:16.474 [Comment] Actual time taken for the test suite execution (in seconds) is: 11.528071
+2026-10-15 12:41:16.491 [Comment] begin output test statistics.
+2026-10-15 12:41:16.491 [Comment] PTFTestResult.TestsExecuted: 1
+2026-10-15 12:41:16.493 [Comment] PTFTestResult.TestsFailed: 1

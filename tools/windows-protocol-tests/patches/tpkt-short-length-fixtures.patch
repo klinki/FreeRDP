@@ -1,0 +1,59 @@
+--- a/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
++++ b/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RdpbcgrAdapter.cs
+@@ -1075,7 +1075,10 @@
+ 
+             if (invalidType.Equals(NegativeType.InvalidTPKTHeader))
+             {
+-                ultimatunPdu.tpktHeader.length--;
++                // The SDK uses zero as an automatic-length placeholder. Serialize
++                // first so this test sends a short TPKT instead of underflowing.
++                ushort invalidLength = checked((ushort)(ultimatunPdu.ToBytes().Length - 1));
++                ultimatunPdu.tpktHeader.length = (ushort)((invalidLength >> 8) | (invalidLength << 8));
+             }
+             else if (invalidType.Equals(NegativeType.InvalidX224))
+             {
+@@ -1436,7 +1439,10 @@
+ 
+             if (invalidType == SlowPathTest_InvalidType.InvalidTPKTLength)
+             {
+-                spOutputPdu.commonHeader.tpktHeader.length = (ushort)(spOutputPdu.commonHeader.tpktHeader.length - 1);
++                // Mutate the encoded TPKT after its automatic length is filled.
++                // Serialize only once, including when RDP encryption is in use.
++                SendPdu(new SlowPathOutputPduWithInvalidTpktLength(spOutputPdu, sessionContext));
++                return;
+             }
+             else if (invalidType == SlowPathTest_InvalidType.InvalidX224Length)
+             {
+--- a/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RDPBCGRTypes.cs
++++ b/TestSuites/RDP/Client/src/Adapter/RDPBCGR/RDPBCGRTypes.cs
+@@ -464,6 +464,30 @@
+         InvalidPduLength,
+ 
+         #endregion
++    }
++
++    /// <summary>
++    /// Wrapper that sets TPKT length below the serialized slow-path PDU length.
++    /// </summary>
++    public class SlowPathOutputPduWithInvalidTpktLength : SlowPathOutputPdu
++    {
++        public SlowPathOutputPduWithInvalidTpktLength(SlowPathOutputPdu original, RdpbcgrServerSessionContext context)
++            : base(context)
++        {
++            this.commonHeader = original.commonHeader;
++            this.slowPathUpdates = original.slowPathUpdates;
++        }
++
++        public override byte[] ToBytes()
++        {
++            // The zero header field means automatic length, not a zero-byte PDU.
++            // Serialize once to avoid advancing an encrypted session twice.
++            byte[] bytes = base.ToBytes();
++            ushort invalidLength = checked((ushort)(bytes.Length - 1));
++            bytes[2] = (byte)(invalidLength >> 8);
++            bytes[3] = (byte)invalidLength;
++            return bytes;
++        }
+     }
+ 
+     /// <summary>

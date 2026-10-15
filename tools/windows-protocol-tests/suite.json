@@ -17,6 +17,11 @@
         "quick"
       ],
       "cases": [
+        "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidMCSLength",
+        "S1_ConnectionTest_CapabilityExchange_NegativeTest_DemandActive_InvalidPDULength",
+        "S1_ConnectionTest_Disconnection_NegativeTest_MCSDisconnectProviderUltimatum_InvalidTPKTLength",
+        "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidMCSLength",
+        "S4_SlowPathInputTest_NegativeTest_ServerToClientSlowPath_InvalidTPKTLength",
         "BVT_ConnectionTest_ChannelConnection_PositiveTest",
         "BVT_ConnectionTest_SecurityExchange_PositiveTest",
         "BVT_ConnectionTest_ConnectionFinalization_PositiveTest_BitmapHostCacheSupported",
@@ -249,6 +254,10 @@
     {
       "path": "patches/udp-listener-shutdown.patch",
       "sha256": "879e3439457e8c2855ceee61909a6669b5dc36261f4509863ec1edb6dfe669e7"
+    },
+    {
+      "path": "patches/tpkt-short-length-fixtures.patch",
+      "sha256": "35d6ab19ff76a524a1c0ca9e001910ea2f082c29c1c9eac9a448ff056365ecf1"
     }
   ]
 }

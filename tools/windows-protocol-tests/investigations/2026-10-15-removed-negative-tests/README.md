@@ -1,5 +1,7 @@
 # Five removed negative tests — findings
 
+> Follow-up: the [production repairs and restoration](../2026-10-15-restored-negative-tests/README.md) are complete. Extended now has 120 cases; this document preserves the earlier investigation and qualification state.
+
 The suite additions were committed as `0ed6fd412` on `codex/windows-protocol-smoke`.
 This follow-up investigated all five tests removed when the disconnect verifier
 was corrected. **Three tests expose two FreeRDP length-validation defects. Two
