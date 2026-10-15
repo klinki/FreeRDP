@@ -1,0 +1,130 @@
+{
+  "date": "2026-10-15",
+  "environment": {
+    "os": "macOS 27.0.1 (26A434)",
+    "architecture": "arm64",
+    "python": "3.14.5",
+    "dotnet_sdk": "8.0.425",
+    "dotnet_runtime": "8.0.31",
+    "graphical_session": true
+  },
+  "microsoft": {
+    "repository": "https://github.com/microsoft/WindowsProtocolTestSuites.git",
+    "revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+    "sdk": "8.0.425"
+  },
+  "freerdp_source_revision": "dfb1c647b566ee34552c5557af25d59f837f3221",
+  "client_version": "This is FreeRDP version 3.31.2-dev0 (n/a)",
+  "client_sha256": "9582f1aa14e2549abc05ba8c65fe80a2f4a1617b231d75ffcb83a96125d4cf1c",
+  "harness_files_sha256": {
+    "prepare.py": "2962b32b5a4c36e91eaa96abaf14c73b6dd6643e203abd86fcdffd734ff69878",
+    "run.py": "cdcd81e9f72912a23faf3d53f740856752231ee6c4cae598ba861f57032b3d1b",
+    "control.py": "6a8197b404a02b8734eed2aa8fa380084cc51ff4bd3deb36fa030e4c591d75dd",
+    "test_smoke.py": "c965938355fec10ede95c8ea7ef217dce9f49372f3c7cd0a3049691bd356a610",
+    "suite.json": "f781ae99323f0e6f1ceb035d3bdcc05834487c239f8e5ee7293a1c8b68589458"
+  },
+  "harness_regression_tests": {
+    "passed": 8,
+    "failed": 0
+  },
+  "protocol_tests": [
+    {
+      "case": "BVT_ConnectionTest_ConnectionInitiation_PositiveTest",
+      "mode": "standard",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 3.51
+    },
+    {
+      "case": "BVT_ConnectionTest_BasicSettingExchange_PositiveTest_ExtendedClientDataSupported",
+      "mode": "standard",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 2.82
+    },
+    {
+      "case": "BVT_ConnectionTest_CapabilityExchange_PositiveTest",
+      "mode": "standard",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 3.71
+    },
+    {
+      "case": "BVT_ConnectionTest_Disconnection_PositiveTest_ServerInitiated",
+      "mode": "standard",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 4.67
+    },
+    {
+      "case": "S1_ConnectionTest_ConnectionInitiation_NegativeTest_RDPNegotiationFailure",
+      "mode": "standard",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 2.46
+    },
+    {
+      "case": "S1_ConnectionTest_ConnectionInitiation_NegativeTest_InvalidTPKTHeader",
+      "mode": "standard",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 2.51
+    },
+    {
+      "case": "BVT_ConnectionTest_ConnectionInitiation_PositiveTest",
+      "mode": "bridge",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 2.58
+    },
+    {
+      "case": "BVT_ConnectionTest_BasicSettingExchange_PositiveTest_ExtendedClientDataSupported",
+      "mode": "bridge",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 2.64
+    },
+    {
+      "case": "BVT_ConnectionTest_CapabilityExchange_PositiveTest",
+      "mode": "bridge",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 3.82
+    },
+    {
+      "case": "BVT_ConnectionTest_Disconnection_PositiveTest_ServerInitiated",
+      "mode": "bridge",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 4.65
+    },
+    {
+      "case": "S1_ConnectionTest_ConnectionInitiation_NegativeTest_RDPNegotiationFailure",
+      "mode": "bridge",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 2.47
+    },
+    {
+      "case": "S1_ConnectionTest_ConnectionInitiation_NegativeTest_InvalidTPKTHeader",
+      "mode": "bridge",
+      "passed": true,
+      "detail": "Passed",
+      "errors": [],
+      "seconds": 2.5
+    }
+  ],
+  "scope": "Six unchanged Microsoft TLS connection tests, each run in standard and launcher-bridge mode. Bridge disconnect also checked connected and terminal events. No NLA, reconnect, UDP, rendering, physical display, or Swift app validation is claimed.",
+  "evidence_directory": "results/validation-20261015-final (ignored local artifacts)"
+}

@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/microsoft/WindowsProtocolTestSuites.git",
+  "revision": "29ddb4238a5443b7499e82934c90cc898861c5e7",
+  "cases": [
+    "BVT_ConnectionTest_ConnectionInitiation_PositiveTest",
+    "BVT_ConnectionTest_BasicSettingExchange_PositiveTest_ExtendedClientDataSupported",
+    "BVT_ConnectionTest_CapabilityExchange_PositiveTest",
+    "BVT_ConnectionTest_Disconnection_PositiveTest_ServerInitiated",
+    "S1_ConnectionTest_ConnectionInitiation_NegativeTest_RDPNegotiationFailure",
+    "S1_ConnectionTest_ConnectionInitiation_NegativeTest_InvalidTPKTHeader"
+  ]
+}
