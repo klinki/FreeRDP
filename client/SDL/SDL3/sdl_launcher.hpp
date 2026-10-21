@@ -13,6 +13,7 @@
 #include <freerdp/freerdp.h>
 #include <winpr/json.h>
 #include "sdl_monitor_selection.hpp"
+#include "sdl_window_geometry.hpp"
 
 class SdlContext;
 
@@ -52,6 +53,9 @@ class SdlLauncher
 	bool closeConfirmationEnabled() const;
 	bool thumbnailsEnabled() const;
 	bool reverseMouseWheel() const;
+	bool windowGeometryEnabled() const { return _rememberWindowSize; }
+	void configureWindowGeometry(SDL_Window* window); // SDL main thread only
+	void observeWindowGeometry(SDL_Window* window, Uint32 event); // SDL main thread only
     uint64_t performanceGeneration() const {return _performanceGeneration.load();}
     unsigned performanceMask() const {return _performanceMask.load();}
     bool performanceAvailable() const {return _performanceAvailable.load();}
@@ -84,6 +88,11 @@ class SdlLauncher
 	std::condition_variable _condition;
 	std::deque<std::string> _outbound;
 	Json _performancePending{nullptr,WINPR_JSON_Delete};
+	Json _windowGeometryPending{nullptr, WINPR_JSON_Delete};
+	std::atomic<bool> _rememberWindowSize{false};
+	SDL_Point _restoreWindowSize{}, _reportedWindowSize{};
+	SDL_WindowID _geometryWindow = 0;
+	SdlWindowGeometry _windowGeometry;
 	std::atomic<unsigned> _performanceMask{0};
 	std::atomic<uint64_t> _performanceGeneration{0};
 	std::atomic<bool> _performanceAvailable{false};
