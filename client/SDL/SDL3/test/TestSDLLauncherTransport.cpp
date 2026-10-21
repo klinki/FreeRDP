@@ -138,6 +138,69 @@ namespace
 			eventually([&] { return invalid.bridge->cancelled(); }, "Invalid style did not reject the control");
 		}
 	}
+	void windowGeometryOptions()
+	{
+		Connection enabled;
+		enabled.command("start", ",\"arguments\":[],\"displaySelections\":[],\"rememberWindowSize\":true,\"windowSize\":{\"width\":900,\"height\":650}");
+		eventually([&] { return enabled.bridge->windowGeometryEnabled(); }, "Window geometry option not applied");
+		Connection legacy;
+		startOptions(legacy, true, false);
+		require(!legacy.bridge->windowGeometryEnabled(), "Older launcher unexpectedly enabled geometry reporting");
+		for (const auto fields : {
+		         ",\"rememberWindowSize\":\"true\"",
+		         ",\"rememberWindowSize\":true,\"windowSize\":{\"width\":0,\"height\":600}",
+		         ",\"rememberWindowSize\":true,\"windowSize\":{\"width\":900.5,\"height\":600}",
+		         ",\"rememberWindowSize\":true,\"windowSize\":{\"width\":900,\"height\":999999}",
+		         ",\"windowSize\":{\"width\":900,\"height\":600}" })
+		{
+			Connection invalid;
+			invalid.command("start", std::string(",\"arguments\":[],\"displaySelections\":[]") + fields);
+			eventually([&] { return invalid.bridge->cancelled(); }, "Invalid window geometry was accepted");
+		}
+	}
+	void windowGeometryReporting()
+	{
+		require(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy") && SDL_Init(SDL_INIT_VIDEO), "Cannot initialize geometry fixture");
+		{
+			Connection c;
+			c.command("start", ",\"arguments\":[],\"displaySelections\":[],\"rememberWindowSize\":true,\"windowSize\":{\"width\":900,\"height\":650}");
+			eventually([&] { return c.bridge->windowGeometryEnabled(); }, "Window geometry option not applied");
+			std::ignore = freerdp_settings_set_uint32(c.rdp->context->settings, FreeRDP_DesktopWidth, 800);
+			std::ignore = freerdp_settings_set_uint32(c.rdp->context->settings, FreeRDP_DesktopHeight, 600);
+			std::ignore = freerdp_settings_set_bool(c.rdp->context->settings, FreeRDP_DynamicResolutionUpdate, FALSE);
+			auto window = SDL_CreateWindow("geometry transport fixture", 640, 480, SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE);
+			require(window != nullptr, "Cannot create geometry fixture window");
+			c.bridge->configureWindowGeometry(window);
+			require(SDL_ShowWindow(window) && SDL_SyncWindow(window), "Cannot show geometry fixture");
+			c.bridge->state("connected"); std::ignore = c.next();
+			c.bridge->observeWindowGeometry(window, SDL_EVENT_WINDOW_SHOWN);
+			auto first = c.next();
+			auto size = WINPR_JSON_GetObjectItemCaseSensitive(first.get(), "windowSize");
+			require(getString(first.get(), "type") == "window_geometry" &&
+			        WINPR_JSON_GetNumberValue(WINPR_JSON_GetObjectItemCaseSensitive(size, "width")) == 900,
+			        "Restored normal geometry not reported");
+			for (int width = 700; width <= 900; width++)
+			{
+				require(SDL_SetWindowSize(window, width, 600) && SDL_SyncWindow(window), "Cannot resize geometry fixture");
+				c.bridge->observeWindowGeometry(window, SDL_EVENT_WINDOW_RESIZED);
+			}
+			require(freerdp_settings_get_uint32(c.rdp->context->settings, FreeRDP_DesktopWidth) == 800 &&
+			        freerdp_settings_get_uint32(c.rdp->context->settings, FreeRDP_DesktopHeight) == 600,
+			        "Local geometry changed fixed remote desktop dimensions");
+			c.bridge->ended(0, "geometry fixture complete");
+			int lastWidth = 0;
+			for (;;)
+			{
+				auto event = c.next();
+				if (getString(event.get(), "type") == "ended") break;
+				size = WINPR_JSON_GetObjectItemCaseSensitive(event.get(), "windowSize");
+				lastWidth = static_cast<int>(WINPR_JSON_GetNumberValue(WINPR_JSON_GetObjectItemCaseSensitive(size, "width")));
+			}
+			require(lastWidth == 900, "Latest coalesced geometry was not delivered before terminal event");
+			SDL_DestroyWindow(window);
+		}
+		SDL_Quit();
+	}
 	void closeConfirmation()
 	{
 		Connection c;
@@ -602,10 +665,12 @@ int main()
 		terminalDistinctions();
 		reconnectPolicyExclusions();
 		performanceOverlayStyles();
+		windowGeometryOptions();
 		closeConfirmation();
 		closeCancellationAndEOF();
 		thumbnailBoundsAndDisable();
 		thumbnailBackpressureTeardown();
+		windowGeometryReporting();
 	}
 	catch (const std::exception& e)
 	{

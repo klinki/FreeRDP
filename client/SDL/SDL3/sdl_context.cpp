@@ -533,6 +533,9 @@ bool SdlContext::createWindows()
 		                     ? monitor->orig_screen
 		                     : WINPR_ASSERTING_INT_CAST(SDL_DisplayID, id);
 		auto window = SdlWindow::create(did, title, flags, w, h);
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+		if (auto bridge = SdlLauncher::active()) bridge->configureWindowGeometry(window.window());
+#endif
 		if (freerdp_settings_get_bool(settings, FreeRDP_UseMultimon))
 		{
 			// Cache local coordinates; negotiated coordinates are relative to the
@@ -1227,6 +1230,9 @@ bool SdlContext::addDisplayWindow(SDL_DisplayID id)
 	auto w = SdlWindow::create(id, title, flags);
 	if (!w.window() || !w.renderer())
 		return false;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active()) bridge->configureWindowGeometry(w.window());
+#endif
 	w.setMonitor(monitor);
 	SDL_ShowWindow(w.window());
 	if (_topBarWindowId == 0)
@@ -1586,6 +1592,10 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 	auto window = getWindowForId(ev.windowID);
 	if (!window)
 		return true;
+
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active()) bridge->observeWindowGeometry(window->window(), ev.type);
+#endif
 
 	{
 		const auto& r = window->rect();
@@ -2322,6 +2332,12 @@ void SdlContext::setCredentialsRead()
 
 bool SdlContext::resizeToScale(SdlWindow* window)
 {
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	// Constructor sizing still translates the configured remote pixels once.
+	// Thereafter preserve the user's logical window size, including display moves.
+	if (auto bridge = SdlLauncher::active(); bridge && bridge->windowGeometryEnabled() &&
+	    !freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon)) return true;
+#endif
 	if (freerdp_settings_get_bool(context()->settings, FreeRDP_SmartSizing))
 		return true;
 	if (!useLocalScale())
@@ -2800,6 +2816,12 @@ bool SdlContext::setResizeable(bool enable)
 	const bool dyn = freerdp_settings_get_bool(settings, FreeRDP_DynamicResolutionUpdate);
 	const bool smart = freerdp_settings_get_bool(settings, FreeRDP_SmartSizing);
 	bool use = (dyn && enable) || smart;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	// Remembering local geometry must not depend on the server negotiating
+	// dynamic resolution. Fixed-resolution desktops keep their framebuffer.
+	if (auto bridge = SdlLauncher::active(); bridge && bridge->windowGeometryEnabled() &&
+	    !freerdp_settings_get_bool(settings, FreeRDP_UseMultimon)) use = true;
+#endif
 
 	for (auto& window : _windows)
 	{

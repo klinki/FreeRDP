@@ -110,6 +110,31 @@ shutdown request surviving the abort-event reset performed by reconnect.
 Physical external-display disconnection was also verified with a live
 multimonitor session on macOS 26.7 on 2026-09-28.
 
+## Window size memory
+
+The optional `window_geometry` capability accepts `start.rememberWindowSize: true`
+and an optional `windowSize` object containing integer `width` and `height` values
+from 64 through 16384. These are logical local window content dimensions, not
+remote desktop pixels. Missing opt-in preserves older launcher/CLI behavior;
+malformed sizes or sizes without opt-in reject the start command.
+
+Single-display windows restore this size within the current usable display,
+including room for borders, without changing configured remote resolution.
+Fullscreen starts retain the size for returning to a normal window. Connected
+normal windows report changed dimensions as `window_geometry` events with a
+`windowSize` object. Fullscreen, minimized, maximized and multi-monitor windows
+are excluded. The latest update is coalesced in one pending slot and delivered
+before a terminal event. Automatic reconnect retains the last normal size.
+With opt-in, later pixel-density events preserve logical window dimensions;
+dynamic resolution continues through the existing display-control path.
+Opted-in single-display sessions remain locally resizable even without a
+negotiated dynamic-resolution channel; this does not enable remote resizing.
+
+`TestSDLWindowGeometry` covers restoration, resizing, fullscreen transitions,
+maximize/minimize exclusion and display fitting without an RDP server. Native
+runs also report logical versus backing-pixel dimensions. Transport tests cover
+validation and compatibility with older launchers.
+
 ## Performance overlay styles
 
 The optional `performance_overlay_styles` capability extends monitoring controls

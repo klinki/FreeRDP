@@ -44,7 +44,7 @@ namespace
 	constexpr const char* bridgeCapabilities[] = {
 		"auth", "certificate", "focus", "retry", "display_uuid", "per_monitor_scaling",
 		"dynamic_resolution", "multimon", "close_confirmation", "session_thumbnail",
-		"dock_accessory", "primary_monitor", "reverse_mouse_wheel", "performance_monitoring", "performance_overlay_styles"
+		"dock_accessory", "primary_monitor", "reverse_mouse_wheel", "performance_monitoring", "performance_overlay_styles", "window_geometry"
 	};
 	// The nonconnecting query and the live handshake must advertise the same features.
 	bool addCapabilities(WINPR_JSON* message)
@@ -270,7 +270,7 @@ SdlLauncher::~SdlLauncher()
 	{
 		std::unique_lock lock(_mutex);
 		_condition.wait_for(lock, std::chrono::milliseconds(750),
-		                    [&] { return _outbound.empty() && !_writing; });
+		                    [&] { return _outbound.empty() && !_windowGeometryPending && !_writing; });
 	}
 	_closing = true;
 	_condition.notify_all();
@@ -315,6 +315,14 @@ bool SdlLauncher::send(Json event)
 	std::lock_guard lock(_mutex);
 	if (_closing || _outbound.size() >= 128)
 		return false;
+	// Deliver the newest normal size before the terminal event, even if the
+	// writer has been busy with authentication/control traffic.
+	if (str(event.get(), "type") == "ended" && _windowGeometryPending)
+	{
+		std::unique_ptr<char, decltype(&free)> size(WINPR_JSON_PrintUnformatted(_windowGeometryPending.get()), free);
+		if (size) _outbound.emplace_back(std::string(size.get()) + "\n");
+		_windowGeometryPending.reset();
+	}
 	_outbound.emplace_back(std::string(encoded.get()) + "\n");
 	_condition.notify_all();
 	return true;
@@ -327,11 +335,16 @@ void SdlLauncher::writeLoop()
 		bool telemetry=false;
 		{
 			std::unique_lock lock(_mutex);
-			_condition.wait(lock, [&] { return _closing || !_outbound.empty() || _performancePending != nullptr; });
+			_condition.wait(lock, [&] { return _closing || !_outbound.empty() || _windowGeometryPending || _performancePending; });
 			if (_closing)
 				break;
             if(!_outbound.empty()) {
                 frame = std::move(_outbound.front()); _outbound.pop_front();
+            } else if (_windowGeometryPending) {
+                auto event = std::move(_windowGeometryPending);
+                std::unique_ptr<char, decltype(&free)> encoded(WINPR_JSON_PrintUnformatted(event.get()), free);
+                if (!encoded) continue;
+                frame = std::string(encoded.get()) + "\n";
             } else {
                 telemetry=true;
                 auto event=std::move(_performancePending);
@@ -515,13 +528,27 @@ bool SdlLauncher::receive(Json event)
 		const auto confirm = item(event.get(), "confirmSessionClose");
 		const auto thumbnails = item(event.get(), "thumbnailsEnabled");
 		const auto reverseWheel = item(event.get(), "reverseMouseWheel");
+		const auto remember = item(event.get(), "rememberWindowSize");
+		const auto windowSize = item(event.get(), "windowSize");
 		if ((confirm && !WINPR_JSON_IsBool(confirm)) ||
 		    (thumbnails && !WINPR_JSON_IsBool(thumbnails)) ||
-		    (reverseWheel && !WINPR_JSON_IsBool(reverseWheel)))
+		    (reverseWheel && !WINPR_JSON_IsBool(reverseWheel)) ||
+		    (remember && !WINPR_JSON_IsBool(remember)))
 			return false;
+		if (windowSize)
+		{
+			if (!WINPR_JSON_IsTrue(remember) || !WINPR_JSON_IsObject(windowSize)) return false;
+			const auto width = item(windowSize, "width"), height = item(windowSize, "height");
+			const auto w = WINPR_JSON_GetNumberValue(width), h = WINPR_JSON_GetNumberValue(height);
+			if (!WINPR_JSON_IsNumber(width) || !WINPR_JSON_IsNumber(height) ||
+			    !std::isfinite(w) || !std::isfinite(h) || w < 64 || w > 16384 || h < 64 || h > 16384 ||
+			    std::floor(w) != w || std::floor(h) != h) return false;
+			_restoreWindowSize = { static_cast<int>(w), static_cast<int>(h) };
+		}
 		_confirmSessionClose = WINPR_JSON_IsTrue(confirm);
 		_thumbnailEnabled = WINPR_JSON_IsTrue(thumbnails);
 		_reverseMouseWheel = WINPR_JSON_IsTrue(reverseWheel);
+		_rememberWindowSize = WINPR_JSON_IsTrue(remember);
 		_started = true;
 		_start = std::move(event);
 	}
@@ -1078,6 +1105,10 @@ void SdlLauncher::ended(int exitCode, const std::string& detail)
 }
 void SdlLauncher::serviceFocus()
 {
+	if (_rememberWindowSize && _geometryWindow)
+	{
+		if (auto window = SDL_GetWindowFromID(_geometryWindow)) observeWindowGeometry(window, 0);
+	}
 	if (!_focus.exchange(false))
 		return;
 	activateAccessorySession();
@@ -1089,6 +1120,32 @@ void SdlLauncher::serviceFocus()
 		std::ignore = SDL_RaiseWindow(windows[i]);
 	}
 	SDL_free(windows);
+}
+
+void SdlLauncher::configureWindowGeometry(SDL_Window* window)
+{
+	if (!_rememberWindowSize || !window || freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon))
+		return;
+	_geometryWindow = SDL_GetWindowID(window);
+	const auto previous = _windowGeometry.normalSize();
+	_windowGeometry.initialize(window, SdlWindowGeometry::valid(previous) ? previous : _restoreWindowSize);
+	_reportedWindowSize = {};
+}
+
+void SdlLauncher::observeWindowGeometry(SDL_Window* window, Uint32 type)
+{
+	if (!_rememberWindowSize || !window || SDL_GetWindowID(window) != _geometryWindow ||
+	    freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon)) return;
+	const auto size = _windowGeometry.observe(window, type);
+	if (!_connected || !size || (size->x == _reportedWindowSize.x && size->y == _reportedWindowSize.y)) return;
+	auto event = message("window_geometry");
+	auto dimensions = WINPR_JSON_AddObjectToObject(event.get(), "windowSize");
+	number(dimensions, "width", size->x); number(dimensions, "height", size->y);
+	std::lock_guard lock(_mutex);
+	if (_closing || _terminal) return;
+	_reportedWindowSize = *size;
+	_windowGeometryPending = std::move(event); // bounded latest-value queue while dragging
+	_condition.notify_all();
 }
 
 
