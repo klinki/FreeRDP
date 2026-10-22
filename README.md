@@ -1,8 +1,41 @@
 # FreeRDP: A Remote Desktop Protocol Implementation
 
+This repository is a downstream fork of [FreeRDP](https://github.com/FreeRDP/FreeRDP)
+for use with **Sheltie**, a native macOS Remote Desktop launcher. The fork focuses
+on macOS improvements, including multimonitor support, per-monitor scaling,
+rendering and session reliability, and a native launcher bridge between Sheltie
+and FreeRDP's SDL3 client.
+
+The Sheltie bridge provides structured communication for session lifecycle,
+authentication, display configuration and session controls. FreeRDP remains the
+RDP engine; Sheltie provides the macOS interface around it.
+
 FreeRDP is a free implementation of the Remote Desktop Protocol (RDP), released under the Apache license.
 Enjoy the freedom of using your software wherever you want, the way you want it, in a world where
 interoperability can finally liberate your computing experience.
+
+## Fork versioning and upstream updates
+
+`main` is the rolling downstream integration branch: the latest supported
+upstream FreeRDP release plus the current Sheltie patch stack. As an initial
+exception, its upstream base is a snapshot of upstream `master` rather than a
+release tag. Future upstream updates normally target published FreeRDP releases.
+
+The downstream patches are rebased onto each new upstream base, reviewed and
+tested before publication. Consequently, `main` may be rebased and force-pushed;
+its commit history is not a stable release reference. Contributors should fetch
+and rebase their work onto the updated `main` after an upstream update.
+
+Stable fork releases use immutable tags such as `v3.32.0-sheltie.1`. The upstream
+version identifies the FreeRDP base; the `sheltie.N` suffix identifies the fork
+release on that base. Additional fork releases increment `N`; moving to a new
+upstream release starts again at `1`. Published release tags are never moved.
+Sheltie release builds pin an exact engine tag or commit rather than following
+the moving `main` branch.
+
+Feature and fix branches are temporary development branches and may be rebased
+before integration. Maintenance branches are created from release tags only when
+an older release needs a fix; a permanent branch for every release is not required.
 
 ## Code Quality Status
 
