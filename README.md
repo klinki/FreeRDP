@@ -37,6 +37,76 @@ Feature and fix branches are temporary development branches and may be rebased
 before integration. Maintenance branches are created from release tags only when
 an older release needs a fix; a permanent branch for every release is not required.
 
+### Calculating fork versions
+
+Use Python 3.9 or newer to calculate versions from the local Git history:
+
+```sh
+python3 scripts/sheltie-version.py              # Development or exact release version
+python3 scripts/sheltie-version.py --next-tag   # Next available fork release tag
+python3 scripts/sheltie-version.py --json       # Version, base commit and revision metadata
+```
+
+The script finds the common ancestor with `upstream/master` and reads its
+FreeRDP version, preferring an upstream release tag at that commit. For a
+release-based branch, pass the upstream tag explicitly with
+`--upstream-ref 3.32.0`. Use `--ref` to describe a different branch or commit.
+
+An exact fork release returns a version such as `3.32.0-sheltie.1`. Other
+commits return a development version such as
+`3.32.0-sheltie.2.dev.4+g0123456789ab`: the next fork release number, the number
+of commits since the latest reachable fork release (or upstream base), and the
+commit ID. Modified tracked files add a `dirty` marker; untracked files are
+ignored. Upstream development suffixes are retained, so the initial master-based
+line uses tags such as `v3.32.3-dev0-sheltie.1`, distinct from release-based tags.
+
+The next release number accounts for every matching local tag, including tags
+preserved across rebases. Other upstream versions and legacy tags do not affect
+it. Use a full clone and fetch the fork's release tags before calculating a
+release tag; unfetched remote tags cannot be considered. The script does not
+fetch, create tags, change FreeRDP's build version, or modify the repository.
+
+### Preparing an upstream rebase
+
+Fetch the intended upstream release and inspect a rebase plan before applying it:
+
+```sh
+git fetch --no-tags upstream tag 3.33.0
+python3 scripts/sheltie-rebase.py --onto 3.33.0
+python3 scripts/sheltie-rebase.py --onto 3.33.0 --apply
+```
+
+Replace the example tag with the desired upstream release. The helper uses local
+refs and does not fetch automatically. Its default source is `main`; the old
+upstream base is its common ancestor with `upstream/master`. Check the printed
+base before applying. Use `--from <old-base>` when the old base is known explicitly,
+or `--upstream-ref <ref>` to change how it is inferred. An upstream branch such
+as `upstream/master` can also be passed to `--onto` when intentionally updating
+to a development snapshot.
+
+Without `--apply`, the helper only prints a plan. Applying requires the source
+branch to be checked out with no tracked changes or Git operation in progress.
+It creates a `backup/sheltie-rebase-...` branch at the original commit, checks out
+a new `update/sheltie-...` branch, and rebases the downstream range onto the chosen
+commit while preserving merge structure. Use `--update-branch <name>` to name the
+review branch. The source branch and release tags stay in place; automatic ref
+updates, stashing and autosquashing are disabled for the rebase. Untracked files
+are left to Git's normal overwrite protections.
+
+If conflicts occur, resolve and stage the affected files, then run
+`git rebase --continue`; `git rebase --abort` restores the update branch to its
+starting point. The backup remains available in either case. The helper prints
+a `git range-diff` command for comparing the old and new patch stacks; also
+review merge resolutions, which `range-diff` does not cover. Build and test the
+update branch before deliberately moving `main` to it. The helper does not move
+`main`, publish tags, push history, or run project validation automatically.
+
+Run the helper regression checks without network access:
+
+```sh
+python3 -m unittest discover -s scripts -p 'test_sheltie_*.py'
+```
+
 ## Code Quality Status
 
 [![abi-checker](https://github.com/FreeRDP/FreeRDP/actions/workflows/abi-checker.yml/badge.svg)](https://github.com/FreeRDP/FreeRDP/actions/workflows/abi-checker.yml)
