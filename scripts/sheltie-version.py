@@ -49,11 +49,15 @@ def calculate(repo, ref="HEAD", upstream_ref="upstream/master"):
     next_number = max((number for number, _ in tags), default=0) + 1
     next_tag = f"v{upstream_version}-sheltie.{next_number}"
 
-    reachable = set(git(repo, "tag", "--merged", revision).splitlines())
-    previous = max((item for item in tags if item[1] in reachable), default=None)
+    # Treat a merged patch branch as one integration step. Release anchors must
+    # be on this same path, so a tag inside a merged branch cannot reset it.
+    first_parents = set(git(repo, "rev-list", "--first-parent", revision).splitlines())
+    previous = max((item for item in tags
+                    if git(repo, "rev-parse", f"{item[1]}^{{commit}}") in first_parents),
+                   default=None)
     previous_tag = previous[1] if previous else None
     anchor = previous_tag or base
-    distance = int(git(repo, "rev-list", "--count", f"{anchor}..{revision}"))
+    distance = int(git(repo, "rev-list", "--count", "--first-parent", f"{anchor}..{revision}"))
     # Ignore untracked local logs/build artifacts, and do not attach worktree
     # dirtiness to a different revision requested with --ref.
     dirty = revision == git(repo, "rev-parse", "HEAD") and bool(
