@@ -55,8 +55,13 @@ release-based branch, pass the upstream tag explicitly with
 An exact fork release returns a version such as `3.32.0-sheltie.1`. Other
 commits return a development version such as
 `3.32.0-sheltie.2.dev.4+g0123456789ab`: the next fork release number, the number
-of commits since the latest reachable fork release (or upstream base), and the
-commit ID. Modified tracked files add a `dirty` marker; untracked files are
+of first-parent steps since the latest fork release on that path (or upstream
+base), and the commit ID. A branch with 20 commits merged using `--no-ff` counts
+as one step: the merge commit. Direct and fast-forwarded commits each count as
+one step. Tags inside merged side branches reserve release numbers but do not
+reset this counter. The rebase helper still reports the full downstream commit
+count, including side-branch commits, to describe the work being replayed.
+Modified tracked files add a `dirty` marker; untracked files are
 ignored. Upstream development suffixes are retained, so the initial master-based
 line uses tags such as `v3.32.3-dev0-sheltie.1`, distinct from release-based tags.
 

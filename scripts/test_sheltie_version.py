@@ -77,6 +77,31 @@ class VersionTests(unittest.TestCase):
         self.git("update-ref", "refs/remotes/upstream/master", self.git("rev-parse", "HEAD"))
         self.assertEqual(self.calculate()["next_tag"], "v3.33.0-sheltie.1")
 
+    def test_twenty_commit_branch_merge_counts_as_one_and_ignores_side_tag(self):
+        self.commit("first fork release")
+        self.git("tag", "v3.32.3-dev0-sheltie.1")
+        self.git("switch", "-c", "feature")
+        for i in range(20):
+            self.commit(f"feature patch {i}")
+        self.git("tag", "v3.32.3-dev0-sheltie.9")
+        self.git("switch", "main")
+        self.git("merge", "--no-ff", "feature", "-m", "Merge: Add feature")
+        result = self.calculate()
+        self.assertEqual(result["commits_since_anchor"], 1)
+        self.assertEqual(result["previous_tag"], "v3.32.3-dev0-sheltie.1")
+        self.assertIsNone(result["release_tag"])
+        self.assertEqual(result["next_tag"], "v3.32.3-dev0-sheltie.10")
+        self.commit("direct patch")
+        self.assertEqual(self.calculate()["commits_since_anchor"], 2)
+
+    def test_fast_forwarded_commits_count_individually(self):
+        self.git("switch", "-c", "feature")
+        for i in range(3):
+            self.commit(f"feature patch {i}")
+        self.git("switch", "main")
+        self.git("merge", "--ff-only", "feature")
+        self.assertEqual(self.calculate()["commits_since_anchor"], 3)
+
     def test_dirty_tracked_files_and_historical_refs(self):
         (self.repo / "local.log").write_text("untracked output")
         self.assertFalse(self.calculate()["dirty"])
