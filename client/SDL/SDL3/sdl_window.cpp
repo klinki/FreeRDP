@@ -774,6 +774,7 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 	if (!SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr))
 		return false;
 
+    if(_performanceOverlay) _performanceOverlay->draw(pixelViewport(),SDL_GetWindowPixelDensity(_window));
 	if (showTopBar && _topBar)
 	{
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
@@ -791,7 +792,6 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 		_renderMetrics.noteTopBarDraw();
 	}
 
-    if(_performanceOverlay) _performanceOverlay->draw(pixelViewport(),SDL_GetWindowPixelDensity(_window));
     const auto liveStart=_liveMetrics.nowNs();
     auto presentTimer = _renderMetrics.beginPresent();
     const auto result=SDL_RenderPresent(_renderer);
@@ -977,6 +977,29 @@ SDL_Rect SdlWindow::pixelViewport() const
 	return { 0, 0, width, height };
 }
 
+bool SdlWindow::rebuildDesktopTextures()
+{
+    if (!_renderer || !SDL_SetRenderTarget(_renderer, nullptr)) return false;
+    if (_renderTarget) SDL_DestroyTexture(_renderTarget);
+    if (_gdiTexture) SDL_DestroyTexture(_gdiTexture);
+    _renderTarget = nullptr; _gdiTexture = nullptr; _gdiTextureW = _gdiTextureH = 0;
+    _renderTargetNeedsFullRedraw = _gdiTextureNeedsFullRedraw = true;
+    return ensureRenderTarget();
+}
+
+bool SdlWindow::updateTopBarHover(float x, float y, uint64_t now)
+{
+    SDL_FPoint point{};
+    return _topBar && _renderer && windowRenderPoint(_renderer, x, y, point) &&
+        _topBar->updateHover(_topBarRect, pixelViewport(), point, now);
+}
+bool SdlWindow::serviceTopBarHover(uint64_t now) { return _topBar && _topBar->serviceHover(now); }
+bool SdlWindow::refreshMenuOpen() const { return _topBar && _topBar->refreshMenuOpen(); }
+void SdlWindow::closeRefreshMenu() { if (_topBar) _topBar->closeRefreshMenu(); }
+void SdlWindow::setRefreshCapabilities(bool server, bool updates) { if (_topBar) _topBar->setRefreshCapabilities(server, updates); }
+bool SdlWindow::refreshEnabled(SdlTopBarButton button) const { return _topBar && _topBar->refreshEnabled(button); }
+void SdlWindow::noteRefresh(SdlTopBarButton button) { if (_topBar) _topBar->noteRefresh(button); }
+
 bool SdlWindow::topBarContains(float x, float y) const
 {
 	if (!_renderer || !_topBar)
@@ -985,7 +1008,7 @@ bool SdlWindow::topBarContains(float x, float y) const
 	SDL_FPoint pointer{};
 	if (!windowRenderPoint(_renderer, x, y, pointer))
 		return false;
-	return _topBar->contains(_topBarRect, pointer);
+	return _topBar->contains(_topBarRect, windowViewport(_window), pointer);
 }
 
 bool SdlWindow::topBarNearTop(float x, float y) const
