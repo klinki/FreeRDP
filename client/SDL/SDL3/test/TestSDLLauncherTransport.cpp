@@ -218,7 +218,14 @@ namespace
         c.write("{\"v\":1,\"type\":\"refresh_screen\",\"sessionId\":\"stale\"}\n"); barrier();
         require(!c.bridge->takeScreenRefreshRequest(), "Stale session refresh accepted");
         c.command("refresh_screen"); c.command("refresh_screen"); barrier();
-        require(c.bridge->takeScreenRefreshRequest() && !c.bridge->takeScreenRefreshRequest(), "Refresh requests did not coalesce");
+        require(c.bridge->takeScreenRefreshRequests() == sdlRefreshBit(SdlRefreshMode::Server) && !c.bridge->takeScreenRefreshRequests(), "Refresh requests did not coalesce");
+        uint32_t expectedModes = 0;
+        for (const auto mode : sdlRefreshModes) {
+            c.command("refresh_screen", std::string(",\"refreshMode\":\"") + sdlRefreshName(mode) + "\"");
+            expectedModes |= sdlRefreshBit(mode);
+        }
+        barrier();
+        require(c.bridge->takeScreenRefreshRequests() == expectedModes, "Distinct refresh methods were lost");
         c.command("refresh_screen"); barrier();
         c.bridge->state("reconnecting"); std::ignore = c.next();
         require(!c.bridge->takeScreenRefreshRequest(), "Pending refresh survived reconnect");
@@ -228,6 +235,11 @@ namespace
         c.command("refresh_screen"); barrier(); c.command("cancel");
         eventually([&] { return c.bridge->cancelled(); }, "Cancel not applied");
         require(!c.bridge->takeScreenRefreshRequest(), "Cancelled refresh was delivered");
+        for (const auto value : {"\"unknown\"", "1", "null", "true"}) {
+            Connection invalid;
+            invalid.command("refresh_screen", std::string(",\"refreshMode\":") + value);
+            eventually([&] { return invalid.bridge->cancelled(); }, "Invalid refresh mode was accepted");
+        }
     }
 	void closeConfirmation()
 	{
