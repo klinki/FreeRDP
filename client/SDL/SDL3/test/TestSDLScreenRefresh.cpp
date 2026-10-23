@@ -1,4 +1,4 @@
-/** Screen refresh requests and cached-pixel recovery. Apache-2.0. */
+/** Screen refresh variants, safe output restart and hover controls. Apache-2.0. */
 #include "sdl_context.hpp"
 #include "sdl_types.hpp"
 #include "dialogs/sdl_dialogs.hpp"
@@ -21,6 +21,7 @@ struct SdlScreenRefreshFixture
         gdi.primary_buffer = pixels.data(); context->gdi = &gdi;
     }
     ~SdlScreenRefreshFixture() { context->gdi = nullptr; }
+    static void suppress(SdlContext& sdl, bool value) { sdl._screenOutputSuppressed = value; }
     bool initialize(SdlContext& sdl)
     {
         sdl._sdlPixelFormat = SDL_PIXELFORMAT_BGRA32;
@@ -30,157 +31,231 @@ struct SdlScreenRefreshFixture
     }
 };
 
-static unsigned calls = 0, remoteMouseEvents = 0;
-static BOOL captureMouse(rdpInput*, UINT16, UINT16, UINT16) { ++remoteMouseEvents; return TRUE; }
-static RECTANGLE_16 captured{};
-static bool sendSucceeds = true;
-static bool connectionThread = true;
-static BOOL captureRefresh(rdpContext*, BYTE count, const RECTANGLE_16* areas)
+
+struct Call { char kind; RECTANGLE_16 area{}; };
+static std::vector<Call> calls;
+static unsigned remoteMouse = 0, remoteKeys = 0;
+static bool redrawOK = true, pauseOK = true, onConnectionThread = true;
+static int resumeFailures = 0;
+static BOOL mouse(rdpInput*, UINT16, UINT16, UINT16) { ++remoteMouse; return TRUE; }
+static BOOL key(rdpInput*, UINT16, UINT8) { ++remoteKeys; return TRUE; }
+static BOOL refresh(rdpContext*, BYTE count, const RECTANGLE_16* areas)
 {
-    connectionThread = connectionThread && !SDL_IsMainThread();
+    onConnectionThread &= !SDL_IsMainThread();
     if (count != 1 || !areas) return FALSE;
-    ++calls;
-    captured = areas[0];
-    return sendSucceeds;
+    calls.push_back({'R', areas[0]}); return redrawOK;
 }
-static bool expect(bool value, const char* message)
+static BOOL suppress(rdpContext*, BYTE allow, const RECTANGLE_16* area)
 {
-    if (!value) fprintf(stderr, "FAIL: %s\n", message);
-    return value;
+    onConnectionThread &= !SDL_IsMainThread();
+    if ((allow == 0 && area) || (allow != 0 && !area)) return FALSE;
+    calls.push_back({allow ? 'U' : 'P', area ? *area : RECTANGLE_16{}});
+    if (!allow) return pauseOK;
+    if (resumeFailures > 0) { --resumeFailures; return FALSE; }
+    return TRUE;
 }
-static void service(SdlContext& sdl)
+static bool expect(bool ok, const char* message)
 {
-    std::thread worker([&] { sdl.serviceScreenRefresh(); });
-    worker.join();
+    if (!ok) fprintf(stderr, "FAIL: %s\n", message);
+    return ok;
 }
-static bool pixelIsGreen(SdlWindow& window, bool green)
+static bool service(SdlContext& context)
 {
-    std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> pixels(
-        SDL_RenderReadPixels(window.renderer(), nullptr), SDL_DestroySurface);
-    Uint8 r = 0, g = 0, b = 0, a = 0;
-    return pixels && SDL_ReadSurfacePixel(pixels.get(), pixels->w / 2, pixels->h / 2, &r, &g, &b, &a) &&
-        (green ? g == 170 && r == 0 && b == 0 : r == 0 && g == 0 && b == 0);
+    bool result = false;
+    std::thread worker([&] { result = context.serviceScreenRefresh(); }); worker.join();
+    return result;
 }
-static bool topBar(const char* preview)
+static std::string order()
 {
-    std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> pixels(
-        SDL_CreateSurface(800, 160, SDL_PIXELFORMAT_RGBA32), SDL_DestroySurface);
+    std::string result; for (const auto& call : calls) result += call.kind; return result;
+}
+static bool green(SdlWindow& window, bool expected)
+{
+    std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> pixels(SDL_RenderReadPixels(window.renderer(), nullptr), SDL_DestroySurface);
+    Uint8 r=0,g=0,b=0,a=0;
+    return pixels && SDL_ReadSurfacePixel(pixels.get(), pixels->w/2, pixels->h/2, &r,&g,&b,&a) &&
+        (expected ? r==0 && g==170 && b==0 : r==0 && g==0 && b==0);
+}
+static SDL_FPoint findButton(SdlTopBar& bar, const SdlTopBarRect& rect, const SDL_Rect& viewport, SdlTopBarButton button)
+{
+    for (float x=rect.x; x<rect.x+rect.w; ++x)
+        if (bar.hitTest(rect, viewport, {x, rect.y+rect.h/2})==button) return {x+2, rect.y+rect.h/2};
+    return {-1,-1};
+}
+static bool layoutAndPreview(const char* preview)
+{
+    std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> pixels(SDL_CreateSurface(1300, 320, SDL_PIXELFORMAT_RGBA32), SDL_DestroySurface);
     if (!pixels) return false;
-    std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer(
-        SDL_CreateSoftwareRenderer(pixels.get()), SDL_DestroyRenderer);
+    std::unique_ptr<SDL_Renderer, decltype(&SDL_DestroyRenderer)> renderer(SDL_CreateSoftwareRenderer(pixels.get()), SDL_DestroyRenderer);
     if (!renderer) return false;
-    SdlTopBar bar(renderer.get(), "Remote Desktop");
-    bar.setPerformanceAvailable(true);
-    const SDL_Rect viewport{0, 0, 800, 160};
-    SDL_SetRenderDrawColor(renderer.get(), 58, 85, 104, 255);
-    SDL_RenderClear(renderer.get());
-    for (const bool compact : {false, true})
-    {
-        auto rect = SdlTopBar::clampToViewport(SdlTopBar::defaultRect(viewport, compact), viewport, compact);
-        rect.y = compact ? 85 : 10;
-        SDL_FPoint refresh{-1, -1};
-        for (float x = rect.x; x < rect.x + rect.w; ++x)
-            if (bar.hitTest(rect, viewport, {x, rect.y + rect.h / 2}) == SdlTopBarButton::Refresh)
-            { refresh = {x + 2, rect.y + rect.h / 2}; break; }
-        if (!expect(refresh.x >= rect.x && !bar.hitMove(rect, viewport, refresh), "Refresh owns clicks in both bar densities") ||
-            !bar.draw(rect, viewport, true, refresh)) return false;
+    SdlTopBar bar(renderer.get(), "Remote Desktop"); bar.setPerformanceAvailable(true);
+    SDL_SetRenderDrawColor(renderer.get(),58,85,104,255); SDL_RenderClear(renderer.get());
+    for (const bool compact : {false,true}) {
+        const SDL_Rect viewport{0,0,1300,320};
+        auto rect=SdlTopBar::defaultRect(viewport,compact); rect.x=compact?700:20; rect.y=20;
+        bar.closeRefreshMenu();
+        const auto point=findButton(bar,rect,viewport,SdlTopBarButton::Refresh);
+        if (!expect(point.x>=0 && bar.updateHover(rect,viewport,point,100),"Hover opens refresh panel in both densities") ||
+            !bar.draw(rect,viewport,true,point)) return false;
     }
     SDL_RenderPresent(renderer.get());
-    return !preview || SDL_SaveBMP(pixels.get(), preview);
+    if (preview && !SDL_SaveBMP(pixels.get(),preview)) return false;
+    for (const auto viewport : {SDL_Rect{0,0,320,200},SDL_Rect{0,0,800,600},SDL_Rect{0,0,3840,2160}})
+        for (const bool compact : {false,true}) for (const bool bottom : {false,true}) for (const bool right : {false,true}) {
+            auto rect=SdlTopBar::clampToViewport(SdlTopBar::defaultRect(viewport,compact),viewport,compact);
+            rect.x=right?viewport.w-rect.w:0; rect.y=bottom?viewport.h-rect.h:0;
+            bar.closeRefreshMenu(); const auto point=findButton(bar,rect,viewport,SdlTopBarButton::Refresh);
+            if (!bar.updateHover(rect,viewport,point,100)) return false;
+            const auto menu=bar.refreshMenuRect(rect,viewport);
+            if (!expect(menu.x>=0 && menu.y>=0 && menu.x+menu.w<=viewport.w && menu.y+menu.h<=viewport.h,
+                        "Popup stays inside small, Retina, and edge-positioned viewports")) return false;
+            const float bridgeY=bottom?rect.y-1:rect.y+rect.h+1;
+            const SDL_FPoint bridge{point.x,bridgeY};
+            if (!expect(bar.contains(rect,viewport,bridge),"The gap between icon and panel remains local")) return false;
+            std::ignore=bar.updateHover(rect,viewport,bridge,110);
+            for (size_t i=0;i<sdlRefreshModes.size();++i) {
+                const SDL_FPoint row{menu.x+menu.w/2,menu.y+(i+0.5f)*menu.h/5};
+                const auto button=SdlTopBar::refreshButton(sdlRefreshModes[i]);
+                if (!expect(bar.hitTest(rect,viewport,row)==button && !bar.hitMove(rect,viewport,row),"Each popup button owns its row without moving the bar")) return false;
+            }
+            std::ignore=bar.updateHover(rect,viewport,{-5,-5},200);
+            if (!expect(bar.refreshMenuOpen() && !bar.serviceHover(499) && bar.serviceHover(500) && !bar.refreshMenuOpen(),
+                        "Leaving the hover region closes the panel after a bounded grace period")) return false;
+        }
+    bar.setRefreshCapabilities(false,false);
+    return expect(!bar.refreshEnabled(SdlTopBarButton::RefreshServer) && !bar.refreshEnabled(SdlTopBarButton::RefreshUpdates) &&
+                  bar.refreshEnabled(SdlTopBarButton::RefreshCombined),"Unsupported server methods are disabled individually");
 }
 static bool run()
 {
-    std::unique_ptr<freerdp, decltype(&freerdp_free)> instance(freerdp_new(), freerdp_free);
+    std::unique_ptr<freerdp,decltype(&freerdp_free)> instance(freerdp_new(),freerdp_free);
     if (!instance) return false;
-    instance->ContextSize = sizeof(sdl_rdp_context);
+    instance->ContextSize=sizeof(sdl_rdp_context);
     if (!freerdp_context_new(instance.get())) return false;
-    struct Guard { freerdp* value; ~Guard() { freerdp_context_free(value); } } guard{instance.get()};
-    SdlContext sdl(instance->context);
-    reinterpret_cast<sdl_rdp_context*>(instance->context)->sdl = &sdl;
-    const auto settings = instance->context->settings;
-    freerdp_settings_set_string(settings, FreeRDP_ServerHostname, "refresh-test.invalid");
-    freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, 320);
-    freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, 200);
-    freerdp_settings_set_bool(settings, FreeRDP_RefreshRect, TRUE);
-    freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, FALSE);
-    SdlScreenRefreshFixture framebuffer(instance->context);
-    if (!framebuffer.initialize(sdl) || !sdl.detectDisplays()) return false;
-    const auto ids = sdl.getDisplayIds();
-    if (ids.empty() || !sdl.addDisplayWindow(ids.front())) return false;
-    const auto window = sdl.getFirstWindow();
-    if (!window) return false;
-    const auto gdi = instance->context->gdi;
-    for (int y = 0; y < gdi->height; ++y)
-        for (int x = 0; x < gdi->width; ++x)
-        {
-            auto pixel = gdi->primary_buffer + y * gdi->stride + x * 4;
-            pixel[0] = 0; pixel[1] = 170; pixel[2] = 0; pixel[3] = 255;
-        }
-    instance->context->update->RefreshRect = captureRefresh;
-    sdl.requestScreenRefresh(); service(sdl);
-    if (!expect(calls == 0, "Disconnected refresh is discarded")) return false;
+    struct Guard { freerdp* value; ~Guard(){freerdp_context_free(value);} } guard{instance.get()};
+    SdlContext sdl(instance->context); reinterpret_cast<sdl_rdp_context*>(instance->context)->sdl=&sdl;
+    const auto settings=instance->context->settings;
+    if (!freerdp_settings_set_string(settings,FreeRDP_ServerHostname,"refresh-test.invalid") ||
+        !freerdp_settings_set_uint32(settings,FreeRDP_DesktopWidth,320) ||
+        !freerdp_settings_set_uint32(settings,FreeRDP_DesktopHeight,200) ||
+        !freerdp_settings_set_bool(settings,FreeRDP_RefreshRect,TRUE) ||
+        !freerdp_settings_set_bool(settings,FreeRDP_SuppressOutput,TRUE) ||
+        !freerdp_settings_set_bool(settings,FreeRDP_UseMultimon,FALSE)) return false;
+    SdlScreenRefreshFixture frame(instance->context);
+    if (!frame.initialize(sdl) || !sdl.detectDisplays()) return false;
+    const auto displays=sdl.getDisplayIds(); if (displays.empty() || !sdl.addDisplayWindow(displays.front())) return false;
+    const auto window=sdl.getFirstWindow(); if (!window) return false;
+    for (size_t p=0;p<frame.pixels.size();p+=4) {frame.pixels[p]=0;frame.pixels[p+1]=170;frame.pixels[p+2]=0;frame.pixels[p+3]=255;}
+    instance->context->update->RefreshRect=refresh; instance->context->update->SuppressOutput=suppress;
+    instance->context->input->MouseEvent=mouse; instance->context->input->KeyboardEvent=key;
+    sdl.requestScreenRefresh(); if (!service(sdl) || !expect(calls.empty(),"Disconnected requests are discarded")) return false;
     sdl.setConnected(true);
-    if (!window->fill() || !window->updateSurface() || !pixelIsGreen(*window, false)) return false;
-    sdl.requestScreenRefresh(); sdl.requestScreenRefresh();
-    if (!expect(calls == 0, "SDL thread only queues the server request") ||
-        !expect(pixelIsGreen(*window, true), "Refresh restores pixels from the desktop buffer")) return false;
-    service(sdl); service(sdl);
-    if (!expect(calls == 1 && connectionThread, "Requests coalesce and send on the connection thread") ||
-        !expect(captured.left == 0 && captured.top == 0 && captured.right == 319 && captured.bottom == 199,
-                "Server refresh covers the complete composed desktop with inclusive coordinates")) return false;
-    freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, 3840);
-    freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, 2160);
-    sdl.requestScreenRefresh(); service(sdl);
-    if (!expect(calls == 2 && captured.right == 3839 && captured.bottom == 2159,
-                "Server request uses current desktop dimensions instead of Mac window size")) return false;
-    freerdp_settings_set_bool(settings, FreeRDP_RefreshRect, FALSE);
-    if (!window->fill() || !window->updateSurface()) return false;
-    sdl.requestScreenRefresh(); service(sdl);
-    if (!expect(calls == 2 && pixelIsGreen(*window, true), "Unsupported servers still receive a local repaint")) return false;
-    freerdp_settings_set_bool(settings, FreeRDP_RefreshRect, TRUE);
-    for (const UINT32 dimension : {0U, 65537U})
-    {
-        freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, dimension);
-        sdl.requestScreenRefresh(); service(sdl);
+    for (const auto mode : {SdlRefreshMode::Local,SdlRefreshMode::Textures}) {
+        if (!window->fill()) return false;
+        const auto target=SDL_GetRenderTarget(window->renderer());
+        if (!target || !SDL_SetBooleanProperty(SDL_GetTextureProperties(target),"refresh.test.marker",true) ||
+            !window->updateSurface() || !green(*window,false)) return false;
+        sdl.requestScreenRefresh(mode);
+        if (!expect(green(*window,true) && calls.empty(),"Local methods repair the cached display without remote packets")) return false;
+        if (!window->fill()) return false;
+        const bool retained=SDL_GetBooleanProperty(SDL_GetTextureProperties(SDL_GetRenderTarget(window->renderer())),"refresh.test.marker",false);
+        if (!expect(retained==(mode==SdlRefreshMode::Local),"Texture rebuild recreates targets; simple repaint retains them")) return false;
+        sdl.requestScreenRefresh(SdlRefreshMode::Local);
     }
-    if (!expect(calls == 2, "Invalid rectangle dimensions are discarded")) return false;
-    freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, 320);
-    sdl.requestScreenRefresh(); sdl.setConnected(false); sdl.setConnected(true); service(sdl);
-    if (!expect(calls == 2, "Pending refresh cannot cross a disconnect")) return false;
-    sdl.requestScreenRefresh(); sdl.setReconnecting(true); service(sdl);
-    sdl.requestScreenRefresh(); sdl.setReconnecting(false); service(sdl);
-    if (!expect(calls == 2, "Reconnecting refresh requests are discarded")) return false;
-    sendSucceeds = false;
-    sdl.requestScreenRefresh(); service(sdl);
-    if (!expect(calls == 3 && sdl.isConnected(), "Refresh failure does not terminate the session")) return false;
-    sendSucceeds = true;
-    freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, TRUE);
-    instance->context->input->MouseEvent = captureMouse;
+    sdl.requestScreenRefresh(); sdl.requestScreenRefresh();
+    if (!expect(calls.empty(),"Server requests remain off the SDL thread") || !service(sdl) || !service(sdl) ||
+        !expect(order()=="R" && calls.back().area.right==319 && calls.back().area.bottom==199,"Legacy click coalesces into an inclusive full-desktop request")) return false;
+    calls.clear(); sdl.requestScreenRefresh(SdlRefreshMode::Updates); if (!service(sdl) || !expect(order()=="PU","Restart updates pauses then resumes without a Refresh Rect")) return false;
+    calls.clear(); sdl.requestScreenRefresh(SdlRefreshMode::Combined); if (!service(sdl) || !expect(order()=="PUR","Combined recovery resumes before requesting a redraw")) return false;
+    if (!freerdp_settings_set_uint32(settings,FreeRDP_DesktopWidth,3840) || !freerdp_settings_set_uint32(settings,FreeRDP_DesktopHeight,2160)) return false;
+    calls.clear(); sdl.requestScreenRefresh(SdlRefreshMode::Combined); if (!service(sdl) || !expect(calls.back().area.right==3839 && calls.back().area.bottom==2159,"Server methods use the current composed desktop dimensions")) return false;
+    for (const UINT32 dimension : {0U,65537U}) {
+        if (!freerdp_settings_set_uint32(settings,FreeRDP_DesktopWidth,dimension)) return false;
+        calls.clear(); sdl.requestScreenRefresh(SdlRefreshMode::Combined); if (!service(sdl) || !expect(calls.empty(),"Invalid dimensions never pause output")) return false;
+    }
+    if (!freerdp_settings_set_uint32(settings,FreeRDP_DesktopWidth,320) || !freerdp_settings_set_uint32(settings,FreeRDP_DesktopHeight,200)) return false;
+    for (const auto setting : {FreeRDP_RefreshRect,FreeRDP_SuppressOutput}) {
+        if (!freerdp_settings_set_bool(settings,setting,FALSE)) return false;
+        calls.clear(); sdl.requestScreenRefresh(SdlRefreshMode::Combined); if (!service(sdl) || !expect(order()==(setting==FreeRDP_RefreshRect?"PU":"R"),"Combined recovery retains supported components")) return false;
+        if (!freerdp_settings_set_bool(settings,setting,TRUE)) return false;
+    }
+    calls.clear(); pauseOK=false; sdl.requestScreenRefresh(SdlRefreshMode::Updates);
+    if (!service(sdl) || !expect(order()=="PU","A failed pause never skips the resume attempt")) return false; pauseOK=true;
+    calls.clear(); resumeFailures=1; sdl.requestScreenRefresh(SdlRefreshMode::Updates);
+    if (!service(sdl) || !service(sdl) || !expect(order()=="PUU","A failed resume is retried without pausing again")) return false;
+    calls.clear(); resumeFailures=1; sdl.requestScreenRefresh(SdlRefreshMode::Combined);
+    if (!service(sdl) || !service(sdl) || !expect(order()=="PUUR","Combined recovery defers its redraw until resume succeeds")) return false;
+    calls.clear(); resumeFailures=20; sdl.requestScreenRefresh(SdlRefreshMode::Updates);
+    if (!service(sdl) || !service(sdl) || !service(sdl) || service(sdl) || !expect(order()=="PUUUU","Repeated resume failure triggers bounded transport recovery")) return false;
+    resumeFailures=0; sdl.setConnected(false); sdl.setConnected(true);
+    calls.clear(); SdlScreenRefreshFixture::suppress(sdl,true); sdl.requestScreenRefresh(SdlRefreshMode::Combined);
+    if (!service(sdl) || !expect(calls.empty(),"Refresh does not resume intentionally hidden/minimized output")) return false;
+    SdlScreenRefreshFixture::suppress(sdl,false);
+    for (const bool reconnect : {false,true}) {
+        calls.clear(); sdl.requestScreenRefresh(SdlRefreshMode::Combined);
+        if (reconnect) {sdl.setReconnecting(true);sdl.requestScreenRefresh(SdlRefreshMode::Combined);sdl.setReconnecting(false);}
+        else {sdl.setConnected(false);sdl.setConnected(true);}
+        if (!service(sdl) || !expect(calls.empty(),"Pending methods cannot cross disconnect/reconnect")) return false;
+    }
+    calls.clear(); redrawOK=false; sdl.requestScreenRefresh();
+    if (!service(sdl) || !expect(sdl.isConnected(),"Redraw failure remains nonfatal")) return false; redrawOK=true;
+    if (!freerdp_settings_set_bool(settings,FreeRDP_UseMultimon,TRUE) || !sdl.repaintAll()) return false;
+    SdlTopBar geometry(nullptr,"");
+    window->setPerformanceOverlay(true,"FPS: 60\nRTT: 12 ms\nRx: 2 MiB/s",SdlPerformanceOverlay::Style::Panel);
     if (!sdl.repaintAll()) return false;
-    const auto bar = window->topBarRect();
-    SDL_FPoint refresh{-1, -1};
-    for (float x = bar.x; x < bar.x + bar.w; ++x)
-        if (window->topBarButtonAt(x, bar.y + bar.h / 2) == SdlTopBarButton::Refresh)
-        { refresh = {x + 2, bar.y + bar.h / 2}; break; }
-    SDL_Event event{};
-    event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
-    event.button.windowID = window->id(); event.button.button = SDL_BUTTON_LEFT;
-    event.button.x = refresh.x; event.button.y = refresh.y;
-    if (!expect(refresh.x >= bar.x && sdl.handleEvent(event), "Refresh press is handled locally")) return false;
-    event.type = SDL_EVENT_MOUSE_BUTTON_UP;
-    if (!expect(sdl.handleEvent(event), "Refresh release is handled locally")) return false;
-    service(sdl);
-    if (!expect(calls == 4 && remoteMouseEvents == 0, "Top-bar click triggers refresh without remote mouse input")) return false;
-    sdl.setConnected(false);
-    return true;
+    // Place the performance overlay underneath the hover panel; the popup must own the click.
+    const auto popup=geometry.refreshMenuRect(window->topBarRect(),window->pixelViewport());
+    auto overlay=window->performanceOverlay();
+    const auto bounds=overlay->bounds();
+    SDL_MouseButtonEvent drag{};drag.type=SDL_EVENT_MOUSE_BUTTON_DOWN;drag.button=SDL_BUTTON_LEFT;
+    SdlPerformanceOverlay::Action action;
+    if (!overlay->button(drag,{bounds.x+10,bounds.y+10},action) ||
+        !overlay->motion({popup.x+10,popup.y+10})) return false;
+    drag.type=SDL_EVENT_MOUSE_BUTTON_UP;
+    if (!overlay->button(drag,{popup.x+10,popup.y+10},action)) return false;
+    if (!sdl.repaintAll()) return false;
+    for (const auto mode : sdlRefreshModes) {
+        window->closeRefreshMenu(); calls.clear();
+        const auto bar=window->topBarRect();
+        const auto anchor=findButton(geometry,bar,window->pixelViewport(),SdlTopBarButton::Refresh);
+        SDL_Event event{}; event.type=SDL_EVENT_MOUSE_MOTION;event.motion.windowID=window->id();event.motion.x=anchor.x;event.motion.y=anchor.y;
+        if (!sdl.handleEvent(event) || !expect(window->refreshMenuOpen(),"Real SDL pointer movement opens the panel")) return false;
+        const auto menu=geometry.refreshMenuRect(bar,window->pixelViewport());
+        const auto i=static_cast<unsigned>(mode);
+        const SDL_FPoint point{menu.x+menu.w/2,menu.y+(i+0.5f)*menu.h/5};
+        event={};event.type=SDL_EVENT_MOUSE_BUTTON_DOWN;event.button.windowID=window->id();event.button.button=SDL_BUTTON_LEFT;event.button.x=point.x;event.button.y=point.y;
+        if (!sdl.handleEvent(event)) return false;
+        event.type=SDL_EVENT_MOUSE_BUTTON_UP;if (!sdl.handleEvent(event) || !service(sdl)) return false;
+        const std::string expected=mode==SdlRefreshMode::Server?"R":mode==SdlRefreshMode::Updates?"PU":mode==SdlRefreshMode::Combined?"PUR":"";
+        if (!expect(order()==expected && remoteMouse==0 && !overlay->capturing(),
+                    "Each hover button invokes its own method without remote input or underlying overlay capture")) return false;
+    }
+    // Pressing one row and releasing elsewhere cancels locally and still closes the hover panel.
+    window->closeRefreshMenu(); calls.clear();
+    const auto barRect=window->topBarRect();
+    const auto anchor=findButton(geometry,barRect,window->pixelViewport(),SdlTopBarButton::Refresh);
+    SDL_Event move{};move.type=SDL_EVENT_MOUSE_MOTION;move.motion.windowID=window->id();move.motion.x=anchor.x;move.motion.y=anchor.y;
+    if (!sdl.handleEvent(move)) return false;
+    const auto menuRect=geometry.refreshMenuRect(barRect,window->pixelViewport());
+    SDL_Event press{};press.type=SDL_EVENT_MOUSE_BUTTON_DOWN;press.button.windowID=window->id();press.button.button=SDL_BUTTON_LEFT;
+    press.button.x=menuRect.x+menuRect.w/2;press.button.y=menuRect.y+menuRect.h*0.5f;
+    if (!sdl.handleEvent(press)) return false;
+    press.type=SDL_EVENT_MOUSE_BUTTON_UP;press.button.x=-10;press.button.y=-10;
+    if (!sdl.handleEvent(press) || !service(sdl) || !expect(calls.empty() && remoteMouse==0,"Dragging off a popup row cancels without a remote release")) return false;
+    SDL_Delay(350);sdl.serviceRefreshHover();
+    if (!expect(!window->refreshMenuOpen(),"An outside release does not leave the popup stuck open")) return false;
+    if (!sdl.handleEvent(move) || !expect(window->refreshMenuOpen(),"Hover reopens the popup after dismissal")) return false;
+    SDL_Event escape{};escape.type=SDL_EVENT_KEY_DOWN;escape.key.windowID=window->id();escape.key.scancode=SDL_SCANCODE_ESCAPE;
+    if (!sdl.handleEvent(escape)) return false;escape.type=SDL_EVENT_KEY_UP;
+    if (!sdl.handleEvent(escape) || !expect(!window->refreshMenuOpen() && remoteKeys==0,"Escape closes the panel without forwarding an orphan key-up")) return false;
+    if (!expect(onConnectionThread,"All refresh control packets stay on the RDP thread")) return false;
+    sdl.setConnected(false);return true;
 }
-int main(int argc, char** argv)
+int main(int argc,char** argv)
 {
-    SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy");
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) return 1;
-    sdl_dialogs_init();
-    const bool success = run() && topBar(argc > 1 ? argv[1] : nullptr);
-    sdl_dialogs_uninit(); SDL_Quit();
-    if (success) puts("PASS screen refresh requests, pixel recovery, reconnect safety, and top-bar controls");
-    return success ? 0 : 1;
+    SDL_SetHint(SDL_HINT_VIDEO_DRIVER,"dummy"); if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS)) return 1;
+    sdl_dialogs_init();const bool ok=run() && layoutAndPreview(argc>1?argv[1]:nullptr);
+    sdl_dialogs_uninit();SDL_Quit();
+    if (ok) puts("PASS five refresh methods, failure-safe resume, cached pixels, and hover-panel input/layout");
+    return ok?0:1;
 }

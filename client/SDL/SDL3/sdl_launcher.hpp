@@ -13,6 +13,7 @@
 #include <freerdp/freerdp.h>
 #include <winpr/json.h>
 #include "sdl_monitor_selection.hpp"
+#include "sdl_refresh.hpp"
 #include "sdl_window_geometry.hpp"
 
 class SdlContext;
@@ -49,7 +50,8 @@ class SdlLauncher
 	bool cancelled() const;
 	bool hadConnected() const;
 	void serviceFocus(); // SDL main thread only
-	bool takeScreenRefreshRequest() { return _screenRefresh.exchange(false) && _connected && !_cancelled && !_terminal; }
+	uint32_t takeScreenRefreshRequests() { const auto modes = _screenRefresh.exchange(0); return _connected && !_cancelled && !_terminal ? modes : 0; }
+	bool takeScreenRefreshRequest() { return takeScreenRefreshRequests() != 0; }
 	bool requestClose(); // SDL main thread: queues a decision; never waits.
 	bool closeConfirmationEnabled() const;
 	bool thumbnailsEnabled() const;
@@ -116,7 +118,7 @@ class SdlLauncher
 	std::thread _reader, _writer, _thumbnailWorker;
 	std::atomic<bool> _confirmSessionClose{ false }, _thumbnailEnabled{ false }, _connected{ false };
 	std::atomic<bool> _reverseMouseWheel{ false };
-	std::atomic<bool> _screenRefresh{ false };
+	std::atomic<uint32_t> _screenRefresh{ 0 };
 	std::atomic<bool> _cancelled{ false }, _closing{ false }, _focus{ false };
 	std::atomic<bool> _hadConnected{ false }, _terminal{ false };
 	bool _credentialsRead = false;

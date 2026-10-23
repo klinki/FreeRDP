@@ -31,6 +31,7 @@ set(SRCS
     sdl_input.hpp
     sdl_input_mapping.hpp
     sdl_update_queue.hpp
+    sdl_refresh.hpp
     sdl_render_metrics.hpp
     sdl_render_geometry.hpp
     sdl_touch.cpp

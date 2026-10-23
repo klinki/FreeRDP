@@ -68,6 +68,14 @@ class SdlWindow
     }
     SdlPerformanceOverlay* performanceOverlay() {return _performanceOverlay.get();}
 	[[nodiscard]] bool ensureRenderTarget();
+	[[nodiscard]] bool rebuildDesktopTextures();
+	[[nodiscard]] bool updateTopBarHover(float x, float y, uint64_t now);
+	[[nodiscard]] bool serviceTopBarHover(uint64_t now);
+	[[nodiscard]] bool refreshMenuOpen() const;
+	void closeRefreshMenu();
+	void setRefreshCapabilities(bool server, bool updates);
+	[[nodiscard]] bool refreshEnabled(SdlTopBarButton button) const;
+	void noteRefresh(SdlTopBarButton button);
 	[[nodiscard]] bool needsFullRedraw() const;
 	[[nodiscard]] bool needsFullRedraw(int surfaceWidth, int surfaceHeight) const;
 
