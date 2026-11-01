@@ -210,6 +210,10 @@ if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
   set_property(TARGET TestSDLRenderGeometry PROPERTY FOLDER "FreeRDP/Client/Test")
 
   add_executable(TestSDLRenderWindow test/TestSDLRenderWindow.cpp sdl_window.cpp sdl_utils.cpp)
+  # sdl_window.cpp reports window state through the bridge when it is compiled in.
+  if(SDL_LAUNCHER_BRIDGE_ENABLED)
+    target_sources(TestSDLRenderWindow PRIVATE sdl_launcher.cpp sdl_launcher_macos.mm)
+  endif()
   target_link_libraries(TestSDLRenderWindow PRIVATE ${LIBS})
   set_target_properties(TestSDLRenderWindow PROPERTIES RUNTIME_OUTPUT_DIRECTORY
                         "${TESTING_OUTPUT_DIRECTORY}")
