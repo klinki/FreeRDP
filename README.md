@@ -37,6 +37,9 @@ every engine release a unique number. Published release tags are never moved.
 Sheltie release builds pin an exact engine tag or commit rather than following
 the moving `main` branch.
 
+Each fork release tag builds, tests and publishes the runtime Sheltie bundles;
+see [Sheltie runtime releases](scripts/sheltie/README.md).
+
 Feature and fix branches are temporary development branches and may be rebased
 before integration. Maintenance branches are created from release tags only when
 an older release needs a fix; a permanent branch for every release is not required.
