@@ -1,5 +1,10 @@
 # UDP review harness archive
 
+Raw review logs referenced below and from the investigation notes (`logs/...`)
+were removed from the patch stack during the 3.32.2 rebase to keep fork history
+small. They remain available at tag `archive/master-pre-3.32.2-rebase`, under
+`tools/udp-review-tests/logs/`.
+
 Saved from the review session's `/tmp/udp-review-*` files on 2026-09-06.
 These are historical diagnostic harnesses, not a replacement for `TestRdpeUdp`.
 Several intentionally reproduce old defects and return success after printing
