@@ -1,0 +1,132 @@
+name: Sheltie runtime
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*-sheltie.*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sheltie-runtime-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  scripts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Test versioning, rebase and manifest helpers
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_sheltie_*.py' -v
+          python3 -m unittest discover -s scripts/sheltie/tests -p 'test_release_manifest.py' -v
+
+  runtime:
+    needs: scripts
+    runs-on: macos-26
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+      MACOSX_DEPLOYMENT_TARGET: '26.0'
+      BUILD_JOBS: '3'
+      RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch upstream for fork versioning
+        run: git fetch --no-tags https://github.com/FreeRDP/FreeRDP.git +refs/heads/master:refs/remotes/upstream/master
+      - name: Resolve version
+        id: version
+        run: |
+          python3 scripts/sheltie-version.py --json | tee "$RUNNER_TEMP/version.json"
+          echo "version=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$RUNNER_TEMP/version.json")" >> "$GITHUB_OUTPUT"
+      - name: Check release tag
+        if: env.RELEASE_TAG != ''
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          git merge-base --is-ancestor HEAD origin/main || { echo "::error::Release tags must point to a commit on main."; exit 1; }
+          python3 scripts/sheltie/release_manifest.py check-release --version-json "$RUNNER_TEMP/version.json" --tag "$RELEASE_TAG"
+      - name: Install build dependencies
+        run: |
+          brew update
+          brew install cmake pkgconf sdl3 sdl3_ttf openssl@3 ffmpeg jansson libusb uriparser
+          brew upgrade sdl3 sdl3_ttf openssl@3 ffmpeg jansson libusb uriparser
+      - name: Test packaging helpers
+        run: python3 -m unittest discover -s scripts/sheltie/tests -v
+      - name: Build and test engine
+        run: BUILD_SAMPLE_SERVER=ON BUILD_ENGINE_TESTS=ON bash scripts/sheltie/build-engine.sh "$PWD"
+      - name: Package and smoke-test runtime
+        run: bash scripts/sheltie/package-runtime.sh "$PWD" "$RUNNER_TEMP/sheltie" "$RELEASE_TAG"
+      - name: Summarize
+        run: |
+          python3 - "$RUNNER_TEMP/sheltie/dist/runtime-manifest.json" >> "$GITHUB_STEP_SUMMARY" <<'PY'
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          print(f"### Sheltie runtime {m['engine_version']}\n")
+          print(f"- FreeRDP base: {m['upstream_version']} (`{m['upstream_base'][:12]}`)")
+          print(f"- Revision: `{m['engine_revision']}`")
+          print(f"- Bridge protocol {m['bridge']['protocol_version']}: {', '.join(m['bridge']['capabilities'])}")
+          print("- Dependencies: " + ", ".join(f"{d['formula']} {d['version']}" for d in m.get('dependencies', [])))
+          PY
+          cat "$RUNNER_TEMP/sheltie/dist/SHA256SUMS" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sheltie-runtime
+          path: ${{ runner.temp }}/sheltie/dist/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: sheltie-runtime-smoke-diagnostics
+          path: |
+            ${{ runner.temp }}/sheltie/smoke-*
+          if-no-files-found: ignore
+          retention-days: 14
+
+  publish:
+    needs: runtime
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: sheltie-runtime
+          path: dist
+      - name: Verify checksums
+        working-directory: dist
+        run: sha256sum -c SHA256SUMS
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          python3 - dist/runtime-manifest.json > notes.md <<'PY'
+          import json, sys
+          m = json.load(open(sys.argv[1]))
+          print(f"Sheltie runtime {m['engine_version']} based on FreeRDP {m['upstream_version']}.\n")
+          print(f"- Revision: `{m['engine_revision']}`")
+          print(f"- Architecture: {m['architecture']}, minimum macOS {m['minimum_macos']}")
+          print(f"- Bridge protocol {m['bridge']['protocol_version']}: {', '.join(m['bridge']['capabilities'])}")
+          print("- Dependencies: " + ", ".join(f"{d['formula']} {d['version']}" for d in m.get('dependencies', [])))
+          print("\nVerify downloads with `SHA256SUMS`. The validation archive contains the test-only sample server and the matching test kit.")
+          PY
+          # Fails rather than replacing an existing release.
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --title "Sheltie runtime $TAG" \
+            --notes-file notes.md dist/runtime.tar.gz dist/validation-runtime.tar.gz \
+            dist/runtime-sources.tar.gz dist/runtime-manifest.json dist/SHA256SUMS
