@@ -17,9 +17,11 @@ interoperability can finally liberate your computing experience.
 ## Fork versioning and upstream updates
 
 `main` is the rolling downstream integration branch: the latest supported
-upstream FreeRDP release plus the current Sheltie patch stack. As an initial
-exception, its upstream base is a snapshot of upstream `master` rather than a
-release tag. Future upstream updates normally target published FreeRDP releases.
+upstream FreeRDP release plus the current Sheltie patch stack. It is currently
+based on FreeRDP 3.32.2. Upstream updates normally target published FreeRDP
+releases. Until `main` replaces it, `master` keeps the earlier patch stack on an
+upstream `master` snapshot; that history is also preserved at tag
+`archive/master-pre-3.32.2-rebase`.
 
 The downstream patches are rebased onto each new upstream base, reviewed and
 tested before publication. Consequently, `main` may be rebased and force-pushed;
@@ -62,8 +64,9 @@ one step. Tags inside merged side branches reserve release numbers but do not
 reset this counter. The rebase helper still reports the full downstream commit
 count, including side-branch commits, to describe the work being replayed.
 Modified tracked files add a `dirty` marker; untracked files are
-ignored. Upstream development suffixes are retained, so the initial master-based
-line uses tags such as `v3.32.3-dev0-sheltie.1`, distinct from release-based tags.
+ignored. Upstream development suffixes are retained, so a branch based on an
+upstream development snapshot would use tags such as `v3.32.3-dev0-sheltie.1`,
+distinct from release-based tags.
 
 The next release number accounts for every matching local tag, including tags
 preserved across rebases. Other upstream versions and legacy tags do not affect
@@ -105,6 +108,11 @@ a `git range-diff` command for comparing the old and new patch stacks; also
 review merge resolutions, which `range-diff` does not cover. Build and test the
 update branch before deliberately moving `main` to it. The helper does not move
 `main`, publish tags, push history, or run project validation automatically.
+
+The inherited upstream GitHub Actions workflows are disabled in this fork's
+repository settings, not removed from the tree, so rebases do not conflict with
+upstream workflow changes. After each upstream update, check the repository's
+Actions workflow list and disable any newly added upstream workflow.
 
 Run the helper regression checks without network access:
 
