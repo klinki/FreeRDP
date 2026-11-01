@@ -69,13 +69,58 @@ class VersionTests(unittest.TestCase):
         self.assertIsNone(result["previous_tag"])
         self.assertEqual(result["commits_since_anchor"], 1)
 
-    def test_new_upstream_version_restarts_fork_numbering(self):
+    def new_upstream_release(self, version_string):
+        # Upstream advances independently of the fork's patch stack.
+        self.git("switch", "-C", "upstream-line", "refs/remotes/upstream/master")
+        self.metadata.write_text(f'set(RAW_VERSION_STRING "{version_string}")\n')
+        self.commit(f"upstream {version_string}")
+        self.git("tag", version_string)
+        upstream = self.git("rev-parse", "HEAD")
+        self.git("update-ref", "refs/remotes/upstream/master", upstream)
+        return upstream
+
+    def test_fork_numbering_continues_across_upstream_versions(self):
+        self.commit("fork patch on a development snapshot")
+        self.git("tag", "v3.32.3-dev0-sheltie.3")
         self.git("tag", "v3.32.2-sheltie.9")
-        self.metadata.write_text('set(RAW_VERSION_STRING "3.33.0")\n')
-        self.commit("new upstream release")
-        self.git("tag", "3.33.0")
-        self.git("update-ref", "refs/remotes/upstream/master", self.git("rev-parse", "HEAD"))
-        self.assertEqual(self.calculate()["next_tag"], "v3.33.0-sheltie.1")
+        self.git("tag", "sheltie/beta.2")
+        upstream = self.new_upstream_release("3.33.0")
+        self.git("switch", "-c", "rebased", upstream)
+        self.commit("rebased patch stack")
+        result = self.calculate()
+        self.assertEqual(result["upstream_version"], "3.33.0")
+        self.assertEqual(result["next_tag"], "v3.33.0-sheltie.10")
+        self.assertRegex(result["version"], r"^3\.33\.0-sheltie\.10\.dev\.1\+g[0-9a-f]{12}$")
+
+    def test_rebase_onto_new_upstream_anchors_at_the_new_base(self):
+        self.git("tag", "3.32.2")
+        self.commit("fork patch")
+        self.git("tag", "v3.32.2-sheltie.1")
+        upstream = self.new_upstream_release("3.33.0")
+        self.git("switch", "-c", "rebased", upstream)
+        self.commit("rebased patch")
+        self.commit("next patch")
+        result = self.calculate()
+        self.assertEqual(result["next_tag"], "v3.33.0-sheltie.2")
+        self.assertIsNone(result["previous_tag"])
+        self.assertEqual(result["commits_since_anchor"], 2)
+        self.git("tag", "v3.33.0-sheltie.2")
+        result = self.calculate()
+        self.assertEqual(result["version"], "3.33.0-sheltie.2")
+        self.assertEqual(result["next_tag"], "v3.33.0-sheltie.3")
+
+    def test_release_on_an_earlier_base_still_anchors_its_path(self):
+        self.git("tag", "3.32.2")
+        self.commit("fork patch")
+        self.git("tag", "v3.32.2-sheltie.4")
+        upstream = self.new_upstream_release("3.33.0")
+        self.git("switch", "-c", "fork", "v3.32.2-sheltie.4")
+        self.git("merge", "--no-ff", upstream, "-m", "Merge upstream 3.33.0")
+        result = self.calculate()
+        self.assertEqual(result["upstream_version"], "3.33.0")
+        self.assertEqual(result["previous_tag"], "v3.32.2-sheltie.4")
+        self.assertEqual(result["commits_since_anchor"], 1)
+        self.assertEqual(result["next_tag"], "v3.33.0-sheltie.5")
 
     def test_twenty_commit_branch_merge_counts_as_one_and_ignores_side_tag(self):
         self.commit("first fork release")

@@ -40,7 +40,9 @@ def calculate(repo, ref="HEAD", upstream_ref="upstream/master"):
     if versions:
         upstream_version = versions.pop()
 
-    pattern = re.compile(r"v" + re.escape(upstream_version) + r"-sheltie\.([1-9]\d*)")
+    # Fork release numbers are global: they continue across upstream bases, so
+    # every fork release tag reserves its number regardless of upstream version.
+    pattern = re.compile(r"v\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?-sheltie\.([1-9]\d*)")
     tags = []
     for tag in git(repo, "tag", "--list").splitlines():
         match = pattern.fullmatch(tag)

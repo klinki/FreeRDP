@@ -28,10 +28,12 @@ tested before publication. Consequently, `main` may be rebased and force-pushed;
 its commit history is not a stable release reference. Contributors should fetch
 and rebase their work onto the updated `main` after an upstream update.
 
-Stable fork releases use immutable tags such as `v3.32.0-sheltie.1`. The upstream
-version identifies the FreeRDP base; the `sheltie.N` suffix identifies the fork
-release on that base. Additional fork releases increment `N`; moving to a new
-upstream release starts again at `1`. Published release tags are never moved.
+Stable fork releases use immutable tags such as `v3.32.2-sheltie.1`. The upstream
+version identifies the FreeRDP base; `sheltie.N` is a fork-wide release counter.
+Every fork release increments `N`, including the first release on a new upstream
+base, so `v3.32.2-sheltie.1` may be followed by `v3.32.2-sheltie.2` and then
+`v3.33.0-sheltie.3`. Each `N` is used once across all upstream versions, giving
+every engine release a unique number. Published release tags are never moved.
 Sheltie release builds pin an exact engine tag or commit rather than following
 the moving `main` branch.
 
@@ -54,9 +56,9 @@ FreeRDP version, preferring an upstream release tag at that commit. For a
 release-based branch, pass the upstream tag explicitly with
 `--upstream-ref 3.32.0`. Use `--ref` to describe a different branch or commit.
 
-An exact fork release returns a version such as `3.32.0-sheltie.1`. Other
+An exact fork release returns a version such as `3.32.2-sheltie.1`. Other
 commits return a development version such as
-`3.32.0-sheltie.2.dev.4+g0123456789ab`: the next fork release number, the number
+`3.32.2-sheltie.2.dev.4+g0123456789ab`: the next fork release number, the number
 of first-parent steps since the latest fork release on that path (or upstream
 base), and the commit ID. A branch with 20 commits merged using `--no-ff` counts
 as one step: the merge commit. Direct and fast-forwarded commits each count as
@@ -68,9 +70,12 @@ ignored. Upstream development suffixes are retained, so a branch based on an
 upstream development snapshot would use tags such as `v3.32.3-dev0-sheltie.1`,
 distinct from release-based tags.
 
-The next release number accounts for every matching local tag, including tags
-preserved across rebases. Other upstream versions and legacy tags do not affect
-it. Use a full clone and fetch the fork's release tags before calculating a
+The next release number is one higher than the highest `N` among all local
+`v<version>-sheltie.N` tags, for any upstream version, including tags preserved
+across rebases. Legacy tags such as `sheltie/beta.2` do not affect it. After a
+rebase onto a new upstream base, earlier release tags are no longer on the
+branch, so the development distance counts from the new upstream base. Use a
+full clone and fetch the fork's release tags before calculating a
 release tag; unfetched remote tags cannot be considered. The script does not
 fetch, create tags, change FreeRDP's build version, or modify the repository.
 
