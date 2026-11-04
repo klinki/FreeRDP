@@ -167,15 +167,19 @@ display returns.
 SDL display/window work and Display Control layout sends run on the SDL main
 thread, woken by a coalesced resize request rather than a timer-thread probe.
 Reconnection forces a layout update even if the final layout equals the previous
-one; settling retries otherwise suppress duplicate layouts. Channel availability
-and dynamic-resolution settings still gate remote layout updates. Temporary
-probe/send failures retry without deliberately terminating the RDP connection.
+one; settling retries otherwise suppress duplicate layouts. Usable-bounds/work-area
+notifications refresh display information but send a layout only when its effective
+geometry or scaling changed. They preserve forced updates already requested by
+reconnection or display-channel activation. Channel availability and dynamic-resolution
+settings still gate remote layout updates. Temporary probe/send failures retry
+without deliberately terminating the RDP connection.
 
 `TestSDLMonitorDetection` covers stable UUID mapping across changed display IDs,
 scale preservation, ambiguity and fallback selection. `TestSDLFullscreenResize`
 checks deferred refresh, fresh dimensions, saved DPI, layout deduplication, forced
-same-layout rescaling and main-thread sends. Physical dock/cable unplug and replug
-still requires verification on a real multimonitor Windows session.
+same-layout rescaling, usable-bounds deduplication and mixed reconnect/work-area
+bursts, and main-thread sends. Physical dock/cable unplug and replug still requires
+verification on a real multimonitor Windows session.
 
 ## Manual screen refresh
 

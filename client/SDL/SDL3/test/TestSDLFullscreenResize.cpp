@@ -221,6 +221,88 @@ static bool run()
 	if (!expect(layoutCalls == before + 2,
 	            "reconnection triggers rescaling even when final layout matches the previous one"))
 		return false;
+
+#if SDL_VERSION_ATLEAST(3, 3, 2)
+	// Focus/work-area notifications must refresh inventory without reconfiguring
+	// the server when the effective remote layout has not changed.
+	SDL_DisplayEvent bounds{};
+	bounds.type = SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED;
+	bounds.displayID = physical;
+	const auto beforeBounds = layoutCalls;
+	if (!disp.handleEvent(bounds))
+		return false;
+	disp.service(now + 2200);
+	if (!disp.handleEvent(bounds))
+		return false;
+	disp.service(now + 2300);
+	disp.service(now + 2799);
+	if (!expect(layoutCalls == beforeBounds, "usable-bounds bursts retain the settling delay"))
+		return false;
+	for (UINT64 offset = 2800; offset <= 7800; offset += 1000)
+	{
+		disp.service(now + offset);
+		if (!expect(layoutCalls == beforeBounds,
+		            "unchanged usable bounds and settling retries do not resend the layout"))
+			return false;
+	}
+
+	// A real effective-layout change must still be discovered by this event.
+	const SdlMonitorScaleOverrides newScales{ { physical, { physical, 150, 140 } } };
+	if (!sdl.setHotplugMonitorSelection({ physical }, newScales) || !disp.handleEvent(bounds))
+		return false;
+	disp.service(now + 8000);
+	if (!expect(layoutCalls == beforeBounds, "changed usable bounds still wait for settling"))
+		return false;
+	disp.service(now + 8500);
+	if (!expect(layoutCalls == beforeBounds + 1 && sentLayouts.size() == 1 &&
+	                sentLayouts.front().Width == static_cast<UINT32>(fresh.w) &&
+	                sentLayouts.front().Height == static_cast<UINT32>(fresh.h) &&
+	                sentLayouts.front().DesktopScaleFactor == 150 &&
+	                sentLayouts.front().DeviceScaleFactor == 140,
+	            "usable-bounds refresh sends changed effective scaling with drawable dimensions"))
+		return false;
+	disp.service(now + 9500);
+	if (!expect(layoutCalls == beforeBounds + 1, "changed usable bounds send only one layout"))
+		return false;
+
+	// Test both queue orders, and a bounds notification after the force request
+	// has already been consumed by service. Neither may cancel reconnect rescaling.
+	UINT64 burstTime = now + 10000;
+	for (const bool reconnectFirst : { false, true })
+	{
+		const auto beforeBurst = layoutCalls;
+		if (!disp.handleEvent(reconnectFirst ? changed : bounds) ||
+		    !disp.handleEvent(reconnectFirst ? bounds : changed))
+			return false;
+		disp.service(burstTime);
+		if (!disp.handleEvent(bounds))
+			return false;
+		disp.service(burstTime + 100);
+		disp.service(burstTime + 599);
+		if (!expect(layoutCalls == beforeBurst, "mixed reconnect/bounds bursts wait for settling"))
+			return false;
+		disp.service(burstTime + 600);
+		if (!expect(layoutCalls == beforeBurst + 1 &&
+		                sentLayouts.front().DesktopScaleFactor == 150 &&
+		                sentLayouts.front().DeviceScaleFactor == 140,
+		            "usable-bounds events preserve forced same-layout reconnect rescaling"))
+			return false;
+		disp.service(burstTime + 1600);
+		if (!expect(layoutCalls == beforeBurst + 1, "mixed-burst settling retries deduplicate layouts"))
+			return false;
+		burstTime += 3000;
+	}
+	const auto beforeActivation = layoutCalls;
+	if (!expect(channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK &&
+	                disp.handleEvent(bounds),
+	            "display-channel reactivation can coalesce with a work-area notification"))
+		return false;
+	disp.service(burstTime);
+	disp.service(burstTime + 500);
+	if (!expect(layoutCalls == beforeActivation + 1,
+	            "usable-bounds events preserve forced same-layout channel activation"))
+		return false;
+#endif
 	return disp.uninit(&channel);
 }
 
