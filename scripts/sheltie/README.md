@@ -83,3 +83,7 @@ python3 -m unittest discover -s scripts/sheltie/tests
 
 Locally built runtimes use the installed Homebrew versions and are for testing;
 published runtimes come from the workflow.
+
+For implausible UDP bandwidth estimates, see the
+[bandwidth diagnostic guide](../../docs/udp-bandwidth-diagnostics.md). Its DEBUG
+records capture the existing exchange without adding network probes.

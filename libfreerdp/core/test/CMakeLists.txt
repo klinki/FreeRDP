@@ -10,7 +10,7 @@ set(DRIVER ${MODULE_NAME}.c)
 set(TESTS TestVersion.c TestSettings.c TestUtils.c TestRdpeUdp.c)
 
 if(BUILD_TESTING_INTERNAL)
-  list(APPEND TESTS TestStreamDump.c TestRdstls.c TestServerChannels.c)
+  list(APPEND TESTS TestStreamDump.c TestRdstls.c TestServerChannels.c TestAutodetectDiagnostics.c)
 endif()
 
 set(FUZZERS TestFuzzCoreClient.c TestFuzzCoreServer.c TestFuzzCoreGateway.c TestFuzzCryptoCertificateDataSetPEM.c)

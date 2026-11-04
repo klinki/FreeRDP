@@ -29,6 +29,21 @@
 #define TYPE_ID_AUTODETECT_REQUEST 0x00
 #define TYPE_ID_AUTODETECT_RESPONSE 0x01
 
+static const char* autodetect_transport_name(RDP_TRANSPORT_TYPE transport)
+{
+	switch (transport)
+	{
+		case RDP_TRANSPORT_TCP:
+			return "TCP";
+		case RDP_TRANSPORT_UDP_R:
+			return "UDP_R";
+		case RDP_TRANSPORT_UDP_L:
+			return "UDP_L";
+		default:
+			return "UNKNOWN";
+	}
+}
+
 /* Per-transport RTT start times: TCP uses rttMeasureStartTime, UDP_R uses
  * paddingA[0] (public struct padding reserved, zero-initialized). Keeps
  * parallel TCP+UDP measurements from clobbering each other. */
@@ -415,7 +430,8 @@ static BOOL autodetect_send_bandwidth_measure_results(rdpAutoDetect* autodetect,
 	UINT16 sec_flags = 0;
 	UINT64 start = *autodetect_bw_start_slot(autodetect, transport);
 	UINT32 byteCount = *autodetect_bw_count_slot(autodetect, transport);
-	UINT64 timeDelta = GetTickCount64();
+	const UINT64 now = GetTickCount64();
+	UINT64 timeDelta = now;
 
 	WINPR_ASSERT(autodetect);
 	WINPR_ASSERT(autodetect->context);
@@ -443,20 +459,36 @@ static BOOL autodetect_send_bandwidth_measure_results(rdpAutoDetect* autodetect,
 	           "sending Bandwidth Measure Results PDU -> timeDelta=%" PRIu64 ", byteCount=%" PRIu32
 	           "",
 	           timeDelta, byteCount);
+	const UINT32 wireTimeDelta = (UINT32)MIN(timeDelta, UINT32_MAX);
+	const BOOL mathValid = wireTimeDelta > 0 && byteCount > 0;
+	WLog_Print(autodetect->log, WLOG_DEBUG,
+	           "BWDIAG result transport=%s seq=%" PRIu16 " response=0x%04" PRIx16
+	           " start_ms=%" PRIu64 " now_ms=%" PRIu64 " elapsed_ms=%" PRIu64
+	           " wire_elapsed_ms=%" PRIu32 " bytes=%" PRIu32
+	           " derived_kbps=%.3f math_valid=%d start_set=%d clock_reversed=%d"
+	           " duration_clamped=%d bytes_at_limit=%d",
+	           autodetect_transport_name(transport), sequenceNumber, responseType, start, now,
+	           timeDelta, wireTimeDelta, byteCount,
+	           mathValid ? (double)byteCount * 8.0 / wireTimeDelta : 0.0, mathValid, start != 0,
+	           start > now, timeDelta > UINT32_MAX, byteCount == UINT32_MAX);
 
 	Stream_Write_UINT8(s, 0x0E);                                   /* headerLength (1 byte) */
 	Stream_Write_UINT8(s, TYPE_ID_AUTODETECT_RESPONSE);            /* headerTypeId (1 byte) */
 	Stream_Write_UINT16(s, sequenceNumber);                        /* sequenceNumber (2 bytes) */
 	Stream_Write_UINT16(s, responseType);                          /* responseType (1 byte) */
-	Stream_Write_UINT32(s, (UINT32)MIN(timeDelta, UINT32_MAX));    /* timeDelta (4 bytes) */
+	Stream_Write_UINT32(s, wireTimeDelta);                         /* timeDelta (4 bytes) */
 	Stream_Write_UINT32(s, byteCount);                             /* byteCount (4 bytes) */
 	performance_bandwidth_measurement(autodetect->context, transport != RDP_TRANSPORT_TCP,
-	                                  (UINT32)MIN(timeDelta, UINT32_MAX), byteCount);
+	                                  wireTimeDelta, byteCount);
 	IFCALLRET(autodetect->ClientBandwidthMeasureResult, success, autodetect, transport,
-	          responseType, sequenceNumber, (UINT32)MIN(timeDelta, UINT32_MAX), byteCount);
+	          responseType, sequenceNumber, wireTimeDelta, byteCount);
 
 	if (!success)
 	{
+		WLog_Print(autodetect->log, WLOG_DEBUG,
+		           "BWDIAG result_tx transport=%s seq=%" PRIu16
+		           " route=none sent=0 reason=callback_failed",
+		           autodetect_transport_name(transport), sequenceNumber);
 		WLog_Print(autodetect->log, WLOG_ERROR, "ClientBandwidthMeasureResult failed");
 		Stream_Release(s);
 		return FALSE;
@@ -464,9 +496,18 @@ static BOOL autodetect_send_bandwidth_measure_results(rdpAutoDetect* autodetect,
 
 	if (autodetect_try_send_udp(autodetect, transport, FALSE, sec_flags | SEC_AUTODETECT_RSP,
 	                             s, payloadOff))
+	{
+		WLog_Print(autodetect->log, WLOG_DEBUG,
+		           "BWDIAG result_tx transport=%s seq=%" PRIu16 " route=UDP sent=1",
+		           autodetect_transport_name(transport), sequenceNumber);
 		return TRUE;
-	return rdp_send_message_channel_pdu(autodetect->context->rdp, s,
-	                                    sec_flags | SEC_AUTODETECT_RSP);
+	}
+	success = rdp_send_message_channel_pdu(autodetect->context->rdp, s,
+	                                       sec_flags | SEC_AUTODETECT_RSP);
+	WLog_Print(autodetect->log, WLOG_DEBUG,
+	           "BWDIAG result_tx transport=%s seq=%" PRIu16 " route=TCP sent=%d",
+	           autodetect_transport_name(transport), sequenceNumber, success);
+	return success;
 }
 
 static BOOL autodetect_send_netchar_result(rdpAutoDetect* autodetect,
@@ -632,9 +673,17 @@ static BOOL autodetect_recv_bandwidth_measure_start(rdpAutoDetect* autodetect,
 
 	WLog_Print(autodetect->log, WLOG_TRACE,
 	           "received Bandwidth Measure Start PDU - time=%" PRIu64 "", GetTickCount64());
+	const UINT64 previousStart = *autodetect_bw_start_slot(autodetect, transport);
+	const UINT32 previousBytes = *autodetect_bw_count_slot(autodetect, transport);
 	/* Per-transport measurement state so TCP+UDP can overlap */
 	*autodetect_bw_start_slot(autodetect, transport) = GetTickCount64();
 	*autodetect_bw_count_slot(autodetect, transport) = 0;
+	WLog_Print(autodetect->log, WLOG_DEBUG,
+	           "BWDIAG start transport=%s seq=%" PRIu16 " request=0x%04" PRIx16
+	           " start_ms=%" PRIu64 " previous_start_ms=%" PRIu64 " previous_bytes=%" PRIu32,
+	           autodetect_transport_name(transport), autodetectReqPdu->sequenceNumber,
+	           autodetectReqPdu->requestType, *autodetect_bw_start_slot(autodetect, transport),
+	           previousStart, previousBytes);
 
 	/* Continuous Auto-Detection: mark the start of the measurement */
 	if (autodetectReqPdu->requestType == RDP_BW_START_REQUEST_TYPE_CONTINUOUS)
@@ -674,6 +723,11 @@ autodetect_recv_bandwidth_measure_payload(rdpAutoDetect* autodetect, RDP_TRANSPO
 	WLog_Print(autodetect->log, WLOG_DEBUG,
 	           "received Bandwidth Measure Payload PDU -> payloadLength=%" PRIu16 "",
 	           payloadLength);
+	WLog_Print(autodetect->log, WLOG_DEBUG,
+	           "BWDIAG payload transport=%s seq=%" PRIu16 " payload_bytes=%" PRIu16
+	           " count_before=%" PRIu32,
+	           autodetect_transport_name(transport), autodetectReqPdu->sequenceNumber,
+	           payloadLength, *autodetect_bw_count_slot(autodetect, transport));
 	/* Per-transport byte count so TCP+UDP measurements don't mix */
 	*autodetect_bw_count_slot(autodetect, transport) += payloadLength;
 	return TRUE;
@@ -724,6 +778,12 @@ static BOOL autodetect_recv_bandwidth_measure_stop(rdpAutoDetect* autodetect,
 
 	WLog_Print(autodetect->log, WLOG_TRACE,
 	           "received Bandwidth Measure Stop PDU -> payloadLength=%" PRIu16 "", payloadLength);
+	WLog_Print(autodetect->log, WLOG_DEBUG,
+	           "BWDIAG stop transport=%s seq=%" PRIu16 " request=0x%04" PRIx16
+	           " payload_bytes=%" PRIu16 " count_before=%" PRIu32,
+	           autodetect_transport_name(transport), autodetectReqPdu->sequenceNumber,
+	           autodetectReqPdu->requestType, payloadLength,
+	           *autodetect_bw_count_slot(autodetect, transport));
 	/* Add the payload length to the per-transport bandwidth measurement parameters */
 	*autodetect_bw_count_slot(autodetect, transport) += payloadLength;
 
@@ -890,6 +950,36 @@ static BOOL autodetect_recv_netchar_request(rdpAutoDetect* autodetect, RDP_TRANS
 	           "received Network Characteristics Result PDU -> baseRTT=%" PRIu32
 	           ", bandwidth=%" PRIu32 ", averageRTT=%" PRIu32 "",
 	           result.baseRTT, result.bandwidth, result.averageRTT);
+	if (WLog_IsLevelActive(autodetect->log, WLOG_DEBUG))
+	{
+		/* Only the validated, fixed-size network-characteristics PDU is copied.
+		 * Never include following stream data or bandwidth-measurement payloads. */
+		const size_t length = autodetectReqPdu->headerLength;
+		const size_t end = Stream_GetPosition(s);
+		const size_t offset = end >= length ? end - length : 0;
+		char raw[2 * 18 + 1] = { 0 };
+		if (length <= 18 && end >= length)
+		{
+			static const char hex[] = "0123456789abcdef";
+			const BYTE* pdu = Stream_Buffer(s) + offset;
+			for (size_t i = 0; i < length; i++)
+			{
+				raw[2 * i] = hex[pdu[i] >> 4];
+				raw[2 * i + 1] = hex[pdu[i] & 0x0F];
+			}
+		}
+		WLog_Print(autodetect->log, WLOG_DEBUG,
+		           "BWDIAG netchar_rx transport=%s seq=%" PRIu16 " request=0x%04" PRIx16
+		           " header_bytes=%" PRIu8 " stream_offset=%" PRIuz
+		           " bandwidth_present=%d bandwidth_kbps=%" PRIu32
+		           " bandwidth_hex=0x%08" PRIx32 " base_rtt_present=%d base_rtt_ms=%" PRIu32
+		           " average_rtt_ms=%" PRIu32 " raw=%s",
+		           autodetect_transport_name(transport), autodetectReqPdu->sequenceNumber,
+		           autodetectReqPdu->requestType, autodetectReqPdu->headerLength, offset,
+		           result.type != RDP_NETCHAR_RESULT_TYPE_BASE_RTT_AVG_RTT, result.bandwidth,
+		           result.bandwidth, result.type != RDP_NETCHAR_RESULT_TYPE_BW_AVG_RTT,
+		           result.baseRTT, result.averageRTT, raw);
+	}
 
 	performance_rtt(autodetect->context, transport != RDP_TRANSPORT_TCP, result.averageRTT);
 	if (result.type == RDP_NETCHAR_RESULT_TYPE_BW_AVG_RTT ||
