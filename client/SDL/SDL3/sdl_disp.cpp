@@ -324,12 +324,21 @@ bool sdlDispContext::updateMonitors(SDL_EventType type, SDL_DisplayID displayID)
 	if (!freerdp_settings_get_bool(settings, FreeRDP_DynamicResolutionUpdate))
 		return true;
 
-	WINPR_UNUSED(type);
 	WINPR_UNUSED(displayID);
+	bool forceLayout = true;
+#if SDL_VERSION_ATLEAST(3, 3, 2)
+	// Work-area notifications can accompany focus changes without changing the
+	// remote layout. Refresh geometry, but let unchanged layouts be deduplicated.
+	forceLayout = type != SDL_EVENT_DISPLAY_USABLE_BOUNDS_CHANGED;
+#else
+	WINPR_UNUSED(type);
+#endif
 	// Coalesce cable/dock event bursts and query again while modes settle.
 	// Reconcile against current inventory, not a possibly obsolete queued ID.
 	_topologyRequested = true;
-	_forceRequested = true;
+	// Do not clear a forced reconnect/activation request in the same event burst.
+	if (forceLayout)
+		_forceRequested = true;
 	return scheduleResize();
 }
 
