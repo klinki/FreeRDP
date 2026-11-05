@@ -456,6 +456,7 @@ static state_run_t multitransport_client_request(rdpMultitransport* multi, UINT3
 	                         publicKey, publicKeyLength, multitransport_tunnel_event, multi);
 	if (!emt)
 		return multitransport_decline(multi, reqId);
+	rdpemt_set_context(emt, multi->rdp->context);
 
 	EnterCriticalSection(&multi->lock);
 	multi->reliable = emt;

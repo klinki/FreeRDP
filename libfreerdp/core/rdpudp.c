@@ -34,6 +34,7 @@
 #endif
 
 #include "rdpudp.h"
+#include "performance.h"
 
 /* [MS-RDPEUDP] 2.2.2.1 RDPUDP_FEC_HEADER uFlags */
 typedef enum WINPR_C23_ENUM_TYPE(uint16_t)
@@ -177,6 +178,7 @@ typedef struct
 	UINT64 due;
 	UINT32 rto;
 	UINT32 retransmits;
+	BOOL lossReported; /* performance monitoring: the peer reported this transmission missing */
 } rdpudp_pending;
 
 typedef struct
@@ -196,6 +198,8 @@ typedef struct
 struct rdp_udp
 {
 	wLog* log;
+	rdpContext* context;   /* performance monitoring only, may be NULL */
+	BOOL perfConnected;    /* reported to performance monitoring as connected */
 	SOCKET sockfd;
 	RDPUDP_STATE state;
 	UINT16 version;
@@ -374,10 +378,37 @@ static void pending_clear(rdpudp_pending* p)
 	memset(p, 0, sizeof(*p));
 }
 
+static void perf_connected(rdpUdp* udp, BOOL connected)
+{
+	WINPR_ASSERT(udp);
+	if (udp->perfConnected == connected)
+		return;
+	udp->perfConnected = connected;
+	performance_udp_connected(udp->context, connected);
+}
+
+/* A negative acknowledgement is an observation, not proof of permanent loss: count it once per
+ * transmission, however many ACK vectors repeat it. */
+static void perf_note_loss(rdpUdp* udp, UINT32 seq)
+{
+	WINPR_ASSERT(udp);
+	for (size_t x = 0; x < RDPUDP_MAX_IN_FLIGHT; x++)
+	{
+		rdpudp_pending* p = &udp->pending[x];
+		if (p->used && (p->seq == seq) && !p->lossReported)
+		{
+			p->lossReported = TRUE;
+			performance_udp_stats(udp->context, 0, 0, 0, 1);
+			return;
+		}
+	}
+}
+
 static void rdpudp_fail(rdpUdp* udp, const char* why)
 {
 	WINPR_ASSERT(udp);
 	WINPR_ASSERT(why);
+	perf_connected(udp, FALSE);
 	if (udp->state != RDPUDP_STATE_FAILED)
 		WLog_Print(udp->log, WLOG_WARN, "RDP-UDP connection failed: %s", why);
 	udp->state = RDPUDP_STATE_FAILED;
@@ -432,6 +463,8 @@ static BOOL rdpudp_send_raw(rdpUdp* udp, const BYTE* data, size_t length)
 		WLog_Print(udp->log, WLOG_DEBUG, "send failed with %d, the datagram counts as lost", error);
 		return TRUE;
 	}
+	performance_account(udp->context, TRUE, TRUE, WINPR_ASSERTING_INT_CAST(size_t, rc));
+	performance_udp_stats(udp->context, 1, 0, 0, 0);
 	udp->lastSent = now_ms();
 	return TRUE;
 }
@@ -1075,6 +1108,7 @@ static BOOL send_chunk_now(rdpUdp* udp, BYTE* data, size_t length)
 	p->rto = rto_initial(udp);
 	p->due = now + p->rto;
 	p->retransmits = 0;
+	p->lossReported = FALSE;
 	udp->inFlight++;
 
 	return rdpudp_transmit(udp, p);
@@ -1293,6 +1327,8 @@ static void v1_process_ack_vector(rdpUdp* udp, UINT32 snSourceAck, wStream* s, s
 		{
 			if (state == DATAGRAM_RECEIVED)
 				acknowledge_seq(udp, seq);
+			else
+				perf_note_loss(udp, seq);
 			seq++;
 		}
 	}
@@ -1468,6 +1504,8 @@ static void v3_process_ack_vector(rdpUdp* udp, UINT16 base, wStream* s, size_t c
 			{
 				if (received)
 					acknowledge_seq(udp, seq);
+				else
+					perf_note_loss(udp, seq);
 				seq++;
 			}
 		}
@@ -1478,6 +1516,8 @@ static void v3_process_ack_vector(rdpUdp* udp, UINT16 base, wStream* s, size_t c
 			{
 				if (entry & (1 << bit))
 					acknowledge_seq(udp, seq);
+				else
+					perf_note_loss(udp, seq);
 				seq++;
 			}
 		}
@@ -1856,6 +1896,7 @@ static BOOL process_syn_ack(rdpUdp* udp, const BYTE* data, size_t length)
 	udp->ackVectorStart = seq32_add(peerInitial, 1);
 	udp->lastDelivery = now_ms();
 	udp->state = RDPUDP_STATE_ESTABLISHED;
+	perf_connected(udp, TRUE);
 
 	if (version == RDPUDP_PROTOCOL_VERSION_3)
 	{
@@ -1958,6 +1999,8 @@ static BOOL run_timers(rdpUdp* udp)
 			return FALSE;
 		}
 		p->retransmits++;
+		p->lossReported = FALSE; /* a new transmission */
+		performance_udp_stats(udp->context, 0, 0, 1, 0);
 		p->rto = (p->rto * 2 > RDPUDP_MAX_RTO_MS) ? RDPUDP_MAX_RTO_MS : p->rto * 2;
 		p->due = now + p->rto;
 		if (udp->version == RDPUDP_PROTOCOL_VERSION_3)
@@ -2038,6 +2081,8 @@ void rdpudp_free(rdpUdp* udp)
 	if (!udp)
 		return;
 
+	perf_connected(udp, FALSE);
+
 	if (udp->sockfd != INVALID_SOCKET)
 		closesocket(udp->sockfd);
 
@@ -2098,6 +2143,12 @@ BOOL rdpudp_connect(rdpUdp* udp, const struct sockaddr* addr, size_t addrlen)
 	udp->state = RDPUDP_STATE_SYN_SENT;
 	udp->lastReceived = now_ms();
 	return send_syn(udp);
+}
+
+void rdpudp_set_context(rdpUdp* udp, rdpContext* context)
+{
+	WINPR_ASSERT(udp);
+	udp->context = context;
 }
 
 SOCKET rdpudp_get_socket(const rdpUdp* udp)
@@ -2199,6 +2250,8 @@ BOOL rdpudp_check(rdpUdp* udp)
 			break;
 		}
 
+		performance_account(udp->context, TRUE, FALSE, WINPR_ASSERTING_INT_CAST(size_t, rc));
+		performance_udp_stats(udp->context, 0, 1, 0, 0);
 		if (!process_datagram(udp, buffer, WINPR_ASSERTING_INT_CAST(size_t, rc)))
 		{
 			rdpudp_fail(udp, "failed to process a datagram");

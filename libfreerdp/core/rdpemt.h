@@ -26,6 +26,7 @@
 
 #include <freerdp/config.h>
 #include <freerdp/api.h>
+#include <freerdp/types.h>
 
 /** @brief A client side multitransport tunnel.
  *
@@ -74,6 +75,9 @@ FREERDP_LOCAL rdpEmt* rdpemt_new(wLog* log, UINT32 requestId, const BYTE* cookie
                                  size_t publicKeyLength, rdpEmtEventFn callback, void* custom);
 
 WINPR_ATTR_NODISCARD
+/* Sheltie: performance monitoring of the tunnel's datagrams. Call before rdpemt_start. */
+FREERDP_LOCAL void rdpemt_set_context(rdpEmt* emt, rdpContext* context);
+
 FREERDP_LOCAL BOOL rdpemt_start(rdpEmt* emt, const struct sockaddr* addr, size_t addrlen);
 
 /** Sends one Tunnel Data PDU. Thread safe. */
@@ -109,6 +113,11 @@ FREERDP_LOCAL UINT32 rdpemt_take_direct_bytes(rdpEmt* emt);
 #else
 
 /* Built without UDP multitransport: requests are declined and no tunnel ever exists. */
+static inline void rdpemt_set_context(WINPR_ATTR_UNUSED rdpEmt* emt,
+                                      WINPR_ATTR_UNUSED rdpContext* context)
+{
+}
+
 WINPR_ATTR_NODISCARD
 static inline BOOL rdpemt_is_supported(void)
 {
