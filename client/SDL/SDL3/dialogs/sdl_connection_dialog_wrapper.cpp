@@ -46,9 +46,17 @@ void SdlConnectionDialogWrapper::create(rdpContext* context)
 	 * it), which unwinds the main thread while it holds _mux. The messages go to the log. */
 	WINPR_UNUSED(enabled);
 #else
-	if (!enabled)
+	if (!enabled && !_suppressed)
 		_connection_dialog = std::make_unique<SDLConnectionDialog>(context);
 #endif
+}
+
+void SdlConnectionDialogWrapper::setSuppressed(bool suppressed)
+{
+	std::unique_lock lock(_mux);
+	_suppressed = suppressed;
+	if (suppressed)
+		_connection_dialog.reset();
 }
 
 void SdlConnectionDialogWrapper::destroy()
@@ -224,6 +232,8 @@ void SdlConnectionDialogWrapper::push(EventArg&& arg)
 {
 	{
 		std::unique_lock lock(_mux);
+		if (_suppressed)
+			return;
 		_queue.push(std::move(arg));
 	}
 
