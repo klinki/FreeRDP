@@ -424,9 +424,11 @@ void SdlContext::postDisconnect(freerdp* instance)
 		return;
 
 	auto sdl = get_context(instance->context);
+	// Serialize teardown with output control and completed-frame refreshes.
+	std::lock_guard outputLock(sdl->_screenOutputMutex);
+	std::unique_lock frameLock(sdl->_critical);
 	sdl->setConnected(false);
 	sdl->_updates.clear();
-
 	gdi_free(instance);
 }
 
@@ -990,14 +992,15 @@ int SdlContext::sdl_client_thread_run(std::string& error_msg)
 			    }
 		    }
 		    HANDLE handles[MAXIMUM_WAIT_OBJECTS] = {};
-		    const DWORD count = freerdp_get_event_handles(context(), handles, ARRAYSIZE(handles));
+		    const DWORD count = freerdp_get_event_handles(context(), handles, ARRAYSIZE(handles) - 1);
 		    if (count == 0)
 		    {
 			    WLog_Print(getWLog(), WLOG_ERROR, "freerdp_get_event_handles failed");
 			    return freerdp_get_last_error(context()) == FREERDP_ERROR_CONNECT_TRANSPORT_FAILED
 			               ? SdlSessionStep::TransportFailure : SdlSessionStep::LocalFailure;
 		    }
-		    if (WaitForMultipleObjects(count, handles, FALSE, INFINITE) == WAIT_FAILED)
+		    handles[count] = _screenRefreshEvent.handle();
+		    if (WaitForMultipleObjects(count + 1, handles, FALSE, _screenResumePending ? 250 : INFINITE) == WAIT_FAILED)
 		    {
 			    WLog_Print(getWLog(), WLOG_ERROR, "WaitForMultipleObjects WAIT_FAILED");
 			    return SdlSessionStep::LocalFailure;
@@ -1007,6 +1010,11 @@ int SdlContext::sdl_client_thread_run(std::string& error_msg)
 		    if (!freerdp_check_event_handles(context()))
 		    {
 			    WLog_Print(getWLog(), WLOG_DEBUG, "Reconnect checkpoint: event processing failed");
+			    return SdlSessionStep::TransportFailure;
+		    }
+		    if (!serviceScreenRefresh()) {
+			    WLog_Print(getWLog(), WLOG_ERROR, "Screen refresh could not resume graphics output; recovering transport");
+			    freerdp_set_last_error_if_not(context(), FREERDP_ERROR_CONNECT_TRANSPORT_FAILED);
 			    return SdlSessionStep::TransportFailure;
 		    }
 		    return SdlSessionStep::Continue;
@@ -1237,15 +1245,11 @@ void SdlContext::updateMonitorDataFromOffsets()
 
 bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& rects, bool remoteContent)
 {
-	if (!isConnected())
-		return true;
-
-	auto gdi = context()->gdi;
-	WINPR_ASSERT(gdi);
-
 	auto size = window.rect();
-
 	std::unique_lock lock(_critical);
+	if (!isConnected()) return true;
+	auto gdi = context()->gdi;
+	if (!gdi || !_primary) return true;
 	auto surface = _primary.get();
 	auto& metrics = window.renderMetrics();
 	auto& live = window.liveMetrics();
@@ -1306,6 +1310,8 @@ bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& re
 	const auto topBarPointer = _topBarHoveredButton != SdlTopBarButton::None
 	                               ? _topBarPointer
 	                               : SDL_FPoint{ -1.0f, -1.0f };
+	window.setRefreshCapabilities(freerdp_settings_get_bool(settings, FreeRDP_RefreshRect),
+	                              freerdp_settings_get_bool(settings, FreeRDP_SuppressOutput));
 	return window.updateSurface(showTopBar, _topBarPinned, topBarPointer);
 }
 
@@ -1721,25 +1727,28 @@ bool SdlContext::handleTopBarMotion(const SDL_MouseMotionEvent& ev)
 		return false;
 
 	_topBarPointer = screenToPixel(ev.windowID, { ev.x, ev.y });
+	bool panelChanged = _topBarVisible && window->updateTopBarHover(ev.x, ev.y, SDL_GetTicks());
 	const bool overBar = window->topBarContains(ev.x, ev.y);
 	const bool nearTop = window->topBarNearTop(ev.x, ev.y);
 	const bool wasVisible = _topBarVisible;
 
 	if (!_topBarPinned)
 	{
-		if (nearTop)
+		if (nearTop || window->refreshMenuOpen())
 			_topBarVisible = true;
 		else if (!overBar)
 			_topBarVisible = false;
 	}
 
+	if (_topBarVisible && !wasVisible)
+		panelChanged = window->updateTopBarHover(ev.x, ev.y, SDL_GetTicks()) || panelChanged;
 	const auto hoveredButton = _topBarVisible && overBar
 	                               ? window->topBarButtonAt(ev.x, ev.y)
 	                               : SdlTopBarButton::None;
 	const bool hoverChanged = hoveredButton != _topBarHoveredButton;
 	_topBarHoveredButton = hoveredButton;
 
-	if ((_topBarVisible != wasVisible || hoverChanged) && !redrawWindows())
+	if ((_topBarVisible != wasVisible || hoverChanged || panelChanged) && !redrawWindows())
 		WLog_Print(_log, WLOG_WARN, "Unable to redraw the SDL connection bar");
 
 	return _topBarVisible && overBar;
@@ -1747,6 +1756,9 @@ bool SdlContext::handleTopBarMotion(const SDL_MouseMotionEvent& ev)
 
 bool SdlContext::handleEvent(const SDL_MouseWheelEvent& ev)
 {
+	if (auto window = getWindowForId(ev.windowID); window && refreshMenuOpen() &&
+	    window->topBarContains(ev.mouse_x, ev.mouse_y))
+		return true;
 	SDL_Event copy{};
 	copy.wheel = ev;
 	if (_rail.enabled() &&
@@ -1839,6 +1851,9 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 	if (auto bridge = SdlLauncher::active()) bridge->observeWindowGeometry(window->window(), ev.type);
 #endif
 
+	if (ev.type == SDL_EVENT_WINDOW_HIDDEN || ev.type == SDL_EVENT_WINDOW_MINIMIZED ||
+	    ev.type == SDL_EVENT_WINDOW_LEAVE_FULLSCREEN || ev.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
+		window->closeRefreshMenu();
 	{
 		const auto& r = window->rect();
 		const auto& b = window->bounds();
@@ -1855,7 +1870,12 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 	{
 		case SDL_EVENT_WINDOW_MOUSE_ENTER:
 			return restoreCursor();
+		case SDL_EVENT_WINDOW_FOCUS_LOST:
+			window->closeRefreshMenu();
+			std::ignore = redrawWindows();
+			break;
 		case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+			window->closeRefreshMenu();
 			if (ev.windowID == _topBarWindowId &&
 			    _topBarGestureOwner == TopBarGestureOwner::None)
 			{
@@ -1963,6 +1983,18 @@ bool SdlContext::handleEvent(const SDL_DisplayEvent& ev)
 
 bool SdlContext::handleEvent(const SDL_MouseButtonEvent& ev)
 {
+	auto window = getWindowForId(ev.windowID);
+	const bool overBar = window && _topBarVisible && ev.windowID == _topBarWindowId &&
+	    (_fullscreen || freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon)) &&
+	    window->topBarContains(ev.x, ev.y);
+	if ((_topBarGestureOwner == TopBarGestureOwner::Local ||
+	     (overBar && _topBarGestureOwner == TopBarGestureOwner::None && !_performanceCapture && !_performanceOrphanCapture)) &&
+	    handleTopBarButton(ev)) return true;
+	if (ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN && window && !overBar && window->refreshMenuOpen()) {
+		window->closeRefreshMenu(); _topBarHoveredButton = SdlTopBarButton::None;
+		if (!_topBarPinned) _topBarVisible = false;
+		std::ignore = redrawWindows();
+	}
 	if(performanceButton(ev)) return true;
 	const auto* capture = ev.type == SDL_EVENT_MOUSE_BUTTON_UP ? topBarCapture(ev.button) : nullptr;
 	const auto capturedWindowId = capture && capture->active ? capture->windowId : 0;
@@ -2050,8 +2082,12 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 
 		/* A local press owns its release, even if the pointer is now outside the
 		 * bar or the window state changed in the meantime. */
-		if (gesture.windowId != ev.windowID || gesture.button == SdlTopBarButton::None)
+		if (gesture.windowId != ev.windowID || gesture.button == SdlTopBarButton::None) {
+			if (auto source = getWindowForId(gesture.windowId); source && source->refreshMenuOpen()) {
+				source->closeRefreshMenu(); std::ignore = redrawWindows();
+			}
 			return true;
+		}
 
 		const auto settings = context()->settings;
 		if (!_topBarVisible ||
@@ -2059,12 +2095,13 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 			return true;
 
 		auto window = getWindowForId(gesture.windowId);
-		if (!window || !window->topBarContains(ev.x, ev.y))
-			return true;
-
+		if (!window) return true;
 		_topBarPointer = screenToPixel(ev.windowID, { ev.x, ev.y });
-		if (window->topBarButtonAt(ev.x, ev.y) != gesture.button)
-			return true;
+		std::ignore = window->updateTopBarHover(ev.x, ev.y, SDL_GetTicks());
+		_topBarHoveredButton = window->topBarButtonAt(ev.x, ev.y);
+		if (!window->topBarContains(ev.x, ev.y) || _topBarHoveredButton != gesture.button) {
+			std::ignore = redrawWindows(); return true;
+		}
 
 		switch (gesture.button)
 		{
@@ -2073,6 +2110,22 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
                 if(auto bridge=SdlLauncher::active()) bridge->requestPerformanceOverlay((bridge->performanceMask()&2)==0);
 #endif
                 break;
+			case SdlTopBarButton::Refresh:
+				window->noteRefresh(SdlTopBarButton::RefreshServer);
+				requestScreenRefresh();
+				break;
+			case SdlTopBarButton::RefreshLocal:
+			case SdlTopBarButton::RefreshTextures:
+			case SdlTopBarButton::RefreshServer:
+			case SdlTopBarButton::RefreshUpdates:
+			case SdlTopBarButton::RefreshCombined:
+			{
+				SdlRefreshMode mode = SdlRefreshMode::Server;
+				if (window->refreshEnabled(gesture.button) && SdlTopBar::refreshMode(gesture.button, mode)) {
+					window->noteRefresh(gesture.button); requestScreenRefresh(mode);
+				}
+				break;
+			}
 			case SdlTopBarButton::Compact:
 			{
 				/* Test toggle between the normal (3/4) and compact (1/2)
@@ -2472,6 +2525,14 @@ bool SdlContext::handleEvent(const SDL_Event& ev)
 		case SDL_EVENT_KEY_UP:
 		{
 			const auto& cev = ev.key;
+			if (cev.scancode == SDL_SCANCODE_ESCAPE) {
+				if (ev.type == SDL_EVENT_KEY_DOWN && (_refreshEscapeCaptured || refreshMenuOpen())) {
+					_refreshEscapeCaptured = true;
+					for (auto& entry : _windows) entry.second.closeRefreshMenu();
+					std::ignore = redrawWindows(); return true;
+				}
+				if (ev.type == SDL_EVENT_KEY_UP && _refreshEscapeCaptured) { _refreshEscapeCaptured = false; return true; }
+			}
 			return getInputChannelContext().handleEvent(cev);
 		}
 		default:
@@ -2802,8 +2863,9 @@ BOOL SdlContext::beginPaint(rdpContext* context)
 	return TRUE;
 }
 
-bool SdlContext::redraw(bool suppress) const
+bool SdlContext::redraw(bool suppress)
 {
+	std::lock_guard outputLock(_screenOutputMutex);
 	if (!_connected)
 		return true;
 
@@ -2812,13 +2874,128 @@ bool SdlContext::redraw(bool suppress) const
 		return true;
 
 	auto gdi = context()->gdi;
-	WINPR_ASSERT(gdi);
+	if (!gdi) return true;
+	_screenOutputSuppressed = suppress;
 	return gdi_send_suppress_output(gdi, suppress);
+}
+
+void SdlContext::requestScreenRefreshModes(uint32_t modes)
+{
+    for (const auto mode : sdlRefreshModes)
+        if ((modes & sdlRefreshBit(mode)) != 0) requestScreenRefresh(mode);
+}
+
+void SdlContext::requestScreenRefresh(SdlRefreshMode mode)
+{
+    if (!isConnected() || isReconnecting() || _stopRequested) return;
+    WLog_Print(_log, WLOG_INFO, "Screen refresh requested: method=%s", sdlRefreshName(mode));
+    const bool rebuild = mode == SdlRefreshMode::Textures || mode == SdlRefreshMode::Combined;
+    bool localOK = true;
+    std::unique_lock frameLock(_critical);
+    if (!isConnected() || isReconnecting() || _stopRequested) return;
+    for (auto& entry : _windows) {
+        if (rebuild && !entry.second.rebuildDesktopTextures()) localOK = false;
+        if (!drawToWindow(entry.second)) localOK = false;
+    }
+    frameLock.unlock();
+    WLog_Print(_log, localOK ? WLOG_INFO : WLOG_WARN,
+               "Screen refresh local repaint: method=%s result=%s",
+               sdlRefreshName(mode), localOK ? "presented" : "failed");
+    if (mode != SdlRefreshMode::Local && mode != SdlRefreshMode::Textures) {
+        _screenRefreshModes.fetch_or(sdlRefreshBit(mode));
+        _screenRefreshEvent.set();
+    }
+}
+
+bool SdlContext::serviceScreenRefresh()
+{
+    if (!_screenRefreshEvent.isSet() && !_screenResumePending) return true;
+    _screenRefreshEvent.clear();
+    if (!isConnected() || isReconnecting() || _stopRequested) {
+        _screenRefreshModes = 0; _screenResumePending = false; return true;
+    }
+    std::lock_guard outputLock(_screenOutputMutex);
+    if (_screenOutputSuppressed) {
+        _screenRefreshModes = 0; _screenResumePending = false; return true;
+    }
+    const auto settings = context()->settings;
+    const auto width = freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth);
+    const auto height = freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight);
+    if (width == 0 || height == 0 || width - 1 > UINT16_MAX || height - 1 > UINT16_MAX) {
+        _screenRefreshModes = 0;
+        // A pending resume must not be abandoned if dimensions are transiently invalid.
+        if (_screenResumePending && ++_screenResumeRetries >= 3) return false;
+        return true;
+    }
+    const RECTANGLE_16 area{0, 0, static_cast<UINT16>(width - 1), static_cast<UINT16>(height - 1)};
+    const auto update = context()->update;
+    const auto resume = [&]() {
+        return update->SuppressOutput && update->SuppressOutput(context(), 1, &area);
+    };
+    if (_screenResumePending) {
+        if (resume()) {
+            _screenResumePending = false; _screenResumeRetries = 0;
+            WLog_Print(_log, WLOG_INFO, "Screen refresh output resume retry succeeded");
+        } else {
+            WLog_Print(_log, WLOG_WARN, "Screen refresh output resume retry failed");
+            return ++_screenResumeRetries < 3;
+        }
+    }
+    const uint32_t pending = _screenRefreshModes.exchange(0);
+    for (const auto mode : sdlRefreshModes) {
+        if ((pending & sdlRefreshBit(mode)) == 0) continue;
+        const bool restart = mode == SdlRefreshMode::Updates || mode == SdlRefreshMode::Combined;
+        const bool server = mode == SdlRefreshMode::Server || mode == SdlRefreshMode::Combined;
+        if (restart) {
+            if (freerdp_settings_get_bool(settings, FreeRDP_SuppressOutput) && update->SuppressOutput) {
+                const bool paused = update->SuppressOutput(context(), 0, nullptr) != FALSE;
+                // Always attempt resume, including when the pause call failed.
+                const bool resumed = resume();
+                WLog_Print(_log, paused && resumed ? WLOG_INFO : WLOG_WARN,
+                           "Screen refresh output restart: method=%s pause=%d resume=%d",
+                           sdlRefreshName(mode), paused, resumed);
+                if (!resumed) {
+                    _screenResumePending = true; _screenResumeRetries = 0;
+                    // Preserve subsequent methods until output is resumed.
+                    const uint32_t remaining = pending & ~((sdlRefreshBit(mode) << 1) - 1);
+                    _screenRefreshModes.fetch_or(remaining | (server ? sdlRefreshBit(SdlRefreshMode::Server) : 0));
+                    return true;
+                }
+            } else WLog_Print(_log, WLOG_WARN, "Screen refresh output restart unsupported: method=%s", sdlRefreshName(mode));
+        }
+        if (server) {
+            if (freerdp_settings_get_bool(settings, FreeRDP_RefreshRect) && update->RefreshRect) {
+                const bool sent = update->RefreshRect(context(), 1, &area) != FALSE;
+                WLog_Print(_log, sent ? WLOG_INFO : WLOG_WARN,
+                           "Screen refresh server redraw: method=%s result=%s", sdlRefreshName(mode), sent ? "sent" : "failed");
+            } else WLog_Print(_log, WLOG_WARN, "Screen refresh server redraw unsupported: method=%s", sdlRefreshName(mode));
+        }
+    }
+    return true;
+}
+
+bool SdlContext::refreshMenuOpen() const
+{
+    const auto window = getWindowForId(_topBarWindowId);
+    return _topBarVisible && window && window->refreshMenuOpen();
+}
+
+void SdlContext::serviceRefreshHover()
+{
+    auto window = getWindowForId(_topBarWindowId);
+    if (window && window->serviceTopBarHover(SDL_GetTicks())) {
+        if (!_topBarPinned && _topBarHoveredButton == SdlTopBarButton::None) _topBarVisible = false;
+        std::ignore = redrawWindows();
+    }
 }
 
 void SdlContext::setConnected(bool val)
 {
 	_connected = val;
+	if (!val) {
+		_screenRefreshEvent.clear(); _screenRefreshModes = 0;
+		_screenResumePending = false; _screenResumeRetries = 0; _screenOutputSuppressed = false;
+	}
 }
 
 bool SdlContext::isConnected() const
@@ -2828,6 +3005,10 @@ bool SdlContext::isConnected() const
 
 void SdlContext::setReconnecting(bool val)
 {
+	if (val) {
+		_screenRefreshEvent.clear(); _screenRefreshModes = 0;
+		_screenResumePending = false; _screenResumeRetries = 0;
+	}
 	if (_reconnecting.exchange(val) == val)
 		return;
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
@@ -2849,6 +3030,7 @@ bool SdlContext::redrawStalled()
 	const int dots = static_cast<int>((SDL_GetTicks() / 500) % 3) + 1;
 	for (auto& window : _windows)
 	{
+		window.second.closeRefreshMenu();
 		if (!window.second.updateStalledSurface(dots))
 			return false;
 	}

@@ -176,3 +176,25 @@ scale preservation, ambiguity and fallback selection. `TestSDLFullscreenResize`
 checks deferred refresh, fresh dimensions, saved DPI, layout deduplication, forced
 same-layout rescaling and main-thread sends. Physical dock/cable unplug and replug
 still requires verification on a real multimonitor Windows session.
+
+## Manual screen refresh
+
+`screen_refresh` supports version-1 `refresh_screen` with a matching session ID.
+An absent `refreshMode` retains the original server redraw. The additive
+`screen_refresh_modes` capability supports `local`, `textures`, `server`,
+`updates`, and `combined`. Unknown types/values fail protocol validation. Each
+mode is coalesced independently and cleared during disconnect/reconnect.
+
+The SDL top bar opens a five-button hover panel, with descriptions and A–E
+labels. Its hover geometry, input ownership, dismissal, and individual method
+contracts are documented in the launcher's screen refresh specification. Only
+SDL-thread code recreates local textures. Server controls use current inclusive
+composed-desktop bounds on the connection thread. Output restart is serialized
+with ordinary window suppression, always attempts resume, and retries a failed
+resume without repeating pause. Three failed retries cause normal transport
+recovery; no indefinitely paused connected session is left behind. Intentionally
+suppressed output stays suppressed. Combined redraw waits for successful resume.
+
+Requests and stage results log the mode without frame content or credentials.
+No decoder reset, codec change, remote input, or normal-session reconnect is
+performed by these methods. Packet success is not proof of visual recovery.
