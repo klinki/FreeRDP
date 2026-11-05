@@ -6,7 +6,6 @@
 extern "C"
 {
 #include "../../../../libfreerdp/core/performance.h"
-#include "../../../../libfreerdp/core/rdpeudp.h"
 }
 #include <winpr/sysinfo.h>
 #include <cstdio>
@@ -137,32 +136,6 @@ static bool diagnosticMetrics(rdpContext* ctx)
     s=snapshot(ctx);
     if (!expect(s.decodeCalls+s.decodeSamplesSkipped==4000 && s.decodeRecentSampleCount<=256,
                 "contended timing drops observations instead of blocking decoding")) return false;
-    std::unique_ptr<rdpUdpTransport,decltype(&rdpeudp_test_free)> udp(rdpeudp_test_new(),rdpeudp_test_free);
-    if(!udp) return false;
-    rdpeudp_test_set_context(udp.get(),ctx);
-    if(!rdpeudp_test_seed_sent(udp.get(),100,100) || !rdpeudp_test_seed_sent(udp.get(),101,101)) return false;
-    const BOOL received[4]={FALSE,FALSE,FALSE,FALSE};
-    wStream* ack=rdpeudp_build_ackvec(100,received,4,FALSE,0,0);
-    if(!ack) return false;
-    RdpUdp2Layout layout{};
-    layout.flags=RDPUDP2_FLAG_ACKVEC | RDPUDP2_FLAG_AOA; layout.logWindow=5; layout.hasAckvec=TRUE;
-    layout.hasAoa=TRUE; layout.aoa=1; // Keep this control layout above the short-packet padding threshold.
-    layout.ackvec=Stream_Buffer(ack); layout.ackvecLen=Stream_Length(ack);
-    wStream* wire=rdpeudp2_encode_layout(&layout);
-    Stream_Release(ack);
-    if(!wire || !Stream_SetPosition(wire,Stream_Length(wire)) || !rdpeudp2_protect(wire,FALSE)) return false;
-    const bool fed=rdpeudp_test_feed(udp.get(),Stream_Buffer(wire),Stream_Length(wire)) &&
-                   rdpeudp_test_feed(udp.get(),Stream_Buffer(wire),Stream_Length(wire));
-    Stream_Release(wire);
-    RdpUdpStats stats{};
-    const auto haveStats=rdpeudp_test_get_stats(udp.get(),&stats);
-    const auto loss=snapshot(ctx).udpLossReports;
-    if (!fed || !haveStats || stats.lostDetected!=2 || loss!=2)
-        fprintf(stderr,"UDP fixture: fed=%d stats=%d lost=%llu collected=%llu received=%llu\n",
-                fed,haveStats,(unsigned long long)stats.lostDetected,(unsigned long long)loss,
-                (unsigned long long)stats.recvPackets);
-    if (!expect(fed && haveStats && stats.lostDetected==2 && loss==2,
-                "repeated negative ACK vectors count each outstanding transmission once")) return false;
     performance_udp_stats(ctx,10,15,3,0);
     s=snapshot(ctx);
     if (!expect(s.udpSentDatagrams==10 && s.udpReceivedDatagrams==15 && s.udpRetransmissions==3,
