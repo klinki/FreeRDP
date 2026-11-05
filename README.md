@@ -18,10 +18,13 @@ interoperability can finally liberate your computing experience.
 
 `main` is the rolling downstream integration branch: the latest supported
 upstream FreeRDP release plus the current Sheltie patch stack. It is currently
-based on FreeRDP 3.32.2. Upstream updates normally target published FreeRDP
-releases. Until `main` replaces it, `master` keeps the earlier patch stack on an
-upstream `master` snapshot; that history is also preserved at tag
+based on FreeRDP 3.33.0. Upstream updates normally target published FreeRDP
+releases. The patch stack on FreeRDP 3.32.2 is preserved at tag
+`v3.32.2-sheltie.1`, and the earlier stack on an upstream `master` snapshot at
 `archive/master-pre-3.32.2-rebase`.
+
+Since 3.33.0 the fork uses upstream's UDP multitransport, built with the
+experimental `WITH_RDPEUDP` option, instead of its own UDP transport.
 
 The downstream patches are rebased onto each new upstream base, reviewed and
 tested before publication. Consequently, `main` may be rebased and force-pushed;
