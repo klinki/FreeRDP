@@ -199,6 +199,16 @@ void sdlDispContext::service(UINT64 now)
 		std::ignore = _sdl->setResizeable(resizeable != 0);
 	if (!_pending || now < _nextAttempt)
 		return;
+	{
+		/* Wait out the minimum delay after the last send (or the capabilities) instead of
+		 * spending a retry on it. */
+		std::lock_guard lock(_channelMutex);
+		if (_activated && (now - _lastSentDate < RESIZE_MIN_DELAY))
+		{
+			_nextAttempt = _lastSentDate + RESIZE_MIN_DELAY;
+			return;
+		}
+	}
 	bool refreshed = true;
 	if (_refreshTopology)
 		refreshed = _sdl->refreshDisplayWindows();

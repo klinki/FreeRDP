@@ -99,7 +99,12 @@ static bool run()
 	            channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
 	            "delayed fullscreen display-channel activation succeeds"))
 		return false;
-	disp.service();
+	// Windows ignores a layout sent right after the capabilities.
+	const UINT64 activated = GetTickCount64();
+	disp.service(activated);
+	if (!expect(sentLayouts.empty(), "activation waits the minimum resize delay"))
+		return false;
+	disp.service(activated + 500);
 	if (!expect(sentLayouts.size() == 1 && sentLayouts.front().Width == static_cast<UINT32>(pixels.w) &&
 	            sentLayouts.front().Height == static_cast<UINT32>(pixels.h),
 	            "activation sends the corrected fullscreen layout without another resize") ||
@@ -133,7 +138,8 @@ static bool run()
 	changed.type = SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED;
 	changed.displayID = physical;
 	const auto before = layoutCalls;
-	const UINT64 now = GetTickCount64();
+	// Continue the simulated clock after the activation send.
+	const UINT64 now = activated + 1000;
 	if (!disp.handleEvent(changed))
 		return false;
 	disp.service(now);
