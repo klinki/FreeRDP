@@ -50,7 +50,7 @@ def main():
                     result["bridgeProtocolVersion"] == 1, "Wrong bridge version")
             expected = ["auth", "certificate", "focus", "retry",
                     "display_uuid", "per_monitor_scaling", "dynamic_resolution", "multimon",
-                    "close_confirmation", "session_thumbnail", "dock_accessory", "primary_monitor", "reverse_mouse_wheel"]
+                    "close_confirmation", "session_thumbnail", "dock_accessory", "primary_monitor", "reverse_mouse_wheel", "performance_monitoring", "performance_overlay_styles"]
             if tls_enabled == "ON":
                 expected.append("tls_keylog")
             require(result["capabilities"] == expected,

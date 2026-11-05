@@ -52,6 +52,13 @@ class SdlLauncher
 	bool closeConfirmationEnabled() const;
 	bool thumbnailsEnabled() const;
 	bool reverseMouseWheel() const;
+    uint64_t performanceGeneration() const {return _performanceGeneration.load();}
+    unsigned performanceMask() const {return _performanceMask.load();}
+    bool performanceAvailable() const {return _performanceAvailable.load();}
+    Json performanceMessage(const char* type) {return message(type);}
+    bool sendPerformance(Json event);
+    void requestPerformanceOverlay(bool visible);
+    void requestPerformanceDetails();
 	// Composing RDP thread only, after the completed BGRA frame's writes finish.
 	bool captureThumbnail(const BYTE* bgra, UINT32 width, UINT32 height, UINT32 stride);
 	static bool isAuthenticationError(UINT32 error);
@@ -76,6 +83,10 @@ class SdlLauncher
 	std::mutex _mutex;
 	std::condition_variable _condition;
 	std::deque<std::string> _outbound;
+	Json _performancePending{nullptr,WINPR_JSON_Delete};
+	std::atomic<unsigned> _performanceMask{0};
+	std::atomic<uint64_t> _performanceGeneration{0};
+	std::atomic<bool> _performanceAvailable{false};
 	Json _start{ nullptr, WINPR_JSON_Delete };
 	struct Pending
 	{

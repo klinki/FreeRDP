@@ -23,6 +23,7 @@
 #include <winpr/wlog.h>
 
 #include <freerdp/api.h>
+#include <freerdp/types.h>
 
 /** @brief The client side of a reliable (RDP-UDP-R) connection.
  *
@@ -66,6 +67,10 @@ WINPR_ATTR_NODISCARD
 FREERDP_LOCAL BOOL rdpudp_connect(rdpUdp* udp, const struct sockaddr* addr, size_t addrlen);
 
 WINPR_ATTR_NODISCARD
+/* Sheltie: count datagrams, retransmissions and loss reports for performance monitoring. Call
+ * before rdpudp_connect; the context may be NULL. */
+FREERDP_LOCAL void rdpudp_set_context(rdpUdp* udp, rdpContext* context);
+
 FREERDP_LOCAL SOCKET rdpudp_get_socket(const rdpUdp* udp);
 
 WINPR_ATTR_NODISCARD

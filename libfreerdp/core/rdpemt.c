@@ -806,6 +806,12 @@ fail:
 	return nullptr;
 }
 
+void rdpemt_set_context(rdpEmt* emt, rdpContext* context)
+{
+	WINPR_ASSERT(emt);
+	rdpudp_set_context(emt->udp, context);
+}
+
 BOOL rdpemt_start(rdpEmt* emt, const struct sockaddr* addr, size_t addrlen)
 {
 	WINPR_ASSERT(emt);
