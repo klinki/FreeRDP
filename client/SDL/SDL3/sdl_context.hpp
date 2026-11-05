@@ -37,6 +37,7 @@
 
 #include "sdl_window.hpp"
 #include "sdl_disp.hpp"
+#include "sdl_monitor_scale.hpp"
 #include "sdl_clip.hpp"
 #include "sdl_input.hpp"
 #include "sdl_rail.hpp"
@@ -129,6 +130,9 @@ class SdlContext
 	[[nodiscard]] bool detectDisplays();
 	[[nodiscard]] rdpMonitor getDisplay(SDL_DisplayID id) const;
 	[[nodiscard]] std::vector<SDL_DisplayID> getDisplayIds() const;
+	[[nodiscard]] bool parseMonitorScaleOverrides(const char* value);
+	[[nodiscard]] bool validateMonitorScaleOverrides() const;
+	void applyMonitorScaleOverride(rdpMonitor& monitor) const;
 
 	[[nodiscard]] sdlDispContext& getDisplayChannelContext();
 	[[nodiscard]] sdlInput& getInputChannelContext();
@@ -142,6 +146,11 @@ class SdlContext
 	[[nodiscard]] bool moveMouseTo(const SDL_FPoint& pos);
 
 	[[nodiscard]] SDL_FPoint screenToPixel(SDL_WindowID id, const SDL_FPoint& pos);
+	/* Map window-relative logical coordinates to the normalized RDP desktop.
+	 * During capture, resolve the window under the event position first so its
+	 * renderer scale and monitor origin apply. Keep the event's window ID for
+	 * input focus and capture ownership. */
+	[[nodiscard]] bool screenToRdp(SDL_WindowID id, const SDL_FPoint& pos, SDL_FPoint& rpos);
 
 	[[nodiscard]] SDL_FPoint pixelToScreen(SDL_WindowID id, const SDL_FPoint& pos);
 	[[nodiscard]] SDL_FRect pixelToScreen(SDL_WindowID id, const SDL_FRect& pos,
@@ -308,5 +317,7 @@ class SdlContext
 	std::vector<COMMAND_LINE_ARGUMENT_A> _args;
 	std::optional<bool> _connectionDialog;
 	std::vector<rdpPointer*> _valid_pointers;
+	SdlMonitorScaleOverrides _monitorScaleOverrides;
+	bool _monitorScaleOverridesConfigured = false;
 	bool _credentialsRead = false;
 };
