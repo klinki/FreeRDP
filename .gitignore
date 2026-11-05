@@ -3,3 +3,6 @@
 build
 checker
 abi-checker
+
+# Python bytecode of the Sheltie runtime tooling
+__pycache__/
