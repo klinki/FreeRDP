@@ -24,6 +24,7 @@
 #include <cstdio>
 #include <string>
 #include <freerdp/client/cmdline.h>
+#include <freerdp/codec/yuv.h>
 
 #include "sdl_context.hpp"
 #include "sdl_config.hpp"
@@ -2648,6 +2649,20 @@ void SdlContext::flushQueueMetrics(bool force)
 	_queueAccum.popRects += snapshot.popRects;
 	_queueAccum.queueWaitNs += snapshot.queueWaitNs;
 
+	/* Codec-side threadpool counters, polled here on the UI thread.
+	 * Unsigned delta arithmetic absorbs 32-bit wraps. Offline replay
+	 * drives decoding too, but without queue pops no record is written. */
+	uint32_t tiles = 0;
+	uint32_t created = 0;
+	uint32_t reused = 0;
+	yuv_pool_stats(&tiles, &created, &reused);
+	_queueAccum.yuvTiles += tiles - _yuvLastTiles;
+	_queueAccum.yuvWorkCreated += created - _yuvLastCreated;
+	_queueAccum.yuvWorkReused += reused - _yuvLastReused;
+	_yuvLastTiles = tiles;
+	_yuvLastCreated = created;
+	_yuvLastReused = reused;
+
 	if (!_queueAccum.active())
 		return;
 
@@ -2671,7 +2686,8 @@ void SdlContext::flushQueueMetrics(bool force)
 	              "\"pops\":%llu,\"empty_pops\":%llu,\"pop_rects\":%llu,"
 	              "\"queue_wait_ns\":%llu,"
 	              "\"update_events_received\":%llu,\"update_events_acted\":%llu,"
-	              "\"motions_coalesced\":%llu}",
+	              "\"motions_coalesced\":%llu,"
+	              "\"yuv_tiles\":%llu,\"yuv_work_created\":%llu,\"yuv_work_reused\":%llu}",
 	              static_cast<unsigned long long>(_queueIntervalStartNs),
 	              static_cast<unsigned long long>(duration),
 	              static_cast<unsigned long long>(_queueAccum.pushes),
@@ -2684,7 +2700,10 @@ void SdlContext::flushQueueMetrics(bool force)
 	              static_cast<unsigned long long>(_queueAccum.queueWaitNs),
 	              static_cast<unsigned long long>(_queueAccum.updateReceived),
 	              static_cast<unsigned long long>(_queueAccum.updateActed),
-	              static_cast<unsigned long long>(_queueAccum.motionsCoalesced));
+	              static_cast<unsigned long long>(_queueAccum.motionsCoalesced),
+	              static_cast<unsigned long long>(_queueAccum.yuvTiles),
+	              static_cast<unsigned long long>(_queueAccum.yuvWorkCreated),
+	              static_cast<unsigned long long>(_queueAccum.yuvWorkReused));
 	line[sizeof(line) - 1] = '\0';
 	SdlRenderMetrics::appendJsonLine(line);
 	_queueAccum = QueueAccum{};
