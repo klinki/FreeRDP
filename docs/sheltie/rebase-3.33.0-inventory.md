@@ -69,7 +69,7 @@ code. **Drop**: do not carry over. **Decide**: needs an owner decision.
 
 | Branch | Decision | Notes |
 |---|---|---|
-| `codex/screen-refresh-based-on-main` | **Keep**, rework one commit | Carry over manual screen refresh (`bb49bfe34`), hover refresh methods (`734cee794`), FFmpeg hardware acceleration in runtime builds (`5eb7b6a0f`) and unchanged-layout suppression (`9d64e995f`). `c37d523b5` (UDP bandwidth diagnostics) targets our autodetect/UDP code; fold it into the step 26 rework. Then delete `codex/screen-refresh`. |
+| `codex/screen-refresh-based-on-main` | **Keep**, minus one commit | Carry over manual screen refresh (`bb49bfe34`), hover refresh methods (`734cee794`), FFmpeg hardware acceleration in runtime builds (`5eb7b6a0f`) and unchanged-layout suppression (`9d64e995f`). Drop `c37d523b5` (UDP bandwidth diagnostics): it is built on the fork's per-transport autodetect slots and tunnel send path, which 3.33.0 replaced. Redo the investigation on upstream UDP if the estimates still look wrong. Then delete `codex/screen-refresh`. |
 | `codex/windows-protocol-smoke` | **Partly keep** | 7 commits: Microsoft RDP protocol test harness (`tools/windows-protocol-tests`, ~54k lines), its investigation evidence (~170k lines) and one engine fix. Carry only the engine part of `054b42e81` (MCS userData and Demand Active length validation in `rdp.c`/`connection.c`, plus `TestRdpPacketLengths.c`) as its own merge, and offer it upstream. Tag the branch `archive/windows-protocol-tests`; the harness can return later without its evidence folders. |
 | `feat/multimon-layout-2` | **Keep as upstream PR branch** | Source of upstream PR #13431; the same feature ships in step 9. Rebase the PR if upstream asks. |
 | `perf-bench` … `codex/pr13608-reliability` (6 branches) | **Drop** | Fixes to our UDP code plus the benchmark suite. Tag the tip `archive/udp-bench-2026-10` first. `tools/rdp-bench` can come back later (without its result files) to benchmark the upstream UDP code. |
@@ -87,3 +87,28 @@ code. **Drop**: do not carry over. **Decide**: needs an owner decision.
 - Multi-monitor, mixed DPI, notch, fullscreen and monitor reconnection on the
   MacBook + M27UP + Dell setup.
 - A few days of real use before tagging `v3.33.0-sheltie.1`.
+
+## Decisions made during the rebuild
+
+- **Upstream UDP is experimental.** 3.33.0 builds it only with
+  `-DWITH_RDPEUDP=ON` (default OFF). `scripts/sheltie/build-engine.sh` now
+  enables it.
+- **Primary monitor (step 19).** 3.33.0 added a simpler "first `/monitors:`
+  entry is primary" rule. Ours is kept because it also follows the saved
+  monitor order across reconnects and display removal.
+- **Display layout after DisplayControlCaps (steps 23 and 24).** 3.33.0 waits
+  `RESIZE_MIN_DELAY` after the capabilities because Windows ignores an
+  earlier layout. Our display scheduler replaces upstream's timer, so the
+  rule is carried over in a separate commit; `TestSDLFullscreenResize` now
+  expects the delayed send.
+- **Exit code after failed recovery (step 22).** Follows 3.33.0: the code is
+  derived from the last FreeRDP error (`errorToExitCode`) instead of always
+  `CONN_FAILED`. Sheltie should be checked for any reliance on
+  `CONN_FAILED` in this case.
+- **Monitor-probe flashes (step 7).** Upstream's Wayland/X11 probe path is
+  kept; the windowless probe applies to the other platforms.
+- **Performance monitoring (step 26).** The hooks moved from the fork's
+  `rdpeudp.c` to upstream `rdpudp.c`, with the context passed via
+  `rdpemt_set_context()`. Upstream's `TestRdpUdp` passes with them.
+- **New upstream workflow.** 3.33.0 adds `.github/workflows/emscripten.yml`;
+  disable it in the repository's Actions settings after the push.
