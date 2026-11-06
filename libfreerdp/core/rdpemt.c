@@ -43,8 +43,11 @@
 #include <openssl/x509.h>
 
 #include <freerdp/crypto/certificate.h>
+#include <freerdp/freerdp.h>
+#include <freerdp/settings.h>
 
 #include "../crypto/certificate.h"
+#include "../crypto/tls.h"
 #include "rdpudp.h"
 #include "rdpemt.h"
 
@@ -90,6 +93,7 @@ struct rdp_emt
 	LONG directBytes;
 
 	rdpUdp* udp;
+	rdpContext* context;
 	SSL_CTX* ctx;
 	SSL* ssl;
 	BIO* rbio;
@@ -597,6 +601,10 @@ static BOOL emt_start_tls(rdpEmt* emt)
 	emt->ssl = SSL_new(emt->ctx);
 	if (!emt->ssl)
 		return FALSE;
+	if (emt->context &&
+	    !freerdp_tls_set_secrets_file(
+	        emt->ssl, freerdp_settings_get_string(emt->context->settings, FreeRDP_TlsSecretsFile)))
+		return FALSE;
 
 	emt->rbio = BIO_new(BIO_s_mem());
 	emt->wbio = BIO_new(BIO_s_mem());
@@ -809,6 +817,7 @@ fail:
 void rdpemt_set_context(rdpEmt* emt, rdpContext* context)
 {
 	WINPR_ASSERT(emt);
+	emt->context = context;
 	rdpudp_set_context(emt->udp, context);
 }
 

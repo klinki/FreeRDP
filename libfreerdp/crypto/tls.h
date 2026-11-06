@@ -101,6 +101,11 @@ extern "C"
 	WINPR_ATTR_NODISCARD
 	FREERDP_LOCAL const SSL_METHOD* freerdp_tls_get_ssl_method(BOOL isDtls, BOOL isClient);
 
+	/** Enables opt-in TLS key logging for an SSL session, including multitransport tunnels.
+	 * file must remain valid for the lifetime of ssl. NULL leaves key logging disabled. */
+	WINPR_ATTR_NODISCARD
+	FREERDP_LOCAL BOOL freerdp_tls_set_secrets_file(SSL* ssl, const char* file);
+
 	WINPR_ATTR_NODISCARD
 	FREERDP_LOCAL int freerdp_tls_connect(rdpTls* tls, BIO* underlying);
 

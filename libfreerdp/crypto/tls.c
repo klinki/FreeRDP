@@ -876,6 +876,23 @@ static void SSLCTX_keylog_cb(const SSL* ssl, const char* line)
 	}
 }
 
+BOOL freerdp_tls_set_secrets_file(SSL* ssl, const char* file)
+{
+	WINPR_ASSERT(ssl);
+	if (!file)
+		return TRUE;
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+	if (!InitOnceExecuteOnce(&secrets_file_idx_once, secrets_file_init_cb, nullptr, nullptr))
+		return FALSE;
+	if (SSL_set_ex_data(ssl, secrets_file_idx, (void*)file) != 1)
+		return FALSE;
+	SSL_CTX_set_keylog_callback(SSL_get_SSL_CTX(ssl), SSLCTX_keylog_cb);
+#else
+	WLog_WARN(TAG, "Key-Logging not available - requires OpenSSL 1.1.1 or higher");
+#endif
+	return TRUE;
+}
+
 static void tls_reset(rdpTls* tls)
 {
 	WINPR_ASSERT(tls);
@@ -970,21 +987,8 @@ static BOOL tls_prepare(rdpTls* tls, BIO* underlying, SSL_METHOD* method, int op
 		return FALSE;
 	}
 
-	if (settings->TlsSecretsFile)
-	{
-#if OPENSSL_VERSION_NUMBER >= 0x10101000L
-		if (!InitOnceExecuteOnce(&secrets_file_idx_once, secrets_file_init_cb, nullptr, nullptr))
-			return FALSE;
-
-		if (secrets_file_idx != -1)
-		{
-			SSL_set_ex_data(tls->ssl, secrets_file_idx, settings->TlsSecretsFile);
-			SSL_CTX_set_keylog_callback(tls->ctx, SSLCTX_keylog_cb);
-		}
-#else
-		WLog_WARN(TAG, "Key-Logging not available - requires OpenSSL 1.1.1 or higher");
-#endif
-	}
+	if (!freerdp_tls_set_secrets_file(tls->ssl, settings->TlsSecretsFile))
+		return FALSE;
 
 	BIO_push(tls->bio, underlying);
 	return TRUE;
