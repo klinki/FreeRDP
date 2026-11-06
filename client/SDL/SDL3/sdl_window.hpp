@@ -82,6 +82,7 @@ class SdlWindow
 	void setRefreshCapabilities(bool server, bool updates);
 	[[nodiscard]] bool refreshEnabled(SdlTopBarButton button) const;
 	void noteRefresh(SdlTopBarButton button);
+	[[nodiscard]] SdlTopBarButton selectedRefresh() const;
 	[[nodiscard]] bool needsFullRedraw() const;
 	[[nodiscard]] bool needsFullRedraw(int surfaceWidth, int surfaceHeight) const;
 

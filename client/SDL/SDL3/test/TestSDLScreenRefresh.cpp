@@ -82,7 +82,7 @@ static SDL_FPoint findButton(SdlTopBar& bar, const SdlTopBarRect& rect, const SD
         if (bar.hitTest(rect, viewport, {x, rect.y+rect.h/2})==button) return {x+2, rect.y+rect.h/2};
     return {-1,-1};
 }
-static bool layoutAndPreview(const char* preview)
+static bool layoutAndPreview(const char* preview, bool menuEnabled)
 {
     std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> pixels(SDL_CreateSurface(1300, 320, SDL_PIXELFORMAT_RGBA32), SDL_DestroySurface);
     if (!pixels) return false;
@@ -95,11 +95,25 @@ static bool layoutAndPreview(const char* preview)
         auto rect=SdlTopBar::defaultRect(viewport,compact); rect.x=compact?700:20; rect.y=20;
         bar.closeRefreshMenu();
         const auto point=findButton(bar,rect,viewport,SdlTopBarButton::Refresh);
-        if (!expect(point.x>=0 && bar.updateHover(rect,viewport,point,100),"Hover opens refresh panel in both densities") ||
+        if (!expect(point.x >= 0 && bar.updateHover(rect, viewport, point, 100) == menuEnabled &&
+                    bar.refreshMenuOpen() == menuEnabled && bar.selectedRefresh() == SdlTopBarButton::RefreshCombined,
+                    "The menu is opt-in and E is the initial method in both bar densities") ||
             !bar.draw(rect,viewport,true,point)) return false;
+        if (!menuEnabled) {
+            if (!SDL_RenderPresent(renderer.get())) return false;
+            const auto menu = bar.refreshMenuRect(rect, viewport);
+            const SDL_FPoint hidden{menu.x + menu.w / 2, menu.y + menu.h / 2};
+            Uint8 r = 0, g = 0, b = 0, a = 0;
+            if (!expect(!bar.contains(rect, viewport, hidden) &&
+                        bar.hitTest(rect, viewport, hidden) == SdlTopBarButton::None,
+                        "The disabled menu has no invisible input area") ||
+                !SDL_ReadSurfacePixel(pixels.get(), static_cast<int>(hidden.x), static_cast<int>(hidden.y), &r, &g, &b, &a) ||
+                !expect(r == 58 && g == 85 && b == 104, "Hovering paints no menu when its flag is off")) return false;
+        }
     }
     SDL_RenderPresent(renderer.get());
     if (preview && !SDL_SaveBMP(pixels.get(),preview)) return false;
+    if (!menuEnabled) return true;
     for (const auto viewport : {SDL_Rect{0,0,320,200},SDL_Rect{0,0,800,600},SDL_Rect{0,0,3840,2160}})
         for (const bool compact : {false,true}) for (const bool bottom : {false,true}) for (const bool right : {false,true}) {
             auto rect=SdlTopBar::clampToViewport(SdlTopBar::defaultRect(viewport,compact),viewport,compact);
@@ -126,8 +140,9 @@ static bool layoutAndPreview(const char* preview)
     return expect(!bar.refreshEnabled(SdlTopBarButton::RefreshServer) && !bar.refreshEnabled(SdlTopBarButton::RefreshUpdates) &&
                   bar.refreshEnabled(SdlTopBarButton::RefreshCombined),"Unsupported server methods are disabled individually");
 }
-static bool run()
+static bool run(bool menuEnabled)
 {
+    calls.clear(); remoteMouse = remoteKeys = 0; onConnectionThread = true;
     std::unique_ptr<freerdp,decltype(&freerdp_free)> instance(freerdp_new(),freerdp_free);
     if (!instance) return false;
     instance->ContextSize=sizeof(sdl_rdp_context);
@@ -214,6 +229,28 @@ static bool run()
     drag.type=SDL_EVENT_MOUSE_BUTTON_UP;
     if (!overlay->button(drag,{popup.x+10,popup.y+10},action)) return false;
     if (!sdl.repaintAll()) return false;
+    const auto clickRefreshIcon = [&](const SDL_FPoint& point) {
+        SDL_Event event{};
+        event.type = SDL_EVENT_MOUSE_MOTION; event.motion.windowID = window->id();
+        event.motion.x = point.x; event.motion.y = point.y;
+        if (!sdl.handleEvent(event)) return false;
+        event = {}; event.type = SDL_EVENT_MOUSE_BUTTON_DOWN;
+        event.button.windowID = window->id(); event.button.button = SDL_BUTTON_LEFT;
+        event.button.x = point.x; event.button.y = point.y;
+        if (!sdl.handleEvent(event)) return false;
+        event.type = SDL_EVENT_MOUSE_BUTTON_UP;
+        return sdl.handleEvent(event) && service(sdl);
+    };
+    calls.clear();
+    const auto defaultIcon = findButton(geometry, window->topBarRect(), window->pixelViewport(), SdlTopBarButton::Refresh);
+    if (!expect(window->selectedRefresh() == SdlTopBarButton::RefreshCombined,
+                "A new connection bar defaults to combined recovery") ||
+        !clickRefreshIcon(defaultIcon) || !expect(order() == "PUR", "The initial icon click runs combined recovery")) return false;
+    if (!menuEnabled) {
+        if (!expect(!window->refreshMenuOpen() && remoteMouse == 0 && onConnectionThread,
+                    "With the flag unset the plain refresh icon runs E without opening a menu or sending remote input")) return false;
+        sdl.setConnected(false); return true;
+    }
     for (const auto mode : sdlRefreshModes) {
         window->closeRefreshMenu(); calls.clear();
         const auto bar=window->topBarRect();
@@ -229,6 +266,22 @@ static bool run()
         const std::string expected=mode==SdlRefreshMode::Server?"R":mode==SdlRefreshMode::Updates?"PU":mode==SdlRefreshMode::Combined?"PUR":"";
         if (!expect(order()==expected && remoteMouse==0 && !overlay->capturing(),
                     "Each hover button invokes its own method without remote input or underlying overlay capture")) return false;
+        const auto selected = SdlTopBar::refreshButton(mode);
+        if (!expect(window->selectedRefresh() == selected, "The chosen method becomes the icon action")) return false;
+        for (unsigned repeat = 0; repeat < 2; ++repeat) {
+            window->closeRefreshMenu(); calls.clear();
+            if (!window->fill()) return false;
+            const auto target = SDL_GetRenderTarget(window->renderer());
+            if (!target || !SDL_SetBooleanProperty(SDL_GetTextureProperties(target), "refresh.repeat.marker", true) ||
+                !window->updateSurface() || !clickRefreshIcon(anchor)) return false;
+            if (!expect(order() == expected && green(*window, true) && window->selectedRefresh() == selected && remoteMouse == 0,
+                        "Icon clicks repeat the selected method after closing and reopening the panel")) return false;
+            if (!window->fill()) return false;
+            const bool retained = SDL_GetBooleanProperty(SDL_GetTextureProperties(SDL_GetRenderTarget(window->renderer())),
+                                                        "refresh.repeat.marker", false);
+            if (!expect(retained == (mode != SdlRefreshMode::Textures && mode != SdlRefreshMode::Combined),
+                        "Repeating B/E rebuilds textures while A/C/D retain them") || !sdl.repaintAll()) return false;
+        }
     }
     // Pressing one row and releasing elsewhere cancels locally and still closes the hover panel.
     window->closeRefreshMenu(); calls.clear();
@@ -241,21 +294,29 @@ static bool run()
     press.button.x=menuRect.x+menuRect.w/2;press.button.y=menuRect.y+menuRect.h*0.5f;
     if (!sdl.handleEvent(press)) return false;
     press.type=SDL_EVENT_MOUSE_BUTTON_UP;press.button.x=-10;press.button.y=-10;
-    if (!sdl.handleEvent(press) || !service(sdl) || !expect(calls.empty() && remoteMouse==0,"Dragging off a popup row cancels without a remote release")) return false;
+    if (!sdl.handleEvent(press) || !service(sdl) || !expect(calls.empty() && remoteMouse==0 && window->selectedRefresh()==SdlTopBarButton::RefreshCombined,"Dragging off a popup row cancels without remote input or changing the selected method")) return false;
     SDL_Delay(350);sdl.serviceRefreshHover();
     if (!expect(!window->refreshMenuOpen(),"An outside release does not leave the popup stuck open")) return false;
     if (!sdl.handleEvent(move) || !expect(window->refreshMenuOpen(),"Hover reopens the popup after dismissal")) return false;
     SDL_Event escape{};escape.type=SDL_EVENT_KEY_DOWN;escape.key.windowID=window->id();escape.key.scancode=SDL_SCANCODE_ESCAPE;
     if (!sdl.handleEvent(escape)) return false;escape.type=SDL_EVENT_KEY_UP;
-    if (!sdl.handleEvent(escape) || !expect(!window->refreshMenuOpen() && remoteKeys==0,"Escape closes the panel without forwarding an orphan key-up")) return false;
+    if (!sdl.handleEvent(escape) || !expect(!window->refreshMenuOpen() && remoteKeys==0 && window->selectedRefresh()==SdlTopBarButton::RefreshCombined,"Escape closes the panel without remote input or changing the selected method")) return false;
     if (!expect(onConnectionThread,"All refresh control packets stay on the RDP thread")) return false;
     sdl.setConnected(false);return true;
 }
 int main(int argc,char** argv)
 {
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER,"dummy"); if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS)) return 1;
-    sdl_dialogs_init();const bool ok=run() && layoutAndPreview(argc>1?argv[1]:nullptr);
+    sdl_dialogs_init();
+    constexpr const char* flag = "FREERDP_SDL_REFRESH_MENU";
+    std::ignore = SDL_ResetHint(flag);
+    const std::string defaultPreview = argc > 1 ? std::string(argv[1]) + ".default.bmp" : "";
+    const bool ok = SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), flag) && run(false) &&
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), flag, "0", true) &&
+        layoutAndPreview(defaultPreview.empty() ? nullptr : defaultPreview.c_str(), false) &&
+        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), flag, "1", true) && run(true) &&
+        layoutAndPreview(argc > 1 ? argv[1] : nullptr, true);
     sdl_dialogs_uninit();SDL_Quit();
-    if (ok) puts("PASS five refresh methods, failure-safe resume, cached pixels, and hover-panel input/layout");
+    if (ok) puts("PASS default combined refresh, opt-in hover menu, remembered methods, and failure-safe recovery");
     return ok?0:1;
 }

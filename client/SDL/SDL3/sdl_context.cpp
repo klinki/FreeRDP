@@ -2111,18 +2111,20 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 #endif
                 break;
 			case SdlTopBarButton::Refresh:
-				window->noteRefresh(SdlTopBarButton::RefreshServer);
-				requestScreenRefresh();
-				break;
 			case SdlTopBarButton::RefreshLocal:
 			case SdlTopBarButton::RefreshTextures:
 			case SdlTopBarButton::RefreshServer:
 			case SdlTopBarButton::RefreshUpdates:
 			case SdlTopBarButton::RefreshCombined:
 			{
+				const auto button = gesture.button == SdlTopBarButton::Refresh
+				                        ? window->selectedRefresh() : gesture.button;
 				SdlRefreshMode mode = SdlRefreshMode::Server;
-				if (window->refreshEnabled(gesture.button) && SdlTopBar::refreshMode(gesture.button, mode)) {
-					window->noteRefresh(gesture.button); requestScreenRefresh(mode);
+				if ((gesture.button == SdlTopBarButton::Refresh || window->refreshEnabled(button)) &&
+				    SdlTopBar::refreshMode(button, mode))
+				{
+					window->noteRefresh(button);
+					requestScreenRefresh(mode);
 				}
 				break;
 			}

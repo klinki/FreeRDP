@@ -85,6 +85,10 @@ class SdlTopBar
 	void setRefreshCapabilities(bool server, bool updates) { _serverRefresh = server; _outputReset = updates; }
 	[[nodiscard]] bool refreshEnabled(SdlTopBarButton button) const;
 	void noteRefresh(SdlTopBarButton button) { _lastRefresh = button; }
+	[[nodiscard]] SdlTopBarButton selectedRefresh() const
+	{
+		return _lastRefresh == SdlTopBarButton::None ? SdlTopBarButton::RefreshCombined : _lastRefresh;
+	}
 	[[nodiscard]] static bool refreshMode(SdlTopBarButton button, SdlRefreshMode& mode);
 	[[nodiscard]] static SdlTopBarButton refreshButton(SdlRefreshMode mode);
 	[[nodiscard]] SDL_FRect refreshMenuRect(const SdlTopBarRect& bar, const SDL_Rect& viewport) const;
@@ -99,6 +103,7 @@ class SdlTopBar
 
   private:
 	bool _performanceAvailable=false;
+	bool _refreshMenuEnabled = false;
 	bool _refreshOpen = false, _serverRefresh = true, _outputReset = true;
 	uint64_t _refreshCloseAt = 0;
 	SdlTopBarButton _lastRefresh = SdlTopBarButton::None;

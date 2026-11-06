@@ -185,9 +185,19 @@ An absent `refreshMode` retains the original server redraw. The additive
 `updates`, and `combined`. Unknown types/values fail protocol validation. Each
 mode is coalesced independently and cleared during disconnect/reconnect.
 
-The SDL top bar opens a five-button hover panel, with descriptions and A–E
-labels. Its hover geometry, input ownership, dismissal, and individual method
-contracts are documented in the launcher's screen refresh specification. Only
+The SDL top bar normally shows a single refresh icon that runs combined recovery
+(E). The five-button A–E hover panel is an opt-in runtime feature: set
+`FREERDP_SDL_REFRESH_MENU=1` in the client environment before creating a session.
+Unset or `0` keeps the panel off; hovering leaves the icon usable and does not
+capture input in the hidden panel area. The flag is read when each connection
+bar is created. Sheltie forwards this specific environment variable to its helper.
+
+With the panel enabled, E is initially selected and clicking the icon repeats
+the last method chosen in that connection bar. Dismissing the panel retains the
+choice in memory; it is not saved for a new connection bar. Launcher commands
+without `refreshMode` continue to request server redraw independently of this
+UI choice. Its hover geometry, input ownership, dismissal, and individual
+method contracts are documented in the launcher's screen refresh specification. Only
 SDL-thread code recreates local textures. Server controls use current inclusive
 composed-desktop bounds on the connection thread. Output restart is serialized
 with ordinary window suppression, always attempts resume, and retries a failed

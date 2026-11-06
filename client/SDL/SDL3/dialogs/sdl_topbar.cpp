@@ -290,7 +290,8 @@ struct SdlTopBar::Impl
 };
 
 SdlTopBar::SdlTopBar(SDL_Renderer* renderer, std::string title)
-    : _impl(std::make_unique<Impl>())
+    : _refreshMenuEnabled(SDL_GetHintBoolean("FREERDP_SDL_REFRESH_MENU", false)),
+      _impl(std::make_unique<Impl>())
 {
 	_impl->renderer = renderer;
 	_impl->title = std::move(title);
@@ -397,6 +398,7 @@ bool SdlTopBar::contains(const SdlTopBarRect& bar, const SDL_Rect& viewport,
 bool SdlTopBar::updateHover(const SdlTopBarRect& bar, const SDL_Rect& viewport,
                              const SDL_FPoint& pointer, uint64_t now)
 {
+    if (!_refreshMenuEnabled) return false;
     const bool before = _refreshOpen;
     const auto anchor = buttonRect(layoutFor(bar, viewport), SdlTopBarButton::Refresh);
     if (pointIn(anchor, pointer) || (_refreshOpen && contains(bar, viewport, pointer))) {
@@ -607,7 +609,7 @@ bool SdlTopBar::draw(const SdlTopBarRect& bar, const SDL_Rect& viewport, bool pi
             const bool enabled = refreshEnabled(button);
             const auto color = !enabled ? SDL_Color{38, 49, 66, 255}
                 : pointIn(row, pointer) ? buttonHoverColor
-                : button == _lastRefresh ? pinnedButtonColor : buttonColor;
+                : button == selectedRefresh() ? pinnedButtonColor : buttonColor;
             if (!fillRect(_impl->renderer, row, color)) return false;
             const auto& details = !enabled ? _impl->unsupported
                 : button == SdlTopBarButton::RefreshCombined && (!_serverRefresh || !_outputReset)

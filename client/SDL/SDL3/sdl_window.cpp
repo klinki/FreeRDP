@@ -1026,6 +1026,10 @@ void SdlWindow::closeRefreshMenu() { if (_topBar) _topBar->closeRefreshMenu(); }
 void SdlWindow::setRefreshCapabilities(bool server, bool updates) { if (_topBar) _topBar->setRefreshCapabilities(server, updates); }
 bool SdlWindow::refreshEnabled(SdlTopBarButton button) const { return _topBar && _topBar->refreshEnabled(button); }
 void SdlWindow::noteRefresh(SdlTopBarButton button) { if (_topBar) _topBar->noteRefresh(button); }
+SdlTopBarButton SdlWindow::selectedRefresh() const
+{
+    return _topBar ? _topBar->selectedRefresh() : SdlTopBarButton::RefreshCombined;
+}
 
 bool SdlWindow::topBarContains(float x, float y) const
 {
