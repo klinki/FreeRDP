@@ -48,6 +48,7 @@ struct Layout
 	float grip = 0.0f;
 	float buttonY = 0.0f;
 	float performanceX = 0.0f;
+	float refreshX = 0.0f;
 	float compactX = 0.0f;
 	float pinX = 0.0f;
 	float minimizeX = 0.0f;
@@ -80,7 +81,8 @@ Layout layoutFor(const SdlTopBarRect& bar, const SDL_Rect& viewport)
 	layout.minimizeX = layout.restoreX - layout.gap - layout.button;
 	layout.pinX = layout.minimizeX - layout.gap - layout.button;
 	layout.compactX = layout.pinX - layout.gap - layout.button;
-	layout.performanceX = layout.compactX - layout.gap - layout.button;
+	layout.refreshX = layout.compactX - layout.gap - layout.button;
+	layout.performanceX = layout.refreshX - layout.gap - layout.button;
 	return layout;
 }
 
@@ -92,6 +94,9 @@ SDL_FRect buttonRect(const Layout& layout, SdlTopBarButton button)
 	{
 		case SdlTopBarButton::Performance:
 			x = layout.performanceX;
+			break;
+		case SdlTopBarButton::Refresh:
+			x = layout.refreshX;
 			break;
 		case SdlTopBarButton::Compact:
 			x = layout.compactX;
@@ -108,6 +113,11 @@ SDL_FRect buttonRect(const Layout& layout, SdlTopBarButton button)
 		case SdlTopBarButton::Close:
 			x = layout.closeX;
 			break;
+		case SdlTopBarButton::RefreshLocal:
+		case SdlTopBarButton::RefreshTextures:
+		case SdlTopBarButton::RefreshServer:
+		case SdlTopBarButton::RefreshUpdates:
+		case SdlTopBarButton::RefreshCombined:
 		case SdlTopBarButton::None:
 			return {};
 	}
@@ -145,6 +155,32 @@ void drawPin(SDL_Renderer* renderer, const SDL_FRect& rect)
 	std::ignore = drawLine(renderer, cx + rect.w * 0.18f, top, cx + rect.w * 0.11f, bottom);
 	std::ignore = drawLine(renderer, cx - rect.w * 0.20f, bottom, cx + rect.w * 0.20f, bottom);
 	std::ignore = drawLine(renderer, cx, bottom, cx, rect.y + rect.h * 0.88f);
+}
+
+void drawRefresh(SDL_Renderer* renderer, const SDL_FRect& rect)
+{
+	constexpr float pi = 3.14159265f;
+	const float cx = rect.x + rect.w * 0.5f, cy = rect.y + rect.h * 0.5f;
+	const float radius = rect.w * 0.27f;
+	/* A clockwise circular arrow, kept legible at the compact bar height. */
+	SDL_FPoint previous{};
+	for (int i = 0; i <= 24; ++i)
+	{
+		const float angle = (-60.0f + i * 12.0f) * pi / 180.0f;
+		const SDL_FPoint point{ cx + radius * std::cos(angle), cy + radius * std::sin(angle) };
+		if (i > 0)
+			std::ignore = drawLine(renderer, previous.x, previous.y, point.x, point.y);
+		previous = point;
+	}
+	const float angle = 228.0f * pi / 180.0f;
+	const float tx = -std::sin(angle), ty = std::cos(angle);
+	const float length = rect.w * 0.20f, spread = rect.w * 0.12f;
+	std::ignore = drawLine(renderer, previous.x, previous.y,
+	                      previous.x - tx * length - ty * spread,
+	                      previous.y - ty * length + tx * spread);
+	std::ignore = drawLine(renderer, previous.x, previous.y,
+	                      previous.x - tx * length + ty * spread,
+	                      previous.y - ty * length - tx * spread);
 }
 
 void drawMinimize(SDL_Renderer* renderer, const SDL_FRect& rect)
@@ -194,16 +230,16 @@ float SdlTopBar::fixedHeight(const SDL_Rect& viewport, bool compact)
 float SdlTopBar::minWidth(const SDL_Rect& viewport)
 {
 	const auto scale = topBarScale(viewport);
-	/* grips + 5 buttons + gaps + margins + a sliver of title so the bar stays
-	 * grabbable */
-	return 2.0f * 8.0f * scale + 5.0f * 30.0f * scale + 4.0f * 4.0f * scale +
+	/* Reserve all seven buttons, including optional performance stats, with
+	 * enough title space to keep the bar grabbable. */
+	return 2.0f * 8.0f * scale + 7.0f * 30.0f * scale + 6.0f * 4.0f * scale +
 	       2.0f * 10.0f * scale + 40.0f * scale;
 }
 
 float SdlTopBar::defaultWidth(const SDL_Rect& viewport)
 {
 	const auto scale = topBarScale(viewport);
-	return std::min(static_cast<float>(viewport.w), 280.0f * scale);
+	return std::min(static_cast<float>(viewport.w), 360.0f * scale);
 }
 
 SdlTopBarRect SdlTopBar::defaultRect(const SDL_Rect& viewport, bool compact)
@@ -240,12 +276,22 @@ struct SdlTopBar::Impl
 	std::unique_ptr<TTF_Font, decltype(&TTF_CloseFont)> font{ nullptr, TTF_CloseFont };
 	std::unique_ptr<SDL_Texture, decltype(&SDL_DestroyTexture)> titleTexture{ nullptr,
 	                                                                           SDL_DestroyTexture };
+	std::unique_ptr<SDL_Texture, decltype(&SDL_DestroyTexture)> refreshLabel{ nullptr, SDL_DestroyTexture };
+	int refreshLabelWidth = 0, refreshLabelHeight = 0;
+	struct Text
+	{
+		std::unique_ptr<SDL_Texture, decltype(&SDL_DestroyTexture)> texture{ nullptr, SDL_DestroyTexture };
+		int width = 0, height = 0;
+	};
+	std::array<Text, 5> refreshNames, refreshDetails;
+	Text unsupported, combinedLimited;
 	int titleWidth = 0;
 	int titleHeight = 0;
 };
 
 SdlTopBar::SdlTopBar(SDL_Renderer* renderer, std::string title)
-    : _impl(std::make_unique<Impl>())
+    : _refreshMenuEnabled(SDL_GetHintBoolean("FREERDP_SDL_REFRESH_MENU", false)),
+      _impl(std::make_unique<Impl>())
 {
 	_impl->renderer = renderer;
 	_impl->title = std::move(title);
@@ -284,6 +330,32 @@ SdlTopBar::SdlTopBar(SDL_Renderer* renderer, std::string title)
 	_impl->titleHeight = surface->h;
 	_impl->titleTexture = { SDL_CreateTextureFromSurface(_impl->renderer, surface.get()),
 	                        SDL_DestroyTexture };
+	const auto cacheText = [&](const char* text, Impl::Text& target) {
+		auto pixels = std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)>(
+		    TTF_RenderText_Blended(_impl->font.get(), text, 0, titleColor), SDL_DestroySurface);
+		if (pixels) {
+			target.width = pixels->w; target.height = pixels->h;
+			target.texture = { SDL_CreateTextureFromSurface(_impl->renderer, pixels.get()), SDL_DestroyTexture };
+		}
+	};
+	constexpr const char* names[] = { "A  Local repaint", "B  Rebuild display", "C  Server redraw",
+	                                "D  Restart updates", "E  Combined recovery" };
+	constexpr const char* details[] = { "Display the cached frame again", "Recreate local drawing textures",
+	                                  "Ask the server for a full redraw", "Pause and resume server graphics",
+	                                  "Rebuild, restart updates, then redraw" };
+	for (size_t i = 0; i < sdlRefreshModes.size(); ++i) {
+		cacheText(names[i], _impl->refreshNames[i]); cacheText(details[i], _impl->refreshDetails[i]);
+	}
+	cacheText("Not supported by this server", _impl->unsupported);
+	cacheText("Combines the supported methods", _impl->combinedLimited);
+	surface.reset(TTF_RenderText_Blended(_impl->font.get(), "Refresh screen", 0, titleColor));
+	if (surface)
+	{
+		_impl->refreshLabelWidth = surface->w;
+		_impl->refreshLabelHeight = surface->h;
+		_impl->refreshLabel = { SDL_CreateTextureFromSurface(_impl->renderer, surface.get()),
+		                        SDL_DestroyTexture };
+	}
 }
 
 SdlTopBar::SdlTopBar(SdlTopBar&& other) noexcept = default;
@@ -292,12 +364,84 @@ SdlTopBar::~SdlTopBar() = default;
 
 SdlTopBar& SdlTopBar::operator=(SdlTopBar&& other) noexcept = default;
 
-bool SdlTopBar::contains(const SdlTopBarRect& bar, const SDL_FPoint& pointer) const
+SDL_FRect SdlTopBar::refreshMenuRect(const SdlTopBarRect& bar, const SDL_Rect& viewport) const
 {
-	if (!_impl)
-		return false;
-	return pointer.x >= bar.x && pointer.x < bar.x + bar.w && pointer.y >= bar.y &&
-	       pointer.y < bar.y + bar.h;
+    const auto layout = layoutFor(bar, viewport);
+    const float scale = topBarScale(viewport);
+    const float width = std::min(310.0f * scale, std::max(0.0f, static_cast<float>(viewport.w)));
+    const float gap = 3.0f * scale;
+    const float below = std::max(0.0f, viewport.h - bar.y - bar.h - gap);
+    const float above = std::max(0.0f, bar.y - gap);
+    const float height = std::min(222.0f * scale, std::max(below, above));
+    const float x = std::clamp(layout.refreshX, 0.0f, std::max(0.0f, viewport.w - width));
+    float y = bar.y + bar.h + gap;
+    if (y + height > viewport.h && bar.y - height - gap >= 0)
+        y = bar.y - height - gap;
+    y = std::clamp(y, 0.0f, std::max(0.0f, viewport.h - height));
+    return { x, y, width, height };
+}
+
+bool SdlTopBar::contains(const SdlTopBarRect& bar, const SDL_Rect& viewport,
+                          const SDL_FPoint& pointer) const
+{
+    if (!_impl) return false;
+    if (pointIn({bar.x, bar.y, bar.w, bar.h}, pointer)) return true;
+    if (!_refreshOpen) return false;
+    const auto menu = refreshMenuRect(bar, viewport);
+    if (pointIn(menu, pointer)) return true;
+    // The small connecting strip owns pointer movement while crossing the gap.
+    const float y0 = std::min(bar.y + bar.h, menu.y + menu.h);
+    const float y1 = std::max(bar.y, menu.y);
+    return y1 >= y0 && pointIn({menu.x, y0, menu.w, y1 - y0}, pointer);
+}
+
+bool SdlTopBar::updateHover(const SdlTopBarRect& bar, const SDL_Rect& viewport,
+                             const SDL_FPoint& pointer, uint64_t now)
+{
+    if (!_refreshMenuEnabled) return false;
+    const bool before = _refreshOpen;
+    const auto anchor = buttonRect(layoutFor(bar, viewport), SdlTopBarButton::Refresh);
+    if (pointIn(anchor, pointer) || (_refreshOpen && contains(bar, viewport, pointer))) {
+        _refreshOpen = true; _refreshCloseAt = 0;
+    } else if (_refreshOpen) {
+        if (_refreshCloseAt == 0) _refreshCloseAt = now + 300;
+        std::ignore = serviceHover(now);
+    }
+    return before != _refreshOpen;
+}
+
+bool SdlTopBar::serviceHover(uint64_t now)
+{
+    if (_refreshOpen && _refreshCloseAt && now >= _refreshCloseAt) {
+        closeRefreshMenu(); return true;
+    }
+    return false;
+}
+
+SdlTopBarButton SdlTopBar::refreshButton(SdlRefreshMode mode)
+{
+    switch (mode) {
+        case SdlRefreshMode::Local: return SdlTopBarButton::RefreshLocal;
+        case SdlRefreshMode::Textures: return SdlTopBarButton::RefreshTextures;
+        case SdlRefreshMode::Server: return SdlTopBarButton::RefreshServer;
+        case SdlRefreshMode::Updates: return SdlTopBarButton::RefreshUpdates;
+        case SdlRefreshMode::Combined: return SdlTopBarButton::RefreshCombined;
+    }
+    return SdlTopBarButton::None;
+}
+
+bool SdlTopBar::refreshMode(SdlTopBarButton button, SdlRefreshMode& mode)
+{
+    for (const auto value : sdlRefreshModes)
+        if (refreshButton(value) == button) { mode = value; return true; }
+    return false;
+}
+
+bool SdlTopBar::refreshEnabled(SdlTopBarButton button) const
+{
+    if (button == SdlTopBarButton::RefreshServer) return _serverRefresh;
+    if (button == SdlTopBarButton::RefreshUpdates) return _outputReset;
+    return true;
 }
 
 bool SdlTopBar::nearTop(const SDL_Rect& viewport, const SDL_FPoint& pointer,
@@ -327,7 +471,7 @@ bool SdlTopBar::hitResize(const SdlTopBarRect& bar, const SDL_Rect& viewport,
 bool SdlTopBar::hitMove(const SdlTopBarRect& bar, const SDL_Rect& viewport,
                          const SDL_FPoint& pointer) const
 {
-	if (!contains(bar, pointer))
+	if (!pointIn({bar.x, bar.y, bar.w, bar.h}, pointer))
 		return false;
 	if (hitTest(bar, viewport, pointer) != SdlTopBarButton::None)
 		return false;
@@ -337,11 +481,17 @@ bool SdlTopBar::hitMove(const SdlTopBarRect& bar, const SDL_Rect& viewport,
 SdlTopBarButton SdlTopBar::hitTest(const SdlTopBarRect& bar, const SDL_Rect& viewport,
                                    const SDL_FPoint& pointer) const
 {
-	if (!contains(bar, pointer))
+	if (!contains(bar, viewport, pointer))
 		return SdlTopBarButton::None;
-
+	if (_refreshOpen) {
+		const auto menu = refreshMenuRect(bar, viewport);
+		if (pointIn(menu, pointer) && menu.h > 0) {
+			const auto row = std::min<size_t>(4, static_cast<size_t>((pointer.y - menu.y) * 5 / menu.h));
+			return refreshButton(sdlRefreshModes[row]);
+		}
+	}
 	const auto layout = layoutFor(bar, viewport);
-	for (const auto button : { SdlTopBarButton::Performance, SdlTopBarButton::Compact, SdlTopBarButton::Pin,
+	for (const auto button : { SdlTopBarButton::Performance, SdlTopBarButton::Refresh, SdlTopBarButton::Compact, SdlTopBarButton::Pin,
 	                           SdlTopBarButton::Minimize, SdlTopBarButton::Restore,
 	                           SdlTopBarButton::Close })
 	{
@@ -382,6 +532,9 @@ bool SdlTopBar::draw(const SdlTopBarRect& bar, const SDL_Rect& viewport, bool pi
 			return false;
 		switch (button)
 		{
+			case SdlTopBarButton::Refresh:
+				drawRefresh(_impl->renderer, rect);
+				break;
 			case SdlTopBarButton::Compact:
 				drawCompact(_impl->renderer, rect);
 				break;
@@ -403,13 +556,18 @@ bool SdlTopBar::draw(const SdlTopBarRect& bar, const SDL_Rect& viewport, bool pi
                     SDL_RenderFillRect(_impl->renderer,&column);
                 }
                 break;
+			case SdlTopBarButton::RefreshLocal:
+			case SdlTopBarButton::RefreshTextures:
+			case SdlTopBarButton::RefreshServer:
+			case SdlTopBarButton::RefreshUpdates:
+			case SdlTopBarButton::RefreshCombined:
 			case SdlTopBarButton::None:
 				break;
 		}
 		return true;
 	};
 
-	if ((_performanceAvailable && !drawButton(SdlTopBarButton::Performance)) || !drawButton(SdlTopBarButton::Compact) || !drawButton(SdlTopBarButton::Pin) ||
+	if ((_performanceAvailable && !drawButton(SdlTopBarButton::Performance)) || !drawButton(SdlTopBarButton::Refresh) || !drawButton(SdlTopBarButton::Compact) || !drawButton(SdlTopBarButton::Pin) ||
 	    !drawButton(SdlTopBarButton::Minimize) || !drawButton(SdlTopBarButton::Restore) ||
 	    !drawButton(SdlTopBarButton::Close))
 		return false;
@@ -417,7 +575,7 @@ bool SdlTopBar::draw(const SdlTopBarRect& bar, const SDL_Rect& viewport, bool pi
 	if (_impl->titleTexture && _impl->titleWidth > 0 && _impl->titleHeight > 0)
 	{
 		const auto titleX0 = bar.x + layout.grip + layout.margin;
-		const auto maxWidth = std::max(0.0f, (_performanceAvailable?layout.performanceX:layout.compactX) - layout.gap - titleX0);
+		const auto maxWidth = std::max(0.0f, (_performanceAvailable?layout.performanceX:layout.refreshX) - layout.gap - titleX0);
 		const auto widthScale =
 		    std::min(1.0f, maxWidth / static_cast<float>(_impl->titleWidth));
 		/* Fit the 20px font into thinner bars as well. */
@@ -432,5 +590,34 @@ bool SdlTopBar::draw(const SdlTopBarRect& bar, const SDL_Rect& viewport, bool pi
 			return false;
 	}
 
+    if (_refreshOpen)
+    {
+        const auto menu = refreshMenuRect(bar, viewport);
+        if (!fillRect(_impl->renderer, menu, barColor)) return false;
+        const float rowHeight = menu.h / 5.0f;
+        const float inset = std::min(10.0f * topBarScale(viewport), menu.w * 0.04f);
+        const auto drawText = [&](const Impl::Text& text, float y, float height) {
+            if (!text.texture || text.width <= 0 || text.height <= 0) return true;
+            const float scale = std::max(0.0f, std::min(height / text.height, (menu.w - 2 * inset) / text.width));
+            const SDL_FRect dst{menu.x + inset, y, text.width * scale, text.height * scale};
+            return SDL_RenderTexture(_impl->renderer, text.texture.get(), nullptr, &dst);
+        };
+        for (size_t i = 0; i < sdlRefreshModes.size(); ++i)
+        {
+            const auto button = refreshButton(sdlRefreshModes[i]);
+            const SDL_FRect row{menu.x, menu.y + i * rowHeight, menu.w, rowHeight};
+            const bool enabled = refreshEnabled(button);
+            const auto color = !enabled ? SDL_Color{38, 49, 66, 255}
+                : pointIn(row, pointer) ? buttonHoverColor
+                : button == selectedRefresh() ? pinnedButtonColor : buttonColor;
+            if (!fillRect(_impl->renderer, row, color)) return false;
+            const auto& details = !enabled ? _impl->unsupported
+                : button == SdlTopBarButton::RefreshCombined && (!_serverRefresh || !_outputReset)
+                    ? _impl->combinedLimited : _impl->refreshDetails[i];
+            if (!drawText(_impl->refreshNames[i], row.y + rowHeight * 0.10f, rowHeight * 0.42f) ||
+                !drawText(details,
+                          row.y + rowHeight * 0.59f, rowHeight * 0.27f)) return false;
+        }
+    }
 	return SDL_SetRenderDrawBlendMode(_impl->renderer, SDL_BLENDMODE_NONE);
 }
