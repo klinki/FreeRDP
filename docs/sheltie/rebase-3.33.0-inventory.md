@@ -132,22 +132,52 @@ The following archive tag objects were verified published in the fork on
 |---|---|---|
 | Original pre-3.32.2 fork stack | `archive/master-pre-3.32.2-rebase` | Preserved alongside the immutable 3.32.2 release tag. |
 | Six-branch fork UDP/benchmark chain | `archive/udp-bench-2026-10` | Its six obsolete local and remote branches were retired. |
-| Three upstream-UDP experiment branches | `archive/pr13608-experiments` | Their three local/remote branches were retired; the archived worktree and local artifacts were retained. |
-| Microsoft protocol harness and evidence | `archive/windows-protocol-tests` | The old local/remote branch was retired; archived worktree files were retained. |
-| Pre-main screen-refresh branch | `archive/screen-refresh-pre-main` | Original branch tip preserved; later local candidate/duplicate-worktree cleanup remains below. |
+| Three upstream-UDP experiment branches | `archive/pr13608-experiments` | Their three local/remote branches were retired; a complete local snapshot preserves the experiment worktree and its artifacts. |
+| Microsoft protocol harness and evidence | `archive/windows-protocol-tests` | The old local/remote branch and worktree were retired after full local preservation of prepared suites, results and build outputs. |
+| Pre-main screen-refresh branch | `archive/screen-refresh-pre-main` | Original branch tip preserved; its obsolete local/remote branch and duplicate worktree were retired. |
+| Later 3.32.2 diagnostic candidate | `archive/screen-refresh-3.32.2-candidate` | Preserves exact tip `c37d523b5`; the obsolete local/remote branch and duplicate worktree were retired. |
+| Initial 3.33.0 diagnostic candidate | `archive/rebuild-3.33.0-initial` | Preserves exact tip `5e867cab5`; `update/sheltie-3.33.0` was retired locally and remotely after the worktree was backed up in full. |
 | Older pre-squash feature histories | `archive/old-codex-launcher-bridge`, `archive/old-feat-further-performance-improvements`, `archive/old-feat-performance-macos-native` | Preserved. These superseded remote branch names were already absent at cleanup. |
 
-Ten fully archived local/remote branches were retired in total. The two old
-screen-refresh worktrees still have a duplicate working-tree patch: stable patch
-IDs matched the already integrated `2c9095e27`. That comparison establishes the
-refresh edit is carried; it does not establish that every local artifact can be
-deleted.
+Thirteen fully archived local/remote development branches were retired in total:
+the original ten, followed by both screen-refresh branches and the initial
+3.33.0 rebuild branch. The stale local upstream `master` branch was also removed;
+its tip remained reachable from upstream history. The fork's remote `master`
+was retained.
 
-Two additional historical tips had no containing tag at review: old UDP
-bandwidth-diagnostic candidate `c37d523b5` and initial 3.33 candidate `5e867cab5`.
-The latter remains on `origin/update/sheltie-3.33.0`; the former has no containing
-remote branch. Preserve these exact tips before retiring their remaining local
-references, because the diagnostic records identify those revisions.
+The two screen-refresh working-tree patches had stable patch IDs matching the
+already integrated `2c9095e27`. Both uncommitted patches were preserved anyway,
+together with every other file in the retired worktrees. The exact historical
+candidate tips `c37d523b5` and `5e867cab5`, previously lacking containing tags,
+were tagged and verified published before their branches were removed.
+
+### Local artifact preservation
+
+On 2026-11-07, six obsolete checkouts were retired: the upstream-UDP flight
+benchmark, initial 3.33.0 rebuild, notch fallback, Microsoft protocol tests and
+both screen-refresh worktrees. Complete private local snapshots preserved all
+files, including ignored caches, raw test results, build outputs and uncommitted
+changes. SHA-256 verification covered every regular file before retirement;
+manifests, original Git state and restoration instructions accompany the copies.
+This consolidated workspace paths without discarding those artifacts or claiming
+to reclaim their disk space.
+
+An offline FreeRDP Git bundle was independently cloned and integrity-checked,
+including the published archive tags and both diagnostic candidates. The primary
+checkout, parser-hardening PR worktree, launcher worktree and running Sheltie app
+were retained. Captures and TLS key logs in Sheltie's log directory were retained.
+
+The published `archive/windows-protocol-tests` tag already contains the Microsoft
+test harness, configuration, 11 driver patches and historical qualification and
+investigation evidence. It does not contain the complete Microsoft source or
+every ignored local result. The complete retired-worktree snapshot additionally
+preserves the prepared suite, four older prepared suites, raw results and build
+outputs. An independent offline backup of official Microsoft source revision
+`29ddb4238a5443b7499e82934c90cc898861c5e7` passed `git fsck --full`; all 11 driver
+patches were checked and applied to a fresh export of its required source paths.
+These were preservation checks, not a rebuild or rerun of the Microsoft suite.
+
+### Retained upstream submissions
 
 The upstream submission branches are separate ongoing work:
 
@@ -195,7 +225,7 @@ do not substitute for an unrecorded physical-hardware scenario.
 ## Remaining follow-ups
 
 The rebuild is integrated and the hosted runtime pipeline passes. The following
-items remain validation gaps, unfinished extensions or preservation work; they
+items remain validation gaps or unfinished extensions; they
 are not all confirmed defects and this list does not authorize implementation.
 
 - Record controlled Windows UDP network-loss/reconnect behavior, reconnecting
@@ -208,9 +238,6 @@ are not all confirmed defects and this list does not authorize implementation.
   but that does not exercise the new `rdpudp.c` loss-report hook itself.
 - Extend graphics extraction to follow a graphics channel created on TCP and
   moved onto UDP by Soft-Sync, if that capture path is needed.
-- Preserve the exact old candidate tips identified above, then complete the
-  remaining duplicate-worktree/artifact cleanup. Retain upstream PR branches
-  while their reviews are active.
 - Keep the separately tracked live disconnect investigation open until its cause
   or repair is validated against the reported scenario. Passing TLS-key tests,
   ordinary later connectivity and green runtime CI are insufficient to close it.
