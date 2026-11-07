@@ -1,114 +1,229 @@
-# Sheltie rebuild on FreeRDP 3.33.0: patch inventory
+# Sheltie rebuild on FreeRDP 3.33.0: completed record
 
-Source: `main` at `b378540f1` (tag `v3.32.2-sheltie.1`, based on upstream
-`3.32.2`). Target: branch `update/sheltie-3.33.0`, created from upstream tag
-`3.33.0`.
+Reviewed: **2026-11-07**. This is the historical rebuild audit: source decisions,
+implemented adaptations, validation evidence and explicit follow-ups. Feature
+contracts remain with their implementation documentation.
 
-3.33.0 includes upstream PR #13608 (client-side UDP multitransport, merged
-2026-10-20). Our own RDP-UDP implementation is therefore **not** carried over.
-Features that read our UDP state are reworked to use upstream's
-`rdpudp`/`rdpemt` instead.
+## Inputs and integrated result
 
-Everything removed here remains reachable through `v3.32.2-sheltie.1` and
-`archive/master-pre-3.32.2-rebase`. Unmerged branches get their own
-`archive/*` tags before deletion (see the end of this document).
+- **Original fork:** `main` at `b378540f1a9b920b67c3ea109aea6ddf2837fec8`,
+  preserved by `v3.32.2-sheltie.1`, based on upstream 3.32.2.
+- **New upstream base:** tag `3.33.0`, commit
+  `5a10d7b6b79a2fbc62e8eba77085cd356dc303a6`.
+- **Integrated result:** the rebuilt patch stack is on fork `main`. The code
+  checkpoint reviewed here is `14c3a42e503d666384d303b8edb001ec8d94dc7b`.
+- **Hosted validation:** [runtime CI for that checkpoint](https://github.com/klinki/FreeRDP/actions/runs/42230888505)
+  passed on 2026-11-06, including build, tests, packaging, smoke checks and
+  artifact upload.
+- **Release boundary at review:** the published fork release remained
+  `v3.32.2-sheltie.1`. The next available release tag was
+  `v3.33.0-sheltie.2`; publishing it and updating Sheltie's pin are separate work.
 
-## Method
+The rebuild replaced the fork's UDP implementation with the reliable transport
+from upstream 3.33.0 / [PR #13608](https://github.com/FreeRDP/FreeRDP/pull/13608).
+Consumers of UDP state were adapted to upstream `rdpudp`/`rdpemt`. The old patch
+stack remains preserved by the release tag and
+`archive/master-pre-3.32.2-rebase`.
 
-Rebuild instead of running `scripts/sheltie-rebase.py`: re-apply each kept
-feature as its own `--no-ff` merge, in the original order. Inside every merge,
-drop the parts listed as dropped. Then build, run the tests and do a quick
-launcher check before moving to the next step. Fork tooling and documentation
-come first, so that the version helpers work during the rebuild.
+The initial review branch was `update/sheltie-3.33.0`. Its historical candidates
+included `3423c92ca` and `5e867cab5`; they identify binaries used in the November 6
+investigation. Later patch-stack reconstruction changed descendant commit IDs.
+The implementation references below use the integrated history; original source
+references are retained in the inventory. Historical hashes must not be replaced
+in diagnostic evidence merely because the current history has different IDs.
 
-Decisions: **Keep**: re-apply as is (conflicts expected only from upstream
-churn). **Trim**: keep the code but drop the investigation logs and docs
-committed with it. **Rework**: keep the feature but adapt it to upstream
-code. **Drop**: do not carry over. **Decide**: needs an owner decision.
+## Rebuild method and original patch inventory
 
-## First-parent steps on `main`
+The stack was rebuilt feature by feature from tag 3.33.0 instead of replaying
+the entire old UDP-dependent history with `scripts/sheltie-rebase.py`. Kept
+multi-commit features retained merge boundaries; the documented logs, harnesses
+and obsolete UDP code were omitted while each feature was replayed. Build/test
+checkpoints accompanied the lifecycle/rendering, launcher/display and monitoring
+adaptations, followed by a clean runtime build and packaged smoke tests.
 
-| # | Step | Size | Decision | Notes |
+The following 34 rows describe the **original 3.32.2 source stack**. Original
+commit IDs and keep/trim/rework/drop decisions are preserved; the last column
+records what happened in the rebuild. An original "verify" note is not evidence
+that every live scenario passed: see the validation record and follow-ups.
+
+| # | Original step | Original size | Original decision | Rebuild treatment |
 |---|---|---|---|---|
-| 1 | `89ee1b90b` Document the Sheltie fork and versioning policy | README | **Keep** | Update the base description to 3.33.0 (merge with step 30). |
-| 2 | `05c595785` Fork versioning and upstream rebase helpers | 5 files | **Keep** | |
-| 3 | `aa91a4406` Count merged patch branches as one version step | 3 files | **Keep** | |
-| 4 | `68c3cb294` Merge: transport, reliable RDP UDP transport | 90 files, +62k | **Drop** | `rdpeudp.c/h`, `udp.c/h`, multitransport, Soft-Sync, `drdynvc` and `channels.c` routing, UDP autodetect, server accept path, `TestRdpeUdp.c`, `REVIEW.md`, `WINDOWS_ANALYZED.md`, office findings, `tools/udp-review-tests`, the UDP files in `tools/branch-review-20260926`. Replaced by upstream #13608. |
-| 5 | `9c37e46eb` Merge: lifecycle, SDL teardown races and shutdown hangs | 2 files | **Keep** | Check whether 3.33.0 fixed the same races. |
-| 6 | `f38f066a7` Merge: ui, draggable connection controls (topbar) | 10 files | **Trim** | Keep `client/SDL/SDL3`. Drop `REVIEW.md` and `free-rdp-multi-screen.sh`. |
-| 7 | `cce2f2afc` Merge: ui, prevent monitor-probe flashes at startup | 4 files | **Keep** | Upstream `d9a14f857` removed the dummy probe window on Linux only; keep ours for macOS. Upstream #13564 (macOS without a probe window) was closed unmerged. |
-| 8 | `c8ddd476f` Merge: input, coalesce mouse motion | 1 file | **Keep** | |
-| 9 | `2a82187ae` Merge: multi-mon, scaling and cross-monitor input | 48 files, +26.7k | **Trim** | Keep `sdl_monitor_scale.*`, `sdl_input_mapping.hpp`, the SDL changes and both tests. Drop `ai/MULTIMONITOR.md`, `bugs/drag-*.md`, `record-screens.sh`, `tools/udp-review-tests/logs/drag-20260916`, `tools/branch-review-20260926/probe_case.cpp`. Upstream PR #13431 (per-monitor scaling) is still open; drop ours if it merges. Interacts with upstream `d74f158e9` (physical size in mm) and `eb87e5c84` (monitor order). |
-| 10 | `cf6d0bccc` Merge: performance, SDL rendering and input scheduling | 20 files | **Trim** | Keep the SDL code, render metrics and `tools/render-benchmark`. Drop `bugs/rapid-pace-freeze.md`, `VIDEO-PLAYBACK-FINDINGS-20260918.md` and `tools/branch-review-20260926/skip_case.cpp`. |
-| 11 | `6aca32944` Merge: ui, reconnecting overlay and overlay teardown | 10 files | **Keep**, verify | SDL-level, not tied to our UDP code. Check that it still fires when upstream ends a stalled tunnel (16 s ordered-gap limit, then reconnect). Drop `bugs/connection-stall-feedback.md` and `overlay_case.cpp`. |
-| 12 | `508de10a2` Merge: performance, reuse YUV workers, shorter batch waits | 10 files | **Trim** | Keep `yuv.c`, codec headers and tests. Upstream changed `yuv.c` twice in 3.33.0; expect conflicts. Good upstream PR candidate. Drop the `branch-review` YUV harnesses. |
-| 13 | `b986f22ca` Merge: tooling, authenticated graphics capture replay | 10 files | **Keep** | `tools/graphics-replay` replays captured graphics through production SDL rendering, for rendering benchmarks. The extractor parses captures of our UDP layout; adapt it to upstream framing when it is next used. Drop `run-graphics-replay.sh` and `GRAPHICS-REPLAY-20260920.md`. |
-| 14 | `8ec965914` Merge: tooling, macOS build and diagnostic launchers | 11 files | **Drop** | `build.sh`, `free-rdp-*.sh/.py`, `run-with-counters*.sh`, `freeze-snapshot.sh`, `free-rdp-vm-loop.sh`. Replaced by `scripts/sheltie/build-engine.sh`; nothing in `scripts/sheltie` or CI references them. Move `tools/render-benchmark/README.md` changes into step 10 if still relevant. |
-| 15 | `0aaca3386` Merge: review, regression harnesses and diagnostic reports | 10 files | **Drop** | `tools/branch-review-20260926`, `COMMITS-FEATURES.md` (replaced by this inventory), render validation reports, `bugs/connection-failures.md`. |
-| 16 | `a4039dd57` Merge: diagnostic tools and investigation records | 36 files | **Drop** | UDP logs, integration rigs, VM capture launchers and `bugs/*` notes. Copy any still-open bug into the Sheltie repo under `docs/bugs/current/` first. |
-| 17 | `b343f2ef9` Merge: macOS launcher bridge for SDL3 | 17 files | **Keep** | Core of the fork. |
-| 18 | `9012c708c` Fix session hangs after display removal | 7 files | **Keep** | |
-| 19 | `3d6b01df4` Honor the first selected monitor as primary | 6 files | **Keep** | Check against upstream `eb87e5c84` (monitor order with `/monitors:`). |
-| 20 | `23af86df4` Optional launcher TLS key logging | 7 files | **Keep**, verify | Check that the upstream UDP tunnel (`rdpemt`) also writes its TLS secrets. |
-| 21 | `058afbb4e` Per-session mouse wheel reversal | 10 files | **Keep** | |
-| 22 | `b3af78a65` Merge transport recovery fix | 6 files | **Keep**, verify | SDL session-loop recovery, not our UDP code. Re-run `TestSDLReconnect` and check reconnects after upstream tunnel loss (`be112202b`, `e0a5bc436`). |
-| 23 | `f296d4459` Report actual fullscreen desktop dimensions | 4 files | **Keep** | Interacts with upstream `0be2fd799` (menu bar in fullscreen on macOS) and `eec280288` (resize delay after DisplayControlCaps). |
-| 24 | `b4b4f8b9c` Refresh display layout after monitor reconnection | 9 files | **Keep** | |
-| 25 | `c8211568a` Restore selected monitors and scaling after reconnection | 9 files | **Keep** | |
-| 26 | `9f7f892e4` Merge: session performance monitoring | 29 files | **Rework** | Remove the `rdpeudp.c/h` hooks. Feed UDP datagram, retransmission and loss counters from upstream `rdpudp`, and the bandwidth estimate from upstream autodetect (`autodetect.c` changed in 3.33.0). Keep TCP, rendering, FPS and overlay parts. Sheltie's `udpReliability` fields follow whatever upstream exposes; launcher changes go in a separate Sheltie PR. |
-| 27 | `c2d0d3c7c` Update merge instructions (`AGENTS.md`) | 1 file | **Keep** | |
-| 28 | `60eb45d02` Fix MacBook notch sizing after monitor disconnection | 3 files | **Keep** | |
-| 29 | `da8b8a869` Window geometry reporting and restoration | 9 files | **Keep** | |
-| 30 | `658a9b4a3` Remove raw UDP review logs | −69k | **Drop** | Unnecessary once steps 4, 9 and 16 are trimmed. |
-| 31 | `2b784495d` Describe the 3.32.2 base and disabled upstream workflows | README | **Keep** | Update to 3.33.0. |
-| 32 | `1d955ae55` Link the launcher bridge into TestSDLRenderWindow | 1 file | **Keep** | |
-| 33 | `2e82785d8` Number fork releases with a global counter | 3 files | **Keep** | |
-| 34 | `b378540f1` Merge: Sheltie runtime build, test and publish | 17 files | **Trim** | Drop the committed `scripts/sheltie/__pycache__` and add it to `.gitignore`. Update the workflow's base references to 3.33.0. |
+| 1 | `89ee1b90b` Document the Sheltie fork and versioning policy | README | **Keep** | Retained the fork policy and updated the supported upstream base to 3.33.0 in `6456d9b5f`. |
+| 2 | `05c595785` Fork versioning and upstream rebase helpers | 5 files | **Keep** | Retained version calculation and rebase helpers in `b9851e102`. |
+| 3 | `aa91a4406` Count merged patch branches as one version step | 3 files | **Keep** | Retained first-parent version-step counting in `f30d2f5a3`. |
+| 4 | `68c3cb294` Merge: transport, reliable RDP UDP transport | 90 files, +62k | **Drop** | Omitted the fork UDP implementation, its server path and transport-specific fixtures (`rdpeudp.c/h`, `udp.c/h`, old routing/Soft-Sync/autodetect changes, `TestRdpeUdp.c`, and bulk UDP review material). Replaced it with the transport in upstream 3.33.0 / PR #13608. |
+| 5 | `9c37e46eb` Merge: lifecycle, SDL teardown races and shutdown hangs | 2 files | **Keep** | Retained the SDL teardown and shutdown repairs in `c47f0fd05`; automated lifecycle coverage passed. This does not close unrelated live-session reports. |
+| 6 | `f38f066a7` Merge: ui, draggable connection controls (topbar) | 10 files | **Trim** | Retained SDL connection controls in `27d3565d3`; omitted `REVIEW.md` and the workspace-specific `free-rdp-multi-screen.sh` launcher. |
+| 7 | `cce2f2afc` Merge: ui, prevent monitor-probe flashes at startup | 4 files | **Keep** | Retained windowless macOS probing in `9f64f1c9a` alongside upstream Wayland/X11 handling. At the rebuild, upstream #13564 had closed unmerged; upstream `d9a14f857` covered Linux only. |
+| 8 | `c8ddd476f` Merge: input, coalesce mouse motion | 1 file | **Keep** | Retained motion coalescing without input-event reordering in `fddbcb187`. |
+| 9 | `2a82187ae` Merge: multi-mon, scaling and cross-monitor input | 48 files, +26.7k | **Trim** | Retained `sdl_monitor_scale.*`, `sdl_input_mapping.hpp`, SDL changes and tests in `5c942ab52`. Omitted the large display logs and review harnesses. Reconciled upstream physical-size/monitor-order changes (`d74f158e9`, `eb87e5c84`); PR #13431 remains separate upstream work. |
+| 10 | `cf6d0bccc` Merge: performance, SDL rendering and input scheduling | 20 files | **Trim** | Retained rendering/input scheduling, render metrics and `tools/render-benchmark` in `fbda7289c`. Omitted `bugs/rapid-pace-freeze.md`, `VIDEO-PLAYBACK-FINDINGS-20260918.md` and the branch-review skip harness. |
+| 11 | `6aca32944` Merge: ui, reconnecting overlay and overlay teardown | 10 files | **Keep**, verify | Retained the reconnecting overlay and teardown handling in `df8bcc4b6`; omitted its historical bug note and review harness. Controlled live UDP-loss/overlay validation remains outstanding below. |
+| 12 | `508de10a2` Merge: performance, reuse YUV workers, shorter batch waits | 10 files | **Trim** | Retained YUV workers, codec headers and tests in `de1c2efe0`, resolving the 3.33.0 codec changes. Omitted benchmark/review harness material. |
+| 13 | `b986f22ca` Merge: tooling, authenticated graphics capture replay | 10 files | **Keep** | The approved `tools/graphics-replay` preservation was initially missed, then completed in `14c3a42e5`. Omitted `run-graphics-replay.sh` and `GRAPHICS-REPLAY-20260920.md`; the restored README documents legacy capture limits. |
+| 14 | `8ec965914` Merge: tooling, macOS build and diagnostic launchers | 11 files | **Drop** | Omitted old `build.sh`, `free-rdp-*.sh/.py`, `run-with-counters*.sh`, `freeze-snapshot.sh` and `free-rdp-vm-loop.sh`. Runtime build/package tooling is under `scripts/sheltie`; retained render-benchmark documentation remains with its tool. |
+| 15 | `0aaca3386` Merge: review, regression harnesses and diagnostic reports | 10 files | **Drop** | Omitted bulk branch-review harnesses, `COMMITS-FEATURES.md`, rendering investigations and old connection-failure notes from the rebuilt stack. The old release preserves them. |
+| 16 | `a4039dd57` Merge: diagnostic tools and investigation records | 36 files | **Drop** | Omitted bulk diagnostic logs, VM launchers and investigations from the current stack. Their archived history remains available; omission does not classify unresolved reports as fixed. |
+| 17 | `b343f2ef9` Merge: macOS launcher bridge for SDL3 | 17 files | **Keep** | Retained the native macOS launcher bridge in `a3404a7ca`. |
+| 18 | `9012c708c` Fix session hangs after display removal | 7 files | **Keep** | Retained display-removal hang handling in `ddd99656a`. |
+| 19 | `3d6b01df4` Honor the first selected monitor as primary | 6 files | **Keep** | Retained the selected-primary-monitor implementation in `5f51bdaa0`, including reconnect subsets, instead of reducing it to upstream's simpler initial-order behavior. |
+| 20 | `23af86df4` Optional launcher TLS key logging | 7 files | **Keep**, verify | Retained opt-in launcher TLS logging in `292bcd71a`. Live inspection exposed the missing UDP SSL callback; `20901bbac` completed tunnel logging and added `TestTlsSecretsFile`. |
+| 21 | `058afbb4e` Per-session mouse wheel reversal | 10 files | **Keep** | Retained per-session wheel reversal in `a77233eff`. |
+| 22 | `b3af78a65` Merge transport recovery fix | 6 files | **Keep**, verify | Retained SDL transport recovery in `7328581c4`, including upstream session-loop behavior and `errorToExitCode` after failed recovery. `TestSDLReconnect` passed; a dedicated Windows UDP-loss matrix remains outstanding. |
+| 23 | `f296d4459` Report actual fullscreen desktop dimensions | 4 files | **Keep** | Retained actual fullscreen desktop dimensions in `9bcb61b65`. |
+| 24 | `b4b4f8b9c` Refresh display layout after monitor reconnection | 9 files | **Keep** | Retained monitor reconnection scheduling in `adc1b87e5`; `e4d0a7565` additionally applies the upstream display-capability resize delay and updates its regression test. |
+| 25 | `c8211568a` Restore selected monitors and scaling after reconnection | 9 files | **Keep** | Retained selected monitors and scaling restoration in `32bb1d9c9`. |
+| 26 | `9f7f892e4` Merge: session performance monitoring | 29 files | **Rework** | Retained monitoring in `9b9170f9a` and adapted its hooks to upstream `rdpudp`/`rdpemt` and autodetect. Datagram, byte, retransmission, loss-report and tunnel-state hooks were carried over. `bbf074d93` removed the retired transport fixture; direct loss-report counting still lacks automated coverage. |
+| 27 | `c2d0d3c7c` Update merge instructions (`AGENTS.md`) | 1 file | **Keep** | Retained merge/integration instructions in `4c2100968`. |
+| 28 | `60eb45d02` Fix MacBook notch sizing after monitor disconnection | 3 files | **Keep** | Retained the MacBook fallback sizing repair in `c147efcca`; physical transition evidence for the new base remains separate from unit tests. |
+| 29 | `da8b8a869` Window geometry reporting and restoration | 9 files | **Keep** | Retained geometry reporting/restoration in `9d821e1a8`. |
+| 30 | `658a9b4a3` Remove raw UDP review logs | −69k | **Drop** | No separate cleanup replay was needed because the raw UDP review logs were not imported into the rebuilt stack. |
+| 31 | `2b784495d` Describe the 3.32.2 base and disabled upstream workflows | README | **Keep** | Retained fork documentation and updated the base/UDP explanation in `6456d9b5f`. Inherited workflows remain in the tree; their GitHub enablement is managed separately. |
+| 32 | `1d955ae55` Link the launcher bridge into TestSDLRenderWindow | 1 file | **Keep** | Retained the launcher-bridge link for `TestSDLRenderWindow` in `1d00cf1f3`. |
+| 33 | `2e82785d8` Number fork releases with a global counter | 3 files | **Keep** | Retained the fork-wide release counter in `98b522831`; changing upstream base does not restart the counter. |
+| 34 | `b378540f1` Merge: Sheltie runtime build, test and publish | 17 files | **Trim** | Retained runtime build, test, source packaging and publication in `b7faf87d4`. Omitted committed Python cache files; `0117830cd` enabled upstream UDP in runtime builds. |
 
-## Unmerged branches
+## Additional carried work and adaptations
 
-| Branch | Decision | Notes |
+- **Screen refresh:** `b197241dd` carried manual full-desktop refresh and hover
+  recovery methods from the old screen-refresh work. `2c9095e27` subsequently
+  made combined recovery the top-bar default and gated the advanced menu with
+  `FREERDP_SDL_REFRESH_MENU`. The bridge default for requests without a mode
+  remains server redraw; see [the bridge contract](../../client/SDL/SDL3/launcher-bridge.md).
+- **Runtime decoding/layout:** `70e5aa37a` enabled FFmpeg hardware acceleration;
+  `505f4761e` suppressed unchanged layouts after work-area notifications.
+- **Parser hardening:** `8517e64fe` retained the engine portion of the Microsoft
+  protocol-test work (`054b42e81`) and its native regression, leaving the large
+  external harness/evidence in `archive/windows-protocol-tests`. It was submitted
+  as [upstream PR #14079](https://github.com/FreeRDP/FreeRDP/pull/14079), open at
+  review. The fork continues carrying it until an adopted upstream base includes
+  the repair.
+- **Primary monitor:** the selected-primary implementation covers reconnect
+  subsets and removed displays. It was retained alongside upstream's initial
+  monitor ordering, not replaced with that narrower behavior.
+- **Display capability timing:** the scheduler retained upstream's resize delay
+  after DisplayControlCaps. The delayed send is covered by
+  `TestSDLFullscreenResize`.
+- **Recovery exit codes:** failed in-session recovery follows upstream
+  `errorToExitCode` behavior. The old generic `CONN_FAILED` return was not restored.
+- **UDP build policy:** the runtime explicitly sets `WITH_RDPEUDP=ON`; upstream
+  3.33.0's build option defaults OFF and is experimental. The legacy launcher
+  `-multitransport` option still disables multitransport in this base.
+- **Tunnel TLS keys:** `20901bbac` connects the separate UDP SSL session to the
+  existing opt-in `TlsSecretsFile` callback. The original launcher-only logging
+  port did not log UDP tunnel secrets. This repaired diagnostics, not the cause
+  of the separately reported session disconnects.
+- **SDL compatibility:** `1ee1bad7f` corrected the inherited event-name guard from
+  SDL 3.4.20 to 3.6.0. Local SDL 3.4.16 had skipped the block; hosted SDL 3.4.20
+  exposed the missing event identifiers. The original failure is retained in
+  [CI run 42207104037](https://github.com/klinki/FreeRDP/actions/runs/42207104037).
+- **Offline replay:** `14c3a42e5` restored the eight approved tool files that the
+  initial rebuild missed. Its production-code runner works with the rebuilt
+  client; [the extractor's README](../../tools/graphics-replay/README.md) records
+  its legacy UDP-created-channel restriction. TCP-created channels migrated by
+  Soft-Sync remain unsupported by that extractor.
+
+## Branch and archive disposition
+
+The following archive tag objects were verified published in the fork on
+2026-11-07. They preserve the original work independently of moving branch names.
+
+| Preserved work | Published archive tag(s) | Disposition at review |
 |---|---|---|
-| `codex/screen-refresh-based-on-main` | **Keep**, minus one commit | Carry over manual screen refresh (`bb49bfe34`), hover refresh methods (`734cee794`), FFmpeg hardware acceleration in runtime builds (`5eb7b6a0f`) and unchanged-layout suppression (`9d64e995f`). Drop `c37d523b5` (UDP bandwidth diagnostics): it is built on the fork's per-transport autodetect slots and tunnel send path, which 3.33.0 replaced. Redo the investigation on upstream UDP if the estimates still look wrong. Then delete `codex/screen-refresh`. |
-| `codex/windows-protocol-smoke` | **Partly keep** | 7 commits: Microsoft RDP protocol test harness (`tools/windows-protocol-tests`, ~54k lines), its investigation evidence (~170k lines) and one engine fix. Carry only the engine part of `054b42e81` (MCS userData and Demand Active length validation in `rdp.c`/`connection.c`, plus `TestRdpPacketLengths.c`) as its own merge, and offer it upstream. Tag the branch `archive/windows-protocol-tests`; the harness can return later without its evidence folders. |
-| `feat/multimon-layout-2` | **Keep as upstream PR branch** | Source of upstream PR #13431; the same feature ships in step 9. Rebase the PR if upstream asks. |
-| `perf-bench` … `codex/pr13608-reliability` (6 branches) | **Drop** | Fixes to our UDP code plus the benchmark suite. Tag the tip `archive/udp-bench-2026-10` first. `tools/rdp-bench` can come back later (without its result files) to benchmark the upstream UDP code. |
-| `pr-13608-flight-reference` … `codex/pr13608-protocol-loss-recovery` (3 branches) | **Drop** | Experiments on the PR's code. Tag the tip `archive/pr13608-experiments`. `49fcbb72c` (16 s ordered-gap limit) can be offered upstream as a discussion. |
-| `origin/feat/further-performance-improvements`, `origin/feat/performance-macos-native`, `origin/codex/launcher-bridge` | **Drop** | Pre-squash versions of work already in `main`. Tag as `archive/old-feat-*`. |
+| Original pre-3.32.2 fork stack | `archive/master-pre-3.32.2-rebase` | Preserved alongside the immutable 3.32.2 release tag. |
+| Six-branch fork UDP/benchmark chain | `archive/udp-bench-2026-10` | Its six obsolete local and remote branches were retired. |
+| Three upstream-UDP experiment branches | `archive/pr13608-experiments` | Their three local/remote branches were retired; the archived worktree and local artifacts were retained. |
+| Microsoft protocol harness and evidence | `archive/windows-protocol-tests` | The old local/remote branch was retired; archived worktree files were retained. |
+| Pre-main screen-refresh branch | `archive/screen-refresh-pre-main` | Original branch tip preserved; later local candidate/duplicate-worktree cleanup remains below. |
+| Older pre-squash feature histories | `archive/old-codex-launcher-bridge`, `archive/old-feat-further-performance-improvements`, `archive/old-feat-performance-macos-native` | Preserved. These superseded remote branch names were already absent at cleanup. |
 
-## Checks after the rebuild
+Ten fully archived local/remote branches were retired in total. The two old
+screen-refresh worktrees still have a duplicate working-tree patch: stable patch
+IDs matched the already integrated `2c9095e27`. That comparison establishes the
+refresh edit is carried; it does not establish that every local artifact can be
+deleted.
 
-- The launcher's `-multitransport` still forces TCP only (3.33.0 parses it as
-  `SupportMultitransport = false`). The default is now UDP on.
-- UDP works with the office host and the Windows VM: tunnel up, graphics over
-  UDP, reconnect after tunnel loss, the reconnecting overlay, TLS key logging
-  of the tunnel.
-- Performance overlay and launcher statistics show sensible UDP values.
-- Multi-monitor, mixed DPI, notch, fullscreen and monitor reconnection on the
-  MacBook + M27UP + Dell setup.
-- A few days of real use before tagging `v3.33.0-sheltie.1`.
+Two additional historical tips had no containing tag at review: old UDP
+bandwidth-diagnostic candidate `c37d523b5` and initial 3.33 candidate `5e867cab5`.
+The latter remains on `origin/update/sheltie-3.33.0`; the former has no containing
+remote branch. Preserve these exact tips before retiring their remaining local
+references, because the diagnostic records identify those revisions.
 
-## Decisions made during the rebuild
+The upstream submission branches are separate ongoing work:
 
-- **Upstream UDP is experimental.** 3.33.0 builds it only with
-  `-DWITH_RDPEUDP=ON` (default OFF). `scripts/sheltie/build-engine.sh` now
-  enables it.
-- **Primary monitor (step 19).** 3.33.0 added a simpler "first `/monitors:`
-  entry is primary" rule. Ours is kept because it also follows the saved
-  monitor order across reconnects and display removal.
-- **Display layout after DisplayControlCaps (steps 23 and 24).** 3.33.0 waits
-  `RESIZE_MIN_DELAY` after the capabilities because Windows ignores an
-  earlier layout. Our display scheduler replaces upstream's timer, so the
-  rule is carried over in a separate commit; `TestSDLFullscreenResize` now
-  expects the delayed send.
-- **Exit code after failed recovery (step 22).** Follows 3.33.0: the code is
-  derived from the last FreeRDP error (`errorToExitCode`) instead of always
-  `CONN_FAILED`. Sheltie should be checked for any reliance on
-  `CONN_FAILED` in this case.
-- **Monitor-probe flashes (step 7).** Upstream's Wayland/X11 probe path is
-  kept; the windowless probe applies to the other platforms.
-- **Performance monitoring (step 26).** The hooks moved from the fork's
-  `rdpeudp.c` to upstream `rdpudp.c`, with the context passed via
-  `rdpemt_set_context()`. Upstream's `TestRdpUdp` passes with them.
-- **New upstream workflow.** 3.33.0 adds `.github/workflows/emscripten.yml`;
-  disable it in the repository's Actions settings after the push.
+- `fix/packet-length-validation`: [PR #14079](https://github.com/FreeRDP/FreeRDP/pull/14079),
+  based on upstream master, not the fork stack.
+- `feat/multimon-layout-2`: [PR #13431](https://github.com/FreeRDP/FreeRDP/pull/13431).
+
+Both PRs were open at review. Their submission is complete; upstream acceptance
+and later adoption are not implied.
+
+### Hosted workflow and tag cleanup
+
+The newly inherited `emscripten-builder` workflow was disabled in the fork's
+GitHub settings, verified on 2026-11-07. Its YAML remains in the source tree so
+upstream updates do not require deleting/re-adding workflow files.
+
+An accidental all-tags push was cleaned up by deleting 115 tag refs whose names
+and objects matched upstream. All 11 fork release/archive/backup tags and all
+branch refs were preserved during that tag cleanup. The seven newly created
+archive tags are now published. Upstream tags remain available locally; the
+primary clone's tested pre-push hook rejects publishing them to `origin`.
+That hook and the namespaced upstream-tag fetch configuration are local clone
+settings, not a server-side rule or a guarantee for other clones.
+
+## Validation record
+
+These are recorded results, not a claim that this documentation update reran
+engine or hardware tests. Evidence types and limitations remain explicit.
+
+| Evidence | Date and source | Established result and scope |
+|---|---|---|
+| Hosted runtime validation | 2026-11-06, [run 42230888505](https://github.com/klinki/FreeRDP/actions/runs/42230888505) at `14c3a42e5` | Version/manifest helpers, runtime compilation, SDL/YUV tests, relocatable packaging, bridge/loopback/reverse-wheel smoke tests and artifact upload passed. The sample-server fixture is TCP; this does not establish Windows UDP loss recovery or physical-display behavior. |
+| Local runtime checkpoint | 2026-11-06, recorded build/package results for the earlier pre-reconstruction checkpoint `d24efe44e` | All 17 SDL tests and both YUV tests passed. Client/sample-server bundles verified; bridge checks, release loopback sessions and reverse-wheel delivery passed. Historical revision retained for provenance. |
+| Fork native parser/transport checks | 2026-11-06, validation recorded with `8517e64fe` | `TestRdpPacketLengths`, `TestMcs`, `TestDisconnect` and `TestRdpUdp` passed in an internal-testing build. |
+| UDP TLS logging | 2026-11-06, `20901bbac` / original candidate `5e867cab5`, local crypto CTest and live diagnostic capture | `TestTlsSecretsFile` verified independent SSL contexts sharing a key file and an opt-out session. A live new-engine capture had both TCP and UDP keys; reconstructed tunnel records authenticated. This is diagnostic validation, not a disconnect repair. |
+| Offline graphics replay | 2026-11-06, restoration validation recorded in `14c3a42e5` | Eight extractor tests and four malformed-input tests passed. Existing capture extraction yielded 4,181 messages; a 100-message production replay passed 84 pixel checks with no decode errors. This covers the documented legacy capture path and offline rendering. |
+| Windows desktop use | 2026-11-06, user confirmations during the Sheltie disconnect investigation, separately supported by log/capture inspection | The user reported that the old control held and the original new engine later continued working. New-engine bidirectional UDP graphics was observed. Later complete logs also showed a generic network interruption/reconnect; do not describe the entire control interval as uninterrupted, or close the original disconnect report from these observations. Detailed incident evidence remains in Sheltie's private tracker. |
+| Upstream parser submission | 2026-11-07, `53585f098` based on upstream master `8a312188d`, prepared for [PR #14079](https://github.com/FreeRDP/FreeRDP/pull/14079) | All 11 core CTests passed on macOS arm64 Debug/OpenSSL. The 84-scenario packet test failed against original sources and with either check removed independently; upstream formatting passed. The full Microsoft suite was not rerun on that fresh upstream base. |
+
+The October 15 Microsoft-suite qualification belongs to the preserved old
+protocol-test history. It is not a Microsoft-suite qualification of the 3.33
+rebuild or current upstream master. Local and hosted regression passes likewise
+do not substitute for an unrecorded physical-hardware scenario.
+
+## Remaining follow-ups
+
+The rebuild is integrated and the hosted runtime pipeline passes. The following
+items remain validation gaps, unfinished extensions or preservation work; they
+are not all confirmed defects and this list does not authorize implementation.
+
+- Record controlled Windows UDP network-loss/reconnect behavior, reconnecting
+  overlay behavior, recovery exhaustion and performance-counter behavior.
+- Record physical mixed-DPI monitor unplug/replug/reordering, selected-primary
+  fallback, scaling restoration, notch and fullscreen transitions on the new
+  engine base. Earlier confirmations on an older base remain historical evidence.
+- Add regression coverage for direct UDP loss-report counting. `bbf074d93`
+  removed the old transport-only fixture; counter aggregation coverage remains,
+  but that does not exercise the new `rdpudp.c` loss-report hook itself.
+- Extend graphics extraction to follow a graphics channel created on TCP and
+  moved onto UDP by Soft-Sync, if that capture path is needed.
+- Preserve the exact old candidate tips identified above, then complete the
+  remaining duplicate-worktree/artifact cleanup. Retain upstream PR branches
+  while their reviews are active.
+- Keep the separately tracked live disconnect investigation open until its cause
+  or repair is validated against the reported scenario. Passing TLS-key tests,
+  ordinary later connectivity and green runtime CI are insufficient to close it.
+
+## Release handoff
+
+At this review, `sheltie-version.py --next-tag --upstream-ref 3.33.0` returned
+`v3.33.0-sheltie.2`. The fork-wide counter continues across upstream versions;
+`.1` is already used by the 3.32.2 release. Recompute the next tag when preparing
+publication rather than treating this dated result as a permanent reservation.
+
+Use the [runtime release procedure](../../scripts/sheltie/README.md) for a
+reviewed release commit and immutable tag. A passing main-branch development run
+is not itself a published engine release. Sheltie still pinned
+`v3.32.2-sheltie.1` at review; update its release lock from the published runtime
+manifest and checksums as a separate consumer change.

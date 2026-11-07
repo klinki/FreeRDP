@@ -26,6 +26,10 @@ releases. The patch stack on FreeRDP 3.32.2 is preserved at tag
 Since 3.33.0 the fork uses upstream's UDP multitransport, built with the
 experimental `WITH_RDPEUDP` option, instead of its own UDP transport.
 
+The [3.33.0 rebuild record](docs/sheltie/rebase-3.33.0-inventory.md) preserves the
+patch-stack decisions, implemented adaptations, validation evidence and remaining
+follow-ups for that upstream update.
+
 The downstream patches are rebased onto each new upstream base, reviewed and
 tested before publication. Consequently, `main` may be rebased and force-pushed;
 its commit history is not a stable release reference. Contributors should fetch
