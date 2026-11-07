@@ -87,9 +87,10 @@ that every live scenario passed: see the validation record and follow-ups.
 
 - **Screen refresh:** `b197241dd` carried manual full-desktop refresh and hover
   recovery methods from the old screen-refresh work. `2c9095e27` subsequently
-  made combined recovery the top-bar default and gated the advanced menu with
-  `FREERDP_SDL_REFRESH_MENU`. The bridge default for requests without a mode
-  remains server redraw; see [the bridge contract](../../client/SDL/SDL3/launcher-bridge.md).
+  made combined recovery the top-bar default and made the advanced A–E menu
+  opt-in. The menu is enabled by the `/sdl-refresh-menu` command-line option.
+  The bridge default for requests without a mode remains server redraw; see
+  [the bridge contract](../../client/SDL/SDL3/launcher-bridge.md).
 - **Runtime decoding/layout:** `70e5aa37a` enabled FFmpeg hardware acceleration;
   `505f4761e` suppressed unchanged layouts after work-area notifications.
 - **Parser hardening:** `8517e64fe` retained the engine portion of the Microsoft
