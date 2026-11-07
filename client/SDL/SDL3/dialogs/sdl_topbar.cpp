@@ -20,6 +20,7 @@
 #include "sdl_topbar.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <utility>
 
@@ -289,8 +290,23 @@ struct SdlTopBar::Impl
 	int titleHeight = 0;
 };
 
+namespace
+{
+	std::atomic<bool> refreshMenuOption{ false };
+}
+
+void SdlTopBar::setRefreshMenuEnabled(bool value)
+{
+	refreshMenuOption = value;
+}
+
+bool SdlTopBar::refreshMenuEnabledByDefault()
+{
+	return refreshMenuOption;
+}
+
 SdlTopBar::SdlTopBar(SDL_Renderer* renderer, std::string title)
-    : _refreshMenuEnabled(SDL_GetHintBoolean("FREERDP_SDL_REFRESH_MENU", false)),
+    : _refreshMenuEnabled(refreshMenuOption),
       _impl(std::make_unique<Impl>())
 {
 	_impl->renderer = renderer;

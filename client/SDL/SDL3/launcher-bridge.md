@@ -190,11 +190,13 @@ An absent `refreshMode` retains the original server redraw. The additive
 mode is coalesced independently and cleared during disconnect/reconnect.
 
 The SDL top bar normally shows a single refresh icon that runs combined recovery
-(E). The five-button A–E hover panel is an opt-in runtime feature: set
-`FREERDP_SDL_REFRESH_MENU=1` in the client environment before creating a session.
-Unset or `0` keeps the panel off; hovering leaves the icon usable and does not
-capture input in the hidden panel area. The flag is read when each connection
-bar is created. Sheltie forwards this specific environment variable to its helper.
+(E). The five-button A–E hover panel is opt-in through the `/sdl-refresh-menu`
+command-line option (`+sdl-refresh-menu` also enables it, `-sdl-refresh-menu`
+keeps it off). Without the option the panel stays off; hovering leaves the icon
+usable and does not capture input in the hidden panel area. The option applies
+to every connection bar the client creates. There is no environment variable:
+launchers pass it as an ordinary client argument, for example from Sheltie's
+per-connection Advanced arguments.
 
 With the panel enabled, E is initially selected and clicking the icon repeats
 the last method chosen in that connection bar. Dismissing the panel retains the

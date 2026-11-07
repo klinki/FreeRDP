@@ -57,6 +57,9 @@ class SdlTopBar
 {
   public:
 	explicit SdlTopBar(SDL_Renderer* renderer, std::string title);
+	/* Process-wide /sdl-refresh-menu option; bars created afterwards use it. Off by default. */
+	static void setRefreshMenuEnabled(bool value);
+	[[nodiscard]] static bool refreshMenuEnabledByDefault();
 	void setPerformanceAvailable(bool value) { _performanceAvailable=value; }
 	SdlTopBar(const SdlTopBar& other) = delete;
 	SdlTopBar(SdlTopBar&& other) noexcept;

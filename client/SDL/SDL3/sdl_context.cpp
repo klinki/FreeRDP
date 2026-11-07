@@ -49,6 +49,7 @@
 static constexpr auto sdl_allow_screensaver = "sdl-allow-screensaver";
 static constexpr auto sdl_connection_dialog = "sdl-connection-dialog";
 static constexpr auto sdl_monitor_scale = "sdl-monitor-scale";
+static constexpr auto sdl_refresh_menu = "sdl-refresh-menu";
 
 SdlContext::SdlContext(rdpContext* context)
     : _context(context), _log(WLog_Get(CLIENT_TAG("SDL"))), _cursor(nullptr, sdl_Pointer_FreeCopy),
@@ -130,6 +131,10 @@ SdlContext::SdlContext(rdpContext* context)
 	                  "<id>=<desktop>/<device>[,<id>=<desktop>/<device>...]", nullptr, nullptr, -1,
 	                  nullptr, "Override RDP scaling for individual SDL monitors. Monitor IDs are "
 	                           "shown by /list:monitor." });
+	_args.push_back({ sdl_refresh_menu, COMMAND_LINE_VALUE_BOOL, nullptr, BoolValueFalse, nullptr,
+	                  -1, nullptr,
+	                  "the A-E screen refresh method panel on hovering the connection bar's "
+	                  "refresh button (off: the button always runs combined recovery)" });
 
 	/* Push a null element used as abort when iterating the array */
 	_args.push_back({ nullptr, 0, nullptr, nullptr, nullptr, -1, nullptr, nullptr });
@@ -2577,6 +2582,8 @@ int SdlContext::argumentHandler(const COMMAND_LINE_ARGUMENT_A* arg, void* custom
 		}
 		else if (strcmp(arg->Name, sdl_connection_dialog) == 0)
 			sdl->_connectionDialog = (arg->Value != nullptr);
+		else if (strcmp(arg->Name, sdl_refresh_menu) == 0)
+			SdlTopBar::setRefreshMenuEnabled(arg->Value != nullptr);
 		else if (strcmp(arg->Name, sdl_monitor_scale) == 0)
 		{
 			if (!sdl->parseMonitorScaleOverrides(arg->Value))

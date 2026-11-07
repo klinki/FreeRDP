@@ -2,6 +2,7 @@
 #include "sdl_context.hpp"
 #include "sdl_types.hpp"
 #include "dialogs/sdl_dialogs.hpp"
+#include <freerdp/client/cmdline.h>
 #include <freerdp/gdi/gdi.h>
 #include <cstdio>
 #include <memory>
@@ -304,17 +305,36 @@ static bool run(bool menuEnabled)
     if (!expect(onConnectionThread,"All refresh control packets stay on the RDP thread")) return false;
     sdl.setConnected(false);return true;
 }
+// The panel is controlled only by the client's command line, never by the environment.
+static bool parseRefreshMenu(std::vector<const char*> extra, bool initial, bool expected)
+{
+    SdlTopBar::setRefreshMenuEnabled(initial);
+    std::unique_ptr<freerdp,decltype(&freerdp_free)> instance(freerdp_new(),freerdp_free);
+    if (!instance) return false;
+    instance->ContextSize=sizeof(sdl_rdp_context);
+    if (!freerdp_context_new(instance.get())) return false;
+    struct Guard { freerdp* value; ~Guard(){freerdp_context_free(value);} } guard{instance.get()};
+    SdlContext sdl(instance->context);
+    std::vector<char*> args{const_cast<char*>("sdl-freerdp"),const_cast<char*>("/v:refresh-test.invalid")};
+    for (auto value : extra) args.push_back(const_cast<char*>(value));
+    const auto status=freerdp_client_settings_parse_command_line_ex(instance->context->settings,
+        static_cast<int>(args.size()),args.data(),FALSE,sdl.args(),sdl.argsCount(),&SdlContext::argumentHandler,&sdl);
+    return expect(status==0 && SdlTopBar::refreshMenuEnabledByDefault()==expected,
+                  "/sdl-refresh-menu controls the refresh method panel");
+}
 int main(int argc,char** argv)
 {
     SDL_SetHint(SDL_HINT_VIDEO_DRIVER,"dummy"); if (!SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS)) return 1;
     sdl_dialogs_init();
-    constexpr const char* flag = "FREERDP_SDL_REFRESH_MENU";
-    std::ignore = SDL_ResetHint(flag);
+    // The former environment flag must have no effect.
+    std::ignore = SDL_SetEnvironmentVariable(SDL_GetEnvironment(), "FREERDP_SDL_REFRESH_MENU", "1", true);
     const std::string defaultPreview = argc > 1 ? std::string(argv[1]) + ".default.bmp" : "";
-    const bool ok = SDL_UnsetEnvironmentVariable(SDL_GetEnvironment(), flag) && run(false) &&
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), flag, "0", true) &&
+    const bool ok = expect(!SdlTopBar::refreshMenuEnabledByDefault(), "The refresh method panel is off by default") &&
+        parseRefreshMenu({}, false, false) && parseRefreshMenu({"-sdl-refresh-menu"}, true, false) &&
+        parseRefreshMenu({"/sdl-refresh-menu"}, false, true) && parseRefreshMenu({"+sdl-refresh-menu"}, false, true) &&
+        (SdlTopBar::setRefreshMenuEnabled(false), run(false)) &&
         layoutAndPreview(defaultPreview.empty() ? nullptr : defaultPreview.c_str(), false) &&
-        SDL_SetEnvironmentVariable(SDL_GetEnvironment(), flag, "1", true) && run(true) &&
+        (SdlTopBar::setRefreshMenuEnabled(true), run(true)) &&
         layoutAndPreview(argc > 1 ? argv[1] : nullptr, true);
     sdl_dialogs_uninit();SDL_Quit();
     if (ok) puts("PASS default combined refresh, opt-in hover menu, remembered methods, and failure-safe recovery");
