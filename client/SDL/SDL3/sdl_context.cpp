@@ -196,6 +196,7 @@ void SdlContext::cleanup()
 	_fullscreenState.clear();
 	_topBarPointer = { -1.0f, -1.0f };
 	_topBarHoveredButton = SdlTopBarButton::None;
+	_topBarPointerOver = false;
 	_topBarGestureOwner = TopBarGestureOwner::None;
 	_topBarCaptures = {};
 	_topBarDrag = TopBarDragMode::None;
@@ -505,6 +506,7 @@ bool SdlContext::createWindows()
 	SDL_WindowID primaryWindow = 0;
 	_topBarPointer = { -1.0f, -1.0f };
 	_topBarHoveredButton = SdlTopBarButton::None;
+	_topBarPointerOver = false;
 	_topBarGestureOwner = TopBarGestureOwner::None;
 	_topBarCaptures = {};
 	_topBarDrag = TopBarDragMode::None;
@@ -1757,12 +1759,16 @@ bool SdlContext::handleTopBarMotion(const SDL_MouseMotionEvent& ev)
 		return false;
 
 	const auto settings = context()->settings;
-	if (!_fullscreenState.barOwner || !topBarAllowed())
-		return false;
-
 	auto window = getWindowForId(ev.windowID);
-	if (!window || ev.windowID != _fullscreenState.barOwner)
+	if (!_fullscreenState.barOwner || !topBarAllowed() || !window ||
+	    ev.windowID != _fullscreenState.barOwner)
+	{
+		/* The bar went away or the pointer is in another window: hand the
+		 * cursor back to the server. */
+		if (!setTopBarPointerOver(false))
+			WLog_Print(_log, WLOG_WARN, "Unable to update the cursor over the SDL connection bar");
 		return false;
+	}
 
 	_topBarPointer = screenToPixel(ev.windowID, { ev.x, ev.y });
 	bool panelChanged =
@@ -1791,7 +1797,10 @@ bool SdlContext::handleTopBarMotion(const SDL_MouseMotionEvent& ev)
 	    !redrawWindows())
 		WLog_Print(_log, WLOG_WARN, "Unable to redraw the SDL connection bar");
 
-	return _fullscreenState.barVisible && overBar;
+	const bool pointerOver = _fullscreenState.barVisible && overBar;
+	if (!setTopBarPointerOver(pointerOver))
+		WLog_Print(_log, WLOG_WARN, "Unable to update the cursor over the SDL connection bar");
+	return pointerOver;
 }
 
 bool SdlContext::handleEvent(const SDL_MouseWheelEvent& ev)
@@ -1930,6 +1939,8 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 				_topBarPointer = { -1.0f, -1.0f };
 				const bool hoverChanged = _topBarHoveredButton != SdlTopBarButton::None;
 				_topBarHoveredButton = SdlTopBarButton::None;
+				if (!setTopBarPointerOver(false))
+					return false;
 				if ((_fullscreenState.barVisible != wasVisible || hoverChanged) && !redrawWindows())
 					return false;
 			}
@@ -3129,9 +3140,35 @@ rdpPointer* SdlContext::cursor() const
 	return _cursor.get();
 }
 
+bool SdlContext::localCursorOverride() const
+{
+	/* The server owns the cursor shape, and may have hidden it. Local UI (the
+	 * reconnect overlay and the connection bar) must stay pointable anyway. */
+	return isReconnecting() || _topBarPointerOver;
+}
+
+bool SdlContext::setTopBarPointerOver(bool over)
+{
+	if (_topBarPointerOver == over)
+		return true;
+	_topBarPointerOver = over;
+	return restoreCursor();
+}
+
 bool SdlContext::restoreCursor()
 {
 	WLog_Print(getWLog(), WLOG_TRACE, "restore cursor: %d", _cursorType);
+	if (localCursorOverride())
+	{
+		/* Keep hasCursor() tracking the server cursor: it selects relative mouse mode. */
+		setHasCursor(_cursorType != CURSOR_NULL);
+		if (!SDL_SetCursor(SDL_GetDefaultCursor()) || !SDL_ShowCursor())
+		{
+			WLog_Print(getWLog(), WLOG_ERROR, "Unable to show the local cursor");
+			return false;
+		}
+		return true;
+	}
 	switch (_cursorType)
 	{
 		case CURSOR_NULL:
@@ -3463,6 +3500,8 @@ void SdlContext::resetTopBarPointer()
 {
 	_topBarPointer = { -1.0f, -1.0f };
 	_topBarHoveredButton = SdlTopBarButton::None;
+	if (!setTopBarPointerOver(false))
+		WLog_Print(_log, WLOG_WARN, "Unable to update the cursor over the SDL connection bar");
 }
 
 bool SdlContext::setMinimized()

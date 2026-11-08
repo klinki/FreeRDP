@@ -406,6 +406,10 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 						}
 						else
 							std::ignore = sdl->repaintAll();
+						/* Show the local arrow while reconnecting; restore the server cursor after. */
+						if (!sdl->restoreCursor())
+							WLog_Print(sdl->getWLog(), WLOG_WARN,
+							           "Unable to update the cursor for the reconnect state");
 					}
 					break;
 					case SDL_EVENT_USER_POINTER_NULL:

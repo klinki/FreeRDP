@@ -230,6 +230,27 @@ static bool run(bool menuEnabled)
     drag.type=SDL_EVENT_MOUSE_BUTTON_UP;
     if (!overlay->button(drag,{popup.x+10,popup.y+10},action)) return false;
     if (!sdl.repaintAll()) return false;
+    // The server may hide its cursor; the reconnect overlay and the connection bar still need the arrow.
+    {
+        if (!sdl.setCursor(SdlContext::CURSOR_NULL) || !expect(!SDL_CursorVisible(),"A hidden server cursor hides the pointer")) return false;
+        sdl.setReconnecting(true);
+        if (!sdl.restoreCursor() || !expect(SDL_CursorVisible() && !sdl.hasCursor(),"Reconnecting shows the local arrow and keeps the server cursor state")) return false;
+        if (!sdl.setCursor(SdlContext::CURSOR_NULL) || !expect(SDL_CursorVisible(),"A server cursor change cannot hide the arrow while reconnecting")) return false;
+        sdl.setReconnecting(false);
+        if (!sdl.restoreCursor() || !expect(!SDL_CursorVisible(),"Recovery restores the hidden server cursor")) return false;
+        const auto mouseBefore=remoteMouse;
+        const auto onBar=findButton(geometry,window->topBarRect(),window->pixelViewport(),SdlTopBarButton::Refresh);
+        SDL_Event event{}; event.type=SDL_EVENT_MOUSE_MOTION; event.motion.windowID=window->id(); event.motion.x=onBar.x; event.motion.y=onBar.y;
+        if (!sdl.handleEvent(event) || !expect(SDL_CursorVisible() && remoteMouse==mouseBefore,"The connection bar shows the local arrow over a hidden server cursor")) return false;
+        event={}; event.type=SDL_EVENT_WINDOW_MOUSE_LEAVE; event.window.windowID=window->id();
+        if (!sdl.handleEvent(event) || !expect(!SDL_CursorVisible(),"Leaving the connection bar restores the hidden server cursor")) return false;
+        event={}; event.type=SDL_EVENT_MOUSE_MOTION; event.motion.windowID=window->id(); event.motion.x=onBar.x; event.motion.y=onBar.y;
+        if (!sdl.handleEvent(event) || !expect(SDL_CursorVisible(),"Returning to the connection bar shows the arrow again")) return false;
+        // Moving straight into a window without the bar must not leave the arrow behind.
+        event.motion.windowID=window->id()+1000;
+        if (!sdl.handleEvent(event) || !expect(!SDL_CursorVisible(),"Motion outside the bar's window restores the hidden server cursor")) return false;
+        if (!sdl.setCursor(SdlContext::CURSOR_DEFAULT)) return false;
+    }
     const auto clickRefreshIcon = [&](const SDL_FPoint& point) {
         SDL_Event event{};
         event.type = SDL_EVENT_MOUSE_MOTION; event.motion.windowID = window->id();
