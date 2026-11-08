@@ -368,12 +368,20 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 					break;
 					case SDL_EVENT_USER_WINDOW_FULLSCREEN:
 					{
-						auto window = static_cast<SdlWindow*>(windowEvent.user.data1);
+						const auto id = static_cast<SDL_WindowID>(
+						    reinterpret_cast<uintptr_t>(windowEvent.user.data1));
 						const bool enter = windowEvent.user.code != 0;
 						const bool forceOriginalDisplay = windowEvent.user.data2 != nullptr;
-						if (window)
+						if (id == 0)
 						{
-							window->fullscreen(enter, forceOriginalDisplay);
+							/* A request made off the main thread. */
+							if (!sdl->setFullscreen(enter, forceOriginalDisplay))
+								throw ErrorMsg{ -1, windowEvent.type, "sdl->setFullscreen" };
+						}
+						else if (auto window = sdl->getWindowForId(id))
+						{
+							if (!sdl->applyFullscreen(id, enter, forceOriginalDisplay))
+								throw ErrorMsg{ -1, windowEvent.type, "sdl->applyFullscreen" };
 							/* Windows are born hidden so startup never flashes
 							 * them on the wrong display; reveal here, after
 							 * placement and fullscreen state are final. */
@@ -934,8 +942,19 @@ int main(int argc, char* argv[])
 #endif
 	/* /f enters fullscreen with SDL_SetWindowFullscreen, and SDL's "auto" then hides the macOS menu
 	 * bar for good: no menu, no title bar, no way out. Fails if the environment variable is set,
-	 * which then wins, so the result is ignored. */
-	std::ignore = SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY, "1");
+	 * which then wins, so the result is ignored.
+	 *
+	 * Under the launcher the connection bar is the way out, so keep a fullscreen session's Dock
+	 * and menu bar hidden, as a session started in fullscreen had them before "1". It must look
+	 * the same however fullscreen was entered: with "auto" a session left with the fullscreen
+	 * shortcut and re-entered with the green button revealed the Dock and title bar until the
+	 * shortcut was used again, because only programmatic fullscreen hides them. */
+	const char* fullscreenMenu = "1";
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (bridge)
+		fullscreenMenu = "0";
+#endif
+	std::ignore = SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY, fullscreenMenu);
 
 #if defined(_WIN32)
 	/* Without vsync D3D11 drops a frame while one is still queued (DXGI_PRESENT_DO_NOT_WAIT). */

@@ -599,7 +599,7 @@ bool sdlInput::handleEvent(const SDL_KeyboardEvent& ev)
 				           masktostr(_hotkeyModmask).c_str(), sdl_scancode_name(_hotkeyFullscreen));
 				if (!keyboard_sync_state())
 					return false;
-				return _sdl->toggleFullscreen();
+				return _sdl->toggleFullscreen(ev.windowID);
 			}
 			if (ev.scancode == _hotkeyResizable)
 			{

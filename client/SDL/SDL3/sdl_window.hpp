@@ -103,7 +103,13 @@ class SdlWindow
 	void setBordered(bool bordered);
 	void raise();
 	void resizeable(bool use);
-	void fullscreen(bool enter, bool forceOriginalDisplay);
+	enum class FullscreenResult
+	{
+		Applied,  // SDL accepted the change and the window settled
+		Unsynced, // SDL accepted it, the transition had not completed in time
+		Failed    // SDL refused it; SDL_GetError() says why
+	};
+	[[nodiscard]] FullscreenResult fullscreen(bool enter, bool forceOriginalDisplay);
 	void minimize();
 
 	[[nodiscard]] bool resizeToScale();

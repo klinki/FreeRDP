@@ -36,6 +36,7 @@
 #include <sdl_common_utils.hpp>
 
 #include "sdl_window.hpp"
+#include "sdl_fullscreen_state.hpp"
 #include "sdl_disp.hpp"
 #include "sdl_monitor_scale.hpp"
 #include "sdl_clip.hpp"
@@ -91,9 +92,18 @@ class SdlContext
 	[[nodiscard]] bool toggleResizeable();
 	[[nodiscard]] bool setResizeable(bool enable);
 
+	/* Session fullscreen: the request in flight, otherwise whether every
+	 * window actually is fullscreen (see sdl_fullscreen_state.hpp). */
 	[[nodiscard]] bool fullscreen() const;
-	[[nodiscard]] bool toggleFullscreen();
+	/* Session-wide toggle; `origin` is the window it was invoked from. */
+	[[nodiscard]] bool toggleFullscreen(SDL_WindowID origin = 0);
+	/* Request every window to enter or leave fullscreen. Thread safe: off the
+	 * SDL main thread the request is forwarded to it. */
 	[[nodiscard]] bool setFullscreen(bool enter, bool forceOriginalDisplay = false);
+	/* Main thread: apply a queued request to one window and record failures
+	 * or an already settled state. */
+	[[nodiscard]] bool applyFullscreen(SDL_WindowID id, bool enter, bool forceOriginalDisplay);
+	[[nodiscard]] const SdlFullscreenState& fullscreenState() const;
 
 	[[nodiscard]] bool setMinimized();
 
@@ -236,6 +246,13 @@ class SdlContext
 	[[nodiscard]] bool handleEvent(const SDL_MouseMotionEvent& ev);
 	[[nodiscard]] bool handleEvent(const SDL_MouseWheelEvent& ev);
 	[[nodiscard]] bool handleEvent(const SDL_TouchFingerEvent& ev);
+	[[nodiscard]] bool topBarAllowed() const;
+	void reassignTopBar(SDL_WindowID id, bool replace = false);
+	[[nodiscard]] SDL_WindowID primaryWindowId() const;
+	void resetTopBarPointer();
+	[[nodiscard]] bool observeFullscreen(SDL_WindowID id, bool fullscreen);
+	[[nodiscard]] bool presentFullscreen(SDL_WindowID id, bool fullscreen,
+	                                     const SdlFullscreenState::Observation& observed);
 	[[nodiscard]] bool handleTopBarMotion(const SDL_MouseMotionEvent& ev);
 	[[nodiscard]] bool handleTopBarButton(const SDL_MouseButtonEvent& ev);
 	struct TopBarPointerCapture
@@ -326,7 +343,6 @@ class SdlContext
 	uint32_t _yuvLastCreated = 0;
 	uint32_t _yuvLastReused = 0;
 	/* SDL */
-	bool _fullscreen = false;
 	bool _resizeable = false;
 	bool _grabMouse = false;
 	bool _grabKeyboard = false;
@@ -367,9 +383,8 @@ class SdlContext
 	std::map<SDL_DisplayID, rdpMonitor> _displays;
 	std::map<SDL_WindowID, SdlWindow> _windows;
 	std::map<SDL_DisplayID, std::pair<SDL_Rect, SDL_Rect>> _offsets;
-	SDL_WindowID _topBarWindowId = 0;
-	bool _topBarPinned = true;
-	bool _topBarVisible = true;
+	/* Actual per-window fullscreen state, the bar's window, pin and visibility. */
+	SdlFullscreenState _fullscreenState;
 	SDL_FPoint _topBarPointer{ -1.0f, -1.0f };
 	SdlTopBarButton _topBarHoveredButton = SdlTopBarButton::None;
 	/* Floating-bar move/resize gesture (mstsc-style): press on the title area

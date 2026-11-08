@@ -135,6 +135,54 @@ maximize/minimize exclusion and display fitting without an RDP server. Native
 runs also report logical versus backing-pixel dimensions. Transport tests cover
 validation and compatibility with older launchers.
 
+## Fullscreen state and the connection bar
+
+Native window fullscreen events are the source of truth
+(`sdl_fullscreen_state.hpp`). The session toggle (Right Shift+Return by default,
+or the connection bar's restore button) and the initial connection only record a
+request; each window becomes fullscreen or windowed when SDL reports that it
+entered or left, whatever caused it: FreeRDP's toggle, the macOS green button,
+the Window menu or the system.
+
+- The connection bar belongs to the window of the session's primary display:
+  the first selected display, otherwise the system's primary display. It moves
+  only when that window closes. It then goes to the remaining windows' primary
+  display, chosen by the same rule, and follows that window's state. A window
+  for a display that joins the session in the same topology change never takes
+  the bar from a window that stayed.
+- The bar is shown when its window enters fullscreen and hidden when it leaves.
+  Its pin state is never changed by fullscreen transitions. Leaving with the
+  shortcut and re-entering with the green button therefore restores a pinned
+  bar; an unpinned bar appears and hides on pointer movement as before.
+  Multi-monitor sessions still allow hovering to reveal an unpinned bar while
+  windowed.
+- Other windows entering or leaving fullscreen never affect the bar. A session
+  is reported fullscreen only when every window is.
+- The toggle always acts on the whole session. Its direction comes from the
+  window where it was used: from a fullscreen window every window leaves, from a
+  windowed window every window enters. A mixed session is therefore made
+  consistent in the direction the user expects. A second toggle before the
+  first transition finishes reverses it; a request with no answering event
+  stops deciding the direction after five seconds.
+- A refused transition is logged with SDL's error and the window keeps its
+  actual state; a transition that does not settle within SDL's timeout is
+  logged and decided by the later event.
+
+Under the launcher, fullscreen Spaces hide the macOS Dock and menu bar
+(`SDL_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY=0`) regardless of how fullscreen
+was entered. With SDL's default `auto`, only programmatic fullscreen hides them,
+so re-entering with the green button revealed the Dock and title bar. Without
+the launcher the client keeps `1` (both reachable). An environment variable
+setting still wins.
+
+`TestSDLFullscreenState` covers pinned and unpinned bars, session toggle and
+native controls, mixed fullscreen and windowed monitors, toggles in flight,
+failed transitions and bar ownership without a display. `TestSDLNativeFullscreen`
+repeats the shortcut-leave and native-reenter sequence with SDL windows: with the
+dummy driver by default, and with native macOS Spaces when given any argument
+(the mixed-monitor part then needs a second display). It calls
+`SDL_SetWindowFullscreen` outside the engine; it does not click the green button.
+
 ## Performance overlay styles
 
 The optional `performance_overlay_styles` capability extends monitoring controls
