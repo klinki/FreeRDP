@@ -44,7 +44,7 @@ namespace
 	constexpr const char* bridgeCapabilities[] = {
 		"auth", "certificate", "focus", "retry", "display_uuid", "per_monitor_scaling",
 		"dynamic_resolution", "multimon", "close_confirmation", "session_thumbnail",
-		"dock_accessory", "primary_monitor", "reverse_mouse_wheel", "performance_monitoring", "performance_overlay_styles", "window_geometry", "screen_refresh", "screen_refresh_modes"
+		"dock_accessory", "primary_monitor", "reverse_mouse_wheel", "performance_monitoring", "performance_overlay_styles", "window_geometry", "screen_refresh", "screen_refresh_modes", "local_hotkeys"
 	};
 	// The nonconnecting query and the live handshake must advertise the same features.
 	bool addCapabilities(WINPR_JSON* message)
@@ -625,6 +625,10 @@ bool SdlLauncher::reverseMouseWheel() const
 {
 	return _reverseMouseWheel;
 }
+const SdlLocalHotkeys* SdlLauncher::localHotkeys() const
+{
+	return _localHotkeys ? &*_localHotkeys : nullptr;
+}
 bool SdlLauncher::requestClose()
 {
 	if (!_confirmSessionClose || _cancelled || _terminal)
@@ -843,6 +847,34 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 	{
 		error = "Invalid start command";
 		return false;
+	}
+	if (const auto hotkeys = item(start.get(), "localHotkeys"))
+	{
+		// Authoritative for every action it names; others keep sdl-freerdp.json/defaults.
+		if (!WINPR_JSON_IsObject(hotkeys))
+		{
+			error = "Invalid local hotkeys";
+			return false;
+		}
+		SdlLocalHotkeys parsed;
+		for (size_t i = 0; i < sdlHotkeyActionNames.size(); ++i)
+		{
+			const std::string name(sdlHotkeyActionNames[i]);
+			const auto value = item(hotkeys, name.c_str());
+			if (!value)
+				continue;
+			const auto text = WINPR_JSON_GetStringValue(value);
+			const auto binding = text && strlen(text) <= 64 ? sdl_parse_hotkey(text) : std::nullopt;
+			if (!binding)
+			{
+				error = "Invalid local hotkey for " + name;
+				return false;
+			}
+			parsed[i] = *binding;
+		}
+		_localHotkeys = parsed;
+		if (parsed[static_cast<size_t>(SdlHotkeyAction::Fullscreen)])
+			releaseNativeFullscreenShortcut(); // prepare() runs on the SDL main thread.
 	}
 	if (secrets)
 	{

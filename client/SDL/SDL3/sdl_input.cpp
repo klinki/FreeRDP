@@ -23,6 +23,10 @@
 #include "sdl_utils.hpp"
 #include "sdl_prefs.hpp"
 #include "sdl_touch.hpp"
+#include "sdl_hotkeys.hpp"
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+#include "sdl_launcher.hpp"
+#endif
 
 #include <SDL3/SDL_oldnames.h>
 
@@ -553,6 +557,32 @@ uint32_t sdlInput::prefKeyValue(const std::string& key, uint32_t fallback)
 	return val;
 }
 
+std::optional<SdlHotkeyAction> sdlInput::hotkeyAction(const SDL_KeyboardEvent& ev) const
+{
+	const std::array<uint32_t, sdlHotkeyActionNames.size()> legacy = {
+		_hotkeyFullscreen, _hotkeyResizable, _hotkeyGrab, _hotkeyDisconnect, _hotkeyMinimize
+	};
+	const bool legacyModifiers =
+	    _hotkeysEnabled && (ev.mod & _hotkeyModmask) == _hotkeyModmask;
+	const SdlLocalHotkeys* bridge = nullptr;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (const auto launcher = SdlLauncher::active())
+		bridge = launcher->localHotkeys();
+#endif
+	/* Bridge bindings match the unshifted, layout-mapped key: SDL3 key events report the
+	 * shifted character, and macOS shortcuts follow the character rather than the key cap. */
+	const auto key = SDL_GetKeyFromScancode(ev.scancode, SDL_KMOD_NONE, true);
+	for (size_t i = 0; i < legacy.size(); ++i)
+	{
+		const auto& configured = bridge ? (*bridge)[i] : std::optional<SdlHotkey>{};
+		const bool matched = configured ? sdl_hotkey_matches(*configured, key, ev.mod)
+		                                : legacyModifiers && ev.scancode == legacy[i];
+		if (matched)
+			return static_cast<SdlHotkeyAction>(i);
+	}
+	return std::nullopt;
+}
+
 std::list<std::string> sdlInput::tokenize(const std::string& data, const std::string& delimiter)
 {
 	size_t lastpos = 0;
@@ -589,51 +619,30 @@ bool sdlInput::handleEvent(const SDL_KeyboardEvent& ev)
 	 * before a modifier. */
 	const SDL_Keymod mods = ev.mod;
 
-	if (_hotkeysEnabled && (mods & _hotkeyModmask) == _hotkeyModmask)
+	if (ev.type == SDL_EVENT_KEY_DOWN)
 	{
-		if (ev.type == SDL_EVENT_KEY_DOWN)
+		if (const auto action = hotkeyAction(ev))
 		{
-			if (ev.scancode == _hotkeyFullscreen)
+			WLog_Print(_sdl->getWLog(), WLOG_INFO, "%s hotkey pressed (%s+<%s>)",
+			           std::string(sdlHotkeyActionNames[static_cast<size_t>(*action)]).c_str(),
+			           masktostr(mods).c_str(), sdl_scancode_name(ev.scancode));
+			if (!keyboard_sync_state())
+				return false;
+			switch (*action)
 			{
-				WLog_Print(_sdl->getWLog(), WLOG_INFO, "%s+<%s> pressed, toggling fullscreen state",
-				           masktostr(_hotkeyModmask).c_str(), sdl_scancode_name(_hotkeyFullscreen));
-				if (!keyboard_sync_state())
-					return false;
-				return _sdl->toggleFullscreen();
-			}
-			if (ev.scancode == _hotkeyResizable)
-			{
-				WLog_Print(_sdl->getWLog(), WLOG_INFO, "%s+<%s> pressed, toggling resizeable state",
-				           masktostr(_hotkeyModmask).c_str(), sdl_scancode_name(_hotkeyResizable));
-				if (!keyboard_sync_state())
-					return false;
-				return _sdl->toggleResizeable();
-			}
-
-			if (ev.scancode == _hotkeyGrab)
-			{
-				WLog_Print(_sdl->getWLog(), WLOG_INFO, "%s+<%s> pressed, toggling grab state",
-				           masktostr(_hotkeyModmask).c_str(), sdl_scancode_name(_hotkeyGrab));
-				if (!keyboard_sync_state())
-					return false;
-				return keyboard_grab(ev.windowID, !_sdl->grabKeyboard());
-			}
-			if (ev.scancode == _hotkeyDisconnect)
-			{
-				WLog_Print(_sdl->getWLog(), WLOG_INFO, "%s+<%s> pressed, disconnecting RDP session",
-				           masktostr(_hotkeyModmask).c_str(), sdl_scancode_name(_hotkeyDisconnect));
-				if (!keyboard_sync_state())
-					return false;
-				freerdp_abort_connect_context(_sdl->context());
-				return true;
-			}
-			if (ev.scancode == _hotkeyMinimize)
-			{
-				WLog_Print(_sdl->getWLog(), WLOG_INFO, "%s+<%s> pressed, minimizing client",
-				           masktostr(_hotkeyModmask).c_str(), sdl_scancode_name(_hotkeyMinimize));
-				if (!keyboard_sync_state())
-					return false;
-				return _sdl->setMinimized();
+				case SdlHotkeyAction::Fullscreen:
+					return _sdl->toggleFullscreen();
+				case SdlHotkeyAction::Resizable:
+					return _sdl->toggleResizeable();
+				case SdlHotkeyAction::Grab:
+					return keyboard_grab(ev.windowID, !_sdl->grabKeyboard());
+				case SdlHotkeyAction::Disconnect:
+					freerdp_abort_connect_context(_sdl->context());
+					return true;
+				case SdlHotkeyAction::Minimize:
+					return _sdl->setMinimized();
+				case SdlHotkeyAction::Count:
+					break;
 			}
 		}
 	}

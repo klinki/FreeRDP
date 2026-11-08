@@ -16,6 +16,30 @@ bool SdlLauncher::useAccessoryActivationPolicy()
 	return false;
 }
 
+static void releaseNativeFullscreenShortcut(NSMenu* menu)
+{
+	for (NSMenuItem* item in menu.itemArray)
+	{
+		if (item.action == @selector(toggleFullScreen:))
+		{
+			item.keyEquivalent = @"";
+			item.keyEquivalentModifierMask = 0;
+		}
+		if (item.submenu)
+			releaseNativeFullscreenShortcut(item.submenu);
+	}
+}
+
+void SdlLauncher::releaseNativeFullscreenShortcut()
+{
+	/* SDL's Cocoa Window menu binds Control-Command-F to native toggleFullScreen:, which
+	 * NSApplication runs after SDL has already delivered the key. With a launcher fullscreen
+	 * binding, the configured action (or forwarding, when off) is the only owner of that key:
+	 * the item stays in the menu but no longer bypasses FreeRDP's session-wide toggle. */
+	if ([NSThread isMainThread] && NSApp && NSApp.mainMenu)
+		::releaseNativeFullscreenShortcut(NSApp.mainMenu);
+}
+
 void SdlLauncher::activateAccessorySession()
 {
 	if ([NSThread isMainThread] &&

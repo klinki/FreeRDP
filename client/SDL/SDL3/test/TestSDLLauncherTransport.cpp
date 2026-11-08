@@ -397,6 +397,56 @@ namespace
 			require(!c.bridge->reverseMouseWheel(), "Malformed wheel option changed scroll direction");
 		}
 	}
+	void localHotkeyOptions()
+	{
+		{
+			Connection c;
+			c.command("start", ",\"arguments\":[],\"displaySelections\":[]");
+			std::vector<std::string> arguments;
+			std::string error;
+			require(c.bridge->prepare(arguments, error), "Start without hotkeys rejected");
+			require(c.bridge->localHotkeys() == nullptr, "Absent hotkeys replaced the defaults");
+		}
+		{
+			Connection c;
+			c.command("start", ",\"arguments\":[],\"displaySelections\":[],\"localHotkeys\":{"
+			                   "\"fullscreen\":\"ctrl+gui+f\",\"disconnect\":\"off\","
+			                   "\"minimize\":\"rshift+m\",\"future\":\"anything\"}");
+			std::vector<std::string> arguments;
+			std::string error;
+			require(c.bridge->prepare(arguments, error), "Valid hotkeys rejected");
+			require(arguments.empty(), "Hotkeys leaked into ordinary arguments");
+			const auto hotkeys = c.bridge->localHotkeys();
+			require(hotkeys != nullptr, "Valid hotkeys were not kept");
+			const auto at = [&](SdlHotkeyAction action) {
+				return (*hotkeys)[static_cast<size_t>(action)];
+			};
+			require(at(SdlHotkeyAction::Fullscreen) &&
+			            sdl_hotkey_matches(*at(SdlHotkeyAction::Fullscreen), SDLK_F,
+			                               SDL_KMOD_LCTRL | SDL_KMOD_LGUI),
+			        "Fullscreen binding was not applied");
+			require(at(SdlHotkeyAction::Disconnect) && !at(SdlHotkeyAction::Disconnect)->enabled(),
+			        "Disconnect was not turned off");
+			require(at(SdlHotkeyAction::Minimize) &&
+			            sdl_hotkey_matches(*at(SdlHotkeyAction::Minimize), SDLK_M, SDL_KMOD_RSHIFT),
+			        "Minimize binding was not applied");
+			require(!at(SdlHotkeyAction::Grab) && !at(SdlHotkeyAction::Resizable),
+			        "Unnamed actions lost their configured defaults");
+		}
+		for (const auto fields :
+		     { ",\"localHotkeys\":[]", ",\"localHotkeys\":\"off\"", ",\"localHotkeys\":{\"fullscreen\":1}",
+		       ",\"localHotkeys\":{\"fullscreen\":\"return\"}",
+		       ",\"localHotkeys\":{\"disconnect\":\"ctrl+hyper+d\"}",
+		       ",\"localHotkeys\":{\"grab\":null}" })
+		{
+			Connection c;
+			c.command("start", std::string(",\"arguments\":[],\"displaySelections\":[]") + fields);
+			std::vector<std::string> arguments;
+			std::string error;
+			require(!c.bridge->prepare(arguments, error), "Malformed hotkeys accepted");
+			require(c.bridge->localHotkeys() == nullptr, "Malformed hotkeys were kept");
+		}
+	}
 	void handshakeCapabilities()
 	{
 		Connection c;
@@ -697,6 +747,7 @@ int main()
 	{
 		handshakeCapabilities();
 		mouseWheelOptions();
+		localHotkeyOptions();
 		tlsSecretsOptions();
 		promptAndStaleResponse();
 		concurrentPromptsAndCertificate();
