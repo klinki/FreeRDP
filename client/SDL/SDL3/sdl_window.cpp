@@ -808,22 +808,8 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 		return false;
 
     if(_performanceOverlay) _performanceOverlay->draw(pixelViewport(),SDL_GetWindowPixelDensity(_window));
-	if (showTopBar && _topBar)
-	{
-#ifdef WITH_SDL_LAUNCHER_BRIDGE
-        auto bridge=SdlLauncher::active();
-        _topBar->setPerformanceAvailable(bridge && bridge->performanceAvailable());
-#endif
-		const auto viewport = pixelViewport();
-		if (viewport.w <= 0 || viewport.h <= 0)
-			return false;
-		if (!_topBarRectInit)
-			_topBarRect = SdlTopBar::defaultRect(viewport, _topBarCompact);
-		_topBarRect = SdlTopBar::clampToViewport(_topBarRect, viewport, _topBarCompact);
-		if (!_topBar->draw(_topBarRect, viewport, pinned, pointer))
-			return false;
-		_renderMetrics.noteTopBarDraw();
-	}
+	if (showTopBar && !drawTopBar(pinned, pointer))
+		return false;
 
     const auto liveStart=_liveMetrics.nowNs();
     auto presentTimer = _renderMetrics.beginPresent();
@@ -956,14 +942,28 @@ bool SdlWindow::renderStalledFrame(int dots, bool showTopBar, bool pinned,
 			return false;
 	}
 
-	if (showTopBar && _topBar)
-	{
-		if (!_topBarRectInit)
-			_topBarRect = SdlTopBar::defaultRect(viewport, _topBarCompact);
-		_topBarRect = SdlTopBar::clampToViewport(_topBarRect, viewport, _topBarCompact);
-		if (!_topBar->draw(_topBarRect, viewport, pinned, pointer))
-			return false;
-	}
+	return !showTopBar || drawTopBar(pinned, pointer);
+}
+
+/* Connection bar shared by normal and stalled frames, so both initialize the
+ * same capabilities and record the draw in render metrics. */
+bool SdlWindow::drawTopBar(bool pinned, const SDL_FPoint& pointer)
+{
+	if (!_topBar)
+		return true;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	auto bridge = SdlLauncher::active();
+	_topBar->setPerformanceAvailable(bridge && bridge->performanceAvailable());
+#endif
+	const auto viewport = pixelViewport();
+	if (viewport.w <= 0 || viewport.h <= 0)
+		return false;
+	if (!_topBarRectInit)
+		_topBarRect = SdlTopBar::defaultRect(viewport, _topBarCompact);
+	_topBarRect = SdlTopBar::clampToViewport(_topBarRect, viewport, _topBarCompact);
+	if (!_topBar->draw(_topBarRect, viewport, pinned, pointer))
+		return false;
+	_renderMetrics.noteTopBarDraw();
 	return true;
 }
 

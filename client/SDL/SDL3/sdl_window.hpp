@@ -222,6 +222,7 @@ class SdlWindow
 	};
 	std::unique_ptr<StalledText> _stalled;
 	[[nodiscard]] bool ensureStalledText();
+	[[nodiscard]] bool drawTopBar(bool pinned, const SDL_FPoint& pointer);
 
   public:
 	[[nodiscard]] SdlTopBarRect topBarRect() const;
