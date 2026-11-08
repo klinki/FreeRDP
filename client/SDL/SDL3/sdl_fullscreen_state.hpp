@@ -75,10 +75,20 @@ class SdlFullscreenState
 	 * owner's actual state, as if that window had just entered or left. */
 	void ensureOwner(SDL_WindowID id)
 	{
-		if (barOwner != 0 || _windows.find(id) == _windows.end())
+		if (barOwner == 0)
+			setOwner(id, true);
+	}
+
+	/* Make `id` the bar's window. With `followState` the bar takes that
+	 * window's actual state; without it the visibility choice is kept, for
+	 * windows that are only being created. */
+	void setOwner(SDL_WindowID id, bool followState)
+	{
+		if (_windows.find(id) == _windows.end())
 			return;
 		barOwner = id;
-		barVisible = windowFullscreen(id);
+		if (followState)
+			barVisible = windowFullscreen(id);
 	}
 
 	[[nodiscard]] bool hasWindow(SDL_WindowID id) const

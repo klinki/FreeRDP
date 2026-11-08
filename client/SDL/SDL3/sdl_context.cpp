@@ -498,7 +498,11 @@ bool SdlContext::createWindows()
 
 	Sint32 originX = 0;
 	Sint32 originY = 0;
-	_fullscreenState.resetWindows();
+	/* Windows that already exist stay tracked: forgetting them would leave
+	 * their fullscreen state out of the session's. */
+	if (_windows.empty())
+		_fullscreenState.resetWindows();
+	SDL_WindowID primaryWindow = 0;
 	_topBarPointer = { -1.0f, -1.0f };
 	_topBarHoveredButton = SdlTopBarButton::None;
 	_topBarGestureOwner = TopBarGestureOwner::None;
@@ -585,8 +589,14 @@ bool SdlContext::createWindows()
 		}
 
 		_fullscreenState.addWindow(window.id());
+		/* Definitions follow the display selection, not the primary: give
+		 * the bar to the negotiated primary's window. */
+		if (monitor->is_primary && primaryWindow == 0)
+			primaryWindow = window.id();
 		_windows.insert({ window.id(), std::move(window) });
 	}
+	if (primaryWindow != 0)
+		_fullscreenState.setOwner(primaryWindow, false);
 
 	return true;
 }
@@ -1400,7 +1410,7 @@ bool SdlContext::removeDisplayWindow(SDL_DisplayID id)
 			return false;
 	}
 	if (!_windows.empty())
-		reassignTopBar(_windows.begin()->first);
+		reassignTopBar(primaryWindowId());
 	return true;
 }
 
@@ -1504,17 +1514,24 @@ bool SdlContext::refreshDisplayWindows()
 			++it;
 		}
 	}
+	/* A remaining window takes the bar before new displays are added, so a
+	 * window that only just appeared never takes it from one that stayed. */
+	const bool kept = !_windows.empty();
+	if (kept)
+		reassignTopBar(primaryWindowId());
 	for (const auto id : desired)
 		if (!addDisplayWindow(id))
 			return false;
+	/* Every window is new: the first one created took the bar; give it to
+	 * the primary's window instead. */
+	if (!kept && !_windows.empty())
+		reassignTopBar(primaryWindowId(), true);
 	// A fallback window may be created after its size event has already fired.
 	// Refresh drawable geometry before sending this topology's monitor layout;
 	// subsequent pixel-size events and settling retries refine it as needed.
 	for (const auto& entry : _windows)
 		if (!updateWindow(entry.first))
 			return false;
-	if (!_windows.empty())
-		reassignTopBar(_windows.begin()->first);
 	return updateWindowList();
 }
 
@@ -3385,10 +3402,32 @@ bool SdlContext::topBarAllowed() const
 	    freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon));
 }
 
-void SdlContext::reassignTopBar(SDL_WindowID id)
+/* The window of the session's primary display: the first selected display
+ * that still has a window, otherwise the system primary, otherwise any. */
+SDL_WindowID SdlContext::primaryWindowId() const
+{
+	std::vector<rdpMonitor> monitors;
+	std::vector<SDL_WindowID> ids;
+	for (const auto& entry : _windows)
+	{
+		monitors.push_back(entry.second.monitor(false));
+		ids.push_back(entry.first);
+	}
+	applyPrimaryMonitor(monitors);
+	for (size_t x = 0; x < monitors.size(); x++)
+		if (monitors[x].is_primary)
+			return ids[x];
+	return ids.empty() ? 0 : ids.front();
+}
+
+/* Give the bar to `id` if it has none, or with `replace` in any case. */
+void SdlContext::reassignTopBar(SDL_WindowID id, bool replace)
 {
 	const auto previous = _fullscreenState.barOwner;
-	_fullscreenState.ensureOwner(id);
+	if (replace)
+		_fullscreenState.setOwner(id, true);
+	else
+		_fullscreenState.ensureOwner(id);
 	if (_fullscreenState.barOwner != previous)
 	{
 		WLog_Print(getWLog(), WLOG_DEBUG, "Connection bar moved to window %" PRIu32, id);

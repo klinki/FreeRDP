@@ -144,9 +144,12 @@ request; each window becomes fullscreen or windowed when SDL reports that it
 entered or left, whatever caused it: FreeRDP's toggle, the macOS green button,
 the Window menu or the system.
 
-- The connection bar belongs to the first session window (the primary display's
-  window in multi-monitor sessions). It moves only when that window closes, to
-  the next remaining window, and then follows that window's state.
+- The connection bar belongs to the window of the session's primary display:
+  the first selected display, otherwise the system's primary display. It moves
+  only when that window closes. It then goes to the remaining windows' primary
+  display, chosen by the same rule, and follows that window's state. A window
+  for a display that joins the session in the same topology change never takes
+  the bar from a window that stayed.
 - The bar is shown when its window enters fullscreen and hidden when it leaves.
   Its pin state is never changed by fullscreen transitions. Leaving with the
   shortcut and re-entering with the green button therefore restores a pinned

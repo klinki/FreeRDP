@@ -247,7 +247,8 @@ class SdlContext
 	[[nodiscard]] bool handleEvent(const SDL_MouseWheelEvent& ev);
 	[[nodiscard]] bool handleEvent(const SDL_TouchFingerEvent& ev);
 	[[nodiscard]] bool topBarAllowed() const;
-	void reassignTopBar(SDL_WindowID id);
+	void reassignTopBar(SDL_WindowID id, bool replace = false);
+	[[nodiscard]] SDL_WindowID primaryWindowId() const;
 	void resetTopBarPointer();
 	[[nodiscard]] bool observeFullscreen(SDL_WindowID id, bool fullscreen);
 	[[nodiscard]] bool presentFullscreen(SDL_WindowID id, bool fullscreen,

@@ -228,6 +228,54 @@ static void ownerRemoved()
 	expect(state.barPinned && state.barVisible, s, "session cleanup restores defaults");
 }
 
+/* One topology change removes the bar's display and adds another, as
+ * refreshDisplayWindows does: a remaining window takes the bar first, so the
+ * new window never does. */
+static void ownerReplacedWhileDisplayAdded()
+{
+	const char* s = "owner removed, display added";
+	static constexpr SDL_WindowID added = 7;
+	uint64_t now = 1000;
+	auto state = connected(true, now);
+	state.removeWindow(primary);
+	state.ensureOwner(secondary);
+	state.addWindow(added);
+	expect(state.barOwner == secondary, s, "the remaining window keeps the bar");
+	std::ignore = state.observe(added, true);
+	expect(!state.barShown(added, true), s, "the new window does not show the bar");
+	expect(state.barShown(secondary, true), s, "the remaining fullscreen window shows it");
+
+	/* The order the review found: adding before reassigning hands the bar to
+	 * the new window. Kept as a check that the model needs the order above. */
+	auto wrong = connected(true, now);
+	wrong.removeWindow(primary);
+	wrong.addWindow(added);
+	wrong.ensureOwner(secondary);
+	expect(wrong.barOwner == added, s, "adding first gives the bar to the new window");
+}
+
+/* Creation picks the primary's window even when another was created first,
+ * and keeps the visibility choice; replacing follows the new window. */
+static void primaryChosenAtCreation()
+{
+	const char* s = "primary chosen at creation";
+	SdlFullscreenState state;
+	state.barVisible = false; /* an unpinned bar hidden before recreation */
+	state.addWindow(secondary);
+	state.addWindow(primary);
+	expect(state.barOwner == secondary, s, "the first window created takes the bar");
+	state.setOwner(primary, false);
+	expect(state.barOwner == primary, s, "the primary's window takes it instead");
+	expect(!state.barVisible, s, "creation keeps the visibility choice");
+	std::ignore = state.observe(primary, true);
+	expect(state.barShown(primary, false), s, "entering fullscreen shows it");
+	state.setOwner(secondary, true);
+	expect(state.barOwner == secondary && !state.barVisible, s,
+	       "a replacement follows the windowed window's state");
+	state.setOwner(99, true);
+	expect(state.barOwner == secondary, s, "an unknown window never takes the bar");
+}
+
 static void unknownWindowIgnored()
 {
 	const char* s = "unknown window";
@@ -249,6 +297,8 @@ int TestSDLFullscreenState(int, char*[])
 	toggleInFlightReverses();
 	failedTransition();
 	ownerRemoved();
+	ownerReplacedWhileDisplayAdded();
+	primaryChosenAtCreation();
 	unknownWindowIgnored();
 	if (failures == 0)
 		printf("TestSDLFullscreenState: all scenarios passed\n");
