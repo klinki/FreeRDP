@@ -208,6 +208,79 @@ static bool run()
 	return true;
 }
 
+static SDL_WindowID windowOn(SdlContext& sdl, SDL_DisplayID display)
+{
+	int count = 0;
+	auto windows = SDL_GetWindows(&count);
+	SDL_WindowID found = 0;
+	for (int x = 0; x < count; x++)
+	{
+		const auto id = SDL_GetWindowID(windows[x]);
+		auto window = sdl.getWindowForId(id);
+		if (window && window->monitor(false).orig_screen == display)
+			found = id;
+	}
+	SDL_free(windows);
+	return found;
+}
+
+/* One display refresh replaces the bar's display with a new one while
+ * another display stays: SdlContext::refreshDisplayWindows must give the bar
+ * to the window that stayed, not to the new one. Needs three displays. */
+static bool ownershipAcrossRefresh()
+{
+	std::unique_ptr<freerdp, decltype(&freerdp_free)> instance(freerdp_new(), freerdp_free);
+	if (!instance)
+		return false;
+	instance->ContextSize = sizeof(sdl_rdp_context);
+	if (!freerdp_context_new(instance.get()))
+		return false;
+	struct ContextGuard
+	{
+		freerdp* instance;
+		~ContextGuard() { freerdp_context_free(instance); }
+	} contextGuard{ instance.get() };
+	SdlContext sdl(instance->context);
+	reinterpret_cast<sdl_rdp_context*>(instance->context)->sdl = &sdl;
+	auto settings = instance->context->settings;
+	if (!freerdp_settings_set_string(settings, FreeRDP_ServerHostname, "native-fullscreen.invalid") ||
+	    !freerdp_settings_set_bool(settings, FreeRDP_Fullscreen, TRUE) ||
+	    !freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, TRUE) || !sdl.detectDisplays())
+		return false;
+	const auto displays = sdl.getDisplayIds();
+	if (displays.size() < 3)
+	{
+		printf("SKIP ownership across refresh: needs three displays\n");
+		return true;
+	}
+	const auto a = displays[0];
+	const auto b = displays[1];
+	const auto c = displays[2];
+	const auto& fs = sdl.fullscreenState();
+
+	/* Selected displays A and B; A's window is created first and owns the bar. */
+	sdl.setMonitorIds({ a, b });
+	if (!freerdp_settings_set_pointer_len(settings, FreeRDP_MonitorIds, nullptr, 2) ||
+	    !sdl.addDisplayWindow(a) || !sdl.addDisplayWindow(b))
+		return false;
+	const auto windowA = windowOn(sdl, a);
+	const auto windowB = windowOn(sdl, b);
+	if (!expect(windowA != 0 && windowB != 0, "windows for A and B") ||
+	    !expect(fs.barOwner == windowA, "A's window owns the bar"))
+		return false;
+
+	/* The selection becomes C and B in one refresh: A goes, B stays, C joins.
+	 * C is listed first, so it would be the primary of a fresh selection. */
+	sdl.setMonitorIds({ c, b });
+	if (!expect(sdl.refreshDisplayWindows(), "display refresh succeeds"))
+		return false;
+	const auto windowC = windowOn(sdl, c);
+	return expect(!sdl.getWindowForId(windowA), "A's window removed") &&
+	       expect(windowC != 0, "C's window added") &&
+	       expect(fs.barOwner == windowB, "the window that stayed keeps the bar") &&
+	       expect(fs.barOwner != windowC, "the new window does not take it");
+}
+
 /* Without arguments the dummy video driver is used, which completes each
  * transition synchronously. Pass any argument to use the real display, where
  * transitions are native and asynchronous (macOS Spaces). */
@@ -218,7 +291,9 @@ int main(int argc, char**)
 	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS))
 		return 1;
 	printf("Video driver: %s\n", SDL_GetCurrentVideoDriver());
-	const bool ok = run();
+	bool ok = run();
+	if (ok)
+		ok = ownershipAcrossRefresh();
 	SDL_Quit();
 	if (ok)
 		printf("TestSDLNativeFullscreen: passed\n");
