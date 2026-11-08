@@ -267,7 +267,7 @@ void SdlWindow::resizeable(bool use)
 	std::ignore = SDL_SyncWindow(_window);
 }
 
-void SdlWindow::fullscreen(bool enter, bool forceOriginalDisplay)
+SdlWindow::FullscreenResult SdlWindow::fullscreen(bool enter, bool forceOriginalDisplay)
 {
 	if (enter && forceOriginalDisplay && _displayID != 0)
 	{
@@ -279,8 +279,14 @@ void SdlWindow::fullscreen(bool enter, bool forceOriginalDisplay)
 		std::ignore = SDL_GetDisplayBounds(_displayID, &rect);
 		std::ignore = SDL_SetWindowPosition(_window, rect.x, rect.y);
 	}
-	std::ignore = SDL_SetWindowFullscreen(_window, enter);
-	std::ignore = SDL_SyncWindow(_window);
+	if (!SDL_SetWindowFullscreen(_window, enter))
+		return FullscreenResult::Failed;
+	/* Native transitions (macOS Spaces) are asynchronous; SDL_SyncWindow
+	 * gives up after a timeout while the transition may still complete. The
+	 * window's enter/leave event decides the actual state either way. */
+	if (!SDL_SyncWindow(_window))
+		return FullscreenResult::Unsynced;
+	return FullscreenResult::Applied;
 }
 
 void SdlWindow::minimize()

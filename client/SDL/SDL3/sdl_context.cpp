@@ -193,9 +193,7 @@ void SdlContext::cleanup()
 {
 	std::unique_lock lock(_critical);
 	_windows.clear();
-	_topBarWindowId = 0;
-	_topBarVisible = true;
-	_topBarPinned = true;
+	_fullscreenState.clear();
 	_topBarPointer = { -1.0f, -1.0f };
 	_topBarHoveredButton = SdlTopBarButton::None;
 	_topBarGestureOwner = TopBarGestureOwner::None;
@@ -500,7 +498,7 @@ bool SdlContext::createWindows()
 
 	Sint32 originX = 0;
 	Sint32 originY = 0;
-	_topBarWindowId = 0;
+	_fullscreenState.resetWindows();
 	_topBarPointer = { -1.0f, -1.0f };
 	_topBarHoveredButton = SdlTopBarButton::None;
 	_topBarGestureOwner = TopBarGestureOwner::None;
@@ -586,8 +584,7 @@ bool SdlContext::createWindows()
 			window.setOffsetY(originY - monitor->y);
 		}
 
-		if (_topBarWindowId == 0)
-			_topBarWindowId = window.id();
+		_fullscreenState.addWindow(window.id());
 		_windows.insert({ window.id(), std::move(window) });
 	}
 
@@ -1310,14 +1307,14 @@ bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& re
 	}
 
 	const auto settings = context()->settings;
-	const bool showTopBar = _topBarVisible && (window.id() == _topBarWindowId) &&
-	                        (_fullscreen || freerdp_settings_get_bool(settings, FreeRDP_UseMultimon));
+	const bool showTopBar = _fullscreenState.barShown(
+	    window.id(), freerdp_settings_get_bool(settings, FreeRDP_UseMultimon));
 	const auto topBarPointer = _topBarHoveredButton != SdlTopBarButton::None
 	                               ? _topBarPointer
 	                               : SDL_FPoint{ -1.0f, -1.0f };
 	window.setRefreshCapabilities(freerdp_settings_get_bool(settings, FreeRDP_RefreshRect),
 	                              freerdp_settings_get_bool(settings, FreeRDP_SuppressOutput));
-	return window.updateSurface(showTopBar, _topBarPinned, topBarPointer);
+	return window.updateSurface(showTopBar, _fullscreenState.barPinned, topBarPointer);
 }
 
 bool SdlContext::redrawWindows()
@@ -1374,8 +1371,7 @@ bool SdlContext::addDisplayWindow(SDL_DisplayID id)
 #endif
 	w.setMonitor(monitor);
 	SDL_ShowWindow(w.window());
-	if (_topBarWindowId == 0)
-		_topBarWindowId = w.id();
+	_fullscreenState.addWindow(w.id());
 	_windows.emplace(w.id(), std::move(w));
 	return true;
 }
@@ -1389,8 +1385,7 @@ bool SdlContext::removeDisplayWindow(SDL_DisplayID id)
 		// negotiated monitor still identifies the display that owned it.
 		if (it->second.monitor(false).orig_screen == id)
 		{
-			if (it->first == _topBarWindowId)
-				_topBarWindowId = 0;
+			_fullscreenState.removeWindow(it->first);
 			it = _windows.erase(it);
 		}
 		else
@@ -1404,8 +1399,8 @@ bool SdlContext::removeDisplayWindow(SDL_DisplayID id)
 		if (primary != 0 && !addDisplayWindow(primary))
 			return false;
 	}
-	if (_topBarWindowId == 0 && !_windows.empty())
-		_topBarWindowId = _windows.begin()->first;
+	if (!_windows.empty())
+		reassignTopBar(_windows.begin()->first);
 	return true;
 }
 
@@ -1497,15 +1492,15 @@ bool SdlContext::refreshDisplayWindows()
 		const auto id = it->second.monitor(false).orig_screen;
 		if (std::find(desired.begin(), desired.end(), id) == desired.end())
 		{
-			if (it->first == _topBarWindowId)
-				_topBarWindowId = 0;
+			_fullscreenState.removeWindow(it->first);
 			it = _windows.erase(it);
 		}
 		else
 		{
 			it->second.setMonitor(_displays.at(id));
-			if (SDL_GetDisplayForWindow(it->second.window()) != id)
-				it->second.fullscreen(true, true);
+			if (SDL_GetDisplayForWindow(it->second.window()) != id &&
+			    !applyFullscreen(it->first, true, true))
+				return false;
 			++it;
 		}
 	}
@@ -1518,8 +1513,8 @@ bool SdlContext::refreshDisplayWindows()
 	for (const auto& entry : _windows)
 		if (!updateWindow(entry.first))
 			return false;
-	if (_topBarWindowId == 0 && !_windows.empty())
-		_topBarWindowId = _windows.begin()->first;
+	if (!_windows.empty())
+		reassignTopBar(_windows.begin()->first);
 	return updateWindowList();
 }
 
@@ -1723,40 +1718,41 @@ bool SdlContext::handleTopBarMotion(const SDL_MouseMotionEvent& ev)
 		return false;
 
 	const auto settings = context()->settings;
-	if (!_topBarWindowId ||
-	    !(_fullscreen || freerdp_settings_get_bool(settings, FreeRDP_UseMultimon)))
+	if (!_fullscreenState.barOwner || !topBarAllowed())
 		return false;
 
 	auto window = getWindowForId(ev.windowID);
-	if (!window || ev.windowID != _topBarWindowId)
+	if (!window || ev.windowID != _fullscreenState.barOwner)
 		return false;
 
 	_topBarPointer = screenToPixel(ev.windowID, { ev.x, ev.y });
-	bool panelChanged = _topBarVisible && window->updateTopBarHover(ev.x, ev.y, SDL_GetTicks());
+	bool panelChanged =
+	    _fullscreenState.barVisible && window->updateTopBarHover(ev.x, ev.y, SDL_GetTicks());
 	const bool overBar = window->topBarContains(ev.x, ev.y);
 	const bool nearTop = window->topBarNearTop(ev.x, ev.y);
-	const bool wasVisible = _topBarVisible;
+	const bool wasVisible = _fullscreenState.barVisible;
 
-	if (!_topBarPinned)
+	if (!_fullscreenState.barPinned)
 	{
 		if (nearTop || window->refreshMenuOpen())
-			_topBarVisible = true;
+			_fullscreenState.barVisible = true;
 		else if (!overBar)
-			_topBarVisible = false;
+			_fullscreenState.barVisible = false;
 	}
 
-	if (_topBarVisible && !wasVisible)
+	if (_fullscreenState.barVisible && !wasVisible)
 		panelChanged = window->updateTopBarHover(ev.x, ev.y, SDL_GetTicks()) || panelChanged;
-	const auto hoveredButton = _topBarVisible && overBar
+	const auto hoveredButton = _fullscreenState.barVisible && overBar
 	                               ? window->topBarButtonAt(ev.x, ev.y)
 	                               : SdlTopBarButton::None;
 	const bool hoverChanged = hoveredButton != _topBarHoveredButton;
 	_topBarHoveredButton = hoveredButton;
 
-	if ((_topBarVisible != wasVisible || hoverChanged || panelChanged) && !redrawWindows())
+	if ((_fullscreenState.barVisible != wasVisible || hoverChanged || panelChanged) &&
+	    !redrawWindows())
 		WLog_Print(_log, WLOG_WARN, "Unable to redraw the SDL connection bar");
 
-	return _topBarVisible && overBar;
+	return _fullscreenState.barVisible && overBar;
 }
 
 bool SdlContext::handleEvent(const SDL_MouseWheelEvent& ev)
@@ -1873,6 +1869,11 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 
 	switch (ev.type)
 	{
+		case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+		case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+			if (!observeFullscreen(ev.windowID, ev.type == SDL_EVENT_WINDOW_ENTER_FULLSCREEN))
+				return false;
+			break;
 		case SDL_EVENT_WINDOW_MOUSE_ENTER:
 			return restoreCursor();
 		case SDL_EVENT_WINDOW_FOCUS_LOST:
@@ -1881,16 +1882,16 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 			break;
 		case SDL_EVENT_WINDOW_MOUSE_LEAVE:
 			window->closeRefreshMenu();
-			if (ev.windowID == _topBarWindowId &&
+			if (ev.windowID == _fullscreenState.barOwner &&
 			    _topBarGestureOwner == TopBarGestureOwner::None)
 			{
-				const bool wasVisible = _topBarVisible;
-				if (!_topBarPinned)
-					_topBarVisible = false;
+				const bool wasVisible = _fullscreenState.barVisible;
+				if (!_fullscreenState.barPinned)
+					_fullscreenState.barVisible = false;
 				_topBarPointer = { -1.0f, -1.0f };
 				const bool hoverChanged = _topBarHoveredButton != SdlTopBarButton::None;
 				_topBarHoveredButton = SdlTopBarButton::None;
-				if ((_topBarVisible != wasVisible || hoverChanged) && !redrawWindows())
+				if ((_fullscreenState.barVisible != wasVisible || hoverChanged) && !redrawWindows())
 					return false;
 			}
 			break;
@@ -1989,15 +1990,15 @@ bool SdlContext::handleEvent(const SDL_DisplayEvent& ev)
 bool SdlContext::handleEvent(const SDL_MouseButtonEvent& ev)
 {
 	auto window = getWindowForId(ev.windowID);
-	const bool overBar = window && _topBarVisible && ev.windowID == _topBarWindowId &&
-	    (_fullscreen || freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon)) &&
-	    window->topBarContains(ev.x, ev.y);
+	const bool overBar = window && _fullscreenState.barVisible &&
+	                     ev.windowID == _fullscreenState.barOwner && topBarAllowed() &&
+	                     window->topBarContains(ev.x, ev.y);
 	if ((_topBarGestureOwner == TopBarGestureOwner::Local ||
 	     (overBar && _topBarGestureOwner == TopBarGestureOwner::None && !_performanceCapture && !_performanceOrphanCapture)) &&
 	    handleTopBarButton(ev)) return true;
 	if (ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN && window && !overBar && window->refreshMenuOpen()) {
 		window->closeRefreshMenu(); _topBarHoveredButton = SdlTopBarButton::None;
-		if (!_topBarPinned) _topBarVisible = false;
+		if (!_fullscreenState.barPinned) _fullscreenState.barVisible = false;
 		std::ignore = redrawWindows();
 	}
 	if(performanceButton(ev)) return true;
@@ -2095,8 +2096,7 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 		}
 
 		const auto settings = context()->settings;
-		if (!_topBarVisible ||
-		    !(_fullscreen || freerdp_settings_get_bool(settings, FreeRDP_UseMultimon)))
+		if (!_fullscreenState.barVisible || !topBarAllowed())
 			return true;
 
 		auto window = getWindowForId(gesture.windowId);
@@ -2149,15 +2149,15 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 				break;
 			}
 			case SdlTopBarButton::Pin:
-				_topBarPinned = !_topBarPinned;
-				_topBarVisible = true;
+				_fullscreenState.barPinned = !_fullscreenState.barPinned;
+				_fullscreenState.barVisible = true;
 				if (!redrawWindows())
 					return false;
 				break;
 			case SdlTopBarButton::Minimize:
 				return setMinimized();
 			case SdlTopBarButton::Restore:
-				return toggleFullscreen();
+				return toggleFullscreen(ev.windowID);
 			case SdlTopBarButton::Close:
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 				if (auto bridge = SdlLauncher::active())
@@ -2190,9 +2190,8 @@ bool SdlContext::handleTopBarButton(const SDL_MouseButtonEvent& ev)
 		return false;
 
 	const bool overVisibleBar =
-	    _topBarWindowId && ev.windowID == _topBarWindowId && _topBarVisible &&
-	    (_fullscreen || freerdp_settings_get_bool(settings, FreeRDP_UseMultimon)) &&
-	    window->topBarContains(ev.x, ev.y);
+	    _fullscreenState.barOwner && ev.windowID == _fullscreenState.barOwner &&
+	    _fullscreenState.barVisible && topBarAllowed() && window->topBarContains(ev.x, ev.y);
 
 	if (_topBarGestureOwner == TopBarGestureOwner::None)
 		_topBarGestureOwner = overVisibleBar ? TopBarGestureOwner::Local
@@ -2985,15 +2984,16 @@ bool SdlContext::serviceScreenRefresh()
 
 bool SdlContext::refreshMenuOpen() const
 {
-    const auto window = getWindowForId(_topBarWindowId);
-    return _topBarVisible && window && window->refreshMenuOpen();
+    const auto window = getWindowForId(_fullscreenState.barOwner);
+    return _fullscreenState.barVisible && window && window->refreshMenuOpen();
 }
 
 void SdlContext::serviceRefreshHover()
 {
-    auto window = getWindowForId(_topBarWindowId);
+    auto window = getWindowForId(_fullscreenState.barOwner);
     if (window && window->serviceTopBarHover(SDL_GetTicks())) {
-        if (!_topBarPinned && _topBarHoveredButton == SdlTopBarButton::None) _topBarVisible = false;
+        if (!_fullscreenState.barPinned && _topBarHoveredButton == SdlTopBarButton::None)
+            _fullscreenState.barVisible = false;
         std::ignore = redrawWindows();
     }
 }
@@ -3286,19 +3286,120 @@ void SdlContext::flushQueueMetrics(bool force)
 	_queueIntervalStartNs = now;
 }
 
+static void* fullscreenEventWindow(SDL_WindowID id)
+{
+	return reinterpret_cast<void*>(static_cast<uintptr_t>(id));
+}
+
 bool SdlContext::setFullscreen(bool enter, bool forceOriginalDisplay)
 {
+	/* Window id 0 asks the main thread to make the session request there, so
+	 * the fullscreen state is only ever touched on the SDL main thread. */
+	if (!SDL_IsMainThread())
+		return sdl_push_user_event(SDL_EVENT_USER_WINDOW_FULLSCREEN, fullscreenEventWindow(0),
+		                           enter, forceOriginalDisplay);
+
+	/* Only record the request. The bar and each window's state change when
+	 * the windows report that they actually entered or left fullscreen. */
+	_fullscreenState.request(enter, SDL_GetTicks());
+	WLog_Print(getWLog(), WLOG_DEBUG, "Requesting fullscreen %s for %" PRIuz " window(s)",
+	           enter ? "enter" : "leave", _windows.size());
 	for (const auto& window : _windows)
 	{
-		if (!sdl_push_user_event(SDL_EVENT_USER_WINDOW_FULLSCREEN, &window.second, enter,
-		                         forceOriginalDisplay))
+		if (!sdl_push_user_event(SDL_EVENT_USER_WINDOW_FULLSCREEN,
+		                         fullscreenEventWindow(window.first), enter, forceOriginalDisplay))
 			return false;
 	}
-	_fullscreen = enter;
-	_topBarVisible = enter;
+	return true;
+}
+
+bool SdlContext::applyFullscreen(SDL_WindowID id, bool enter, bool forceOriginalDisplay)
+{
+	auto window = getWindowForId(id);
+	if (!window || !window->window())
+		return true;
+	const auto result = window->fullscreen(enter, forceOriginalDisplay);
+	const auto flags = SDL_GetWindowFlags(window->window());
+	/* SDL sets the fullscreen flag of a shown window only when it sends the
+	 * enter/leave event; a hidden window's flag is only what is pending. */
+	const bool shown = (flags & SDL_WINDOW_HIDDEN) == 0;
+	const bool actual = shown ? (flags & SDL_WINDOW_FULLSCREEN) != 0
+	                          : _fullscreenState.windowFullscreen(id);
+	switch (result)
+	{
+		case SdlWindow::FullscreenResult::Failed:
+		{
+			WLog_Print(getWLog(), WLOG_ERROR,
+			           "Window %" PRIu32 " could not %s fullscreen: %s; it stays %s", id,
+			           enter ? "enter" : "leave", SDL_GetError(),
+			           actual ? "fullscreen" : "windowed");
+			return presentFullscreen(id, actual, _fullscreenState.requestFailed(id, actual));
+		}
+		case SdlWindow::FullscreenResult::Unsynced:
+			WLog_Print(getWLog(), WLOG_WARN,
+			           "Window %" PRIu32 " fullscreen %s did not settle in time: %s", id,
+			           enter ? "enter" : "leave", SDL_GetError());
+			break;
+		case SdlWindow::FullscreenResult::Applied:
+		default:
+			break;
+	}
+	/* SDL sends no event when the window already is in the requested state.
+	 * A hidden window asked to stay windowed will not send one either. */
+	if (actual == enter && (shown || !enter))
+		return observeFullscreen(id, actual);
+	return true;
+}
+
+bool SdlContext::observeFullscreen(SDL_WindowID id, bool fullscreen)
+{
+	return presentFullscreen(id, fullscreen, _fullscreenState.observe(id, fullscreen));
+}
+
+bool SdlContext::presentFullscreen(SDL_WindowID id, bool fullscreen,
+                                   const SdlFullscreenState::Observation& observed)
+{
+	if (!observed.changed)
+		return true;
+	WLog_Print(getWLog(), WLOG_INFO, "Window %" PRIu32 " %s fullscreen (%s)%s", id,
+	           fullscreen ? "entered" : "left", observed.requested ? "requested" : "native control",
+	           observed.owner ? (fullscreen ? "; showing the connection bar"
+	                                        : "; hiding the connection bar")
+	                          : "");
+	if (!observed.owner)
+		return true;
+	resetTopBarPointer();
+	if (auto window = getWindowForId(id); window && !fullscreen)
+		window->closeRefreshMenu();
+	return redrawWindows();
+}
+
+const SdlFullscreenState& SdlContext::fullscreenState() const
+{
+	return _fullscreenState;
+}
+
+bool SdlContext::topBarAllowed() const
+{
+	return _fullscreenState.barAllowed(
+	    freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon));
+}
+
+void SdlContext::reassignTopBar(SDL_WindowID id)
+{
+	const auto previous = _fullscreenState.barOwner;
+	_fullscreenState.ensureOwner(id);
+	if (_fullscreenState.barOwner != previous)
+	{
+		WLog_Print(getWLog(), WLOG_DEBUG, "Connection bar moved to window %" PRIu32, id);
+		resetTopBarPointer();
+	}
+}
+
+void SdlContext::resetTopBarPointer()
+{
 	_topBarPointer = { -1.0f, -1.0f };
 	_topBarHoveredButton = SdlTopBarButton::None;
-	return true;
 }
 
 bool SdlContext::setMinimized()
@@ -3375,10 +3476,10 @@ bool SdlContext::toggleResizeable()
 
 bool SdlContext::fullscreen() const
 {
-	return _fullscreen;
+	return _fullscreenState.sessionFullscreen(SDL_GetTicks());
 }
 
-bool SdlContext::toggleFullscreen()
+bool SdlContext::toggleFullscreen(SDL_WindowID origin)
 {
-	return setFullscreen(!fullscreen());
+	return setFullscreen(_fullscreenState.toggleTarget(origin, SDL_GetTicks()));
 }

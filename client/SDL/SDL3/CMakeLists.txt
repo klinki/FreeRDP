@@ -52,6 +52,7 @@ set(SRCS
     sdl_channels.hpp
     sdl_channels.cpp
     sdl_window.hpp
+    sdl_fullscreen_state.hpp
     sdl_window.cpp
     sdl_clip.hpp
     sdl_clip.cpp
@@ -246,6 +247,13 @@ if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
   add_test(NAME TestSDLInputMapping COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLInputMapping)
   set_property(TARGET TestSDLInputMapping PROPERTY FOLDER "FreeRDP/Client/Test")
 
+  add_executable(TestSDLFullscreenState test/TestSDLFullscreenState.cpp)
+  target_link_libraries(TestSDLFullscreenState PRIVATE SDL3::Headers)
+  set_target_properties(TestSDLFullscreenState PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                        "${TESTING_OUTPUT_DIRECTORY}")
+  add_test(NAME TestSDLFullscreenState COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLFullscreenState)
+  set_property(TARGET TestSDLFullscreenState PROPERTY FOLDER "FreeRDP/Client/Test")
+
   add_executable(TestSDLMonitorScale test/TestSDLMonitorScale.cpp sdl_monitor_scale.cpp)
   target_link_libraries(TestSDLMonitorScale PRIVATE SDL3::Headers)
   set_target_properties(TestSDLMonitorScale PROPERTIES RUNTIME_OUTPUT_DIRECTORY
@@ -305,6 +313,12 @@ if(SDL_LAUNCHER_TEST AND APPLE)
   target_link_libraries(TestSDLFullscreenResize PRIVATE ${LIBS})
   add_test(NAME TestSDLFullscreenResize COMMAND TestSDLFullscreenResize)
   set_tests_properties(TestSDLFullscreenResize PROPERTIES TIMEOUT 30)
+
+  add_executable(TestSDLNativeFullscreen test/TestSDLNativeFullscreen.cpp ${SDL_MONITOR_TEST_SRCS})
+  target_include_directories(TestSDLNativeFullscreen PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_link_libraries(TestSDLNativeFullscreen PRIVATE ${LIBS})
+  add_test(NAME TestSDLNativeFullscreen COMMAND TestSDLNativeFullscreen)
+  set_tests_properties(TestSDLNativeFullscreen PROPERTIES TIMEOUT 60)
 
   add_executable(TestSDLShutdown test/TestSDLShutdown.cpp ${SDL_MONITOR_TEST_SRCS})
   target_include_directories(TestSDLShutdown PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

@@ -368,12 +368,20 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 					break;
 					case SDL_EVENT_USER_WINDOW_FULLSCREEN:
 					{
-						auto window = static_cast<SdlWindow*>(windowEvent.user.data1);
+						const auto id = static_cast<SDL_WindowID>(
+						    reinterpret_cast<uintptr_t>(windowEvent.user.data1));
 						const bool enter = windowEvent.user.code != 0;
 						const bool forceOriginalDisplay = windowEvent.user.data2 != nullptr;
-						if (window)
+						if (id == 0)
 						{
-							window->fullscreen(enter, forceOriginalDisplay);
+							/* A request made off the main thread. */
+							if (!sdl->setFullscreen(enter, forceOriginalDisplay))
+								throw ErrorMsg{ -1, windowEvent.type, "sdl->setFullscreen" };
+						}
+						else if (auto window = sdl->getWindowForId(id))
+						{
+							if (!sdl->applyFullscreen(id, enter, forceOriginalDisplay))
+								throw ErrorMsg{ -1, windowEvent.type, "sdl->applyFullscreen" };
 							/* Windows are born hidden so startup never flashes
 							 * them on the wrong display; reveal here, after
 							 * placement and fullscreen state are final. */
