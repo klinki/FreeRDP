@@ -165,6 +165,13 @@ the Window menu or the system.
   actual state; a transition that does not settle within SDL's timeout is
   logged and decided by the later event.
 
+Under the launcher, fullscreen Spaces hide the macOS Dock and menu bar
+(`SDL_VIDEO_MAC_FULLSCREEN_MENU_VISIBILITY=0`) regardless of how fullscreen
+was entered. With SDL's default `auto`, only programmatic fullscreen hides them,
+so re-entering with the green button revealed the Dock and title bar. Without
+the launcher the client keeps `1` (both reachable). An environment variable
+setting still wins.
+
 `TestSDLFullscreenState` covers pinned and unpinned bars, session toggle and
 native controls, mixed fullscreen and windowed monitors, toggles in flight,
 failed transitions and bar ownership without a display. `TestSDLNativeFullscreen`
