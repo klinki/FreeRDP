@@ -1317,18 +1317,40 @@ bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& re
 	}
 
 	const auto settings = context()->settings;
-	const bool showTopBar = _fullscreenState.barShown(
-	    window.id(), freerdp_settings_get_bool(settings, FreeRDP_UseMultimon));
-	const auto topBarPointer = _topBarHoveredButton != SdlTopBarButton::None
-	                               ? _topBarPointer
-	                               : SDL_FPoint{ -1.0f, -1.0f };
+	const bool showTopBar = showTopBarOn(window);
+	const auto topBarPointer = topBarPointerForDraw();
 	window.setRefreshCapabilities(freerdp_settings_get_bool(settings, FreeRDP_RefreshRect),
 	                              freerdp_settings_get_bool(settings, FreeRDP_SuppressOutput));
+	/* While the transport is down, any repaint (late queued update, connection
+	 * bar hover, performance overlay) must keep the faded "Reconnecting..."
+	 * frame; presenting the clean frame here made the overlay blink. */
+	if (isReconnecting())
+		return window.updateStalledSurface(stalledDots(), showTopBar, _fullscreenState.barPinned,
+		                                   topBarPointer);
 	return window.updateSurface(showTopBar, _fullscreenState.barPinned, topBarPointer);
+}
+
+bool SdlContext::showTopBarOn(const SdlWindow& window) const
+{
+	return _fullscreenState.barShown(
+	    window.id(), freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon));
+}
+
+SDL_FPoint SdlContext::topBarPointerForDraw() const
+{
+	return _topBarHoveredButton != SdlTopBarButton::None ? _topBarPointer
+	                                                     : SDL_FPoint{ -1.0f, -1.0f };
+}
+
+int SdlContext::stalledDots()
+{
+	return static_cast<int>((SDL_GetTicks() / 500) % 3) + 1;
 }
 
 bool SdlContext::redrawWindows()
 {
+	if (isReconnecting())
+		return redrawStalled();
 	if (!isConnected())
 		return true;
 
@@ -3053,11 +3075,13 @@ bool SdlContext::isReconnecting() const
 
 bool SdlContext::redrawStalled()
 {
-	const int dots = static_cast<int>((SDL_GetTicks() / 500) % 3) + 1;
+	const int dots = stalledDots();
+	const auto pointer = topBarPointerForDraw();
 	for (auto& window : _windows)
 	{
 		window.second.closeRefreshMenu();
-		if (!window.second.updateStalledSurface(dots))
+		if (!window.second.updateStalledSurface(dots, showTopBarOn(window.second),
+		                                        _fullscreenState.barPinned, pointer))
 			return false;
 	}
 	flushQueueMetrics(false);

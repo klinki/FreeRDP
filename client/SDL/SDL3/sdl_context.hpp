@@ -83,6 +83,9 @@ class SdlContext
 	/* Present the stalled overlay (dim + animated dots) on all windows.
 	 * Main thread only; needs no GDI — reuses each window's last frame. */
 	[[nodiscard]] bool redrawStalled();
+	[[nodiscard]] bool showTopBarOn(const SdlWindow& window) const;
+	[[nodiscard]] SDL_FPoint topBarPointerForDraw() const;
+	[[nodiscard]] static int stalledDots();
 	/* Best-effort full repaint from the last frame (clears the overlay).
 	 * Harmless no-op when disconnected; the next server frame repaints. */
 	[[nodiscard]] bool repaintAll();
