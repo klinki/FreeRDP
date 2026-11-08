@@ -30,6 +30,7 @@ set(SRCS
     sdl_input.cpp
     sdl_input.hpp
     sdl_input_mapping.hpp
+    sdl_hotkeys.hpp
     sdl_update_queue.hpp
     sdl_refresh.hpp
     sdl_render_metrics.hpp
@@ -238,6 +239,13 @@ if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
                         "${TESTING_OUTPUT_DIRECTORY}")
   add_test(NAME TestSDLUpdateQueue COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLUpdateQueue)
   set_property(TARGET TestSDLUpdateQueue PROPERTY FOLDER "FreeRDP/Client/Test")
+
+  add_executable(TestSDLHotkeys test/TestSDLHotkeys.cpp)
+  target_link_libraries(TestSDLHotkeys PRIVATE SDL3::Headers)
+  set_target_properties(TestSDLHotkeys PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                        "${TESTING_OUTPUT_DIRECTORY}")
+  add_test(NAME TestSDLHotkeys COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLHotkeys)
+  set_property(TARGET TestSDLHotkeys PROPERTY FOLDER "FreeRDP/Client/Test")
 
   add_executable(TestSDLInputMapping test/TestSDLInputMapping.cpp)
   target_link_libraries(TestSDLInputMapping PRIVATE SDL3::Headers)

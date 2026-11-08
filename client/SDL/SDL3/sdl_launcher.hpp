@@ -7,16 +7,21 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
 #include <freerdp/freerdp.h>
 #include <winpr/json.h>
+#include "sdl_hotkeys.hpp"
 #include "sdl_monitor_selection.hpp"
 #include "sdl_refresh.hpp"
 #include "sdl_window_geometry.hpp"
 
 class SdlContext;
+
+/* Per action: unset keeps the configured/default binding; set replaces it (possibly off). */
+using SdlLocalHotkeys = std::array<std::optional<SdlHotkey>, sdlHotkeyActionNames.size()>;
 
 class SdlLauncher
 {
@@ -30,6 +35,7 @@ class SdlLauncher
 	// Pure discovery: no context, transport, SDL, display, or configuration access.
 	static Json capabilities();
 	static bool useAccessoryActivationPolicy(); // macOS main thread, after SDL_Init.
+	static void releaseNativeFullscreenShortcut(); // macOS main thread, after SDL_Init.
 	bool prepare(std::vector<std::string>& arguments, std::string& error);
 	bool hasDisplaySelection() const
 	{
@@ -56,6 +62,8 @@ class SdlLauncher
 	bool closeConfirmationEnabled() const;
 	bool thumbnailsEnabled() const;
 	bool reverseMouseWheel() const;
+	// Set by prepare() on the SDL main thread before input starts; null without the field.
+	const SdlLocalHotkeys* localHotkeys() const;
 	bool windowGeometryEnabled() const { return _rememberWindowSize; }
 	void configureWindowGeometry(SDL_Window* window); // SDL main thread only
 	void observeWindowGeometry(SDL_Window* window, Uint32 event); // SDL main thread only
@@ -118,6 +126,7 @@ class SdlLauncher
 	std::thread _reader, _writer, _thumbnailWorker;
 	std::atomic<bool> _confirmSessionClose{ false }, _thumbnailEnabled{ false }, _connected{ false };
 	std::atomic<bool> _reverseMouseWheel{ false };
+	std::optional<SdlLocalHotkeys> _localHotkeys;
 	std::atomic<uint32_t> _screenRefresh{ 0 };
 	std::atomic<bool> _cancelled{ false }, _closing{ false }, _focus{ false };
 	std::atomic<bool> _hadConnected{ false }, _terminal{ false };

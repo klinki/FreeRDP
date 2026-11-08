@@ -135,6 +135,42 @@ maximize/minimize exclusion and display fitting without an RDP server. Native
 runs also report logical versus backing-pixel dimensions. Transport tests cover
 validation and compatibility with older launchers.
 
+## Local hotkeys
+
+The optional `local_hotkeys` capability accepts `start.localHotkeys`, an object
+that replaces the client's local shortcuts for each action it names:
+`fullscreen`, `resizable`, `grab`, `disconnect` and `minimize`. Each value is
+`"off"` or `"<modifier>+...+<key>"`, matched case-insensitively, for example
+`"ctrl+gui+f"` or `"rshift+return"`.
+
+- Modifiers: `shift`, `ctrl`, `alt` and `gui` accept either side; an `l` or `r`
+  prefix (`lshift`, `rctrl`, ...) requires that side only. At least one
+  modifier is required, and each modifier pair can be named once.
+- Keys: `a`–`z`, `0`–`9`, `f1`–`f12`, `return`, `space`, `tab` and `escape`.
+  Keys are matched by their unshifted, layout-mapped key, as macOS shortcuts are.
+- A binding fires only when exactly its modifiers are held. Lock modifiers are
+  ignored, and any other held modifier forwards the key to the server.
+- An action set to `"off"` never fires, and its keys always reach the server.
+
+Actions the object doesn't name keep the bindings from `sdl-freerdp.json` or the
+Right Shift defaults. Unknown action names are ignored for forward
+compatibility. A value that isn't a string or doesn't parse rejects the start
+command. Without `localHotkeys`, older launcher and command-line behavior is
+unchanged. Bindings are fixed for the session, including across automatic
+reconnects.
+
+When `localHotkeys` names `fullscreen`, the client also removes the
+Control-Command-F shortcut from the Toggle Full Screen item in SDL's Cocoa
+Window menu. SDL delivers the key event before AppKit runs that menu shortcut,
+so otherwise one press would toggle fullscreen twice, once through native
+macOS fullscreen. The configured binding then fully controls the key: it
+toggles FreeRDP's session-wide fullscreen, or reaches the server when the
+action is off. The menu item remains available.
+
+`TestSDLHotkeys` covers parsing, modifier sides, extra and lock modifiers, and
+action lookup. Transport tests cover acceptance, partial objects and rejection
+of malformed values.
+
 ## Performance overlay styles
 
 The optional `performance_overlay_styles` capability extends monitoring controls

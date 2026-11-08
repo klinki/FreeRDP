@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 #include <map>
 #include <list>
@@ -29,6 +30,7 @@
 #include <freerdp/locale/keyboard.h>
 #include <SDL3/SDL.h>
 
+#include "sdl_hotkeys.hpp"
 #include "sdl_types.hpp"
 
 class sdlInput
@@ -68,6 +70,7 @@ class sdlInput
 	[[nodiscard]] static bool extract(const std::string& token, uint32_t& key, uint32_t& value);
 
 	[[nodiscard]] UINT32 scancode_to_rdp(Uint32 scancode);
+	[[nodiscard]] std::optional<SdlHotkeyAction> hotkeyAction(const SDL_KeyboardEvent& ev) const;
 
 	SdlContext* _sdl = nullptr;
 	Uint32 _lastWindowID = 0;
