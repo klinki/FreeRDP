@@ -409,6 +409,60 @@ static bool run()
 	if (!expect(layoutCalls == beforeActivation + 1,
 	            "usable-bounds events preserve forced same-layout channel activation"))
 		return false;
+
+	// With complete connect-time monitor data, the first channel of a connection treats that
+	// layout as sent: Windows applies it itself, and a late identical PDU would only cause a
+	// second display reconfiguration (sheltie-app/sheltie-macos#24).
+	if (!freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, TRUE) ||
+	    !freerdp_settings_set_bool(settings, FreeRDP_HasMonitorAttributes, TRUE) ||
+	    !freerdp_settings_set_uint32(settings, FreeRDP_NegotiationFlags, 0x01))
+		return false;
+	const auto connectState = [&]()
+	{
+		StateChangedEventArgs state = {};
+		EventArgsInit(&state, "TestSDLFullscreenResize");
+		state.oldState = CONNECTION_STATE_NEGO;
+		state.newState = CONNECTION_STATE_MCS_CREATE_REQUEST;
+		return PubSub_OnStateChanged(instance->context->pubSub, instance->context, &state) >= 0;
+	};
+	burstTime += 3000;
+	const auto beforeSeed = layoutCalls;
+	if (!expect(connectState() &&
+	                channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "activation after a connect with monitor data succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 500, 1500, 2500 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeSeed,
+	            "an unchanged connect-time layout is not sent again after activation"))
+		return false;
+
+	burstTime += 3000;
+	const auto beforeChanged = layoutCalls;
+	if (!expect(connectState(), "second connect records its monitor data"))
+		return false;
+	// Change the effective scaling after the connect, the way a display change would.
+	const SdlMonitorScaleOverrides laterScales{ { physical, { physical, 175, 140 } } };
+	if (!sdl.setHotplugMonitorSelection({ physical }, laterScales) || !disp.handleEvent(bounds) ||
+	    !expect(channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "activation after the layout changed since connect succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 600, 1600 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeChanged + 1 && sentLayouts.front().DesktopScaleFactor == 175,
+	            "a layout that changed since connect is still sent, once"))
+		return false;
+
+	burstTime += 3000;
+	const auto beforeReopen = layoutCalls;
+	if (!expect(channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "channel reopened without a new connect succeeds"))
+		return false;
+	disp.service(burstTime);
+	disp.service(burstTime + 500);
+	if (!expect(layoutCalls == beforeReopen + 1,
+	            "a reopened channel without new connect data forces the current layout"))
+		return false;
 #endif
 	return disp.uninit(&channel);
 }

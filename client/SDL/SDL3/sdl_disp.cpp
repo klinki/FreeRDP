@@ -34,6 +34,8 @@
 
 static constexpr UINT64 RESIZE_MIN_DELAY = 500; /* minimum delay in ms between two resizes */
 static constexpr unsigned MAX_RETRIES = 5;
+/* RDP_NEG_RSP flag (MS-RDPBCGR 2.2.1.2.1), private to libfreerdp/core/nego.h. */
+static constexpr UINT32 NEG_EXTENDED_CLIENT_DATA_SUPPORTED = 0x01;
 
 static auto operator==(const DISPLAY_CONTROL_MONITOR_LAYOUT& a,
                        const DISPLAY_CONTROL_MONITOR_LAYOUT& b)
@@ -76,7 +78,11 @@ bool sdlDispContext::sendResize(UINT64 now)
 	std::lock_guard lock(_channelMutex);
 	if (!_activated || !_disp)
 		return true;
-	if (now - _lastSentDate < RESIZE_MIN_DELAY)
+	/* service() takes its time before it may block for a while (display refresh, fullscreen
+	 * transition), and the caps can arrive meanwhile. Take their seed and send time into
+	 * account here, under the lock, rather than relying on the state service() started with. */
+	applySeed();
+	if (tooSoon(now))
 		return true;
 	_lastSentDate = now;
 
@@ -86,6 +92,23 @@ bool sdlDispContext::sendResize(UINT64 now)
 	if (mcount == 0 || !monitors)
 		return true;
 	return sendLayout(monitors, mcount);
+}
+
+void sdlDispContext::applySeed()
+{
+	if (!_seedRequested.exchange(false))
+		return;
+	_last_sent_layout = std::move(_seedLayout);
+	_seedLayout.clear();
+	_forceLayout = false;
+	WLog_Print(_sdl->getWLog(), WLOG_DEBUG,
+	           "Display channel opened: the connect-time monitor layout counts as sent");
+}
+
+bool sdlDispContext::tooSoon(UINT64 now) const
+{
+	/* now may predate a send time set later by the caps; do not let it wrap around. */
+	return (now < _lastSentDate) || (now - _lastSentDate < RESIZE_MIN_DELAY);
 }
 
 bool sdlDispContext::setWindowResizeable()
@@ -151,6 +174,60 @@ void sdlDispContext::OnActivated(void* context, const ActivatedEventArgs* e)
 	std::ignore = sdlDisp->scheduleResize();
 }
 
+void sdlDispContext::OnStateChanged(void* context, const StateChangedEventArgs* e)
+{
+	SdlContext* sdl = nullptr;
+	sdlDispContext* sdlDisp = nullptr;
+	rdpSettings* settings = nullptr;
+
+	WINPR_ASSERT(e);
+	if (!sdl_disp_check_context(context, &sdl, &sdlDisp, &settings))
+		return;
+	/* The client monitor data (CS_MONITOR, CS_MONITOR_EX) is written right after this
+	 * transition, on the same thread. */
+	if ((e->newState == CONNECTION_STATE_MCS_CREATE_REQUEST) &&
+	    (e->oldState != CONNECTION_STATE_MCS_CREATE_REQUEST))
+		sdlDisp->captureConnectLayout();
+}
+
+void sdlDispContext::captureConnectLayout()
+{
+	auto settings = _sdl->context()->settings;
+	WINPR_ASSERT(settings);
+
+	/* Mirror the conditions under which gcc_write_conference_create_request() sends both
+	 * monitor blocks. Overrides apply to layout PDUs only, so their values were not sent. */
+	const UINT64 overrides = FREERDP_MONITOR_OVERRIDE_ORIENTATION |
+	                         FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE |
+	                         FREERDP_MONITOR_OVERRIDE_DEVICE_SCALE;
+	const UINT32 count = freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount);
+	auto monitors = static_cast<const rdpMonitor*>(
+	    freerdp_settings_get_pointer(settings, FreeRDP_MonitorDefArray));
+	const bool sent =
+	    freerdp_settings_get_bool(settings, FreeRDP_UseMultimon) &&
+	    !freerdp_settings_get_bool(settings, FreeRDP_SpanMonitors) &&
+	    ((freerdp_settings_get_uint32(settings, FreeRDP_NegotiationFlags) &
+	      NEG_EXTENDED_CLIENT_DATA_SUPPORTED) != 0) &&
+	    freerdp_settings_get_bool(settings, FreeRDP_HasMonitorAttributes) &&
+	    ((freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags) & overrides) == 0) &&
+	    (count > 0) && monitors;
+
+	std::lock_guard lock(_channelMutex);
+	_connectLayout.clear();
+	if (sent)
+		_connectLayout = buildLayout(settings, monitors, count);
+	WLog_Print(_sdl->getWLog(), WLOG_DEBUG,
+	           "Connect-time monitor layout %s (%" PRIuz " monitors; multimon=%d span=%d "
+	           "negotiation=0x%08" PRIx32 " attributes=%d overrides=0x%" PRIx64 " count=%" PRIu32
+	           ")",
+	           sent ? "recorded" : "not sent", _connectLayout.size(),
+	           freerdp_settings_get_bool(settings, FreeRDP_UseMultimon),
+	           freerdp_settings_get_bool(settings, FreeRDP_SpanMonitors),
+	           freerdp_settings_get_uint32(settings, FreeRDP_NegotiationFlags),
+	           freerdp_settings_get_bool(settings, FreeRDP_HasMonitorAttributes),
+	           freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags), count);
+}
+
 void sdlDispContext::OnGraphicsReset(void* context, const GraphicsResetEventArgs* e)
 {
 	SdlContext* sdl = nullptr;
@@ -191,6 +268,10 @@ void sdlDispContext::service(UINT64 now)
 		if (!_refreshTopology)
 			_nextAttempt = now;
 	}
+	{
+		std::lock_guard lock(_channelMutex);
+		applySeed();
+	}
 	if (_forceRequested.exchange(false))
 		_forceLayout = true;
 	// These requests originate in channel callbacks on the RDP thread.
@@ -203,7 +284,7 @@ void sdlDispContext::service(UINT64 now)
 		/* Wait out the minimum delay after the last send (or the capabilities) instead of
 		 * spending a retry on it. */
 		std::lock_guard lock(_channelMutex);
-		if (_activated && (now - _lastSentDate < RESIZE_MIN_DELAY))
+		if (_activated && tooSoon(now))
 		{
 			_nextAttempt = _lastSentDate + RESIZE_MIN_DELAY;
 			return;
@@ -225,13 +306,12 @@ void sdlDispContext::service(UINT64 now)
 	}
 }
 
-bool sdlDispContext::sendLayout(const rdpMonitor* monitors, size_t nmonitors)
+std::vector<DISPLAY_CONTROL_MONITOR_LAYOUT>
+sdlDispContext::buildLayout(const rdpSettings* settings, const rdpMonitor* monitors,
+                            size_t nmonitors)
 {
-	WINPR_ASSERT(monitors);
-	WINPR_ASSERT(nmonitors > 0);
-
-	auto settings = _sdl->context()->settings;
 	WINPR_ASSERT(settings);
+	WINPR_ASSERT(monitors);
 
 	std::vector<DISPLAY_CONTROL_MONITOR_LAYOUT> layouts;
 	layouts.reserve(nmonitors);
@@ -291,9 +371,25 @@ bool sdlDispContext::sendLayout(const rdpMonitor* monitors, size_t nmonitors)
 			    freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor);
 		layouts.emplace_back(layout);
 	}
+	return layouts;
+}
 
+bool sdlDispContext::sendLayout(const rdpMonitor* monitors, size_t nmonitors)
+{
+	WINPR_ASSERT(monitors);
+	WINPR_ASSERT(nmonitors > 0);
+
+	auto settings = _sdl->context()->settings;
+	WINPR_ASSERT(settings);
+
+	auto layouts = buildLayout(settings, monitors, nmonitors);
 	if (!settings_changed(layouts))
 		return true;
+
+	WLog_Print(_sdl->getWLog(), WLOG_DEBUG, "Sending display layout: %s",
+	           _forceLayout                ? "forced"
+	           : _last_sent_layout.empty() ? "first on this channel"
+	                                       : "layout changed");
 
 	WINPR_ASSERT(_disp);
 	const size_t len = layouts.size();
@@ -358,7 +454,11 @@ bool sdlDispContext::updateMonitors(SDL_EventType type, SDL_DisplayID displayID)
 	_topologyRequested = true;
 	// Do not clear a forced reconnect/activation request in the same event burst.
 	if (forceLayout)
+	{
+		WLog_Print(_sdl->getWLog(), WLOG_DEBUG, "Display event 0x%x forces the next layout",
+		           static_cast<unsigned>(type));
 		_forceRequested = true;
+	}
 	return scheduleResize();
 }
 
@@ -471,17 +571,35 @@ UINT sdlDispContext::DisplayControlCaps(UINT32 maxNumMonitors, UINT32 maxMonitor
 	         "DisplayControlCapsPdu: MaxNumMonitors: %" PRIu32 " MaxMonitorAreaFactorA: %" PRIu32
 	         " MaxMonitorAreaFactorB: %" PRIu32 "",
 	         maxNumMonitors, maxMonitorAreaFactorA, maxMonitorAreaFactorB);
-	_activated = true;
-	/* A new display channel means a new server instance, e.g. after a server redirection. It
-	 * does not know the layout sent to the previous instance, so force the current one. */
-	_forceRequested = true;
-
-	/* Windows ignores a layout sent right after the caps. Count the caps as a send, so the
-	 * layout goes out once RESIZE_MIN_DELAY has passed. */
 	{
+		/* Windows already applies the monitor data sent at connect in its own display
+		 * reconfiguration after logon. A layout PDU that arrives after that reconfiguration has
+		 * started is applied in a separate one seconds later, even when it is unchanged. On
+		 * hosts with a hardware H.264 encoder that late reconfiguration can deadlock the remote
+		 * display driver (RdpIdd watchdog, session ends with reason 17). So on the first channel
+		 * of a connection, count the connect-time layout as sent: an identical layout is not
+		 * sent at all, a different one still is. */
 		std::lock_guard lock(_channelMutex);
+		if (!_connectLayout.empty())
+		{
+			_seedLayout = std::move(_connectLayout);
+			_connectLayout.clear();
+			_seedRequested = true;
+		}
+		else
+		{
+			/* A new display channel means a new server instance, e.g. after a server
+			 * redirection. It does not know the layout sent to the previous instance, so force
+			 * the current one. */
+			_forceRequested = true;
+		}
+
+		/* Windows ignores a layout sent right after the caps. Count the caps as a send, so a
+		 * layout that still has to go out does so once RESIZE_MIN_DELAY has passed. */
 		_lastSentDate = GetTickCount64();
 	}
+	/* Activate only now: the SDL thread must not send before the seed is in place. */
+	_activated = true;
 
 	if (freerdp_settings_get_bool(settings, FreeRDP_Fullscreen))
 	{
@@ -546,6 +664,8 @@ sdlDispContext::sdlDispContext(SdlContext* sdl) : _sdl(sdl)
 		throw std::exception();
 	if (PubSub_SubscribeGraphicsReset(pubSub, sdlDispContext::OnGraphicsReset) < 0)
 		throw std::exception();
+	if (PubSub_SubscribeStateChanged(pubSub, sdlDispContext::OnStateChanged) < 0)
+		throw std::exception();
 	std::ignore = scheduleResize();
 }
 
@@ -556,4 +676,5 @@ sdlDispContext::~sdlDispContext()
 
 	PubSub_UnsubscribeActivated(pubSub, sdlDispContext::OnActivated);
 	PubSub_UnsubscribeGraphicsReset(pubSub, sdlDispContext::OnGraphicsReset);
+	PubSub_UnsubscribeStateChanged(pubSub, sdlDispContext::OnStateChanged);
 }
