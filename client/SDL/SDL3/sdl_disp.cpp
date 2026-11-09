@@ -63,9 +63,35 @@ static auto operator==(const DISPLAY_CONTROL_MONITOR_LAYOUT& a,
 	return true;
 }
 
+/* MS-RDPEDISP 2.2.2.2.1: the server ignores physical dimensions outside 10..10000 mm. A layout
+ * whose only difference is such a size requests nothing new. */
+static bool physicalIgnored(const DISPLAY_CONTROL_MONITOR_LAYOUT& layout)
+{
+	const auto valid = [](UINT32 mm) { return (mm >= 10) && (mm <= 10000); };
+	return !valid(layout.PhysicalWidth) || !valid(layout.PhysicalHeight);
+}
+
+static bool sameRequest(const DISPLAY_CONTROL_MONITOR_LAYOUT& next,
+                        const DISPLAY_CONTROL_MONITOR_LAYOUT& last)
+{
+	if (!physicalIgnored(next))
+		return next == last;
+	auto adjusted = next;
+	adjusted.PhysicalWidth = last.PhysicalWidth;
+	adjusted.PhysicalHeight = last.PhysicalHeight;
+	return adjusted == last;
+}
+
 bool sdlDispContext::settings_changed(const std::vector<DISPLAY_CONTROL_MONITOR_LAYOUT>& layout)
 {
-	return _forceLayout || (layout != _last_sent_layout);
+	if (_forceLayout || (layout.size() != _last_sent_layout.size()))
+		return true;
+	for (size_t i = 0; i < layout.size(); i++)
+	{
+		if (!sameRequest(layout[i], _last_sent_layout[i]))
+			return true;
+	}
+	return false;
 }
 
 bool sdlDispContext::sendResize(UINT64 now)
@@ -212,15 +238,43 @@ void sdlDispContext::captureConnectLayout()
 	    ((freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags) & overrides) == 0) &&
 	    (count > 0) && monitors;
 
+	/* Without multimon, the client core data always describes the single remote monitor:
+	 * desktop size, physical size, orientation and both scale factors. */
+	const bool single = !freerdp_settings_get_bool(settings, FreeRDP_UseMultimon);
+
 	std::lock_guard lock(_channelMutex);
 	_connectLayout.clear();
 	if (sent)
 		_connectLayout = buildLayout(settings, monitors, count);
+	else if (single)
+	{
+		DISPLAY_CONTROL_MONITOR_LAYOUT layout = {};
+		layout.Flags = DISPLAY_CONTROL_MONITOR_PRIMARY;
+		layout.Width = freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth);
+		layout.Height = freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight);
+		layout.PhysicalWidth = freerdp_settings_get_uint32(settings, FreeRDP_DesktopPhysicalWidth);
+		layout.PhysicalHeight =
+		    freerdp_settings_get_uint32(settings, FreeRDP_DesktopPhysicalHeight);
+		layout.Orientation = freerdp_settings_get_uint16(settings, FreeRDP_DesktopOrientation);
+		layout.DesktopScaleFactor =
+		    freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor);
+		layout.DeviceScaleFactor = freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor);
+		_connectLayout.push_back(layout);
+	}
+	for (const auto& layout : _connectLayout)
+		WLog_Print(_sdl->getWLog(), WLOG_DEBUG,
+		           "Connect-time layout: flags=0x%" PRIx32 " %" PRId32 ",%" PRId32 " %" PRIu32
+		           "x%" PRIu32 " physical=%" PRIu32 "x%" PRIu32 " orientation=%" PRIu32
+		           " scale=%" PRIu32 "/%" PRIu32,
+		           layout.Flags, layout.Left, layout.Top, layout.Width, layout.Height,
+		           layout.PhysicalWidth, layout.PhysicalHeight, layout.Orientation,
+		           layout.DesktopScaleFactor, layout.DeviceScaleFactor);
 	WLog_Print(_sdl->getWLog(), WLOG_DEBUG,
-	           "Connect-time monitor layout %s (%" PRIuz " monitors; multimon=%d span=%d "
+	           "Connect-time %s layout %s (%" PRIuz " monitors; multimon=%d span=%d "
 	           "negotiation=0x%08" PRIx32 " attributes=%d overrides=0x%" PRIx64 " count=%" PRIu32
 	           ")",
-	           sent ? "recorded" : "not sent", _connectLayout.size(),
+	           sent ? "monitor" : "desktop", _connectLayout.empty() ? "not sent" : "recorded",
+	           _connectLayout.size(),
 	           freerdp_settings_get_bool(settings, FreeRDP_UseMultimon),
 	           freerdp_settings_get_bool(settings, FreeRDP_SpanMonitors),
 	           freerdp_settings_get_uint32(settings, FreeRDP_NegotiationFlags),

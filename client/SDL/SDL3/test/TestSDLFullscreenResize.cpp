@@ -463,6 +463,59 @@ static bool run()
 	if (!expect(layoutCalls == beforeReopen + 1,
 	            "a reopened channel without new connect data forces the current layout"))
 		return false;
+
+	// Without multimon, the client core data describes the single monitor. A layout equal to it
+	// is not sent after activation; one that differs from it (for example a fullscreen window
+	// shorter than the display on a notched Mac) still is.
+	if (!freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, FALSE) || !sdl.updateWindowList())
+		return false;
+	const auto single = static_cast<const rdpMonitor*>(
+	    freerdp_settings_get_pointer_array(settings, FreeRDP_MonitorDefArray, 0));
+	if (!expect(single && freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount) == 1,
+	            "single-monitor session has one monitor definition"))
+		return false;
+	const auto singleWidth = static_cast<UINT32>(single->width);
+	const auto singleHeight = static_cast<UINT32>(single->height);
+	const auto setCoreData = [&](UINT32 width, UINT32 height)
+	{
+		return freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, width) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, height) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DesktopPhysicalWidth,
+		                                   single->attributes.physicalWidth) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DesktopPhysicalHeight,
+		                                   single->attributes.physicalHeight) &&
+		       freerdp_settings_set_uint16(settings, FreeRDP_DesktopOrientation,
+		                                   ORIENTATION_LANDSCAPE) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor,
+		                                   single->attributes.desktopScaleFactor) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor,
+		                                   single->attributes.deviceScaleFactor);
+	};
+
+	burstTime += 3000;
+	const auto beforeSingle = layoutCalls;
+	if (!expect(setCoreData(singleWidth, singleHeight) && connectState() &&
+	                channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "single-monitor activation after connect succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 500, 1500, 2500 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeSingle,
+	            "an unchanged single-monitor desktop is not sent again after activation"))
+		return false;
+
+	burstTime += 3000;
+	const auto beforeSingleChanged = layoutCalls;
+	if (!expect(setCoreData(singleWidth, singleHeight + 66) && connectState() &&
+	                channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "single-monitor activation after a larger connect-time desktop succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 600, 1600 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeSingleChanged + 1 && sentLayouts.size() == 1 &&
+	                sentLayouts.front().Height == singleHeight,
+	            "a single-monitor desktop that differs from the connect data is sent, once"))
+		return false;
 #endif
 	return disp.uninit(&channel);
 }
