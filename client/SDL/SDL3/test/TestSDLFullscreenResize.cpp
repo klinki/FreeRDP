@@ -147,7 +147,7 @@ static bool run()
 		return false;
 
 	// Two windows can coexist on the remaining display during a removal burst.
-	// Even the live display's window retains physical geometry until only one remains.
+	// The live display's own window must still refresh while the migrated one waits.
 	if (!sdl.addDisplayWindow(physical))
 		return false;
 	int count = 0;
@@ -163,16 +163,89 @@ static bool run()
 	if (!expect(second != 0, "second multimon window created"))
 		return false;
 	monitor.orig_screen = physical;
+	monitor.x = -pixels.w;
+	monitor.y = 120;
 	window->setMonitor(monitor);
 	auto secondMonitor = sdl.getWindowForId(second)->monitor(false);
 	secondMonitor.orig_screen = removed;
 	sdl.getWindowForId(second)->setMonitor(secondMonitor);
 	if (!expect(sdl.updateWindow(window->id()) &&
-	            window->monitor(false).width == monitor.width &&
-	            window->monitor(false).height == monitor.height,
-	            "multiple multimon windows retain physical display geometry") ||
+	            window->monitor(false).width == window->rect().w &&
+	            window->monitor(false).height == window->rect().h &&
+	            window->monitor(false).x == monitor.x &&
+	            window->monitor(false).y == monitor.y &&
+	            window->monitor(false).attributes.desktopScaleFactor == 175 &&
+	            window->monitor(false).attributes.deviceScaleFactor == 140,
+	            "owning multimon window uses drawable pixels while retaining origin and scaling") ||
 	    !expect(sdl.removeDisplayWindow(removed) && sdl.getWindowForId(second) == nullptr,
 	            "removed display window released before fallback sizing"))
+		return false;
+
+	// Recreate another owned window (also works on the one-display dummy driver).
+	// Distinct origins and DPI catch accidentally promoting each window to primary.
+	monitor = window->monitor(false);
+	monitor.orig_screen = removed;
+	window->setMonitor(monitor);
+	if (!sdl.addDisplayWindow(physical))
+		return false;
+	windows = SDL_GetWindows(&count);
+	for (int x = 0; x < count; x++)
+	{
+		const auto id = SDL_GetWindowID(windows[x]);
+		if (id != window->id() && sdl.getWindowForId(id))
+			second = id;
+	}
+	SDL_free(windows);
+	auto other = sdl.getWindowForId(second);
+	if (!other)
+		return false;
+	std::ignore = SDL_SyncWindow(other->window());
+	monitor.orig_screen = physical;
+	monitor.is_primary = true;
+	window->setMonitor(monitor);
+	secondMonitor = other->monitor(false);
+	secondMonitor.x = 0;
+	secondMonitor.y = 0;
+	secondMonitor.is_primary = false;
+	secondMonitor.width = other->rect().w + 32;
+	secondMonitor.height = other->rect().h + 66;
+	secondMonitor.attributes.desktopScaleFactor = 100;
+	secondMonitor.attributes.deviceScaleFactor = 100;
+	other->setMonitor(secondMonitor);
+	resized.windowID = other->id();
+	const auto beforeMultimon = layoutCalls;
+	if (!disp.handleEvent(resized))
+		return false;
+	disp.service(activated + 1000);
+	if (!expect(layoutCalls == beforeMultimon + 1 && sentLayouts.size() == 2,
+	            "pixel-size event sends both multimon layout entries") ||
+	    !expect(window->monitor(false).x == monitor.x && window->monitor(false).y == monitor.y &&
+	                other->monitor(false).x == secondMonitor.x && other->monitor(false).y == secondMonitor.y &&
+	                other->monitor(false).width == other->rect().w &&
+	                other->monitor(false).height == other->rect().h,
+	            "each owned fullscreen window retains its origin and uses its own drawable"))
+		return false;
+	for (const auto& layout : sentLayouts)
+	{
+		const bool primary = layout.Flags == DISPLAY_CONTROL_MONITOR_PRIMARY;
+		if (!expect(layout.Width == static_cast<UINT32>(primary ? window->rect().w : other->rect().w) &&
+		                layout.Height == static_cast<UINT32>(primary ? window->rect().h : other->rect().h) &&
+		                layout.DesktopScaleFactor == (primary ? 175u : 100u) &&
+		                layout.DeviceScaleFactor == (primary ? 140u : 100u) &&
+		                layout.Left == (primary ? 0 : pixels.w) &&
+		                layout.Top == (primary ? 0 : -120),
+		            "wire layout preserves relative monitor positions, primary and per-monitor DPI"))
+			return false;
+	}
+	if (!disp.handleEvent(resized))
+		return false;
+	disp.service(activated + 2000);
+	if (!expect(layoutCalls == beforeMultimon + 1, "duplicate multimon size events are deduplicated"))
+		return false;
+	secondMonitor = other->monitor(false);
+	secondMonitor.orig_screen = removed;
+	other->setMonitor(secondMonitor);
+	if (!sdl.removeDisplayWindow(removed))
 		return false;
 
 	std::ignore = SDL_SyncWindow(window->window());
@@ -180,8 +253,8 @@ static bool run()
 	if (!expect(sdl.updateWindow(window->id()) &&
 	            window->monitor(false).width == fallbackPixels.w &&
 	            window->monitor(false).height == fallbackPixels.h &&
-	            window->monitor(false).attributes.physicalWidth == static_cast<UINT32>(fallbackPixels.w) &&
-	            window->monitor(false).attributes.physicalHeight == static_cast<UINT32>(fallbackPixels.h) &&
+	            window->monitor(false).attributes.physicalWidth == monitor.attributes.physicalWidth &&
+	            window->monitor(false).attributes.physicalHeight == monitor.attributes.physicalHeight &&
 	            window->monitor(false).attributes.desktopScaleFactor == 175 &&
 	            window->monitor(false).attributes.deviceScaleFactor == 140,
 	            "single remaining fullscreen multimon window uses drawable pixels and retains DPI"))
@@ -195,7 +268,7 @@ static bool run()
 	changed.displayID = physical;
 	const auto before = layoutCalls;
 	// Continue the simulated clock after the activation send.
-	const UINT64 now = activated + 1000;
+	const UINT64 now = activated + 3000;
 	if (!disp.handleEvent(changed))
 		return false;
 	disp.service(now);
@@ -317,6 +390,6 @@ int main(int argc, char**)
 	sdl_dialogs_uninit();
 	SDL_Quit();
 	if (success)
-		puts("PASS fullscreen drawable dimensions, delayed activation, multimon fallback, scale preservation, and migration geometry");
+		puts("PASS fullscreen drawable dimensions, delayed activation, per-window multimon layouts, fallback, scaling, and migration geometry");
 	return success ? 0 : 1;
 }

@@ -712,20 +712,23 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 	 * never updated, so a session the server started at another size stayed that way. Only the
 	 * window knows its real size, so ask it in fullscreen as well. */
 	auto& w = _windows.at(id);
-	if (freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon))
+	const bool multimon = freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon);
+	if (multimon)
 	{
-		// Keep physical geometry/ownership while multiple windows or migrated
-		// windows remain. A sole window on its owning display uses its drawable,
-		// including while fullscreen settles; on a notched MacBook this can be
-		// shorter than the physical display bounds.
-		if ((_windows.size() != 1) || (w.displayIndex() != w.monitor(false).orig_screen))
+		// A migrated window still belongs to its removed display until topology
+		// reconciliation. Each owning fullscreen window can use its drawable,
+		// which excludes the space macOS reserves above notched content.
+		if (w.displayIndex() != w.monitor(false).orig_screen)
 			return true;
+		if ((_windows.size() > 1) && !(SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN))
+			return true; // Retain physical geometry while leaving multimon fullscreen.
 	}
 
 	auto r = w.rect();
 	if ((r.w <= 0) || (r.h <= 0))
 		return true; // Retain the last valid geometry until the window settles.
-	auto m = w.monitor(true);
+	// Multimon origins stay in the shared desktop coordinate space.
+	auto m = w.monitor(!multimon);
 	applyMonitorScaleOverride(m);
 	m.width = r.w;
 	m.height = r.h;
