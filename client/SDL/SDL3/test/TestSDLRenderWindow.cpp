@@ -415,6 +415,57 @@ bool rendererLifecycle()
 	}
 	return expect(changed, "scaled draw did not paint its destination");
 }
+/* Issue 75: the reconnect frame must read as clearly faded (about 50% black)
+ * without dimming the retained render target, so the first frame after
+ * reconnecting paints clean. */
+bool stalledFrameFades()
+{
+	const SDL_DisplayID display = SDL_GetPrimaryDisplay();
+	TestWindow window(display, { 0, 0, 480, 240 });
+	if (!expect(window.renderer() != nullptr, "stalled test renderer could not be created"))
+		return false;
+
+	const Pixel source{ 200, 160, 120, 255 };
+	SurfacePtr surface(SDL_CreateSurface(480, 240, SDL_PIXELFORMAT_RGBA32), SDL_DestroySurface);
+	if (!expect(surface != nullptr, "stalled source surface creation failed"))
+		return false;
+	SDL_SetSurfaceBlendMode(surface.get(), SDL_BLENDMODE_NONE);
+	if (!expect(SDL_FillSurfaceRect(surface.get(), nullptr,
+	                                SDL_MapSurfaceRGBA(surface.get(), source.r, source.g, source.b,
+	                                                   source.a)),
+	            "stalled source fill failed"))
+		return false;
+	if (!expect(window.drawRects(surface.get(), { 0, 0 }), "stalled source draw failed"))
+		return false;
+
+	if (!expect(window.renderStalledFrame(1), "stalled frame composition failed"))
+		return false;
+	SurfacePtr faded(SDL_RenderReadPixels(window.renderer(), nullptr), SDL_DestroySurface);
+	if (!expect(faded != nullptr, "stalled frame readback failed"))
+		return false;
+	Uint8 r = 0;
+	Uint8 g = 0;
+	Uint8 b = 0;
+	Uint8 a = 0;
+	/* A corner pixel, away from the centered "Reconnecting..." text. */
+	if (!expect(SDL_ReadSurfacePixel(faded.get(), 2, 2, &r, &g, &b, &a),
+	            "stalled frame pixel could not be decoded"))
+		return false;
+	auto near = [](Uint8 value, int expected) { return value >= expected - 3 && value <= expected + 3; };
+	const auto dimmed = [](Uint8 value) { return (static_cast<int>(value) * 127 + 127) / 255; };
+	bool ok = expect(near(r, dimmed(source.r)) && near(g, dimmed(source.g)) &&
+	                     near(b, dimmed(source.b)),
+	                 "stalled frame is not faded to about 50%: got " + std::to_string(r) + "," +
+	                     std::to_string(g) + "," + std::to_string(b));
+
+	/* Re-uploading one pixel selects the retained render target again; it must
+	 * still hold the undimmed session. */
+	Canvas expected(480, 240, source);
+	ok = expect(window.drawRects(surface.get(), { 0, 0 }, { { 0, 0, 1, 1 } }),
+	            "post-stalled draw failed") &&
+	     readTarget(window, expected, "stalled frame left the render target untouched") && ok;
+	return ok;
+}
 } // namespace
 
 int main()
@@ -426,6 +477,7 @@ int main()
 		return 1;
 	}
 	bool ok = rendererLifecycle();
+	ok = stalledFrameFades() && ok;
 	{
 		auto window = SdlWindow::create(SDL_GetPrimaryDisplay(), "Reconnect teardown", 0, 640, 480);
 		ok = expect(window.updateStalledSurface(1), "reconnect overlay failed") && ok;

@@ -36,9 +36,9 @@
 
 namespace
 {
-/* Stalled-overlay tuning: screen dim alpha (48/255 ≈ 19%, inside the
- * 10–25% band — adjust here) and indicator font size. */
-constexpr Uint8 stalledDimAlpha = 48;
+/* Stalled-overlay tuning: screen dim alpha (128/255 ≈ 50%, so the session
+ * reads as clearly faded over bright content) and indicator font size. */
+constexpr Uint8 stalledDimAlpha = 128;
 constexpr float stalledFontPts = 32.0f;
 constexpr SDL_Color stalledTextColor = { 0xf2, 0xf6, 0xfb, 0xff };
 constexpr SDL_Color stalledShadowColor = { 0x00, 0x00, 0x00, 0xc0 };
@@ -808,22 +808,8 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 		return false;
 
     if(_performanceOverlay) _performanceOverlay->draw(pixelViewport(),SDL_GetWindowPixelDensity(_window));
-	if (showTopBar && _topBar)
-	{
-#ifdef WITH_SDL_LAUNCHER_BRIDGE
-        auto bridge=SdlLauncher::active();
-        _topBar->setPerformanceAvailable(bridge && bridge->performanceAvailable());
-#endif
-		const auto viewport = pixelViewport();
-		if (viewport.w <= 0 || viewport.h <= 0)
-			return false;
-		if (!_topBarRectInit)
-			_topBarRect = SdlTopBar::defaultRect(viewport, _topBarCompact);
-		_topBarRect = SdlTopBar::clampToViewport(_topBarRect, viewport, _topBarCompact);
-		if (!_topBar->draw(_topBarRect, viewport, pinned, pointer))
-			return false;
-		_renderMetrics.noteTopBarDraw();
-	}
+	if (showTopBar && !drawTopBar(pinned, pointer))
+		return false;
 
     const auto liveStart=_liveMetrics.nowNs();
     auto presentTimer = _renderMetrics.beginPresent();
@@ -895,17 +881,19 @@ bool SdlWindow::ensureStalledText()
 	return true;
 }
 
-bool SdlWindow::updateStalledSurface(int dots)
+bool SdlWindow::renderStalledFrame(int dots, bool showTopBar, bool pinned,
+                                   const SDL_FPoint& pointer)
 {
 	if (!_renderer)
 		return false;
 
 	(void)ensureRenderTarget();
 
-	/* Re-present the last accumulated frame (or blank when none yet),
-	 * then dim everything — session content and topbar alike. The render
-	 * target itself is never touched, so the next normal frame paints
-	 * clean with no explicit clear needed. */
+	/* Re-present the last accumulated frame (or blank when none yet), then
+	 * dim the session content. The connection bar is drawn after the dim so
+	 * it stays readable and usable while reconnecting. The render target
+	 * itself is never touched, so the next normal frame paints clean with no
+	 * explicit clear needed. */
 	if (!SDL_SetRenderTarget(_renderer, nullptr))
 		return false;
 	if (_renderTarget)
@@ -920,6 +908,8 @@ bool SdlWindow::updateStalledSurface(int dots)
 		if (!SDL_RenderClear(_renderer))
 			return false;
 	}
+	if (_performanceOverlay)
+		_performanceOverlay->draw(pixelViewport(), SDL_GetWindowPixelDensity(_window));
 
 	const auto viewport = pixelViewport();
 	if (viewport.w <= 0 || viewport.h <= 0)
@@ -951,6 +941,37 @@ bool SdlWindow::updateStalledSurface(int dots)
 		if (!SDL_RenderTexture(_renderer, _stalled->tex[phase], nullptr, &dst))
 			return false;
 	}
+
+	return !showTopBar || drawTopBar(pinned, pointer);
+}
+
+/* Connection bar shared by normal and stalled frames, so both initialize the
+ * same capabilities and record the draw in render metrics. */
+bool SdlWindow::drawTopBar(bool pinned, const SDL_FPoint& pointer)
+{
+	if (!_topBar)
+		return true;
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	auto bridge = SdlLauncher::active();
+	_topBar->setPerformanceAvailable(bridge && bridge->performanceAvailable());
+#endif
+	const auto viewport = pixelViewport();
+	if (viewport.w <= 0 || viewport.h <= 0)
+		return false;
+	if (!_topBarRectInit)
+		_topBarRect = SdlTopBar::defaultRect(viewport, _topBarCompact);
+	_topBarRect = SdlTopBar::clampToViewport(_topBarRect, viewport, _topBarCompact);
+	if (!_topBar->draw(_topBarRect, viewport, pinned, pointer))
+		return false;
+	_renderMetrics.noteTopBarDraw();
+	return true;
+}
+
+bool SdlWindow::updateStalledSurface(int dots, bool showTopBar, bool pinned,
+                                     const SDL_FPoint& pointer)
+{
+	if (!renderStalledFrame(dots, showTopBar, pinned, pointer))
+		return false;
 
 	/* Stalled overlay presents are counted separately from present_calls so
 	 * that identical-input comparisons of present_calls stay stable. */

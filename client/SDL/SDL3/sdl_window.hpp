@@ -134,10 +134,15 @@ class SdlWindow
 	[[nodiscard]] bool updateSurface(bool showTopBar = false, bool pinned = true,
 	                                 const SDL_FPoint& pointer = {});
 	/* Stalled-transport overlay: re-presents the last frame dimmed with a
-	 * centered "Reconnecting..." indicator (dots = 1..3, caller animates).
-	 * Needs no GDI — safe while the transport is down. Never touches the
-	 * accumulated render target, so the next normal frame paints clean. */
-	[[nodiscard]] bool updateStalledSurface(int dots);
+	 * centered "Reconnecting..." indicator (dots = 1..3, caller animates) and,
+	 * when requested, the undimmed connection bar on top. Needs no GDI — safe
+	 * while the transport is down. Never touches the accumulated render
+	 * target, so the next normal frame paints clean. */
+	[[nodiscard]] bool updateStalledSurface(int dots, bool showTopBar = false,
+	                                        bool pinned = true, const SDL_FPoint& pointer = {});
+	/* Composes the stalled frame without presenting it (tests read it back). */
+	[[nodiscard]] bool renderStalledFrame(int dots, bool showTopBar = false, bool pinned = true,
+	                                      const SDL_FPoint& pointer = {});
 	[[nodiscard]] bool topBarContains(float x, float y) const;
 	[[nodiscard]] bool topBarNearTop(float x, float y) const;
 	[[nodiscard]] SdlTopBarButton topBarButtonAt(float x, float y) const;
@@ -217,6 +222,7 @@ class SdlWindow
 	};
 	std::unique_ptr<StalledText> _stalled;
 	[[nodiscard]] bool ensureStalledText();
+	[[nodiscard]] bool drawTopBar(bool pinned, const SDL_FPoint& pointer);
 
   public:
 	[[nodiscard]] SdlTopBarRect topBarRect() const;

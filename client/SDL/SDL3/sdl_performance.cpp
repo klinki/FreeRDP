@@ -241,8 +241,11 @@ void SdlContext::servicePerformance()
 	_performancePrevious = network;
 	_performanceLastNs = now;
 	std::ignore = bridge->sendPerformance(std::move(event));
-	// This only copies/presents retained pixels; it is not a remote frame.
-	std::ignore = redrawWindows();
+	// Repaint only to show new overlay text. This copies retained pixels, not a
+	// remote frame; with the overlay hidden it would only re-upload the whole
+	// session every second (and, while reconnecting, overwrite the faded frame).
+	if (_performanceOverlayVisible)
+		std::ignore = redrawWindows();
 #endif
 }
 bool SdlContext::performanceButton(const SDL_MouseButtonEvent& event)

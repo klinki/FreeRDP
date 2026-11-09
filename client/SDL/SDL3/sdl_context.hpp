@@ -83,6 +83,11 @@ class SdlContext
 	/* Present the stalled overlay (dim + animated dots) on all windows.
 	 * Main thread only; needs no GDI — reuses each window's last frame. */
 	[[nodiscard]] bool redrawStalled();
+	[[nodiscard]] bool showTopBarOn(const SdlWindow& window) const;
+	[[nodiscard]] SDL_FPoint topBarPointerForDraw() const;
+	[[nodiscard]] static int stalledDots();
+	[[nodiscard]] bool localCursorOverride() const;
+	[[nodiscard]] bool setTopBarPointerOver(bool over);
 	/* Best-effort full repaint from the last frame (clears the overlay).
 	 * Harmless no-op when disconnected; the next server frame repaints. */
 	[[nodiscard]] bool repaintAll();
@@ -387,6 +392,8 @@ class SdlContext
 	SdlFullscreenState _fullscreenState;
 	SDL_FPoint _topBarPointer{ -1.0f, -1.0f };
 	SdlTopBarButton _topBarHoveredButton = SdlTopBarButton::None;
+	/* Pointer is over the visible connection bar: show the local arrow there. */
+	bool _topBarPointerOver = false;
 	/* Floating-bar move/resize gesture (mstsc-style): press on the title area
 	 * drags the bar, press on an edge handle resizes its width. */
 	enum class TopBarDragMode
