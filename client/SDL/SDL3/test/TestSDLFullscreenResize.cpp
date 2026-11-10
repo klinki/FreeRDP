@@ -242,6 +242,40 @@ static bool run()
 	disp.service(activated + 2000);
 	if (!expect(layoutCalls == beforeMultimon + 1, "duplicate multimon size events are deduplicated"))
 		return false;
+
+	// A display below a fullscreen window shorter than its display (the notch) must stay
+	// adjacent to it; the origins still come from the full display bounds.
+	auto top = window->monitor(false);
+	top.x = 0;
+	top.y = 0;
+	top.is_primary = true;
+	top.height = window->rect().h + 66;
+	window->setMonitor(top);
+	auto below = other->monitor(false);
+	below.x = 0;
+	below.y = top.height;
+	below.is_primary = false;
+	other->setMonitor(below);
+	resized.windowID = window->id();
+	const auto beforeStacked = layoutCalls;
+	if (!disp.handleEvent(resized))
+		return false;
+	disp.service(activated + 3000);
+	if (!expect(layoutCalls == beforeStacked + 1 && sentLayouts.size() == 2,
+	            "shortening a stacked multimon window sends a layout") ||
+	    !expect(window->monitor(false).height == window->rect().h &&
+	                other->monitor(false).y == below.y,
+	            "windows keep the display origins while the layout is compacted"))
+		return false;
+	for (const auto& layout : sentLayouts)
+	{
+		const bool primary = layout.Flags == DISPLAY_CONTROL_MONITOR_PRIMARY;
+		if (!expect(layout.Left == 0 &&
+		                layout.Top == (primary ? 0 : window->rect().h) &&
+		                layout.Height == static_cast<UINT32>(primary ? window->rect().h : other->rect().h),
+		            "the display below the shortened one stays adjacent in the wire layout"))
+			return false;
+	}
 	secondMonitor = other->monitor(false);
 	secondMonitor.orig_screen = removed;
 	other->setMonitor(secondMonitor);
@@ -268,7 +302,7 @@ static bool run()
 	changed.displayID = physical;
 	const auto before = layoutCalls;
 	// Continue the simulated clock after the activation send.
-	const UINT64 now = activated + 3000;
+	const UINT64 now = activated + 4000;
 	if (!disp.handleEvent(changed))
 		return false;
 	disp.service(now);
@@ -390,6 +424,6 @@ int main(int argc, char**)
 	sdl_dialogs_uninit();
 	SDL_Quit();
 	if (success)
-		puts("PASS fullscreen drawable dimensions, delayed activation, per-window multimon layouts, fallback, scaling, and migration geometry");
+		puts("PASS fullscreen drawable dimensions, delayed activation, per-window multimon layouts, stacked adjacency, fallback, scaling, and migration geometry");
 	return success ? 0 : 1;
 }
