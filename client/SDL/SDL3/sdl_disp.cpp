@@ -17,6 +17,7 @@
  * limitations under the License.
  */
 
+#include <algorithm>
 #include <vector>
 #include <winpr/sysinfo.h>
 #include <winpr/assert.h>
@@ -222,7 +223,8 @@ void sdlDispContext::captureConnectLayout()
 	WINPR_ASSERT(settings);
 
 	/* Mirror the conditions under which gcc_write_conference_create_request() sends both
-	 * monitor blocks. Overrides apply to layout PDUs only, so their values were not sent. */
+	 * monitor blocks. gcc_write_client_monitor_data() writes the monitor geometry only for more
+	 * than one monitor. Overrides apply to layout PDUs only, so their values were not sent. */
 	const UINT64 overrides = FREERDP_MONITOR_OVERRIDE_ORIENTATION |
 	                         FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE |
 	                         FREERDP_MONITOR_OVERRIDE_DEVICE_SCALE;
@@ -236,11 +238,12 @@ void sdlDispContext::captureConnectLayout()
 	      NEG_EXTENDED_CLIENT_DATA_SUPPORTED) != 0) &&
 	    freerdp_settings_get_bool(settings, FreeRDP_HasMonitorAttributes) &&
 	    ((freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags) & overrides) == 0) &&
-	    (count > 0) && monitors;
+	    (count > 1) && monitors;
 
-	/* Without multimon, the client core data always describes the single remote monitor:
-	 * desktop size, physical size, orientation and both scale factors. */
-	const bool single = !freerdp_settings_get_bool(settings, FreeRDP_UseMultimon);
+	/* Without multimon, or with a single monitor that has no monitor block, the client core data
+	 * describes the single remote monitor: desktop size, physical size, orientation and both
+	 * scale factors. */
+	const bool single = !freerdp_settings_get_bool(settings, FreeRDP_UseMultimon) || (count <= 1);
 
 	std::lock_guard lock(_channelMutex);
 	_connectLayout.clear();
@@ -615,6 +618,27 @@ UINT sdlDispContext::DisplayControlCaps(DispClientContext* disp, UINT32 maxNumMo
 	                                   maxMonitorAreaFactorB);
 }
 
+/* Whether the desktop the server accepted is the bounding box of the layout. */
+static bool matchesDesktop(const rdpSettings* settings,
+                           const std::vector<DISPLAY_CONTROL_MONITOR_LAYOUT>& layout)
+{
+	if (layout.empty())
+		return false;
+	INT64 left = layout.front().Left;
+	INT64 top = layout.front().Top;
+	INT64 right = left + layout.front().Width;
+	INT64 bottom = top + layout.front().Height;
+	for (const auto& monitor : layout)
+	{
+		left = std::min<INT64>(left, monitor.Left);
+		top = std::min<INT64>(top, monitor.Top);
+		right = std::max<INT64>(right, static_cast<INT64>(monitor.Left) + monitor.Width);
+		bottom = std::max<INT64>(bottom, static_cast<INT64>(monitor.Top) + monitor.Height);
+	}
+	return ((right - left) == freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth)) &&
+	       ((bottom - top) == freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight));
+}
+
 UINT sdlDispContext::DisplayControlCaps(UINT32 maxNumMonitors, UINT32 maxMonitorAreaFactorA,
                                         UINT32 maxMonitorAreaFactorB)
 {
@@ -634,6 +658,17 @@ UINT sdlDispContext::DisplayControlCaps(UINT32 maxNumMonitors, UINT32 maxMonitor
 		 * of a connection, count the connect-time layout as sent: an identical layout is not
 		 * sent at all, a different one still is. */
 		std::lock_guard lock(_channelMutex);
+		if (!_connectLayout.empty() && !matchesDesktop(settings, _connectLayout))
+		{
+			/* The server chose another desktop than the client data asked for (bitmap
+			 * capability set), so the connect-time layout is not what it applied. */
+			WLog_Print(_sdl->getWLog(), WLOG_DEBUG,
+			           "Display channel opened: the server desktop %" PRIu32 "x%" PRIu32
+			           " differs from the connect-time layout, not counting it as sent",
+			           freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth),
+			           freerdp_settings_get_uint32(settings, FreeRDP_DesktopHeight));
+			_connectLayout.clear();
+		}
 		if (!_connectLayout.empty())
 		{
 			_seedLayout = std::move(_connectLayout);
