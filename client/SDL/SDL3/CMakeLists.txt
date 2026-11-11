@@ -44,6 +44,7 @@ set(SRCS
     sdl_disp.hpp
     sdl_monitor.cpp
     sdl_monitor.hpp
+    sdl_monitor_layout.hpp
     sdl_monitor_scale.cpp
     sdl_monitor_scale.hpp
     sdl_monitor_selection.hpp
@@ -253,6 +254,13 @@ if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
                         "${TESTING_OUTPUT_DIRECTORY}")
   add_test(NAME TestSDLFullscreenState COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLFullscreenState)
   set_property(TARGET TestSDLFullscreenState PROPERTY FOLDER "FreeRDP/Client/Test")
+
+  add_executable(TestSDLMonitorLayout test/TestSDLMonitorLayout.cpp)
+  target_link_libraries(TestSDLMonitorLayout PRIVATE freerdp)
+  set_target_properties(TestSDLMonitorLayout PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                        "${TESTING_OUTPUT_DIRECTORY}")
+  add_test(NAME TestSDLMonitorLayout COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLMonitorLayout)
+  set_property(TARGET TestSDLMonitorLayout PROPERTY FOLDER "FreeRDP/Client/Test")
 
   add_executable(TestSDLMonitorScale test/TestSDLMonitorScale.cpp sdl_monitor_scale.cpp)
   target_link_libraries(TestSDLMonitorScale PRIVATE SDL3::Headers)

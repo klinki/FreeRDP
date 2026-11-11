@@ -34,6 +34,7 @@
 #include "sdl_channels.hpp"
 #include "sdl_input_mapping.hpp"
 #include "sdl_monitor.hpp"
+#include "sdl_monitor_layout.hpp"
 #include "sdl_pointer.hpp"
 #include "sdl_render_geometry.hpp"
 #include "sdl_touch.hpp"
@@ -650,66 +651,6 @@ static std::vector<rdpMonitor> sdl_web_monitors(const rdpMonitor& canvas)
 }
 #endif
 
-/* A fullscreen window can be smaller than its display, for example below the notch of a MacBook,
- * while the origins still come from the full display bounds. A monitor that was below or right of
- * a shortened one would then be separated from it by a gap, and the server ignores layouts whose
- * monitors are not adjacent (MS-RDPEDISP 3.1.5.2). Move each monitor up and left so that it
- * touches the nearest monitor before it on that axis again. */
-static void sdl_close_monitor_gaps(std::vector<rdpMonitor>& list)
-{
-	const auto original = list;
-	const auto overlaps = [](Sint32 a, Sint32 alen, Sint32 b, Sint32 blen)
-	{ return (a < b + blen) && (b < a + alen); };
-
-	std::vector<size_t> order(list.size());
-	for (size_t x = 0; x < order.size(); x++)
-		order[x] = x;
-
-	const auto closeAxis = [&](bool vertical)
-	{
-		const auto pos = [vertical](const rdpMonitor& m) { return vertical ? m.y : m.x; };
-		const auto len = [vertical](const rdpMonitor& m) { return vertical ? m.height : m.width; };
-		const auto cross = [vertical](const rdpMonitor& m) { return vertical ? m.x : m.y; };
-		const auto crossLen = [vertical](const rdpMonitor& m)
-		{ return vertical ? m.width : m.height; };
-
-		std::sort(order.begin(), order.end(), [&](size_t a, size_t b)
-		          { return pos(original[a]) < pos(original[b]); });
-		std::vector<Sint32> moved(list.size());
-		for (size_t x = 0; x < list.size(); x++)
-			moved[x] = pos(original[x]);
-
-		for (size_t i = 0; i < order.size(); i++)
-		{
-			const auto& b = original[order[i]];
-			bool found = false;
-			Sint32 target = 0;
-			for (size_t j = 0; j < i; j++)
-			{
-				const auto& a = original[order[j]];
-				if ((pos(a) + len(a) > pos(b)) ||
-				    !overlaps(cross(a), crossLen(a), cross(b), crossLen(b)))
-					continue;
-				const auto end = moved[order[j]] + len(a);
-				target = found ? std::max(target, end) : end;
-				found = true;
-			}
-			if (found && (target < moved[order[i]]))
-				moved[order[i]] = target;
-		}
-
-		for (size_t x = 0; x < list.size(); x++)
-		{
-			if (vertical)
-				list[x].y = moved[x];
-			else
-				list[x].x = moved[x];
-		}
-	};
-	closeAxis(true);
-	closeAxis(false);
-}
-
 bool SdlContext::updateWindowList()
 {
 	std::vector<rdpMonitor> list;
@@ -733,8 +674,9 @@ bool SdlContext::updateWindowList()
 		list.front().y = 0;
 		list.front().is_primary = true;
 	}
-	else
-		sdl_close_monitor_gaps(list);
+	else if (!sdl_close_monitor_gaps(list))
+		WLog_Print(getWLog(), WLOG_WARN,
+		           "multimon layout could not be compacted, sending the display positions");
 
 	applyPrimaryMonitor(list);
 	Sint32 originX = list.front().x, originY = list.front().y;
