@@ -751,11 +751,19 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 	auto r = w.rect();
 	if ((r.w <= 0) || (r.h <= 0))
 		return true; // Retain the last valid geometry until the window settles.
-	// On a notched display, macOS keeps a window's content below the menu bar band, so a
-	// window as tall as the display has not finished its fullscreen transition. Report the
+	// On a notched display, macOS keeps fullscreen content below the menu bar band, so a
+	// fullscreen window as tall as the display has not finished its transition. Report the
 	// height it will have, as sent at connect, or the layout sent meanwhile differs from it.
+	// Windows that are not fullscreen or entering it keep their drawable height.
+	const auto now = SDL_GetTicks();
+	const bool fullscreen =
+	    ((SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN) != 0) ||
+	    _fullscreenState.windowFullscreen(w.id()) ||
+	    (_fullscreenState.pending(w.id(), now) && _fullscreenState.target());
 	const auto display = _displays.find(SDL_GetDisplayForWindow(w.window()));
-	if (display != _displays.end())
+	if (fullscreen && !freerdp_settings_get_bool(_context->settings, FreeRDP_SpanMonitors) &&
+	    !freerdp_settings_get_bool(_context->settings, FreeRDP_RemoteApplicationMode) &&
+	    (display != _displays.end()))
 	{
 		const auto inset = fullscreenTopInset(display->first);
 		if ((inset > 0) && (r.h == display->second.height) && (r.h > inset))

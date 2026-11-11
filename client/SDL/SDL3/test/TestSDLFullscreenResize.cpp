@@ -144,6 +144,33 @@ static bool run()
 		    !expect(sdl.updateWindow(window->id()) && (window->monitor(true).height == pixels.h),
 		            "without an inset the window reports its drawable height"))
 			return false;
+
+		// A window that is not fullscreen keeps its drawable height, even as tall as the display.
+		auto observe = [&](bool fullscreen)
+		{
+			if (!SDL_SetWindowFullscreen(window->window(), fullscreen))
+				return false;
+			std::ignore = SDL_SyncWindow(window->window());
+			SDL_Event native{};
+			native.window.type =
+			    fullscreen ? SDL_EVENT_WINDOW_ENTER_FULLSCREEN : SDL_EVENT_WINDOW_LEAVE_FULLSCREEN;
+			native.window.windowID = window->id();
+			return sdl.handleEvent(native);
+		};
+		if (!observe(false) ||
+		    !SDL_SetWindowSize(window->window(), pixels.w, sdl.getDisplay(display).height))
+			return false;
+		std::ignore = SDL_SyncWindow(window->window());
+		sdl.setFullscreenTopInset(display, 66);
+		const auto windowed = window->rect();
+		const bool kept = (SDL_GetWindowFlags(window->window()) & SDL_WINDOW_FULLSCREEN) == 0 &&
+		                  (windowed.h == pixels.h) && sdl.updateWindow(window->id()) &&
+		                  (window->monitor(true).height == pixels.h);
+		sdl.setFullscreenTopInset(display, 0);
+		if (!expect(kept, "a full-height window that is not fullscreen keeps its height") ||
+		    !observe(true) || !sdl.updateWindow(window->id()) ||
+		    !expect(window->rect().h == pixels.h, "the window returns to fullscreen"))
+			return false;
 	}
 
 	// A removed display's window may already have migrated to the laptop. Do not

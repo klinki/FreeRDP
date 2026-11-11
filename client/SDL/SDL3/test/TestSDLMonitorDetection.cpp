@@ -7,6 +7,8 @@
 #include <memory>
 #include <winpr/sysinfo.h>
 
+#include <freerdp/client/file.h>
+
 #include "sdl_context.hpp"
 #include "sdl_monitor.hpp"
 #include "sdl_monitor_selection.hpp"
@@ -279,6 +281,28 @@ static bool connectGeometry(SdlContext& sdl, SDL_DisplayID display)
 	                (freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor) == 175) &&
 	                (freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor) == 180),
 	            "single-monitor fullscreen connects with the display's scale"))
+		return false;
+
+	// A scale imported from an .rdp file sets no override flag; it is still sent as asked.
+	{
+		std::unique_ptr<rdpFile, decltype(&freerdp_client_rdp_file_free)> file(
+		    freerdp_client_rdp_file_new(), freerdp_client_rdp_file_free);
+		static const char rdp[] = "desktopscalefactor:i:140\r\n";
+		if (!file ||
+		    !freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, 100) ||
+		    !freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor, 100) ||
+		    !freerdp_client_parse_rdp_file_buffer(file.get(), reinterpret_cast<const BYTE*>(rdp),
+		                                          sizeof(rdp) - 1) ||
+		    !freerdp_client_populate_settings_from_rdp_file(file.get(), settings))
+			return false;
+	}
+	if (!expect((freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags) &
+	             FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE) == 0 &&
+	                sdl_detect_monitors(&sdl, &width, &height) &&
+	                (freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor) == 140) &&
+	                (freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor) == 180),
+	            "a desktop scale from an .rdp file is kept; the default device scale follows the "
+	            "display"))
 		return false;
 
 	if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, 100) ||

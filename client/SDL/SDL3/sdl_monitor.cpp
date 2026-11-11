@@ -290,9 +290,10 @@ static void sdl_shape_fullscreen_monitors(SdlContext* sdl, std::vector<rdpMonito
 }
 
 /* With a single remote monitor, the client core data carries its scale factors. The fullscreen
- * window reports its display's scale in the first layout, so send that scale at connect already,
- * unless the scale was set for the session. Only with dynamic resolution, which sends that
- * layout; without it, the core data scale stays what the session asked for. */
+ * window reports its display's scale in the first layout, so send that scale at connect already.
+ * Only a default scale (100) is replaced: a scale set with /scale, /scale-desktop or
+ * /scale-device, or imported from an .rdp file, is sent as asked. Only with dynamic resolution,
+ * which sends that layout; without it, the core data scale stays what the session asked for. */
 [[nodiscard]] static BOOL sdl_apply_connect_scale(SdlContext* sdl)
 {
 	rdpSettings* settings = sdl->context()->settings;
@@ -310,11 +311,13 @@ static void sdl_shape_fullscreen_monitors(SdlContext* sdl, std::vector<rdpMonito
 	const auto mask = freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags);
 	const auto desktop = monitor->attributes.desktopScaleFactor;
 	const auto device = monitor->attributes.deviceScaleFactor;
-	if (((mask & FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE) == 0) && (desktop >= 100) &&
-	    (desktop <= 500) &&
+	if (((mask & FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE) == 0) &&
+	    (freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor) == 100) &&
+	    (desktop >= 100) && (desktop <= 500) &&
 	    !freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, desktop))
 		return FALSE;
 	if (((mask & FREERDP_MONITOR_OVERRIDE_DEVICE_SCALE) == 0) &&
+	    (freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor) == 100) &&
 	    ((device == 100) || (device == 140) || (device == 180)) &&
 	    !freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor, device))
 		return FALSE;
