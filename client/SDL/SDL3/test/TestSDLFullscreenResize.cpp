@@ -130,6 +130,62 @@ static bool run()
 	            "repeated same-size events do not resend the layout"))
 		return false;
 
+	// A window as tall as a notched display is still in its fullscreen transition; it reports
+	// the height it will have (sheltie-app/sheltie-macos#24). The dummy driver's fullscreen
+	// window fills its display, a native run on a notched Mac already has the shorter height.
+	if (pixels.h == sdl.getDisplay(display).height)
+	{
+		sdl.setFullscreenTopInset(display, 66);
+		const bool shortened =
+		    sdl.updateWindow(window->id()) && (window->monitor(true).height == pixels.h - 66);
+		sdl.setFullscreenTopInset(display, 0);
+		if (!expect(shortened, "a full-height window on a notched display reports its fullscreen "
+		                       "height") ||
+		    !expect(sdl.updateWindow(window->id()) && (window->monitor(true).height == pixels.h),
+		            "without an inset the window reports its drawable height"))
+			return false;
+
+		// A window that is not fullscreen keeps its drawable height, even as tall as the display.
+		auto observe = [&](bool fullscreen)
+		{
+			if (!SDL_SetWindowFullscreen(window->window(), fullscreen))
+				return false;
+			std::ignore = SDL_SyncWindow(window->window());
+			SDL_Event native{};
+			native.window.type =
+			    fullscreen ? SDL_EVENT_WINDOW_ENTER_FULLSCREEN : SDL_EVENT_WINDOW_LEAVE_FULLSCREEN;
+			native.window.windowID = window->id();
+			return sdl.handleEvent(native);
+		};
+		// The leave event itself publishes the windowed height, before the session's fullscreen
+		// state observes it.
+		// The session saw the window enter fullscreen. SDL applies this windowed size when the
+		// window leaves fullscreen.
+		if (!observe(true) ||
+		    !SDL_SetWindowSize(window->window(), pixels.w, sdl.getDisplay(display).height))
+			return false;
+		sdl.setFullscreenTopInset(display, 66);
+		if (!observe(false))
+			return false;
+		auto published = static_cast<const rdpMonitor*>(
+		    freerdp_settings_get_pointer(settings, FreeRDP_MonitorDefArray));
+		const auto windowed = window->rect();
+		printf("Windowed drawable after leaving fullscreen: %dx%d pixels\n", windowed.w,
+		       windowed.h);
+		if (!expect((windowed.h == pixels.h) && (window->monitor(true).height == pixels.h) &&
+		                published && (published->height == pixels.h),
+		            "leaving fullscreen publishes the full windowed height"))
+			return false;
+		const bool kept = (SDL_GetWindowFlags(window->window()) & SDL_WINDOW_FULLSCREEN) == 0 &&
+		                  (windowed.h == pixels.h) && sdl.updateWindow(window->id()) &&
+		                  (window->monitor(true).height == pixels.h);
+		sdl.setFullscreenTopInset(display, 0);
+		if (!expect(kept, "a full-height window that is not fullscreen keeps its height") ||
+		    !observe(true) || !sdl.updateWindow(window->id()) ||
+		    !expect(window->rect().h == pixels.h, "the window returns to fullscreen"))
+			return false;
+	}
+
 	// A removed display's window may already have migrated to the laptop. Do not
 	// replace its physical ownership/geometry until topology reconciliation.
 	if (!freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, TRUE))

@@ -35,6 +35,7 @@
 #include "sdl_input_mapping.hpp"
 #include "sdl_monitor.hpp"
 #include "sdl_monitor_layout.hpp"
+#include "sdl_fullscreen_inset.hpp"
 #include "sdl_pointer.hpp"
 #include "sdl_render_geometry.hpp"
 #include "sdl_touch.hpp"
@@ -583,6 +584,18 @@ bool SdlContext::createWindows()
 			// Cache local coordinates; negotiated coordinates are relative to the
 			// selected primary and must not be mixed with newly added displays.
 			window.setMonitor(getDisplay(did));
+			// Until its fullscreen transition completes, report the window as shorter
+			// already, as the connect-time monitor was sent. Otherwise a layout sent
+			// meanwhile differs from it, and Windows reconfigures a second time.
+			const auto inset = fullscreenTopInset(did);
+			auto shortened = getDisplay(did);
+			if (!freerdp_settings_get_bool(settings, FreeRDP_SpanMonitors) &&
+			    !freerdp_settings_get_bool(settings, FreeRDP_RemoteApplicationMode) &&
+			    (inset > 0) && (inset < shortened.height))
+			{
+				shortened.height -= inset;
+				window.setMonitor(shortened, false);
+			}
 		}
 
 		if (freerdp_settings_get_bool(settings, FreeRDP_UseMultimon))
@@ -738,6 +751,25 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 	auto r = w.rect();
 	if ((r.w <= 0) || (r.h <= 0))
 		return true; // Retain the last valid geometry until the window settles.
+	// On a notched display, macOS keeps fullscreen content below the menu bar band, so a
+	// fullscreen window as tall as the display has not finished its transition. Report the
+	// height it will have, as sent at connect, or the layout sent meanwhile differs from it.
+	// Windows that are not fullscreen or entering it keep their drawable height. SDL's flag is
+	// already clear when the leave event is handled, before the session's fullscreen state
+	// observes that event, so only the flag and a request to enter count.
+	const auto now = SDL_GetTicks();
+	const bool fullscreen =
+	    ((SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN) != 0) ||
+	    (_fullscreenState.pending(w.id(), now) && _fullscreenState.target());
+	const auto display = _displays.find(SDL_GetDisplayForWindow(w.window()));
+	if (fullscreen && !freerdp_settings_get_bool(_context->settings, FreeRDP_SpanMonitors) &&
+	    !freerdp_settings_get_bool(_context->settings, FreeRDP_RemoteApplicationMode) &&
+	    (display != _displays.end()))
+	{
+		const auto inset = fullscreenTopInset(display->first);
+		if ((inset > 0) && (r.h == display->second.height) && (r.h > inset))
+			r.h -= inset;
+	}
 	// Multimon origins stay in the shared desktop coordinate space.
 	auto m = w.monitor(!multimon);
 	applyMonitorScaleOverride(m);
@@ -1462,6 +1494,7 @@ bool SdlContext::detectDisplays()
 		return false;
 	}
 	std::map<SDL_DisplayID, rdpMonitor> current;
+	std::map<SDL_DisplayID, int> insets;
 	for (int i = 0; i < count; i++)
 	{
 		const auto monitor = SdlWindow::query(ids[i], false);
@@ -1471,11 +1504,13 @@ bool SdlContext::detectDisplays()
 			return false;
 		}
 		current.emplace(ids[i], monitor);
+		insets.emplace(ids[i], sdl_fullscreen_top_inset(ids[i]));
 	}
 	SDL_free(ids);
 	// Replace, rather than emplace into, the startup cache. Replugging can
 	// change both SDL IDs and backing dimensions; removed displays must vanish.
 	_displays = std::move(current);
+	_fullscreenTopInsets = std::move(insets);
 	updateDisplayOffsets();
 	return true;
 }
@@ -1576,6 +1611,31 @@ bool SdlContext::refreshDisplayWindows()
 rdpMonitor SdlContext::getDisplay(SDL_DisplayID id) const
 {
 	return _displays.at(id);
+}
+
+int SdlContext::fullscreenTopInset(SDL_DisplayID id) const
+{
+	const auto it = _fullscreenTopInsets.find(id);
+	return (it != _fullscreenTopInsets.end()) ? it->second : 0;
+}
+
+void SdlContext::setFullscreenTopInset(SDL_DisplayID id, int pixels)
+{
+	_fullscreenTopInsets[id] = pixels;
+}
+
+std::pair<UINT32, UINT32> SdlContext::sessionCoreScale()
+{
+	if (!_sessionCoreScale)
+		_sessionCoreScale = std::make_pair(
+		    freerdp_settings_get_uint32(context()->settings, FreeRDP_DesktopScaleFactor),
+		    freerdp_settings_get_uint32(context()->settings, FreeRDP_DeviceScaleFactor));
+	return *_sessionCoreScale;
+}
+
+void SdlContext::resetSessionCoreScale()
+{
+	_sessionCoreScale.reset();
 }
 
 std::vector<SDL_DisplayID> SdlContext::getDisplayIds() const
