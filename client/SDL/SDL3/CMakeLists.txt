@@ -132,6 +132,15 @@ if(NOT WIN32 AND NOT APPLE)
   endif()
 endif()
 
+if(APPLE)
+  # Measures the band macOS keeps above fullscreen content on notched displays.
+  set(CMAKE_OBJCXX_STANDARD 17)
+  list(APPEND SRCS sdl_fullscreen_inset.hpp sdl_fullscreen_inset_macos.mm)
+  list(APPEND LIBS "-framework AppKit")
+else()
+  list(APPEND SRCS sdl_fullscreen_inset.hpp)
+endif()
+
 option(WITH_LAUNCHER_BRIDGE "Build the private native macOS launcher bridge" ON)
 set(SDL_LAUNCHER_BRIDGE_ENABLED OFF)
 if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON)

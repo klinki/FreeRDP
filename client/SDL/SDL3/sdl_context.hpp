@@ -180,6 +180,11 @@ class SdlContext
 	[[nodiscard]] bool setHotplugMonitorSelection(const std::vector<SDL_DisplayID>& ids,
 	                                              const SdlMonitorScaleOverrides& scales);
 	[[nodiscard]] rdpMonitor getDisplay(SDL_DisplayID id) const;
+	/** The pixel rows the system keeps above fullscreen content on a display, measured when
+	 * displays are detected. */
+	[[nodiscard]] int fullscreenTopInset(SDL_DisplayID id) const;
+	/** Replaces a measured inset. Tests use it, since only real notched displays have one. */
+	void setFullscreenTopInset(SDL_DisplayID id, int pixels);
 	[[nodiscard]] std::vector<SDL_DisplayID> getDisplayIds() const;
 	[[nodiscard]] bool parseMonitorScaleOverrides(const char* value);
 	[[nodiscard]] bool validateMonitorScaleOverrides() const;
@@ -386,6 +391,7 @@ class SdlContext
 	SdlConnectionDialogWrapper _dialog;
 
 	std::map<SDL_DisplayID, rdpMonitor> _displays;
+	std::map<SDL_DisplayID, int> _fullscreenTopInsets;
 	std::map<SDL_WindowID, SdlWindow> _windows;
 	std::map<SDL_DisplayID, std::pair<SDL_Rect, SDL_Rect>> _offsets;
 	/* Actual per-window fullscreen state, the bar's window, pin and visibility. */

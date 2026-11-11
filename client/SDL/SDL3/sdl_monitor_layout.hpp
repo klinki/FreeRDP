@@ -232,3 +232,26 @@ inline bool sdl_close_monitor_gaps(std::vector<rdpMonitor>& list,
 		list = bottom;
 	return valid(list);
 }
+
+/**
+ * Shapes the monitors sent at connect like the fullscreen windows will report them: each one
+ * shortened by the rows its display keeps above fullscreen content (insets, in list order), and
+ * the gaps this opens closed as for the windows' layout. Returns whether every monitor is still
+ * attached to another one.
+ */
+inline bool sdl_fullscreen_connect_monitors(std::vector<rdpMonitor>& list,
+                                            const std::vector<int>& insets)
+{
+	const auto displays = list;
+	bool shortened = false;
+	for (size_t x = 0; (x < list.size()) && (x < insets.size()); x++)
+	{
+		if ((insets[x] <= 0) || (insets[x] >= list[x].height))
+			continue;
+		list[x].height -= insets[x];
+		shortened = true;
+	}
+	if (!shortened || (list.size() < 2))
+		return true;
+	return sdl_close_monitor_gaps(list, displays);
+}

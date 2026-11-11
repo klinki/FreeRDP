@@ -38,6 +38,7 @@
 
 #include "sdl_monitor.hpp"
 #include "sdl_context.hpp"
+#include "sdl_monitor_layout.hpp"
 
 typedef struct
 {
@@ -183,6 +184,36 @@ int sdl_list_monitors([[maybe_unused]] SdlContext* sdl)
 	return TRUE;
 }
 
+/* Multimon windows always go fullscreen after connecting, as /f windows do. */
+[[nodiscard]] static bool sdl_connects_fullscreen(const rdpSettings* settings)
+{
+	return (freerdp_settings_get_bool(settings, FreeRDP_Fullscreen) ||
+	        freerdp_settings_get_bool(settings, FreeRDP_UseMultimon)) &&
+	       !freerdp_settings_get_bool(settings, FreeRDP_SpanMonitors) &&
+	       !freerdp_settings_get_bool(settings, FreeRDP_RemoteApplicationMode);
+}
+
+/* Send the monitors at connect as the fullscreen windows will report them. Otherwise the first
+ * layout after connect differs from the connect-time data, and Windows applies it in a second,
+ * late display reconfiguration (sheltie-app/sheltie-macos#24). */
+static void sdl_shape_fullscreen_monitors(SdlContext* sdl, std::vector<rdpMonitor>& monitors)
+{
+	std::vector<int> insets;
+	insets.reserve(monitors.size());
+	for (const auto& monitor : monitors)
+		insets.push_back(sdl->fullscreenTopInset(monitor.orig_screen));
+	if (!sdl_fullscreen_connect_monitors(monitors, insets))
+		WLog_Print(sdl->getWLog(), WLOG_WARN,
+		           "connect-time multimon layout has monitors that are not adjacent to another one");
+	for (size_t x = 0; x < monitors.size(); x++)
+		if (insets[x] > 0)
+			WLog_Print(sdl->getWLog(), WLOG_DEBUG,
+			           "Display %" PRIu32 " keeps %d rows above fullscreen content; connect-time "
+			           "monitor is %" PRId32 ",%" PRId32 " %" PRId32 "x%" PRId32,
+			           monitors[x].orig_screen, insets[x], monitors[x].x, monitors[x].y,
+			           monitors[x].width, monitors[x].height);
+}
+
 [[nodiscard]] static BOOL sdl_apply_display_properties(SdlContext* sdl)
 {
 	WINPR_ASSERT(sdl);
@@ -216,6 +247,8 @@ int sdl_list_monitors([[maybe_unused]] SdlContext* sdl)
 		sdl->applyMonitorScaleOverride(monitor);
 		monitors.emplace_back(monitor);
 	}
+	if (sdl_connects_fullscreen(settings))
+		sdl_shape_fullscreen_monitors(sdl, monitors);
 	sdl->applyPrimaryMonitor(monitors);
 	return freerdp_settings_set_monitor_def_array_sorted(settings, monitors.data(),
 	                                                     monitors.size());
@@ -254,6 +287,41 @@ int sdl_list_monitors([[maybe_unused]] SdlContext* sdl)
 		return sdl_apply_max_size(sdl, pMaxWidth, pMaxHeight);
 	}
 	return sdl_apply_mon_max_size(sdl, pMaxWidth, pMaxHeight);
+}
+
+/* With a single remote monitor, the client core data carries its scale factors. The fullscreen
+ * window reports its display's scale in the first layout, so send that scale at connect already,
+ * unless the scale was set for the session. Only with dynamic resolution, which sends that
+ * layout; without it, the core data scale stays what the session asked for. */
+[[nodiscard]] static BOOL sdl_apply_connect_scale(SdlContext* sdl)
+{
+	rdpSettings* settings = sdl->context()->settings;
+	WINPR_ASSERT(settings);
+
+	if (!sdl_connects_fullscreen(settings) ||
+	    !freerdp_settings_get_bool(settings, FreeRDP_DynamicResolutionUpdate) ||
+	    (freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount) != 1))
+		return TRUE;
+	auto monitor = static_cast<const rdpMonitor*>(
+	    freerdp_settings_get_pointer_array(settings, FreeRDP_MonitorDefArray, 0));
+	if (!monitor)
+		return TRUE;
+
+	const auto mask = freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags);
+	const auto desktop = monitor->attributes.desktopScaleFactor;
+	const auto device = monitor->attributes.deviceScaleFactor;
+	if (((mask & FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE) == 0) && (desktop >= 100) &&
+	    (desktop <= 500) &&
+	    !freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, desktop))
+		return FALSE;
+	if (((mask & FREERDP_MONITOR_OVERRIDE_DEVICE_SCALE) == 0) &&
+	    ((device == 100) || (device == 140) || (device == 180)) &&
+	    !freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor, device))
+		return FALSE;
+	WLog_Print(sdl->getWLog(), WLOG_DEBUG, "Connect-time desktop scale %" PRIu32 "/%" PRIu32,
+	           freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor),
+	           freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor));
+	return TRUE;
 }
 
 BOOL sdl_detect_monitors(SdlContext* sdl, UINT32* pMaxWidth, UINT32* pMaxHeight)
@@ -343,5 +411,7 @@ BOOL sdl_detect_monitors(SdlContext* sdl, UINT32* pMaxWidth, UINT32* pMaxHeight)
 	 * only its count makes the next PreConnect dereference a missing array
 	 * when credentials are retried in the same client process. */
 
-	return sdl_detect_single_window(sdl, pMaxWidth, pMaxHeight);
+	if (!sdl_detect_single_window(sdl, pMaxWidth, pMaxHeight))
+		return FALSE;
+	return sdl_apply_connect_scale(sdl);
 }

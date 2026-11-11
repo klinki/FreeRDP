@@ -184,5 +184,42 @@ int main()
 				}
 			}
 	(void)printf("checked %zu grid layouts\n", checked);
+
+	// Connect-time shaping matches the fullscreen windows' layout: the notched built-in display
+	// loses 66 rows, and the monitor below it moves up, as in sheltie-app/sheltie-macos#24.
+	std::vector<rdpMonitor> below{ mon(0, 0, 2940, 1912), mon(0, 1912, 1920, 1080) };
+	auto windows = layout(below, 0, 66);
+	if (!expect(sdl_close_monitor_gaps(windows.list, windows.displays), "windows' layout"))
+		return 1;
+	if (!expect(sdl_fullscreen_connect_monitors(below, { 66, 0 }) && (below[0].height == 1846) &&
+	                at(below[0], 0, 0) && at(below[1], 0, 1846),
+	            "at connect the monitor below the notched display moves up to touch it") ||
+	    !expect(at(below[0], windows.list[0].x, windows.list[0].y) &&
+	                at(below[1], windows.list[1].x, windows.list[1].y) &&
+	                (below[0].height == windows.list[0].height),
+	            "the connect-time layout equals the one the fullscreen windows report"))
+		return 1;
+
+	std::vector<rdpMonitor> dellAbove{ mon(0, 0, 2940, 1912), mon(0, -1080, 1920, 1080) };
+	if (!expect(sdl_fullscreen_connect_monitors(dellAbove, { 66, 0 }) && at(dellAbove[0], 0, 0) &&
+	                (dellAbove[0].height == 1846) && at(dellAbove[1], 0, -1080),
+	            "a monitor above the notched display keeps its position"))
+		return 1;
+
+	std::vector<rdpMonitor> single{ mon(0, 0, 2940, 1912) };
+	if (!expect(sdl_fullscreen_connect_monitors(single, { 66 }) && (single[0].height == 1846),
+	            "a single notched monitor is shortened"))
+		return 1;
+
+	std::vector<rdpMonitor> plain{ mon(0, 0, 1920, 1080), mon(0, 1080, 1920, 1080) };
+	if (!expect(sdl_fullscreen_connect_monitors(plain, { 0, 0 }) && at(plain[1], 0, 1080) &&
+	                (plain[0].height == 1080),
+	            "displays without an inset are not changed"))
+		return 1;
+
+	std::vector<rdpMonitor> tiny{ mon(0, 0, 200, 60) };
+	if (!expect(sdl_fullscreen_connect_monitors(tiny, { 66 }) && (tiny[0].height == 60),
+	            "an inset as tall as the display is ignored"))
+		return 1;
 	return 0;
 }

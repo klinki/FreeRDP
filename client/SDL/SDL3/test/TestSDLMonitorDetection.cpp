@@ -242,6 +242,55 @@ static bool stableSelections()
 	              "ambiguous identity cannot apply scaling to an unrelated display");
 }
 
+/* The connect-time data describes the fullscreen window: shorter on a notched display, and with
+ * the display's scale for a single monitor (sheltie-app/sheltie-macos#24). */
+static bool connectGeometry(SdlContext& sdl, SDL_DisplayID display)
+{
+	auto settings = sdl.context()->settings;
+	const auto full = sdl.getDisplay(display);
+	UINT32 width = 0;
+	UINT32 height = 0;
+	if (!freerdp_settings_set_pointer_len(settings, FreeRDP_MonitorIds, &display, 1) ||
+	    !freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, FALSE) ||
+	    !freerdp_settings_set_bool(settings, FreeRDP_Fullscreen, TRUE) ||
+	    !freerdp_settings_set_bool(settings, FreeRDP_DynamicResolutionUpdate, TRUE))
+		return false;
+
+	sdl.setFullscreenTopInset(display, 66);
+	if (!expect(sdl_detect_monitors(&sdl, &width, &height), "fullscreen detection with an inset"))
+		return false;
+	auto monitor = static_cast<const rdpMonitor*>(
+	    freerdp_settings_get_pointer(settings, FreeRDP_MonitorDefArray));
+	if (!expect(monitor && (height == static_cast<UINT32>(full.height - 66)) &&
+	                (width == static_cast<UINT32>(full.width)) &&
+	                (monitor->height == full.height - 66),
+	            "fullscreen on a notched display connects with the window's shorter height"))
+		return false;
+	sdl.setFullscreenTopInset(display, 0);
+	if (!expect(sdl_detect_monitors(&sdl, &width, &height) &&
+	                (height == static_cast<UINT32>(full.height)),
+	            "fullscreen without an inset connects with the display's height"))
+		return false;
+
+	if (!sdl.setHotplugMonitorSelection({ display },
+	                                    { { display, SdlMonitorScaleOverride{ display, 175, 180 } } }))
+		return false;
+	if (!expect(sdl_detect_monitors(&sdl, &width, &height) &&
+	                (freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor) == 175) &&
+	                (freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor) == 180),
+	            "single-monitor fullscreen connects with the display's scale"))
+		return false;
+
+	if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, 100) ||
+	    !freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor, 100) ||
+	    !freerdp_settings_set_bool(settings, FreeRDP_DynamicResolutionUpdate, FALSE))
+		return false;
+	return expect(sdl_detect_monitors(&sdl, &width, &height) &&
+	                  (freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor) == 100) &&
+	                  (freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor) == 100),
+	              "without dynamic resolution the session's scale is kept");
+}
+
 static bool run()
 {
 	std::unique_ptr<freerdp, decltype(&freerdp_free)> instance(freerdp_new(), freerdp_free);
@@ -305,7 +354,7 @@ static bool run()
 		return false;
 	if (!expect(!detect(sdl), "missing explicit ID array fails without aborting"))
 		return false;
-	return true;
+	return connectGeometry(sdl, display);
 }
 
 int main(int argc, char**)
@@ -322,6 +371,6 @@ int main(int argc, char**)
 	sdl_dialogs_uninit();
 	SDL_Quit();
 	if (success)
-		puts("PASS primary selection, monitor detection retries, stale events, migrated-window removal, and fallback layout");
+		puts("PASS primary selection, monitor detection retries, stale events, migrated-window removal, fallback layout, and connect-time fullscreen geometry");
 	return success ? 0 : 1;
 }
