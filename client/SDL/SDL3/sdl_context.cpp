@@ -654,7 +654,9 @@ static std::vector<rdpMonitor> sdl_web_monitors(const rdpMonitor& canvas)
 bool SdlContext::updateWindowList()
 {
 	std::vector<rdpMonitor> list;
+	std::vector<rdpMonitor> displays;
 	list.reserve(_windows.size());
+	displays.reserve(_windows.size());
 	for (const auto& win : _windows)
 	{
 		auto monitor = win.second.monitor(false);
@@ -663,6 +665,11 @@ bool SdlContext::updateWindowList()
 			continue;
 		applyMonitorScaleOverride(monitor);
 		list.push_back(monitor);
+		// The full display bounds, which tell which monitors touch each other.
+		const auto size = win.second.displaySize();
+		monitor.width = std::max(monitor.width, size.x);
+		monitor.height = std::max(monitor.height, size.y);
+		displays.push_back(monitor);
 	}
 
 	// Keep the previous valid layout until the remaining removal events arrive.
@@ -674,9 +681,9 @@ bool SdlContext::updateWindowList()
 		list.front().y = 0;
 		list.front().is_primary = true;
 	}
-	else if (!sdl_close_monitor_gaps(list))
+	else if (!sdl_close_monitor_gaps(list, displays))
 		WLog_Print(getWLog(), WLOG_WARN,
-		           "multimon layout could not be compacted, sending the display positions");
+		           "multimon layout has monitors that are not adjacent to another one");
 
 	applyPrimaryMonitor(list);
 	Sint32 originX = list.front().x, originY = list.front().y;
@@ -736,7 +743,7 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 	applyMonitorScaleOverride(m);
 	m.width = r.w;
 	m.height = r.h;
-	w.setMonitor(m);
+	w.setMonitor(m, false);
 	return true;
 }
 

@@ -216,9 +216,16 @@ rdpMonitor SdlWindow::monitor(bool isPrimary) const
 	return m;
 }
 
-void SdlWindow::setMonitor(rdpMonitor monitor)
+void SdlWindow::setMonitor(rdpMonitor monitor, bool display)
 {
 	_monitor = monitor;
+	if (display)
+		_displaySize = { monitor.width, monitor.height };
+}
+
+SDL_Point SdlWindow::displaySize() const
+{
+	return _displaySize;
 }
 
 float SdlWindow::scale() const

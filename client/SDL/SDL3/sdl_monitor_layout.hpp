@@ -20,6 +20,8 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <climits>
+#include <cstdlib>
 #include <cstdint>
 #include <numeric>
 #include <vector>
@@ -74,12 +76,32 @@ namespace sdl_monitor_layout
 		return true;
 	}
 
-	/* Moves each monitor up (vertical) or left until it touches the nearest monitor before it on
-	 * that axis that shares part of its range on the other axis. The positions on the other axis
-	 * are the current ones, so the second pass sees the moves of the first. A monitor only moves
-	 * into space that no such monitor occupies, which keeps a non-overlapping layout free of
-	 * overlaps. */
-	inline void closeAxis(std::vector<rdpMonitor>& list, bool vertical)
+	/* Length of the edge that b shares with a monitor before it on the axis (a's end is b's
+	 * start), or 0. */
+	inline int64_t sharedEdge(const rdpMonitor& a, const rdpMonitor& b, bool vertical)
+	{
+		const int64_t apos = vertical ? a.y : a.x, alen = vertical ? a.height : a.width;
+		const int64_t bpos = vertical ? b.y : b.x;
+		if (apos + alen != bpos)
+			return 0;
+		const int64_t ac = vertical ? a.x : a.y, acl = vertical ? a.width : a.height;
+		const int64_t bc = vertical ? b.x : b.y, bcl = vertical ? b.width : b.height;
+		return std::max<int64_t>(0, std::min(ac + acl, bc + bcl) - std::max(ac, bc));
+	}
+
+	/* One axis of the compaction. list holds the effective rectangles, displays the full
+	 * display rectangles at the same origins, which tell which monitors touch.
+	 *
+	 * In order along the axis, each monitor
+	 * - that touched monitors before it on the axis moves to the end of the furthest of them,
+	 * - otherwise, that touched a monitor on its side, moves as far as that neighbor's start did,
+	 *   or its end when the contact was in the part the neighbor lost (the neighbor with the
+	 *   longest shared edge that has already been placed),
+	 * - otherwise stays,
+	 * but never moves before the end of a placed monitor that shares part of its range on the
+	 * other axis. Monitors only move towards the start, so a layout without overlaps keeps none. */
+	inline void closeAxis(std::vector<rdpMonitor>& list, const std::vector<rdpMonitor>& displays,
+	                      bool vertical)
 	{
 		const auto pos = [vertical](const rdpMonitor& m) -> int64_t
 		{ return vertical ? m.y : m.x; };
@@ -100,21 +122,41 @@ namespace sdl_monitor_layout
 
 		for (size_t i = 0; i < order.size(); i++)
 		{
-			const auto& b = list[order[i]];
-			bool found = false;
-			int64_t target = 0;
+			const auto bi = order[i];
+			const auto& b = list[bi];
+			bool anchored = false;
+			int64_t target = pos(b);
+			int64_t floor = INT64_MIN;
+			int64_t side = 0;
+			int64_t sideShift = 0;
 			for (size_t j = 0; j < i; j++)
 			{
-				const auto& a = list[order[j]];
-				if ((pos(a) + len(a) > pos(b)) ||
-				    !spans(cross(a), crossLen(a), cross(b), crossLen(b)))
-					continue;
-				const auto end = moved[order[j]] + len(a);
-				target = found ? std::max(target, end) : end;
-				found = true;
+				const auto ai = order[j];
+				const auto& a = list[ai];
+				if (sharedEdge(displays[ai], displays[bi], vertical) > 0)
+				{
+					const auto end = moved[ai] + len(a);
+					target = anchored ? std::max(target, end) : end;
+					anchored = true;
+				}
+				const auto edge = sharedEdge(displays[ai], displays[bi], !vertical) +
+				                  sharedEdge(displays[bi], displays[ai], !vertical);
+				if (edge > side)
+				{
+					side = edge;
+					// Follow the neighbor's start, or its end when the contact was in the part
+					// the neighbor lost.
+					sideShift = moved[ai] - pos(a);
+					if (!spans(moved[ai], len(a), pos(b) + sideShift, len(b)))
+						sideShift = moved[ai] + len(a) - pos(displays[ai]) - len(displays[ai]);
+				}
+				if ((pos(a) + len(a) <= pos(b)) &&
+				    spans(cross(a), crossLen(a), cross(b), crossLen(b)))
+					floor = std::max(floor, moved[ai] + len(a));
 			}
-			if (found && (target < moved[order[i]]))
-				moved[order[i]] = target;
+			if (!anchored && (side > 0))
+				target = pos(b) + sideShift;
+			moved[bi] = std::min(pos(b), std::max(target, floor));
 		}
 
 		for (size_t x = 0; x < list.size(); x++)
@@ -127,24 +169,66 @@ namespace sdl_monitor_layout
 	}
 } // namespace sdl_monitor_layout
 
-/* A fullscreen window can be smaller than its display, for example below the notch of a MacBook,
- * while the origins still come from the full display bounds. A monitor that was below or right of
- * a shortened one would then be separated from it by a gap, and the server ignores layouts whose
- * monitors are not adjacent (MS-RDPEDISP 3.1.5.2). Move each monitor up and then left so that it
- * touches the nearest monitor before it on that axis again. If the result is not a valid layout,
- * keep the original one unless that is worse (overlapping, or also invalid while the result has no
- * overlap). Returns true when the compacted layout is used. */
-inline bool sdl_close_monitor_gaps(std::vector<rdpMonitor>& list)
+namespace sdl_monitor_layout
 {
-	const auto original = list;
-	sdl_monitor_layout::closeAxis(list, true);
-	sdl_monitor_layout::closeAxis(list, false);
-	if (sdl_monitor_layout::valid(list))
-		return true;
-	if (sdl_monitor_layout::valid(original) || sdl_monitor_layout::overlapping(list))
+	inline std::vector<rdpMonitor> flipped(std::vector<rdpMonitor> list)
 	{
-		list = original;
-		return false;
+		for (auto& m : list)
+			m.y = -(m.y + m.height);
+		return list;
 	}
-	return true;
+
+	inline int64_t displacement(const std::vector<rdpMonitor>& a, const std::vector<rdpMonitor>& b)
+	{
+		int64_t sum = 0;
+		for (size_t x = 0; x < a.size(); x++)
+			sum += std::llabs(int64_t{ a[x].x } - b[x].x) + std::llabs(int64_t{ a[x].y } - b[x].y);
+		return sum;
+	}
+
+	inline std::vector<rdpMonitor> compact(std::vector<rdpMonitor> list,
+	                                       const std::vector<rdpMonitor>& displays)
+	{
+		closeAxis(list, displays, true);
+		closeAxis(list, displays, false);
+		return list;
+	}
+} // namespace sdl_monitor_layout
+
+/* A fullscreen window can be smaller than its display, for example below the notch of a MacBook,
+ * while the origins still come from the full display bounds. Its monitor can then lose contact
+ * with the monitors that touched its display, and the server ignores layouts whose monitors are
+ * not adjacent (MS-RDPEDISP 3.1.5.2). displays holds the display rectangles in the same order as
+ * list.
+ *
+ * Two arrangements are tried. In the first, a shortened monitor keeps the top of its display and
+ * the monitors move up and then left to touch again what their displays touched. In the second, a
+ * shortened monitor keeps the bottom of its display, where the drawable of a notched display is,
+ * and the monitors move down instead. The valid one that moves the monitors least is used,
+ * preferring the first. If neither is valid, the first one without overlaps is used, else list
+ * keeps its positions. Returns true when the result is a valid layout. */
+inline bool sdl_close_monitor_gaps(std::vector<rdpMonitor>& list,
+                                   const std::vector<rdpMonitor>& displays)
+{
+	using namespace sdl_monitor_layout;
+	if (displays.size() != list.size())
+		return valid(list);
+
+	const auto top = compact(list, displays);
+	auto bottomStart = list;
+	for (size_t x = 0; x < list.size(); x++)
+		bottomStart[x].y = displays[x].y + displays[x].height - list[x].height;
+	const auto bottom = flipped(compact(flipped(bottomStart), flipped(displays)));
+
+	const bool topValid = valid(top);
+	const bool bottomValid = valid(bottom);
+	if (topValid && (!bottomValid || (displacement(top, list) <= displacement(bottom, list))))
+		list = top;
+	else if (bottomValid)
+		list = bottom;
+	else if (!overlapping(top))
+		list = top;
+	else if (!overlapping(bottom))
+		list = bottom;
+	return valid(list);
 }
