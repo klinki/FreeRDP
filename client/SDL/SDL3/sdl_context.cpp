@@ -34,6 +34,7 @@
 #include "sdl_channels.hpp"
 #include "sdl_input_mapping.hpp"
 #include "sdl_monitor.hpp"
+#include "sdl_monitor_layout.hpp"
 #include "sdl_pointer.hpp"
 #include "sdl_render_geometry.hpp"
 #include "sdl_touch.hpp"
@@ -653,7 +654,9 @@ static std::vector<rdpMonitor> sdl_web_monitors(const rdpMonitor& canvas)
 bool SdlContext::updateWindowList()
 {
 	std::vector<rdpMonitor> list;
+	std::vector<rdpMonitor> displays;
 	list.reserve(_windows.size());
+	displays.reserve(_windows.size());
 	for (const auto& win : _windows)
 	{
 		auto monitor = win.second.monitor(false);
@@ -662,6 +665,11 @@ bool SdlContext::updateWindowList()
 			continue;
 		applyMonitorScaleOverride(monitor);
 		list.push_back(monitor);
+		// The full display bounds, which tell which monitors touch each other.
+		const auto size = win.second.displaySize();
+		monitor.width = std::max(monitor.width, size.x);
+		monitor.height = std::max(monitor.height, size.y);
+		displays.push_back(monitor);
 	}
 
 	// Keep the previous valid layout until the remaining removal events arrive.
@@ -673,6 +681,9 @@ bool SdlContext::updateWindowList()
 		list.front().y = 0;
 		list.front().is_primary = true;
 	}
+	else if (!sdl_close_monitor_gaps(list, displays))
+		WLog_Print(getWLog(), WLOG_WARN,
+		           "multimon layout has monitors that are not adjacent to another one");
 
 	applyPrimaryMonitor(list);
 	Sint32 originX = list.front().x, originY = list.front().y;
@@ -712,24 +723,27 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 	 * never updated, so a session the server started at another size stayed that way. Only the
 	 * window knows its real size, so ask it in fullscreen as well. */
 	auto& w = _windows.at(id);
-	if (freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon))
+	const bool multimon = freerdp_settings_get_bool(_context->settings, FreeRDP_UseMultimon);
+	if (multimon)
 	{
-		// Keep physical geometry/ownership while multiple windows or migrated
-		// windows remain. A sole window on its owning display uses its drawable,
-		// including while fullscreen settles; on a notched MacBook this can be
-		// shorter than the physical display bounds.
-		if ((_windows.size() != 1) || (w.displayIndex() != w.monitor(false).orig_screen))
+		// A migrated window still belongs to its removed display until topology
+		// reconciliation. Each owning fullscreen window can use its drawable,
+		// which excludes the space macOS reserves above notched content.
+		if (w.displayIndex() != w.monitor(false).orig_screen)
 			return true;
+		if ((_windows.size() > 1) && !(SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN))
+			return true; // Retain physical geometry while leaving multimon fullscreen.
 	}
 
 	auto r = w.rect();
 	if ((r.w <= 0) || (r.h <= 0))
 		return true; // Retain the last valid geometry until the window settles.
-	auto m = w.monitor(true);
+	// Multimon origins stay in the shared desktop coordinate space.
+	auto m = w.monitor(!multimon);
 	applyMonitorScaleOverride(m);
 	m.width = r.w;
 	m.height = r.h;
-	w.setMonitor(m);
+	w.setMonitor(m, false);
 	return true;
 }
 

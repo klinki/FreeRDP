@@ -430,6 +430,7 @@ bool sdlDispContext::handleEvent(const SDL_WindowEvent& ev)
 			/* fallthrough */
 			WINPR_FALLTHROUGH
 		case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+		case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
 		case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 		case SDL_EVENT_WINDOW_RESIZED:
 			return updateMonitor(ev.windowID);

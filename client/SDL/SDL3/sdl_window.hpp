@@ -93,7 +93,11 @@ class SdlWindow
 	[[nodiscard]] Sint32 offsetY() const;
 
 	[[nodiscard]] rdpMonitor monitor(bool isPrimary) const;
-	void setMonitor(rdpMonitor monitor);
+	/* display: the geometry is the display's (topology), not the drawable's. Only display
+	 * geometry updates the size returned by displaySize(). */
+	void setMonitor(rdpMonitor monitor, bool display = true);
+	/* The display size from the last setMonitor() with display geometry, 0x0 before that. */
+	[[nodiscard]] SDL_Point displaySize() const;
 
 	[[nodiscard]] float scale() const;
 	[[nodiscard]] SDL_DisplayOrientation orientation() const;
@@ -202,6 +206,7 @@ class SdlWindow
 	uint64_t _livePresents=0;
 	std::unique_ptr<SdlPerformanceOverlay> _performanceOverlay;
 	rdpMonitor _monitor{};
+	SDL_Point _displaySize{};
 	std::unique_ptr<SdlTopBar> _topBar;
 	SdlTopBarRect _topBarRect{};
 	bool _topBarRectInit = false;
