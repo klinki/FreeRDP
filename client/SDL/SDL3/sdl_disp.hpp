@@ -58,6 +58,11 @@ class sdlDispContext
 	[[nodiscard]] bool sendResize(UINT64 now);
 	[[nodiscard]] bool settings_changed(const std::vector<DISPLAY_CONTROL_MONITOR_LAYOUT>& layout);
 	[[nodiscard]] bool sendLayout(const rdpMonitor* monitors, size_t nmonitors);
+	[[nodiscard]] static std::vector<DISPLAY_CONTROL_MONITOR_LAYOUT>
+	buildLayout(const rdpSettings* settings, const rdpMonitor* monitors, size_t nmonitors);
+	void captureConnectLayout();
+	void applySeed();                            // _channelMutex held
+	[[nodiscard]] bool tooSoon(UINT64 now) const; // _channelMutex held
 
 	[[nodiscard]] bool scheduleResize();
 
@@ -68,6 +73,7 @@ class sdlDispContext
 	                                             UINT32 maxMonitorAreaFactorA,
 	                                             UINT32 maxMonitorAreaFactorB);
 	static void OnActivated(void* context, const ActivatedEventArgs* e);
+	static void OnStateChanged(void* context, const StateChangedEventArgs* e);
 	static void OnGraphicsReset(void* context, const GraphicsResetEventArgs* e);
 
 	SdlContext* _sdl = nullptr;
@@ -76,7 +82,11 @@ class sdlDispContext
 	std::mutex _channelMutex;
 	std::atomic<bool> _activated{ false };
 	std::atomic<bool> _resizeRequested{ false }, _topologyRequested{ false },
-	    _forceRequested{ false };
+	    _forceRequested{ false }, _seedRequested{ false };
+	/* Layout of the monitor data sent at connect (CS_MONITOR + CS_MONITOR_EX), guarded by
+	 * _channelMutex. Empty when the connect sent no complete monitor layout. */
+	std::vector<DISPLAY_CONTROL_MONITOR_LAYOUT> _connectLayout;
+	std::vector<DISPLAY_CONTROL_MONITOR_LAYOUT> _seedLayout;
 	std::atomic<int> _resizeableUpdate{ -1 };
 	bool _pending = false, _refreshTopology = false, _forceLayout = false;
 	UINT64 _nextAttempt = 0;

@@ -2,6 +2,7 @@
  * Regression coverage for fullscreen drawable size and delayed display-channel activation.
  * Copyright 2026 FreeRDP contributors. Licensed under Apache-2.0.
  */
+#include <algorithm>
 #include <cstdio>
 #include <memory>
 #include <winpr/sysinfo.h>
@@ -408,6 +409,216 @@ static bool run()
 	disp.service(burstTime + 500);
 	if (!expect(layoutCalls == beforeActivation + 1,
 	            "usable-bounds events preserve forced same-layout channel activation"))
+		return false;
+
+	// With complete connect-time monitor data, the first channel of a connection treats that
+	// layout as sent: Windows applies it itself, and a late identical PDU would only cause a
+	// second display reconfiguration (sheltie-app/sheltie-macos#24).
+	if (!freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, TRUE) ||
+	    !freerdp_settings_set_bool(settings, FreeRDP_HasMonitorAttributes, TRUE) ||
+	    !freerdp_settings_set_uint32(settings, FreeRDP_NegotiationFlags, 0x01))
+		return false;
+	// The monitor block is only written for more than one monitor, so add a second one. The
+	// server desktop is the bounding box of both.
+	const auto setTwoMonitors = [&]()
+	{
+		const auto first = static_cast<const rdpMonitor*>(
+		    freerdp_settings_get_pointer_array(settings, FreeRDP_MonitorDefArray, 0));
+		if (!first)
+			return false;
+		rdpMonitor pair[2] = { *first, *first };
+		pair[0].x = 0;
+		pair[0].y = 0;
+		pair[0].is_primary = TRUE;
+		pair[1].x = pair[0].width;
+		pair[1].y = 0;
+		pair[1].width = 800;
+		pair[1].height = 600;
+		pair[1].is_primary = FALSE;
+		pair[1].attributes.desktopScaleFactor = 100;
+		pair[1].attributes.deviceScaleFactor = 100;
+		return freerdp_settings_set_monitor_def_array_sorted(settings, pair, 2) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth,
+		                                   static_cast<UINT32>(pair[0].width + 800)) &&
+		       freerdp_settings_set_uint32(
+		           settings, FreeRDP_DesktopHeight,
+		           static_cast<UINT32>(std::max<INT32>(pair[0].height, 600)));
+	};
+	const auto connectState = [&]()
+	{
+		StateChangedEventArgs state = {};
+		EventArgsInit(&state, "TestSDLFullscreenResize");
+		state.oldState = CONNECTION_STATE_NEGO;
+		state.newState = CONNECTION_STATE_MCS_CREATE_REQUEST;
+		return PubSub_OnStateChanged(instance->context->pubSub, instance->context, &state) >= 0;
+	};
+	// Let pending topology refreshes from the previous steps finish first: they rebuild the
+	// monitor definitions from the windows.
+	burstTime += 3000;
+	for (UINT64 offset = 0; offset <= 10000; offset += 1000)
+		disp.service(burstTime + offset);
+	burstTime += 13000;
+	const auto beforeSeed = layoutCalls;
+	if (!expect(setTwoMonitors() && connectState() &&
+	                channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "activation after a connect with monitor data succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 500, 1500, 2500 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeSeed,
+	            "an unchanged connect-time layout is not sent again after activation"))
+		return false;
+
+	// The server may accept another desktop than the client data asked for. The connect-time
+	// layout then is not what it applied, so the current one is sent.
+	burstTime += 3000;
+	const auto beforeNegotiatedMulti = layoutCalls;
+	if (!expect(connectState() &&
+	                freerdp_settings_set_uint32(
+	                    settings, FreeRDP_DesktopWidth,
+	                    freerdp_settings_get_uint32(settings, FreeRDP_DesktopWidth) - 200) &&
+	                channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "multimon activation after the server chose a smaller desktop succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 600, 1600 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeNegotiatedMulti + 1 && sentLayouts.size() == 2,
+	            "a multimon layout is sent when the server desktop differs from it"))
+		return false;
+	if (!setTwoMonitors())
+		return false;
+
+	burstTime += 3000;
+	const auto beforeChanged = layoutCalls;
+	if (!expect(connectState(), "second connect records its monitor data"))
+		return false;
+	// Change the effective scaling after the connect, the way a display change would.
+	const SdlMonitorScaleOverrides laterScales{ { physical, { physical, 175, 140 } } };
+	if (!sdl.setHotplugMonitorSelection({ physical }, laterScales) || !disp.handleEvent(bounds) ||
+	    !expect(channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "activation after the layout changed since connect succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 600, 1600 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeChanged + 1 && sentLayouts.front().DesktopScaleFactor == 175,
+	            "a layout that changed since connect is still sent, once"))
+		return false;
+
+	burstTime += 3000;
+	const auto beforeReopen = layoutCalls;
+	if (!expect(channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "channel reopened without a new connect succeeds"))
+		return false;
+	disp.service(burstTime);
+	disp.service(burstTime + 500);
+	if (!expect(layoutCalls == beforeReopen + 1,
+	            "a reopened channel without new connect data forces the current layout"))
+		return false;
+
+	// Without multimon, the client core data describes the single monitor. A layout equal to it
+	// is not sent after activation; one that differs from it (for example a fullscreen window
+	// shorter than the display on a notched Mac) still is.
+	if (!freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, FALSE) || !sdl.updateWindowList())
+		return false;
+	const auto single = static_cast<const rdpMonitor*>(
+	    freerdp_settings_get_pointer_array(settings, FreeRDP_MonitorDefArray, 0));
+	if (!expect(single && freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount) == 1,
+	            "single-monitor session has one monitor definition"))
+		return false;
+	const auto singleWidth = static_cast<UINT32>(single->width);
+	const auto singleHeight = static_cast<UINT32>(single->height);
+	const auto setCoreData = [&](UINT32 width, UINT32 height)
+	{
+		return freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, width) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, height) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DesktopPhysicalWidth,
+		                                   single->attributes.physicalWidth) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DesktopPhysicalHeight,
+		                                   single->attributes.physicalHeight) &&
+		       freerdp_settings_set_uint16(settings, FreeRDP_DesktopOrientation,
+		                                   ORIENTATION_LANDSCAPE) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor,
+		                                   single->attributes.desktopScaleFactor) &&
+		       freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor,
+		                                   single->attributes.deviceScaleFactor);
+	};
+
+	burstTime += 3000;
+	const auto beforeSingle = layoutCalls;
+	if (!expect(setCoreData(singleWidth, singleHeight) && connectState() &&
+	                channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "single-monitor activation after connect succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 500, 1500, 2500 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeSingle,
+	            "an unchanged single-monitor desktop is not sent again after activation"))
+		return false;
+
+	burstTime += 3000;
+	const auto beforeSingleChanged = layoutCalls;
+	if (!expect(setCoreData(singleWidth, singleHeight + 66) && connectState() &&
+	                channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "single-monitor activation after a larger connect-time desktop succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 600, 1600 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeSingleChanged + 1 && sentLayouts.size() == 1 &&
+	                sentLayouts.front().Height == singleHeight,
+	            "a single-monitor desktop that differs from the connect data is sent, once"))
+		return false;
+
+	// The server may accept another desktop than the core data asked for
+	// (rdp_apply_bitmap_capability_set()). The requested one must not count as sent then.
+	burstTime += 3000;
+	const auto beforeNegotiated = layoutCalls;
+	if (!expect(setCoreData(singleWidth, singleHeight) && connectState() &&
+	                freerdp_settings_set_uint32(settings, FreeRDP_DesktopWidth, 800) &&
+	                freerdp_settings_set_uint32(settings, FreeRDP_DesktopHeight, 600) &&
+	                channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "single-monitor activation after the server chose another desktop succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 600, 1600 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeNegotiated + 1 && sentLayouts.size() == 1 &&
+	                sentLayouts.front().Width == singleWidth &&
+	                sentLayouts.front().Height == singleHeight,
+	            "the drawable is sent when the server desktop differs from the request"))
+		return false;
+
+	// Multimon with a single monitor writes no monitor block: the core data carries the
+	// geometry, so that is what counts as sent.
+	if (!freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, TRUE))
+		return false;
+	burstTime += 3000;
+	const auto beforeOneMulti = layoutCalls;
+	if (!expect(setCoreData(singleWidth, singleHeight) && connectState() &&
+	                channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "one-monitor multimon activation succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 500, 1500, 2500 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeOneMulti,
+	            "a one-monitor multimon layout equal to the core data is not sent again"))
+		return false;
+
+	burstTime += 3000;
+	const auto beforeOneMultiChanged = layoutCalls;
+	// Same size, so only the source of the connect-time data decides: the monitor definition
+	// was never written, the core data's scale was.
+	const auto monitorScale = single->attributes.desktopScaleFactor;
+	if (!expect(setCoreData(singleWidth, singleHeight) &&
+	                freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor,
+	                                            monitorScale + 25) &&
+	                connectState() &&
+	                channel.DisplayControlCaps(&channel, 1, 8192, 8192) == CHANNEL_RC_OK,
+	            "one-monitor multimon activation with other core data succeeds"))
+		return false;
+	for (const UINT64 offset : { 0, 600, 1600 })
+		disp.service(burstTime + offset);
+	if (!expect(layoutCalls == beforeOneMultiChanged + 1 && sentLayouts.size() == 1 &&
+	                sentLayouts.front().DesktopScaleFactor == monitorScale,
+	            "a one-monitor multimon monitor that differs from the core data is sent"))
 		return false;
 #endif
 	return disp.uninit(&channel);
