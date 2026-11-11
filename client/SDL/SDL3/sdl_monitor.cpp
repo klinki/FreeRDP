@@ -291,39 +291,45 @@ static void sdl_shape_fullscreen_monitors(SdlContext* sdl, std::vector<rdpMonito
 
 /* With a single remote monitor, the client core data carries its scale factors. The fullscreen
  * window reports its display's scale in the first layout, so send that scale at connect already.
- * Only a default scale (100) is replaced: a scale set with /scale, /scale-desktop or
- * /scale-device, or imported from an .rdp file, is sent as asked. Only with dynamic resolution,
- * which sends that layout; without it, the core data scale stays what the session asked for. */
+ * Only with dynamic resolution, which sends that layout, and only for a factor the session left at
+ * the default 100: a factor set with /scale, /scale-desktop or /scale-device, or imported from an
+ * .rdp file, is sent as asked. An .rdp value of 100 cannot be told from the default; without an
+ * override flag the first layout replaces it with the display's scale after connect anyway.
+ * Every detection starts again from the session's factors, so a factor derived on an earlier
+ * attempt follows a display or scale change. */
 [[nodiscard]] static BOOL sdl_apply_connect_scale(SdlContext* sdl)
 {
 	rdpSettings* settings = sdl->context()->settings;
 	WINPR_ASSERT(settings);
 
-	if (!sdl_connects_fullscreen(settings) ||
-	    !freerdp_settings_get_bool(settings, FreeRDP_DynamicResolutionUpdate) ||
-	    (freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount) != 1))
-		return TRUE;
+	const auto session = sdl->sessionCoreScale();
+	UINT32 desktop = session.first;
+	UINT32 device = session.second;
+
 	auto monitor = static_cast<const rdpMonitor*>(
 	    freerdp_settings_get_pointer_array(settings, FreeRDP_MonitorDefArray, 0));
-	if (!monitor)
-		return TRUE;
+	if (sdl_connects_fullscreen(settings) &&
+	    freerdp_settings_get_bool(settings, FreeRDP_DynamicResolutionUpdate) &&
+	    (freerdp_settings_get_uint32(settings, FreeRDP_MonitorCount) == 1) && monitor)
+	{
+		const auto mask = freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags);
+		const auto wantDesktop = monitor->attributes.desktopScaleFactor;
+		const auto wantDevice = monitor->attributes.deviceScaleFactor;
+		if (((mask & FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE) == 0) && (desktop == 100) &&
+		    (wantDesktop >= 100) && (wantDesktop <= 500))
+			desktop = wantDesktop;
+		if (((mask & FREERDP_MONITOR_OVERRIDE_DEVICE_SCALE) == 0) && (device == 100) &&
+		    ((wantDevice == 100) || (wantDevice == 140) || (wantDevice == 180)))
+			device = wantDevice;
+	}
 
-	const auto mask = freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags);
-	const auto desktop = monitor->attributes.desktopScaleFactor;
-	const auto device = monitor->attributes.deviceScaleFactor;
-	if (((mask & FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE) == 0) &&
-	    (freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor) == 100) &&
-	    (desktop >= 100) && (desktop <= 500) &&
-	    !freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, desktop))
-		return FALSE;
-	if (((mask & FREERDP_MONITOR_OVERRIDE_DEVICE_SCALE) == 0) &&
-	    (freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor) == 100) &&
-	    ((device == 100) || (device == 140) || (device == 180)) &&
+	if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, desktop) ||
 	    !freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor, device))
 		return FALSE;
-	WLog_Print(sdl->getWLog(), WLOG_DEBUG, "Connect-time desktop scale %" PRIu32 "/%" PRIu32,
-	           freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor),
-	           freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor));
+	WLog_Print(sdl->getWLog(), WLOG_DEBUG,
+	           "Connect-time desktop scale %" PRIu32 "/%" PRIu32 " (session %" PRIu32 "/%" PRIu32
+	           ")",
+	           desktop, device, session.first, session.second);
 	return TRUE;
 }
 

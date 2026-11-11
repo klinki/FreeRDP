@@ -754,11 +754,12 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 	// On a notched display, macOS keeps fullscreen content below the menu bar band, so a
 	// fullscreen window as tall as the display has not finished its transition. Report the
 	// height it will have, as sent at connect, or the layout sent meanwhile differs from it.
-	// Windows that are not fullscreen or entering it keep their drawable height.
+	// Windows that are not fullscreen or entering it keep their drawable height. SDL's flag is
+	// already clear when the leave event is handled, before the session's fullscreen state
+	// observes that event, so only the flag and a request to enter count.
 	const auto now = SDL_GetTicks();
 	const bool fullscreen =
 	    ((SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN) != 0) ||
-	    _fullscreenState.windowFullscreen(w.id()) ||
 	    (_fullscreenState.pending(w.id(), now) && _fullscreenState.target());
 	const auto display = _displays.find(SDL_GetDisplayForWindow(w.window()));
 	if (fullscreen && !freerdp_settings_get_bool(_context->settings, FreeRDP_SpanMonitors) &&
@@ -1621,6 +1622,20 @@ int SdlContext::fullscreenTopInset(SDL_DisplayID id) const
 void SdlContext::setFullscreenTopInset(SDL_DisplayID id, int pixels)
 {
 	_fullscreenTopInsets[id] = pixels;
+}
+
+std::pair<UINT32, UINT32> SdlContext::sessionCoreScale()
+{
+	if (!_sessionCoreScale)
+		_sessionCoreScale = std::make_pair(
+		    freerdp_settings_get_uint32(context()->settings, FreeRDP_DesktopScaleFactor),
+		    freerdp_settings_get_uint32(context()->settings, FreeRDP_DeviceScaleFactor));
+	return *_sessionCoreScale;
+}
+
+void SdlContext::resetSessionCoreScale()
+{
+	_sessionCoreScale.reset();
 }
 
 std::vector<SDL_DisplayID> SdlContext::getDisplayIds() const

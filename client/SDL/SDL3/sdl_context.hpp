@@ -185,6 +185,11 @@ class SdlContext
 	[[nodiscard]] int fullscreenTopInset(SDL_DisplayID id) const;
 	/** Replaces a measured inset. Tests use it, since only real notched displays have one. */
 	void setFullscreenTopInset(SDL_DisplayID id, int pixels);
+	/** The core data scale factors the session asked for, recorded before monitor detection
+	 * first derives them from a display, so later detections start from them again. */
+	[[nodiscard]] std::pair<UINT32, UINT32> sessionCoreScale();
+	/** Records the session's factors again on the next detection. Tests use it. */
+	void resetSessionCoreScale();
 	[[nodiscard]] std::vector<SDL_DisplayID> getDisplayIds() const;
 	[[nodiscard]] bool parseMonitorScaleOverrides(const char* value);
 	[[nodiscard]] bool validateMonitorScaleOverrides() const;
@@ -392,6 +397,7 @@ class SdlContext
 
 	std::map<SDL_DisplayID, rdpMonitor> _displays;
 	std::map<SDL_DisplayID, int> _fullscreenTopInsets;
+	std::optional<std::pair<UINT32, UINT32>> _sessionCoreScale;
 	std::map<SDL_WindowID, SdlWindow> _windows;
 	std::map<SDL_DisplayID, std::pair<SDL_Rect, SDL_Rect>> _offsets;
 	/* Actual per-window fullscreen state, the bar's window, pin and visibility. */

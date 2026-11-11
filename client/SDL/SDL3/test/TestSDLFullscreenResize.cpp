@@ -157,12 +157,25 @@ static bool run()
 			native.window.windowID = window->id();
 			return sdl.handleEvent(native);
 		};
-		if (!observe(false) ||
+		// The leave event itself publishes the windowed height, before the session's fullscreen
+		// state observes it.
+		// The session saw the window enter fullscreen. SDL applies this windowed size when the
+		// window leaves fullscreen.
+		if (!observe(true) ||
 		    !SDL_SetWindowSize(window->window(), pixels.w, sdl.getDisplay(display).height))
 			return false;
-		std::ignore = SDL_SyncWindow(window->window());
 		sdl.setFullscreenTopInset(display, 66);
+		if (!observe(false))
+			return false;
+		auto published = static_cast<const rdpMonitor*>(
+		    freerdp_settings_get_pointer(settings, FreeRDP_MonitorDefArray));
 		const auto windowed = window->rect();
+		printf("Windowed drawable after leaving fullscreen: %dx%d pixels\n", windowed.w,
+		       windowed.h);
+		if (!expect((windowed.h == pixels.h) && (window->monitor(true).height == pixels.h) &&
+		                published && (published->height == pixels.h),
+		            "leaving fullscreen publishes the full windowed height"))
+			return false;
 		const bool kept = (SDL_GetWindowFlags(window->window()) & SDL_WINDOW_FULLSCREEN) == 0 &&
 		                  (windowed.h == pixels.h) && sdl.updateWindow(window->id()) &&
 		                  (window->monitor(true).height == pixels.h);

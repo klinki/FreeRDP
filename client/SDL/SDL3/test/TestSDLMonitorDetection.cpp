@@ -274,13 +274,26 @@ static bool connectGeometry(SdlContext& sdl, SDL_DisplayID display)
 	            "fullscreen without an inset connects with the display's height"))
 		return false;
 
-	if (!sdl.setHotplugMonitorSelection({ display },
-	                                    { { display, SdlMonitorScaleOverride{ display, 175, 180 } } }))
+	auto scales = [&](UINT32 desktop, UINT32 device)
+	{
+		return sdl.setHotplugMonitorSelection(
+		    { display }, { { display, SdlMonitorScaleOverride{ display, desktop, device } } });
+	};
+	auto core = [&](UINT32 desktop, UINT32 device)
+	{
+		return sdl_detect_monitors(&sdl, &width, &height) &&
+		       (freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor) == desktop) &&
+		       (freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor) == device);
+	};
+	if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, 100) ||
+	    !freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor, 100) || !scales(175, 180))
 		return false;
-	if (!expect(sdl_detect_monitors(&sdl, &width, &height) &&
-	                (freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor) == 175) &&
-	                (freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor) == 180),
-	            "single-monitor fullscreen connects with the display's scale"))
+	sdl.resetSessionCoreScale();
+	if (!expect(core(175, 180), "single-monitor fullscreen connects with the display's scale"))
+		return false;
+	// A later attempt, after the display's scale changed, derives both factors again.
+	if (!scales(200, 140) ||
+	    !expect(core(200, 140), "a derived scale follows a later display scale change"))
 		return false;
 
 	// A scale imported from an .rdp file sets no override flag; it is still sent as asked.
@@ -288,7 +301,7 @@ static bool connectGeometry(SdlContext& sdl, SDL_DisplayID display)
 		std::unique_ptr<rdpFile, decltype(&freerdp_client_rdp_file_free)> file(
 		    freerdp_client_rdp_file_new(), freerdp_client_rdp_file_free);
 		static const char rdp[] = "desktopscalefactor:i:140\r\n";
-		if (!file ||
+		if (!file || !scales(175, 180) ||
 		    !freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, 100) ||
 		    !freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor, 100) ||
 		    !freerdp_client_parse_rdp_file_buffer(file.get(), reinterpret_cast<const BYTE*>(rdp),
@@ -296,23 +309,20 @@ static bool connectGeometry(SdlContext& sdl, SDL_DisplayID display)
 		    !freerdp_client_populate_settings_from_rdp_file(file.get(), settings))
 			return false;
 	}
+	sdl.resetSessionCoreScale();
 	if (!expect((freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags) &
 	             FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE) == 0 &&
-	                sdl_detect_monitors(&sdl, &width, &height) &&
-	                (freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor) == 140) &&
-	                (freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor) == 180),
-	            "a desktop scale from an .rdp file is kept; the default device scale follows the "
-	            "display"))
+	                core(140, 180) && core(140, 180),
+	            "a desktop scale from an .rdp file is kept on every attempt; the default device "
+	            "scale follows the display"))
 		return false;
 
 	if (!freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor, 100) ||
 	    !freerdp_settings_set_uint32(settings, FreeRDP_DeviceScaleFactor, 100) ||
 	    !freerdp_settings_set_bool(settings, FreeRDP_DynamicResolutionUpdate, FALSE))
 		return false;
-	return expect(sdl_detect_monitors(&sdl, &width, &height) &&
-	                  (freerdp_settings_get_uint32(settings, FreeRDP_DesktopScaleFactor) == 100) &&
-	                  (freerdp_settings_get_uint32(settings, FreeRDP_DeviceScaleFactor) == 100),
-	              "without dynamic resolution the session's scale is kept");
+	sdl.resetSessionCoreScale();
+	return expect(core(100, 100), "without dynamic resolution the session's scale is kept");
 }
 
 static bool run()
