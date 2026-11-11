@@ -751,6 +751,16 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 	auto r = w.rect();
 	if ((r.w <= 0) || (r.h <= 0))
 		return true; // Retain the last valid geometry until the window settles.
+	// On a notched display, macOS keeps a window's content below the menu bar band, so a
+	// window as tall as the display has not finished its fullscreen transition. Report the
+	// height it will have, as sent at connect, or the layout sent meanwhile differs from it.
+	const auto display = _displays.find(SDL_GetDisplayForWindow(w.window()));
+	if (display != _displays.end())
+	{
+		const auto inset = fullscreenTopInset(display->first);
+		if ((inset > 0) && (r.h == display->second.height) && (r.h > inset))
+			r.h -= inset;
+	}
 	// Multimon origins stay in the shared desktop coordinate space.
 	auto m = w.monitor(!multimon);
 	applyMonitorScaleOverride(m);

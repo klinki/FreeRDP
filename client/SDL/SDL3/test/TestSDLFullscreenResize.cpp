@@ -130,6 +130,22 @@ static bool run()
 	            "repeated same-size events do not resend the layout"))
 		return false;
 
+	// A window as tall as a notched display is still in its fullscreen transition; it reports
+	// the height it will have (sheltie-app/sheltie-macos#24). The dummy driver's fullscreen
+	// window fills its display, a native run on a notched Mac already has the shorter height.
+	if (pixels.h == sdl.getDisplay(display).height)
+	{
+		sdl.setFullscreenTopInset(display, 66);
+		const bool shortened =
+		    sdl.updateWindow(window->id()) && (window->monitor(true).height == pixels.h - 66);
+		sdl.setFullscreenTopInset(display, 0);
+		if (!expect(shortened, "a full-height window on a notched display reports its fullscreen "
+		                       "height") ||
+		    !expect(sdl.updateWindow(window->id()) && (window->monitor(true).height == pixels.h),
+		            "without an inset the window reports its drawable height"))
+			return false;
+	}
+
 	// A removed display's window may already have migrated to the laptop. Do not
 	// replace its physical ownership/geometry until topology reconciliation.
 	if (!freerdp_settings_set_bool(settings, FreeRDP_UseMultimon, TRUE))
