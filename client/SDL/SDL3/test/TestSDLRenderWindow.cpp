@@ -484,6 +484,24 @@ int main()
 		SDL_ClearError();
 	}
 	ok = expect(SDL_GetError()[0] == '\0', "reconnect teardown used a stale SDL resource") && ok;
+	{
+		// The display size feeds the multimon compaction and must survive the move into the
+		// window map; the drawable size set afterwards must not replace it.
+		auto window = SdlWindow::create(SDL_GetPrimaryDisplay(), "Display size", 0, 640, 480);
+		rdpMonitor display = {};
+		display.width = 1024;
+		display.height = 834;
+		window.setMonitor(display);
+		SdlWindow moved(std::move(window));
+		const auto size = moved.displaySize();
+		ok = expect(size.x == 1024 && size.y == 834, "moving a window dropped its display size") &&
+		     ok;
+		display.height = 768;
+		moved.setMonitor(display, false);
+		ok = expect(moved.displaySize().y == 834 && moved.monitor(false).height == 768,
+		            "the drawable size replaced the display size") &&
+		     ok;
+	}
 	TTF_Quit();
 	SDL_Quit();
 	return ok ? 0 : 1;

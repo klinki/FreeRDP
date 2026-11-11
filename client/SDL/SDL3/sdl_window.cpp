@@ -117,6 +117,7 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
       _offset_y(other._offset_y),
       _renderMetrics(std::move(other._renderMetrics)), _liveMetrics(std::move(other._liveMetrics)),
       _livePresents(other._livePresents), _performanceOverlay(std::move(other._performanceOverlay)), _monitor(other._monitor),
+      _displaySize(other._displaySize),
       _topBar(std::move(other._topBar))
 {
 	other._window = nullptr;
