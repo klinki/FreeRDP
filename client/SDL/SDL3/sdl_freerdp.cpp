@@ -385,6 +385,10 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 							/* Windows are born hidden so startup never flashes
 							 * them on the wrong display; reveal here, after
 							 * placement and fullscreen state are final. */
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+							if (auto bridge = SdlLauncher::active(); bridge && bridge->hosted())
+								break; // Hosted: the window is never shown.
+#endif
 							if (window->window())
 								SDL_ShowWindow(window->window());
 						}

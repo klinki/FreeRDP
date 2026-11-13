@@ -268,6 +268,10 @@ void SdlWindow::setBordered(bool bordered)
 
 void SdlWindow::raise()
 {
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active(); bridge && bridge->hosted())
+		return; // Raising a hidden window would show it.
+#endif
 	SDL_RaiseWindow(_window);
 	std::ignore = SDL_SyncWindow(_window);
 }

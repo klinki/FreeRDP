@@ -9,6 +9,7 @@ Usage: hosted-spike.py ENGINE SAMPLE_SERVER HOST_BINARY [--seconds N] [--log DIR
 """
 import argparse
 import importlib.util
+import json
 import os
 from pathlib import Path
 import shutil
@@ -31,6 +32,11 @@ def main():
     parser.add_argument("host")
     parser.add_argument("--seconds", type=float, default=12)
     parser.add_argument("--log", type=Path, default=Path.cwd())
+    parser.add_argument("--target", help="host[:port] of a real RDP host instead of the sample server")
+    parser.add_argument("--user", default="launcher-test")
+    parser.add_argument("--password", default="synthetic-test-password")
+    parser.add_argument("--size", default="800x500")
+    parser.add_argument("--script", type=Path, help="JSON list of [seconds, type, fields] to send instead of the default")
     parser.add_argument("--icon", type=Path, default=here.parent.parent / "server/Sample/test_icon.bmp")
     args = parser.parse_args()
     args.log.mkdir(parents=True, exist_ok=True)
@@ -66,8 +72,10 @@ def main():
             client.socket.settimeout(30)
             hello = client.hello()
             print("capabilities:", ",".join(hello["capabilities"]))
-            client.send("start", arguments=[f"/v:127.0.0.1:{relay.port}", "/u:launcher-test", "/size:800x500",
-                                             "/rfx", "/timeout:5000", "-multitransport", "-auto-reconnect",
+            target = args.target or f"127.0.0.1:{relay.port}"
+            codec = ["/gfx"] if args.target else ["/rfx"]
+            client.send("start", arguments=[f"/v:{target}", f"/u:{args.user}", f"/size:{args.size}", *codec,
+                                             "/timeout:5000", "-multitransport", "-auto-reconnect",
                                              "+dynamic-resolution"],
                         displaySelections=[], thumbnailsEnabled=False, renderMode="hosted")
             script = [  # seconds after the layer appears, command, fields
@@ -79,10 +87,13 @@ def main():
                 (5.6, "input", dict(action="key", keyCode=0, down=False, flags=0)),
                 (7.0, "layout", dict(width=800, height=500, scale=2)),
             ]
+            if args.script:
+                script = [tuple(entry) for entry in json.loads(args.script.read_text())]
             shown = None
             end = None
             client.socket.settimeout(0.2)
-            while end is None or time.monotonic() < end:
+            give_up = time.monotonic() + 30
+            while (end is None and time.monotonic() < give_up) or (end is not None and time.monotonic() < end):
                 while shown and script and time.monotonic() - shown >= script[0][0]:
                     _, kind, fields = script.pop(0)
                     print(f"t={time.monotonic() - shown:.1f} send {kind} {fields}")
@@ -91,7 +102,11 @@ def main():
                     message = client.receive()
                 except (TimeoutError, socket.timeout):
                     continue
-                smoke.respond(client, message)
+                if message["type"] == "auth_request":
+                    client.send("auth_response", requestId=message["requestId"], accepted=True, username=args.user,
+                                domain="", password=args.password)
+                else:
+                    smoke.respond(client, message)
                 if message["type"] != "state" or message.get("phase"):
                     print("event:", {k: v for k, v in message.items() if k not in ("v", "sessionId")})
                 if message["type"] == "ended":

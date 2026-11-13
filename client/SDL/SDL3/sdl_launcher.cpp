@@ -1281,6 +1281,7 @@ bool SdlLauncher::exportHostedWindow(SDL_Window* window, SDL_Renderer* renderer)
 	if (!_hosted || !id || _hostedWindows.count(id))
 		return false;
 	const auto context = exportLayer(window, renderer);
+	fprintf(stderr, "[hosted] export window %u -> context %u\n", id, context);
 	if (!context)
 		return false;
 	_hostedWindows.insert(id);
