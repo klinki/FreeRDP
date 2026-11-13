@@ -40,6 +40,8 @@ def main():
     parser.add_argument("--mode", choices=("hosted", "sdl"), default="hosted")
     parser.add_argument("--perf", action="store_true", help="enable engine performance samples and log them")
     parser.add_argument("--host-size", nargs=2, default=None, help="host window size in points")
+    parser.add_argument("--multimon", type=int, default=0, help="use this many displays (skipping --skip-display)")
+    parser.add_argument("--skip-display", default="M27UP", help="display name not to use for --multimon")
     parser.add_argument("--icon", type=Path, default=here.parent.parent / "server/Sample/test_icon.bmp")
     args = parser.parse_args()
     args.log.mkdir(parents=True, exist_ok=True)
@@ -60,6 +62,7 @@ def main():
         server = subprocess.Popen([args.sample_server, "--local-only", f"--port={label}", f"--cert={certificate}",
                                    f"--key={key}"], cwd=folder, env=environment, stdout=server_log, stderr=server_log)
         host = client = relay = None
+        hosts = []
         try:
             candidates = [folder / f"tfreerdp-server.{label}", Path("/tmp") / f"tfreerdp-server.{label}"]
             deadline = time.monotonic() + 10
@@ -75,12 +78,17 @@ def main():
             client.socket.settimeout(30)
             hello = client.hello()
             print("capabilities:", ",".join(hello["capabilities"]))
+            selections, size = [], [f"/size:{args.size}"]
+            if args.multimon:
+                usable = [d for d in hello["displays"] if args.skip_display not in d["name"]][:args.multimon]
+                print("displays:", [(d["name"], d["pixelWidth"], d["pixelHeight"], d["scale"]) for d in usable])
+                selections, size = [dict(uuid=d["uuid"]) for d in usable], ["/multimon"]
             target = args.target or f"127.0.0.1:{relay.port}"
             codec = ["/gfx"] if args.target else ["/rfx"]
-            client.send("start", arguments=[f"/v:{target}", f"/u:{args.user}", f"/size:{args.size}", *codec,
+            client.send("start", arguments=[f"/v:{target}", f"/u:{args.user}", *size, *codec,
                                              "/timeout:5000", "-multitransport", "-auto-reconnect",
                                              "+dynamic-resolution"],
-                        displaySelections=[], thumbnailsEnabled=False, performanceSupported=args.perf,
+                        displaySelections=selections, thumbnailsEnabled=False, performanceSupported=args.perf,
                         **(dict(renderMode="hosted") if args.mode == "hosted" else {}))
             script = [  # seconds after the layer appears, command, fields
                 (3.0, "layout", dict(width=640, height=400, scale=2)),
@@ -137,13 +145,22 @@ def main():
                     print("event:", {k: v for k, v in message.items() if k not in ("v", "sessionId")})
                 if message["type"] == "ended":
                     break
-                if message["type"] == "layer_context" and not host:
-                    shown = time.monotonic()
-                    end = shown + args.seconds
-                    host = subprocess.Popen([args.host, str(int(message["contextId"]))] + (["-", *args.host_size] if args.host_size else []),
-                                            stdout=(args.log / "host.log").open("wb"), stderr=subprocess.STDOUT)
+                if message["type"] == "layer_context":
+                    if shown is None:
+                        shown = time.monotonic()
+                        end = shown + args.seconds
+                    index = len(hosts)
+                    command = [args.host, str(int(message["contextId"]))]
+                    if args.multimon:  # half-size host windows side by side, layer scaled to fit
+                        command += ["-", str(message["width"] / 2), str(message["height"] / 2), "0.5",
+                                    str(60 + index * 700), f"window {int(message['windowId'])}"]
+                    elif args.host_size:
+                        command += ["-", *args.host_size]
+                    host = subprocess.Popen(command, stdout=(args.log / f"host{index or ''}.log").open("wb"),
+                                            stderr=subprocess.STDOUT)
+                    hosts.append(host)
         finally:
-            for process in (host, getattr(client, "process", None), server):
+            for process in (*hosts, getattr(client, "process", None), server):
                 if process and process.poll() is None:
                     process.terminate()
             if relay:

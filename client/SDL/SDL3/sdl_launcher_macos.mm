@@ -113,9 +113,10 @@ void SdlLauncher::resizeLayer(SDL_Window* window, SDL_Renderer* renderer, int wi
 	{
 		CAMetalLayer* layer = (__bridge CAMetalLayer*)SDL_GetRenderMetalLayer(renderer);
 		NSView* view = hostedViews[@(SDL_GetWindowID(window))];
-		if (!layer || !view)
+		if (!layer)
 			return;
-		[view setFrameSize:NSMakeSize(width, height)];
+		if (view)
+			[view setFrameSize:NSMakeSize(width, height)];
 		[CATransaction begin];
 		[CATransaction setDisableActions:YES];
 		layer.bounds = CGRectMake(0, 0, width, height);

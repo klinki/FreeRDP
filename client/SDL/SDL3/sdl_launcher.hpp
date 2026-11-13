@@ -55,6 +55,7 @@ class SdlLauncher
 	bool hosted() const { return _hosted; }
 	void prepareHostedWindow(); // before a window's renderer is created
 	bool exportHostedWindow(SDL_Window* window, SDL_Renderer* renderer); // true when newly exported
+	double sizeHostedWindow(SDL_Window* window, SDL_Renderer* renderer); // SDL main thread only
 	void serviceHosted(); // SDL main thread only
 	uint32_t takeScreenRefreshRequests() { const auto modes = _screenRefresh.exchange(0); return _connected && !_cancelled && !_terminal ? modes : 0; }
 	bool takeScreenRefreshRequest() { return takeScreenRefreshRequests() != 0; }

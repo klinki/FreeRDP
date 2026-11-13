@@ -27,6 +27,38 @@
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 #include "sdl_launcher.hpp"
 #endif
+
+/* Spike for sheltie-macos#13: a hosted window is never shown, so its own pixel size and scale are
+ * stale. Read them from the renderer's drawable, which hosted mode sizes itself. */
+static bool spikeHosted()
+{
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active())
+		return bridge->hosted();
+#endif
+	return false;
+}
+static bool spikeWindowPixels(SDL_Window* window, int* w, int* h)
+{
+	if (spikeHosted())
+	{
+		if (auto renderer = SDL_GetRenderer(window))
+			return SDL_GetRenderOutputSize(renderer, w, h);
+	}
+	return SDL_GetWindowSizeInPixels(window, w, h);
+}
+static float spikeWindowDensity(SDL_Window* window)
+{
+	int w = 0, h = 0, pw = 0, ph = 0;
+	if (spikeHosted() && SDL_GetWindowSize(window, &w, &h) && w > 0 && spikeWindowPixels(window, &pw, &ph) &&
+	    pw > 0)
+		return static_cast<float>(pw) / static_cast<float>(w);
+	return SDL_GetWindowPixelDensity(window);
+}
+static float spikeWindowDisplayScale(SDL_Window* window)
+{
+	return spikeHosted() ? spikeWindowDensity(window) : SDL_GetWindowDisplayScale(window);
+}
 #include "sdl_render_geometry.hpp"
 #include "sdl_utils.hpp"
 
@@ -103,6 +135,9 @@ SdlWindow::SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect&
 	if (auto bridge = SdlLauncher::active()) bridge->prepareHostedWindow();
 #endif
 	_renderer = SDL_CreateRenderer(_window, nullptr);
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active()) bridge->sizeHostedWindow(_window, _renderer);
+#endif
 	_topBar = std::make_unique<SdlTopBar>(_renderer, title);
 
 	std::ignore = resizeToScale();
@@ -234,7 +269,7 @@ SDL_Point SdlWindow::displaySize() const
 
 float SdlWindow::scale() const
 {
-	return SDL_GetWindowDisplayScale(_window);
+	return spikeWindowDisplayScale(_window);
 }
 
 SDL_DisplayOrientation SdlWindow::orientation() const
@@ -317,7 +352,7 @@ bool SdlWindow::resizeToScale()
 	if ((SDL_GetWindowFlags(_window) & SDL_WINDOW_FULLSCREEN) != 0)
 		return true;
 
-	float pd = SDL_GetWindowPixelDensity(_window);
+	float pd = spikeWindowDensity(_window);
 	if (pd <= 0.0f)
 		pd = 1.0f;
 
@@ -347,7 +382,7 @@ bool SdlWindow::ensureRenderTarget()
 
 	int w = 0;
 	int h = 0;
-	if (!SDL_GetWindowSizeInPixels(_window, &w, &h))
+	if (!spikeWindowPixels(_window, &w, &h))
 		return false;
 	if (w <= 0 || h <= 0)
 		return false;
@@ -595,7 +630,7 @@ rdpMonitor SdlWindow::query(SDL_Window* window, SDL_DisplayID id, bool forceAsPr
 {
 	if (!window)
 		return {};
-	return makeMonitor(id, rect(window, forceAsPrimary), SDL_GetWindowDisplayScale(window),
+	return makeMonitor(id, rect(window, forceAsPrimary), spikeWindowDisplayScale(window),
 	                   forceAsPrimary);
 }
 
@@ -631,7 +666,7 @@ SDL_Rect SdlWindow::rect(SDL_Window* window, bool forceAsPrimary)
 			return {};
 	}
 
-	if (!SDL_GetWindowSizeInPixels(window, &rect.w, &rect.h))
+	if (!spikeWindowPixels(window, &rect.w, &rect.h))
 		return {};
 
 	const auto flags = SDL_GetWindowFlags(window);
@@ -688,8 +723,8 @@ SdlWindow::HighDPIMode SdlWindow::isHighDPIWindowsMode(SDL_Window* window)
 		return MODE_INVALID;
 
 	const auto cs = SDL_GetDisplayContentScale(id);
-	const auto ds = SDL_GetWindowDisplayScale(window);
-	const auto pd = SDL_GetWindowPixelDensity(window);
+	const auto ds = spikeWindowDisplayScale(window);
+	const auto pd = spikeWindowDensity(window);
 
 	/* mac os x style, but no HighDPI display */
 	if ((cs == 1.0f) && (ds == 1.0f) && (pd == 1.0f))
@@ -822,7 +857,7 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 	if (!SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr))
 		return false;
 
-    if(_performanceOverlay) _performanceOverlay->draw(pixelViewport(),SDL_GetWindowPixelDensity(_window));
+    if(_performanceOverlay) _performanceOverlay->draw(pixelViewport(),spikeWindowDensity(_window));
 	if (showTopBar && !drawTopBar(pinned, pointer))
 		return false;
 
@@ -924,7 +959,7 @@ bool SdlWindow::renderStalledFrame(int dots, bool showTopBar, bool pinned,
 			return false;
 	}
 	if (_performanceOverlay)
-		_performanceOverlay->draw(pixelViewport(), SDL_GetWindowPixelDensity(_window));
+		_performanceOverlay->draw(pixelViewport(), spikeWindowDensity(_window));
 
 	const auto viewport = pixelViewport();
 	if (viewport.w <= 0 || viewport.h <= 0)
@@ -1033,7 +1068,7 @@ static SDL_Rect windowViewport(SDL_Window* window)
 	int width = 0;
 	int height = 0;
 	if (window)
-		SDL_GetWindowSizeInPixels(window, &width, &height);
+		spikeWindowPixels(window, &width, &height);
 	return { 0, 0, width, height };
 }
 
@@ -1042,7 +1077,7 @@ SDL_Rect SdlWindow::pixelViewport() const
 	int width = 0;
 	int height = 0;
 	if (_window)
-		SDL_GetWindowSizeInPixels(_window, &width, &height);
+		spikeWindowPixels(_window, &width, &height);
 	return { 0, 0, width, height };
 }
 
@@ -1155,7 +1190,7 @@ bool SdlWindow::paintResizeFrame(SDL_Surface* surface, SDL_Point off, bool conte
 
 	int ww = 0;
 	int wh = 0;
-	SDL_GetWindowSizeInPixels(_window, &ww, &wh);
+	spikeWindowPixels(_window, &ww, &wh);
 	/* The visible frame; the ring outside it (the resize band) stays fully transparent. */
 	const SDL_FRect frame = { static_cast<float>(inset.x), static_cast<float>(inset.y),
 		                      static_cast<float>(ww - inset.x - inset.w),
@@ -1333,8 +1368,8 @@ static float probeDisplayScale(SDL_DisplayID id, float& pixelDensity)
 	pixelDensity = 0.0f;
 	if (window)
 	{
-		scale = SDL_GetWindowDisplayScale(window.get());
-		pixelDensity = SDL_GetWindowPixelDensity(window.get());
+		scale = spikeWindowDisplayScale(window.get());
+		pixelDensity = spikeWindowDensity(window.get());
 	}
 	if (pixelDensity <= 0.0f)
 	{

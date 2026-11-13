@@ -1202,12 +1202,14 @@ bool SdlLauncher::hostedInput(WINPR_JSON* event)
 			window = SDL_GetWindowID(windows[0]);
 		SDL_free(windows);
 	}
-	if (!window)
-		return true; // Not presented yet.
 	auto num = [&](const char* key) {
 		const auto value = item(event, key);
 		return value && WINPR_JSON_IsNumber(value) ? WINPR_JSON_GetNumberValue(value) : 0.0;
 	};
+	if (const auto requested = static_cast<uint32_t>(num("windowId")))
+		window = requested; // Multi-monitor: the launcher names the window the event belongs to.
+	if (!window)
+		return true; // Not presented yet.
 	const auto kind = str(event, "action");
 	const bool down = WINPR_JSON_IsTrue(item(event, "down"));
 	SDL_Event ev{};
@@ -1283,6 +1285,25 @@ void SdlLauncher::prepareHostedWindow()
 		SDL_SetHint(SDL_HINT_VIDEO_METAL_AUTO_RESIZE_DRAWABLE, "0");
 }
 
+/* A hidden window keeps the backing scale of the display it was created on, so neither its
+ * pixel size nor its drawable can be trusted. Size the drawable from the display the window is
+ * placed on; hosted windows then read their pixel size from the renderer (see sdl_window.cpp). */
+double SdlLauncher::sizeHostedWindow(SDL_Window* window, SDL_Renderer* renderer)
+{
+	if (!_hosted || !window || !renderer)
+		return 1.0;
+	int width = 0, height = 0;
+	SDL_GetWindowSize(window, &width, &height);
+	double scale = 1.0;
+	if (const auto mode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(window));
+	    mode && mode->pixel_density > 0)
+		scale = mode->pixel_density;
+	resizeLayer(window, renderer, width, height, scale);
+	/* No window event follows, so make SDL's renderer re-read its output size now. */
+	std::ignore = SDL_SetRenderLogicalPresentation(renderer, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED);
+	return scale;
+}
+
 bool SdlLauncher::exportHostedWindow(SDL_Window* window, SDL_Renderer* renderer)
 {
 	const auto id = SDL_GetWindowID(window);
@@ -1297,12 +1318,13 @@ bool SdlLauncher::exportHostedWindow(SDL_Window* window, SDL_Renderer* renderer)
 		_hostedWindow = id;
 	int width = 0, height = 0;
 	SDL_GetWindowSize(window, &width, &height);
+	const double scale = sizeHostedWindow(window, renderer);
 	auto event = message("layer_context");
 	number(event.get(), "windowId", id);
 	number(event.get(), "contextId", context);
 	number(event.get(), "width", width);
 	number(event.get(), "height", height);
-	WINPR_JSON_AddNumberToObject(event.get(), "scale", SDL_GetWindowPixelDensity(window));
+	WINPR_JSON_AddNumberToObject(event.get(), "scale", scale);
 	std::ignore = send(std::move(event));
 	return true;
 }
