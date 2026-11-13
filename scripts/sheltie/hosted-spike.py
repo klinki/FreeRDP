@@ -37,6 +37,9 @@ def main():
     parser.add_argument("--password", default="synthetic-test-password")
     parser.add_argument("--size", default="800x500")
     parser.add_argument("--script", type=Path, help="JSON list of [seconds, type, fields] to send instead of the default")
+    parser.add_argument("--mode", choices=("hosted", "sdl"), default="hosted")
+    parser.add_argument("--perf", action="store_true", help="enable engine performance samples and log them")
+    parser.add_argument("--host-size", nargs=2, default=None, help="host window size in points")
     parser.add_argument("--icon", type=Path, default=here.parent.parent / "server/Sample/test_icon.bmp")
     args = parser.parse_args()
     args.log.mkdir(parents=True, exist_ok=True)
@@ -77,7 +80,8 @@ def main():
             client.send("start", arguments=[f"/v:{target}", f"/u:{args.user}", f"/size:{args.size}", *codec,
                                              "/timeout:5000", "-multitransport", "-auto-reconnect",
                                              "+dynamic-resolution"],
-                        displaySelections=[], thumbnailsEnabled=False, renderMode="hosted")
+                        displaySelections=[], thumbnailsEnabled=False, performanceSupported=args.perf,
+                        **(dict(renderMode="hosted") if args.mode == "hosted" else {}))
             script = [  # seconds after the layer appears, command, fields
                 (3.0, "layout", dict(width=640, height=400, scale=2)),
                 (5.0, "input", dict(action="mouse_move", x=320, y=200)),
@@ -96,6 +100,17 @@ def main():
             while (end is None and time.monotonic() < give_up) or (end is not None and time.monotonic() < end):
                 while shown and script and time.monotonic() - shown >= script[0][0]:
                     _, kind, fields = script.pop(0)
+                    if kind == "cpu":
+                        pids = dict(engine=client.process.pid, windowserver=int(subprocess.check_output(
+                            ["pgrep", "-x", "WindowServer"]).split()[0]))
+                        if host:
+                            pids["host"] = host.pid
+                        sample = {}
+                        for name, pid in pids.items():
+                            m, sec = subprocess.check_output(["ps", "-o", "cputime=", "-p", str(pid)]).decode().strip().rsplit(":", 1)
+                            sample[name] = sum(int(x) * 60 ** i for i, x in enumerate(reversed(m.split(":")))) * 60 + float(sec)
+                        print(f"t={time.monotonic() - shown:.1f} cpu {json.dumps(dict(wall=time.monotonic(), **sample))}")
+                        continue
                     print(f"t={time.monotonic() - shown:.1f} send {kind} {fields}")
                     client.send(kind, **fields)
                 try:
@@ -107,6 +122,17 @@ def main():
                                 domain="", password=args.password)
                 else:
                     smoke.respond(client, message)
+                if message["type"] == "performance_sample":
+                    with (args.log / "perf.jsonl").open("a") as out:
+                        out.write(json.dumps(message["performance"]) + "\n")
+                    continue
+                if message["type"] == "state" and message.get("phase") == "connected":
+                    if args.perf:
+                        client.send("performance_control", performanceEnabled=True, performanceOverlayVisible=False,
+                                    performanceGeneration=1)
+                    if args.mode == "sdl" and shown is None:
+                        shown = time.monotonic()
+                        end = shown + args.seconds
                 if message["type"] != "state" or message.get("phase"):
                     print("event:", {k: v for k, v in message.items() if k not in ("v", "sessionId")})
                 if message["type"] == "ended":
@@ -114,7 +140,7 @@ def main():
                 if message["type"] == "layer_context" and not host:
                     shown = time.monotonic()
                     end = shown + args.seconds
-                    host = subprocess.Popen([args.host, str(int(message["contextId"]))],
+                    host = subprocess.Popen([args.host, str(int(message["contextId"]))] + (["-", *args.host_size] if args.host_size else []),
                                             stdout=(args.log / "host.log").open("wb"), stderr=subprocess.STDOUT)
         finally:
             for process in (host, getattr(client, "process", None), server):

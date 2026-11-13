@@ -505,7 +505,7 @@ bool SdlLauncher::receive(Json event)
 		return true;
 	}
 	if (type == "input")
-		return _hosted && hostedInput(event.get());
+		return hostedInput(event.get()); // Also accepted on the SDL window path, for spike comparisons.
 	if (type == "close_response")
 	{
 		bool accepted = false;
@@ -1193,7 +1193,15 @@ static SDL_Keymod hostedMods(uint64_t flags)
  * handles; SDL_PushEvent is thread-safe and wakes the main loop. */
 bool SdlLauncher::hostedInput(WINPR_JSON* event)
 {
-	const auto window = _hostedWindow.load();
+	auto window = _hostedWindow.load();
+	if (!window && !_hosted)
+	{
+		int count = 0;
+		auto windows = SDL_GetWindows(&count);
+		if (windows && count > 0)
+			window = SDL_GetWindowID(windows[0]);
+		SDL_free(windows);
+	}
 	if (!window)
 		return true; // Not presented yet.
 	auto num = [&](const char* key) {
