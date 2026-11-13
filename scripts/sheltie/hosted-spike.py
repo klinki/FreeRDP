@@ -96,6 +96,7 @@ def main():
             codec = ["/gfx"] if args.target else ["/rfx"]
             client.send("start", arguments=[f"/v:{target}", f"/u:{args.user}", *size, *codec,
                                              "/timeout:5000", "-multitransport", "-auto-reconnect",
+                                             "/scale-desktop:100", "/scale-device:100",
                                              "+dynamic-resolution"],
                         displaySelections=selections, thumbnailsEnabled=False, performanceSupported=args.perf,
                         **render)
