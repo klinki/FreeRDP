@@ -484,6 +484,28 @@ bool SdlLauncher::receive(Json event)
 		_focus = true;
 		return true;
 	}
+	if (type == "layout")
+	{
+		const auto width = WINPR_JSON_GetNumberValue(item(event.get(), "width"));
+		const auto height = WINPR_JSON_GetNumberValue(item(event.get(), "height"));
+		const auto scale = WINPR_JSON_GetNumberValue(item(event.get(), "scale"));
+		if (!_hosted || !std::isfinite(width) || !std::isfinite(height) || !std::isfinite(scale) ||
+		    width < 64 || width > 8192 || height < 64 || height > 8192 || scale < 1 || scale > 4)
+			return false;
+		{
+			std::lock_guard lock(_mutex);
+			_layoutWidth = static_cast<int>(width);
+			_layoutHeight = static_cast<int>(height);
+			_layoutScale = scale;
+		}
+		_layoutPending = true;
+		SDL_Event wake{};
+		wake.type = SDL_EVENT_USER;
+		std::ignore = SDL_PushEvent(&wake);
+		return true;
+	}
+	if (type == "input")
+		return _hosted && hostedInput(event.get());
 	if (type == "close_response")
 	{
 		bool accepted = false;
@@ -558,6 +580,7 @@ bool SdlLauncher::receive(Json event)
 		_thumbnailEnabled = WINPR_JSON_IsTrue(thumbnails);
 		_reverseMouseWheel = WINPR_JSON_IsTrue(reverseWheel);
 		_rememberWindowSize = WINPR_JSON_IsTrue(remember);
+		_hosted = str(event.get(), "renderMode") == "hosted";
 		_started = true;
 		_start = std::move(event);
 	}
@@ -1114,8 +1137,194 @@ void SdlLauncher::ended(int exitCode, const std::string& detail)
 		outcome = "disconnected";
 	terminal(outcome, exitCode, detail);
 }
+/* macOS virtual key code to SDL scancode, for keys forwarded by the launcher. */
+static SDL_Scancode hostedScancode(int keyCode)
+{
+	static const SDL_Scancode table[] = {
+		SDL_SCANCODE_A, SDL_SCANCODE_S, SDL_SCANCODE_D, SDL_SCANCODE_F, SDL_SCANCODE_H,
+		SDL_SCANCODE_G, SDL_SCANCODE_Z, SDL_SCANCODE_X, SDL_SCANCODE_C, SDL_SCANCODE_V,
+		SDL_SCANCODE_NONUSBACKSLASH, SDL_SCANCODE_B, SDL_SCANCODE_Q, SDL_SCANCODE_W, SDL_SCANCODE_E,
+		SDL_SCANCODE_R, SDL_SCANCODE_Y, SDL_SCANCODE_T, SDL_SCANCODE_1, SDL_SCANCODE_2,
+		SDL_SCANCODE_3, SDL_SCANCODE_4, SDL_SCANCODE_6, SDL_SCANCODE_5, SDL_SCANCODE_EQUALS,
+		SDL_SCANCODE_9, SDL_SCANCODE_7, SDL_SCANCODE_MINUS, SDL_SCANCODE_8, SDL_SCANCODE_0,
+		SDL_SCANCODE_RIGHTBRACKET, SDL_SCANCODE_O, SDL_SCANCODE_U, SDL_SCANCODE_LEFTBRACKET,
+		SDL_SCANCODE_I, SDL_SCANCODE_P, SDL_SCANCODE_RETURN, SDL_SCANCODE_L, SDL_SCANCODE_J,
+		SDL_SCANCODE_APOSTROPHE, SDL_SCANCODE_K, SDL_SCANCODE_SEMICOLON, SDL_SCANCODE_BACKSLASH,
+		SDL_SCANCODE_COMMA, SDL_SCANCODE_SLASH, SDL_SCANCODE_N, SDL_SCANCODE_M, SDL_SCANCODE_PERIOD,
+		SDL_SCANCODE_TAB, SDL_SCANCODE_SPACE, SDL_SCANCODE_GRAVE, SDL_SCANCODE_BACKSPACE,
+		SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_ESCAPE, SDL_SCANCODE_RGUI, SDL_SCANCODE_LGUI,
+		SDL_SCANCODE_LSHIFT, SDL_SCANCODE_CAPSLOCK, SDL_SCANCODE_LALT, SDL_SCANCODE_LCTRL,
+		SDL_SCANCODE_RSHIFT, SDL_SCANCODE_RALT, SDL_SCANCODE_RCTRL, SDL_SCANCODE_UNKNOWN,
+		SDL_SCANCODE_F17, SDL_SCANCODE_KP_PERIOD, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_KP_MULTIPLY,
+		SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_KP_PLUS, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_NUMLOCKCLEAR,
+		SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_KP_DIVIDE,
+		SDL_SCANCODE_KP_ENTER, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_KP_MINUS, SDL_SCANCODE_F18,
+		SDL_SCANCODE_F19, SDL_SCANCODE_KP_EQUALS, SDL_SCANCODE_KP_0, SDL_SCANCODE_KP_1,
+		SDL_SCANCODE_KP_2, SDL_SCANCODE_KP_3, SDL_SCANCODE_KP_4, SDL_SCANCODE_KP_5,
+		SDL_SCANCODE_KP_6, SDL_SCANCODE_KP_7, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_KP_8,
+		SDL_SCANCODE_KP_9, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_UNKNOWN,
+		SDL_SCANCODE_F5, SDL_SCANCODE_F6, SDL_SCANCODE_F7, SDL_SCANCODE_F3, SDL_SCANCODE_F8,
+		SDL_SCANCODE_F9, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_F11, SDL_SCANCODE_UNKNOWN,
+		SDL_SCANCODE_F13, SDL_SCANCODE_F16, SDL_SCANCODE_F14, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_F10,
+		SDL_SCANCODE_APPLICATION, SDL_SCANCODE_F12, SDL_SCANCODE_UNKNOWN, SDL_SCANCODE_F15,
+		SDL_SCANCODE_INSERT, SDL_SCANCODE_HOME, SDL_SCANCODE_PAGEUP, SDL_SCANCODE_DELETE,
+		SDL_SCANCODE_F4, SDL_SCANCODE_END, SDL_SCANCODE_F2, SDL_SCANCODE_PAGEDOWN, SDL_SCANCODE_F1,
+		SDL_SCANCODE_LEFT, SDL_SCANCODE_RIGHT, SDL_SCANCODE_DOWN, SDL_SCANCODE_UP
+	};
+	if (keyCode < 0 || keyCode >= static_cast<int>(sizeof(table) / sizeof(table[0])))
+		return SDL_SCANCODE_UNKNOWN;
+	return table[keyCode];
+}
+
+/* NSEvent modifier flags, including the device-dependent left/right bits, to SDL modifiers. */
+static SDL_Keymod hostedMods(uint64_t flags)
+{
+	Uint32 mods = SDL_KMOD_NONE;
+	if (flags & (1ULL << 16)) mods |= SDL_KMOD_CAPS;
+	if (flags & (1ULL << 17)) mods |= (flags & 0x4) ? SDL_KMOD_RSHIFT : SDL_KMOD_LSHIFT;
+	if ((flags & (1ULL << 17)) && (flags & 0x2)) mods |= SDL_KMOD_LSHIFT;
+	if (flags & (1ULL << 18)) mods |= (flags & 0x2000) ? SDL_KMOD_RCTRL : SDL_KMOD_LCTRL;
+	if (flags & (1ULL << 19)) mods |= (flags & 0x40) ? SDL_KMOD_RALT : SDL_KMOD_LALT;
+	if (flags & (1ULL << 20)) mods |= (flags & 0x10) ? SDL_KMOD_RGUI : SDL_KMOD_LGUI;
+	return static_cast<SDL_Keymod>(mods);
+}
+
+/* Bridge reader thread. Turns a launcher input message into the SDL event the client already
+ * handles; SDL_PushEvent is thread-safe and wakes the main loop. */
+bool SdlLauncher::hostedInput(WINPR_JSON* event)
+{
+	const auto window = _hostedWindow.load();
+	if (!window)
+		return true; // Not presented yet.
+	auto num = [&](const char* key) {
+		const auto value = item(event, key);
+		return value && WINPR_JSON_IsNumber(value) ? WINPR_JSON_GetNumberValue(value) : 0.0;
+	};
+	const auto kind = str(event, "kind");
+	const bool down = WINPR_JSON_IsTrue(item(event, "down"));
+	SDL_Event ev{};
+	const auto now = SDL_GetTicksNS();
+	if (kind == "key")
+	{
+		const auto mods = hostedMods(static_cast<uint64_t>(num("flags")));
+		const auto scancode = hostedScancode(static_cast<int>(num("keyCode")));
+		if (scancode == SDL_SCANCODE_UNKNOWN)
+			return true;
+		SDL_SetModState(mods);
+		ev.key.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+		ev.key.timestamp = now;
+		ev.key.windowID = window;
+		ev.key.scancode = scancode;
+		ev.key.key = SDL_GetKeyFromScancode(scancode, mods, false);
+		ev.key.mod = mods;
+		ev.key.down = down;
+		ev.key.repeat = WINPR_JSON_IsTrue(item(event, "repeat"));
+	}
+	else if (kind == "mouse_move")
+	{
+		ev.motion.type = SDL_EVENT_MOUSE_MOTION;
+		ev.motion.timestamp = now;
+		ev.motion.windowID = window;
+		ev.motion.state = _hostedButtons.load();
+		ev.motion.x = static_cast<float>(num("x"));
+		ev.motion.y = static_cast<float>(num("y"));
+		ev.motion.xrel = static_cast<float>(num("dx"));
+		ev.motion.yrel = static_cast<float>(num("dy"));
+	}
+	else if (kind == "mouse_button")
+	{
+		const auto button = static_cast<Uint8>(num("button"));
+		if (button < 1 || button > 5)
+			return false;
+		if (down)
+			_hostedButtons.fetch_or(SDL_BUTTON_MASK(button));
+		else
+			_hostedButtons.fetch_and(~SDL_BUTTON_MASK(button));
+		ev.button.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+		ev.button.timestamp = now;
+		ev.button.windowID = window;
+		ev.button.button = button;
+		ev.button.down = down;
+		ev.button.clicks = static_cast<Uint8>(std::max(1.0, num("clicks")));
+		ev.button.x = static_cast<float>(num("x"));
+		ev.button.y = static_cast<float>(num("y"));
+	}
+	else if (kind == "wheel")
+	{
+		ev.wheel.type = SDL_EVENT_MOUSE_WHEEL;
+		ev.wheel.timestamp = now;
+		ev.wheel.windowID = window;
+		ev.wheel.x = static_cast<float>(num("dx"));
+		ev.wheel.y = static_cast<float>(num("dy"));
+		ev.wheel.integer_x = static_cast<Sint32>(num("dx"));
+		ev.wheel.integer_y = static_cast<Sint32>(num("dy"));
+		ev.wheel.direction = SDL_MOUSEWHEEL_NORMAL;
+		ev.wheel.mouse_x = static_cast<float>(num("x"));
+		ev.wheel.mouse_y = static_cast<float>(num("y"));
+	}
+	else
+		return false;
+	std::ignore = SDL_PushEvent(&ev);
+	return true;
+}
+
+void SdlLauncher::prepareHostedWindow()
+{
+	/* A view detached from its window would compute a 1x drawable; hosted mode sizes it itself. */
+	if (_hosted)
+		SDL_SetHint(SDL_HINT_VIDEO_METAL_AUTO_RESIZE_DRAWABLE, "0");
+}
+
+bool SdlLauncher::exportHostedWindow(SDL_Window* window, SDL_Renderer* renderer)
+{
+	const auto id = SDL_GetWindowID(window);
+	if (!_hosted || !id || _hostedWindows.count(id))
+		return false;
+	const auto context = exportLayer(window, renderer);
+	if (!context)
+		return false;
+	_hostedWindows.insert(id);
+	if (!_hostedWindow)
+		_hostedWindow = id;
+	int width = 0, height = 0;
+	SDL_GetWindowSize(window, &width, &height);
+	auto event = message("layer_context");
+	number(event.get(), "windowId", id);
+	number(event.get(), "contextId", context);
+	number(event.get(), "width", width);
+	number(event.get(), "height", height);
+	WINPR_JSON_AddNumberToObject(event.get(), "scale", SDL_GetWindowPixelDensity(window));
+	std::ignore = send(std::move(event));
+	return true;
+}
+
+void SdlLauncher::serviceHosted()
+{
+	if (!_layoutPending.exchange(false))
+		return;
+	int width = 0, height = 0;
+	double scale = 1.0;
+	{
+		std::lock_guard lock(_mutex);
+		width = _layoutWidth;
+		height = _layoutHeight;
+		scale = _layoutScale;
+	}
+	auto window = SDL_GetWindowFromID(_hostedWindow.load());
+	auto renderer = window ? SDL_GetRenderer(window) : nullptr;
+	if (!window || !renderer)
+	{
+		_layoutPending = true; // Not presented yet; apply once the window exists.
+		return;
+	}
+	/* Layer first: SDL's renderer reads the drawable size on the window's resize event. */
+	resizeLayer(window, renderer, width, height, scale);
+	std::ignore = SDL_SetWindowSize(window, width, height);
+}
+
 void SdlLauncher::serviceFocus()
 {
+	serviceHosted();
 	if (_rememberWindowSize && _geometryWindow)
 	{
 		if (auto window = SDL_GetWindowFromID(_geometryWindow)) observeWindowGeometry(window, 0);

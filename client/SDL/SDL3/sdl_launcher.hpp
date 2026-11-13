@@ -5,6 +5,7 @@
 #include <condition_variable>
 #include <deque>
 #include <map>
+#include <set>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -50,6 +51,11 @@ class SdlLauncher
 	bool cancelled() const;
 	bool hadConnected() const;
 	void serviceFocus(); // SDL main thread only
+	/* Spike for sheltie-macos#13: windows stay hidden and their layers are shown by the launcher. */
+	bool hosted() const { return _hosted; }
+	void prepareHostedWindow(); // before a window's renderer is created
+	bool exportHostedWindow(SDL_Window* window, SDL_Renderer* renderer); // true when newly exported
+	void serviceHosted(); // SDL main thread only
 	uint32_t takeScreenRefreshRequests() { const auto modes = _screenRefresh.exchange(0); return _connected && !_cancelled && !_terminal ? modes : 0; }
 	bool takeScreenRefreshRequest() { return takeScreenRefreshRequests() != 0; }
 	bool requestClose(); // SDL main thread: queues a decision; never waits.
@@ -71,6 +77,15 @@ class SdlLauncher
 	static bool isAuthenticationError(UINT32 error);
 
   private:
+	bool hostedInput(WINPR_JSON* event);
+	static uint32_t exportLayer(SDL_Window* window, SDL_Renderer* renderer);
+	static void resizeLayer(SDL_Window* window, SDL_Renderer* renderer, int width, int height,
+	                        double scale);
+	std::atomic<bool> _hosted{ false }, _layoutPending{ false };
+	std::atomic<uint32_t> _hostedWindow{ 0 }, _hostedButtons{ 0 };
+	std::set<uint32_t> _hostedWindows; // SDL main thread only
+	int _layoutWidth = 0, _layoutHeight = 0; // guarded by _mutex
+	double _layoutScale = 1.0;               // guarded by _mutex
 	Json message(const char* type);
 	Json request(Json event, const char* responseType);
 	bool send(Json event);

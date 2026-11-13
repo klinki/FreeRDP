@@ -147,7 +147,7 @@ if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON)
   set(SDL_LAUNCHER_BRIDGE_ENABLED ON)
   set(CMAKE_OBJCXX_STANDARD 17)
   list(APPEND SRCS sdl_launcher.cpp sdl_launcher.hpp sdl_launcher_macos.mm)
-  list(APPEND LIBS "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit")
+  list(APPEND LIBS "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit" "-framework QuartzCore")
   add_compile_definitions(WITH_SDL_LAUNCHER_BRIDGE)
 endif()
 

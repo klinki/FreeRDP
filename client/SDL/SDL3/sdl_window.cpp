@@ -99,6 +99,9 @@ SdlWindow::SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect&
 	SDL_SetHint(SDL_HINT_APP_NAME, "");
 	std::ignore = SDL_SyncWindow(_window);
 
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active()) bridge->prepareHostedWindow();
+#endif
 	_renderer = SDL_CreateRenderer(_window, nullptr);
 	_topBar = std::make_unique<SdlTopBar>(_renderer, title);
 

@@ -2874,6 +2874,15 @@ bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects, bool remoteCo
 	{
 		if (SDL_GetWindowFlags(window.second.window()) & SDL_WINDOW_HIDDEN)
 		{
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+			if (auto bridge = SdlLauncher::active(); bridge && bridge->hosted())
+			{
+				/* Hosted: the window is never shown; the launcher displays its layer. */
+				if (bridge->exportHostedWindow(window.second.window(), window.second.renderer()))
+					firstShow = true;
+				continue;
+			}
+#endif
 			SDL_ShowWindow(window.second.window());
 			SDL_RaiseWindow(window.second.window());
 			firstShow = true;
