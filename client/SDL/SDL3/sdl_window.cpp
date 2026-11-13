@@ -83,7 +83,10 @@ static float spikeWindowDensity(SDL_Window* window)
 }
 static float spikeWindowDisplayScale(SDL_Window* window)
 {
-	return spikeHosted() ? spikeWindowDensity(window) : SDL_GetWindowDisplayScale(window);
+	/* Left as SDL reports it: feeding the drawable's density in here made hosted sessions ask
+	 * the server for 200 % scaling whatever the scale arguments said. What a hosted window
+	 * should report as its display scale has to be defined by the launcher. */
+	return SDL_GetWindowDisplayScale(window);
 }
 #include "sdl_render_geometry.hpp"
 #include "sdl_utils.hpp"
