@@ -56,6 +56,10 @@ class SdlLauncher
 	void prepareHostedWindow(); // before a window's renderer is created
 	bool exportHostedWindow(SDL_Window* window, SDL_Renderer* renderer); // true when newly exported
 	double sizeHostedWindow(SDL_Window* window, SDL_Renderer* renderer); // SDL main thread only
+	/* Spike, IOSurface variant: frames go into shared surfaces instead of an exported layer. */
+	bool surfaceMode() const { return _surface; }
+	SDL_Texture* surfaceTarget(SDL_Window* window, SDL_Renderer* renderer); // SDL main thread only
+	void surfacePresent(SDL_Window* window);                                // SDL main thread only
 	void serviceHosted(); // SDL main thread only
 	uint32_t takeScreenRefreshRequests() { const auto modes = _screenRefresh.exchange(0); return _connected && !_cancelled && !_terminal ? modes : 0; }
 	bool takeScreenRefreshRequest() { return takeScreenRefreshRequests() != 0; }
@@ -82,7 +86,9 @@ class SdlLauncher
 	static uint32_t exportLayer(SDL_Window* window, SDL_Renderer* renderer);
 	static void resizeLayer(SDL_Window* window, SDL_Renderer* renderer, int width, int height,
 	                        double scale);
-	std::atomic<bool> _hosted{ false }, _layoutPending{ false };
+	std::atomic<bool> _hosted{ false }, _layoutPending{ false }, _surface{ false };
+	std::string _surfaceService; // set before _surface
+	static bool connectSurfaceHost(const char* service);
 	std::atomic<uint32_t> _hostedWindow{ 0 }, _hostedButtons{ 0 };
 	std::set<uint32_t> _hostedWindows; // SDL main thread only
 	int _layoutWidth = 0, _layoutHeight = 0; // guarded by _mutex

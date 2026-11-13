@@ -37,7 +37,8 @@ def main():
     parser.add_argument("--password", default="synthetic-test-password")
     parser.add_argument("--size", default="800x500")
     parser.add_argument("--script", type=Path, help="JSON list of [seconds, type, fields] to send instead of the default")
-    parser.add_argument("--mode", choices=("hosted", "sdl"), default="hosted")
+    parser.add_argument("--mode", choices=("hosted", "sdl", "surface"), default="hosted")
+    parser.add_argument("--surface-host", help="ioshost binary for --mode surface")
     parser.add_argument("--perf", action="store_true", help="enable engine performance samples and log them")
     parser.add_argument("--host-size", nargs=2, default=None, help="host window size in points")
     parser.add_argument("--multimon", type=int, default=0, help="use this many displays (skipping --skip-display)")
@@ -78,6 +79,14 @@ def main():
             client.socket.settimeout(30)
             hello = client.hello()
             print("capabilities:", ",".join(hello["capabilities"]))
+            render = dict(renderMode="hosted") if args.mode == "hosted" else {}
+            if args.mode == "surface":
+                service = f"cz.spike.sheltie.{os.getpid()}"
+                host = subprocess.Popen([args.surface_host, service, "thread", "-", *(args.host_size or ["800", "500"])],
+                                        stdout=(args.log / "host.log").open("wb"), stderr=subprocess.STDOUT)
+                hosts.append(host)
+                time.sleep(0.8)
+                render = dict(renderMode="surface", surfaceService=service)
             selections, size = [], [f"/size:{args.size}"]
             if args.multimon:
                 usable = [d for d in hello["displays"] if args.skip_display not in d["name"]][:args.multimon]
@@ -89,7 +98,7 @@ def main():
                                              "/timeout:5000", "-multitransport", "-auto-reconnect",
                                              "+dynamic-resolution"],
                         displaySelections=selections, thumbnailsEnabled=False, performanceSupported=args.perf,
-                        **(dict(renderMode="hosted") if args.mode == "hosted" else {}))
+                        **render)
             script = [  # seconds after the layer appears, command, fields
                 (3.0, "layout", dict(width=640, height=400, scale=2)),
                 (5.0, "input", dict(action="mouse_move", x=320, y=200)),
@@ -149,6 +158,8 @@ def main():
                     if shown is None:
                         shown = time.monotonic()
                         end = shown + args.seconds
+                    if args.mode == "surface":
+                        continue
                     index = len(hosts)
                     command = [args.host, str(int(message["contextId"]))]
                     if args.multimon:  # half-size host windows side by side, layer scaled to fit

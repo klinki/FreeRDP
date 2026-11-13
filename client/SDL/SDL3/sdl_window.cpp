@@ -38,6 +38,32 @@ static bool spikeHosted()
 #endif
 	return false;
 }
+/* IOSurface variant: "the screen" is the current shared surface, and presenting means
+ * finishing the pass on it and telling the launcher which surface is ready. */
+static bool spikeScreenTarget(SDL_Window* window, SDL_Renderer* renderer)
+{
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active(); bridge && bridge->surfaceMode())
+	{
+		if (auto texture = bridge->surfaceTarget(window, renderer))
+			return SDL_SetRenderTarget(renderer, texture);
+	}
+#endif
+	return SDL_SetRenderTarget(renderer, nullptr);
+}
+static bool spikePresent(SDL_Window* window, SDL_Renderer* renderer)
+{
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active(); bridge && bridge->surfaceMode())
+	{
+		if (!SDL_SetRenderTarget(renderer, nullptr) || !SDL_FlushRenderer(renderer))
+			return false;
+		bridge->surfacePresent(window);
+		return true;
+	}
+#endif
+	return SDL_RenderPresent(renderer);
+}
 static bool spikeWindowPixels(SDL_Window* window, int* w, int* h)
 {
 	if (spikeHosted())
@@ -852,7 +878,7 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 		return false;
 
 	/* Copy accumulated render target to screen and present */
-	if (!SDL_SetRenderTarget(_renderer, nullptr))
+	if (!spikeScreenTarget(_window, _renderer))
 		return false;
 	if (!SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr))
 		return false;
@@ -863,7 +889,7 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 
     const auto liveStart=_liveMetrics.nowNs();
     auto presentTimer = _renderMetrics.beginPresent();
-    const auto result=SDL_RenderPresent(_renderer);
+    const auto result=spikePresent(_window, _renderer);
     if (_liveMetrics.enabled()) {
         if (result) {
             const auto now=_liveMetrics.nowNs();
@@ -944,7 +970,7 @@ bool SdlWindow::renderStalledFrame(int dots, bool showTopBar, bool pinned,
 	 * it stays readable and usable while reconnecting. The render target
 	 * itself is never touched, so the next normal frame paints clean with no
 	 * explicit clear needed. */
-	if (!SDL_SetRenderTarget(_renderer, nullptr))
+	if (!spikeScreenTarget(_window, _renderer))
 		return false;
 	if (_renderTarget)
 	{
@@ -1026,7 +1052,7 @@ bool SdlWindow::updateStalledSurface(int dots, bool showTopBar, bool pinned,
 	/* Stalled overlay presents are counted separately from present_calls so
 	 * that identical-input comparisons of present_calls stay stable. */
 	_renderMetrics.noteStalledPresent();
-	return SDL_RenderPresent(_renderer);
+	return spikePresent(_window, _renderer);
 }
 
 SdlTopBarRect SdlWindow::topBarRect() const
@@ -1083,7 +1109,7 @@ SDL_Rect SdlWindow::pixelViewport() const
 
 bool SdlWindow::rebuildDesktopTextures()
 {
-    if (!_renderer || !SDL_SetRenderTarget(_renderer, nullptr)) return false;
+    if (!_renderer || !spikeScreenTarget(_window, _renderer)) return false;
     if (_renderTarget) SDL_DestroyTexture(_renderTarget);
     if (_gdiTexture) SDL_DestroyTexture(_gdiTexture);
     _renderTarget = nullptr; _gdiTexture = nullptr; _gdiTextureW = _gdiTextureH = 0;
@@ -1245,10 +1271,10 @@ bool SdlWindow::paintResizeFrame(SDL_Surface* surface, SDL_Point off, bool conte
 		}
 	}
 
-	if (!SDL_SetRenderTarget(_renderer, nullptr))
+	if (!spikeScreenTarget(_window, _renderer))
 		return false;
 	std::ignore = SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr);
-	std::ignore = SDL_RenderPresent(_renderer);
+	std::ignore = spikePresent(_window, _renderer);
 	return true;
 }
 

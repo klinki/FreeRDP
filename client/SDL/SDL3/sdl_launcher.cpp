@@ -580,7 +580,10 @@ bool SdlLauncher::receive(Json event)
 		_thumbnailEnabled = WINPR_JSON_IsTrue(thumbnails);
 		_reverseMouseWheel = WINPR_JSON_IsTrue(reverseWheel);
 		_rememberWindowSize = WINPR_JSON_IsTrue(remember);
-		_hosted = str(event.get(), "renderMode") == "hosted";
+		const auto renderMode = str(event.get(), "renderMode");
+		_surfaceService = str(event.get(), "surfaceService");
+		_surface = renderMode == "surface" && !_surfaceService.empty();
+		_hosted = renderMode == "hosted" || _surface;
 		_started = true;
 		_start = std::move(event);
 	}
@@ -1309,10 +1312,19 @@ bool SdlLauncher::exportHostedWindow(SDL_Window* window, SDL_Renderer* renderer)
 	const auto id = SDL_GetWindowID(window);
 	if (!_hosted || !id || _hostedWindows.count(id))
 		return false;
-	const auto context = exportLayer(window, renderer);
-	fprintf(stderr, "[hosted] export window %u -> context %u\n", id, context);
-	if (!context)
-		return false;
+	uint32_t context = 0;
+	if (_surface)
+	{
+		if (!connectSurfaceHost(_surfaceService.c_str()))
+			return false;
+	}
+	else
+	{
+		context = exportLayer(window, renderer);
+		fprintf(stderr, "[hosted] export window %u -> context %u\n", id, context);
+		if (!context)
+			return false;
+	}
 	_hostedWindows.insert(id);
 	if (!_hostedWindow)
 		_hostedWindow = id;
