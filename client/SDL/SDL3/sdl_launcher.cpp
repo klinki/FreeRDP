@@ -1200,7 +1200,7 @@ bool SdlLauncher::hostedInput(WINPR_JSON* event)
 		const auto value = item(event, key);
 		return value && WINPR_JSON_IsNumber(value) ? WINPR_JSON_GetNumberValue(value) : 0.0;
 	};
-	const auto kind = str(event, "kind");
+	const auto kind = str(event, "action");
 	const bool down = WINPR_JSON_IsTrue(item(event, "down"));
 	SDL_Event ev{};
 	const auto now = SDL_GetTicksNS();

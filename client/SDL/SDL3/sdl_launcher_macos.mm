@@ -53,6 +53,9 @@ extern "C" CGSConnectionID CGSMainConnectionID(void);
 static NSMutableDictionary<NSNumber*, CAContext*>* hostedContexts;
 static NSMutableDictionary<NSNumber*, NSView*>* hostedViews;
 static id hostedActivity;
+#if __has_feature(objc_arc)
+#error This file assumes manual reference counting.
+#endif
 
 uint32_t SdlLauncher::exportLayer(SDL_Window* window, SDL_Renderer* renderer)
 {
@@ -67,12 +70,13 @@ uint32_t SdlLauncher::exportLayer(SDL_Window* window, SDL_Renderer* renderer)
 			return 0;
 		if (!hostedContexts)
 		{
-			hostedContexts = [NSMutableDictionary dictionary];
-			hostedViews = [NSMutableDictionary dictionary];
+			/* alloc/init: this file is built without ARC, so autoreleased objects would dangle. */
+			hostedContexts = [[NSMutableDictionary alloc] init];
+			hostedViews = [[NSMutableDictionary alloc] init];
 			/* No visible window: keep App Nap from throttling the session. */
-			hostedActivity = [[NSProcessInfo processInfo]
+			hostedActivity = [[[NSProcessInfo processInfo]
 			    beginActivityWithOptions:NSActivityUserInitiated | NSActivityLatencyCritical
-			                      reason:@"Hosted remote desktop session"];
+			                      reason:@"Hosted remote desktop session"] retain];
 		}
 		NSNumber* key = @(SDL_GetWindowID(window));
 		/* While SDL's Metal view is in the window the exported layer shows nothing. */
