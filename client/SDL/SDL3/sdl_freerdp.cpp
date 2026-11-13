@@ -186,6 +186,7 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 			if (auto bridge = SdlLauncher::active())
 			{
 				bridge->serviceFocus();
+				bridge->serviceHosted();
 				sdl->requestScreenRefreshModes(bridge->takeScreenRefreshRequests());
 				sdl->servicePerformance();
 			}
@@ -199,6 +200,7 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 				if (auto bridge = SdlLauncher::active())
 				{
 					bridge->serviceFocus();
+				bridge->serviceHosted();
 					sdl->requestScreenRefreshModes(bridge->takeScreenRefreshRequests());
 					sdl->servicePerformance();
 				}

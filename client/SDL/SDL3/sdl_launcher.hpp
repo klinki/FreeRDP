@@ -10,6 +10,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <array>
 #include <freerdp/freerdp.h>
 #include <winpr/json.h>
 #include "sdl_monitor_selection.hpp"
@@ -50,6 +51,8 @@ class SdlLauncher
 	bool cancelled() const;
 	bool hadConnected() const;
 	void serviceFocus(); // SDL main thread only
+	/** Hosted rendering: applies queued layouts, announces windows, notices a lost launcher. */
+	void serviceHosted(); // SDL main thread only
 	uint32_t takeScreenRefreshRequests() { const auto modes = _screenRefresh.exchange(0); return _connected && !_cancelled && !_terminal ? modes : 0; }
 	bool takeScreenRefreshRequest() { return takeScreenRefreshRequests() != 0; }
 	bool requestClose(); // SDL main thread: queues a decision; never waits.
@@ -71,6 +74,16 @@ class SdlLauncher
 	static bool isAuthenticationError(UINT32 error);
 
   private:
+	struct HostedLayout
+	{
+		uint32_t window = 0;
+		int width = 0; // points
+		int height = 0;
+		float scale = 1.0f;
+	};
+	bool hostedLayout(WINPR_JSON* event);
+	std::vector<HostedLayout> _hostedLayouts;                   // guarded by _mutex
+	std::map<uint32_t, std::array<int, 3>> _hostedAnnounced;    // SDL main thread only
 	Json message(const char* type);
 	Json request(Json event, const char* responseType);
 	bool send(Json event);

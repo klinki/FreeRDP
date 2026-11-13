@@ -83,3 +83,20 @@ python3 -m unittest discover -s scripts/sheltie/tests
 
 Locally built runtimes use the installed Homebrew versions and are for testing;
 published runtimes come from the workflow.
+
+## Hosted rendering tools
+
+`hosted-host.m` and `hosted-driver.py` exercise hosted rendering
+(`client/SDL/SDL3/launcher-bridge.md`) without the launcher. The host stands in
+for the launcher's windows: it starts the engine with the surface port and shows
+the surfaces it receives. The driver answers the bridge prompts and plays a
+script of bridge commands. Build the host as described at the top of
+`hosted-host.m`, then:
+
+```sh
+python3 scripts/sheltie/hosted-driver.py build/launcher/client/SDL/SDL3/sdl-freerdp \
+  build/launcher/server/Sample/sfreerdp-server build/launcher/hosted-host --log /tmp/hosted
+```
+
+Add `--target HOST --user NAME --password PASSWORD` for a real host instead of
+the loopback sample server. These are development tools and are not packaged.

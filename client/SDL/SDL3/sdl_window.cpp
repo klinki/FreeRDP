@@ -100,10 +100,11 @@ SdlWindow::SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect&
 	SDL_SetHint(SDL_HINT_APP_NAME, "");
 	std::ignore = SDL_SyncWindow(_window);
 
-	/* Hosted: the requested size is in pixels and the launcher's scale is not known yet, so
-	 * start from this display's; the launcher's first layout replaces it. */
+	/* Hosted: the requested size is in pixels. The scale is the one the launcher gave at
+	 * start, or this display's; the launcher's first layout replaces both. */
 	if (_window)
-		std::ignore = SdlHosted::setLayout(SDL_GetWindowID(_window), { rect.w, rect.h, pd });
+		std::ignore = SdlHosted::setLayout(SDL_GetWindowID(_window),
+		                                   { rect.w, rect.h, SdlHosted::initialScale(pd) });
 
 	_renderer = SDL_CreateRenderer(_window, nullptr);
 	_topBar = std::make_unique<SdlTopBar>(_renderer, title);

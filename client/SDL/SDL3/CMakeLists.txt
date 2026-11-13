@@ -244,7 +244,7 @@ if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
   add_executable(TestSDLRenderWindow test/TestSDLRenderWindow.cpp sdl_window.cpp sdl_utils.cpp)
   # sdl_window.cpp reports window state through the bridge when it is compiled in.
   if(SDL_LAUNCHER_BRIDGE_ENABLED)
-    target_sources(TestSDLRenderWindow PRIVATE sdl_launcher.cpp sdl_launcher_macos.mm)
+    target_sources(TestSDLRenderWindow PRIVATE sdl_launcher.cpp sdl_launcher_macos.mm sdl_hosted_surface.mm)
   endif()
   target_link_libraries(TestSDLRenderWindow PRIVATE ${LIBS})
   set_target_properties(TestSDLRenderWindow PROPERTIES RUNTIME_OUTPUT_DIRECTORY
@@ -380,7 +380,10 @@ if(SDL_LAUNCHER_TEST AND APPLE)
   set_tests_properties(TestSDLInputInitialization PROPERTIES TIMEOUT 30)
 endif()
 if(SDL_LAUNCHER_BRIDGE_ENABLED AND SDL_LAUNCHER_TEST)
-  add_executable(TestSDLLauncherTransport test/TestSDLLauncherTransport.cpp sdl_launcher.cpp sdl_launcher_macos.mm)
+  add_executable(
+    TestSDLLauncherTransport test/TestSDLLauncherTransport.cpp sdl_launcher.cpp sdl_launcher_macos.mm
+                             sdl_hosted_surface.mm
+  )
   target_link_libraries(TestSDLLauncherTransport PRIVATE winpr freerdp freerdp-client Threads::Threads
                         SDL3::SDL3 "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit")
   add_test(NAME TestSDLLauncherTransport COMMAND TestSDLLauncherTransport)

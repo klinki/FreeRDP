@@ -279,9 +279,11 @@ Frames do not travel on the JSON bridge. The launcher creates a Mach receive
 right, registers a send right to it in registered-port slot 0
 (`mach_ports_register`) while it starts the client, and the client reads it once
 at startup with `mach_ports_lookup`. No bootstrap service name is used, so the
-same code works inside the App Sandbox. If `renderMode` is `"hosted"` and the
-slot holds no valid port, the client reports a terminal `error` and does not
-connect.
+same code works inside the App Sandbox. The launcher clears the slot once the
+client has started, so that no later child process inherits the port. If
+`renderMode` is `"hosted"` and the slot holds no send right, the session ends
+with outcome `initial_failure` before connecting; the client never falls back to
+showing a window of its own.
 
 The client sends two fixed-layout messages, defined in `sdl_launcher_surface.h`.
 All integers are host byte order.
@@ -306,10 +308,13 @@ ends the session as bridge EOF does.
 
 Events from the client:
 
-- `hosted_window`: `windowId`, `monitorIndex`, `width`, `height` in pixels and
-  `scale`. Sent when a window is created or recreated (connect, reconnect,
-  monitor layout change), before its first surface.
+- `hosted_window`: `windowId`, `width`, `height` in pixels and `scale`. Sent
+  when a window is created or recreated (connect, reconnect, monitor layout
+  change) and again whenever its size or scale changes.
 - `hosted_window_closed`: `windowId`.
+
+The JSON bridge and the surface channel are separate queues: a window's
+surfaces may arrive before or after its `hosted_window` event.
 - `cursor`: `kind` of `default`, `hidden` or `image`; for `image`, `pngBase64`,
   `width`, `height`, `hotX`, `hotY`.
 - `pointer_warp`: `windowId`, `x`, `y`.
@@ -338,7 +343,8 @@ applied in the order received and passes through the same key, hotkey, mouse and
 overlay handling as SDL input. Messages naming an unknown `windowId` are
 ignored. On bridge EOF held keys and buttons are released before teardown.
 
-`start` may carry `hostedWindows`, an array of `{monitorIndex, width, height,
-scale}`, giving each window's first size so that the session connects at the
-right resolution. The existing `focus` command, `window_geometry` events and
+`start` may carry `hostedScale`, the backing scale of the launcher's windows,
+used for every window until its first `layout` arrives; without it the client
+assumes the scale of the display the hidden window was created on. The first
+size comes from the session arguments, as for a window. The existing `focus` command, `window_geometry` events and
 fullscreen state reporting do nothing in hosted mode.

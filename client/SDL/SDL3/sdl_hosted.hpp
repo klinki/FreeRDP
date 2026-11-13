@@ -46,6 +46,14 @@ class SdlHosted
 	/** Set once, before the first session window is created. */
 	static void enable(bool on) { state().enabled.store(on); }
 
+	/** The scale a window starts with until the launcher's first layout for it arrives. */
+	static void setInitialScale(float scale) { state().initialScale.store(scale); }
+	static float initialScale(float fallback)
+	{
+		const auto scale = state().initialScale.load();
+		return scale > 0.0f ? scale : fallback;
+	}
+
 	/* Visibility. Hosted windows are never shown, raised, minimized or made fullscreen: a
 	 * hidden window that is raised or restored becomes visible. Each returns true when the
 	 * request needs no further action. */
@@ -98,6 +106,13 @@ class SdlHosted
 		std::lock_guard lock(state().mutex);
 		state().layouts.erase(id);
 	}
+	static std::map<SDL_WindowID, Layout> layouts()
+	{
+		if (!enabled())
+			return {};
+		std::lock_guard lock(state().mutex);
+		return state().layouts;
+	}
 	static std::optional<Layout> layout(SDL_WindowID id)
 	{
 		if (!enabled())
@@ -137,6 +152,7 @@ class SdlHosted
 	struct State
 	{
 		std::atomic<bool> enabled{ false };
+		std::atomic<float> initialScale{ 0.0f };
 		std::mutex mutex;
 		std::map<SDL_WindowID, Layout> layouts;
 		Output* output = nullptr; // SDL main thread only

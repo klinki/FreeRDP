@@ -3,6 +3,8 @@
  * Copyright 2026 FreeRDP contributors. Licensed under Apache-2.0.
  */
 #include "sdl_hosted.hpp"
+#include "sdl_hosted_surface.hpp"
+#include "sdl_utils.hpp"
 #include "sdl_launcher.hpp"
 #include "sdl_context.hpp"
 #include "sdl_utils.hpp"
@@ -480,6 +482,8 @@ bool SdlLauncher::receive(Json event)
 			_screenRefresh.fetch_or(sdlRefreshBit(mode));
 		return true;
 	}
+	if (type == "layout")
+		return hostedLayout(event.get());
 	if (type == "focus")
 	{
 		_focus = true;
@@ -835,6 +839,29 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 	}
 	if (!start)
 		return false;
+	const auto renderMode = item(start.get(), "renderMode");
+	const auto hostedScale = item(start.get(), "hostedScale");
+	const std::string mode = renderMode ? str(start.get(), "renderMode") : "window";
+	const auto scale = hostedScale ? WINPR_JSON_GetNumberValue(hostedScale) : 0.0;
+	if ((renderMode && !WINPR_JSON_IsString(renderMode)) || (mode != "window" && mode != "hosted") ||
+	    (hostedScale && (mode != "hosted" || !WINPR_JSON_IsNumber(hostedScale) ||
+	                     !std::isfinite(scale) || scale < 0.5 || scale > 8.0)))
+	{
+		error = "Invalid start command";
+		return false;
+	}
+	if (mode == "hosted")
+	{
+		/* No port, no session: falling back to a window nobody asked for would be worse. */
+		if (!SdlHostedSurfaces::instance().adoptInheritedPort())
+		{
+			error = "Hosted rendering was requested but the launcher's surface port is missing";
+			return false;
+		}
+		SdlHosted::setOutput(&SdlHostedSurfaces::instance());
+		SdlHosted::setInitialScale(static_cast<float>(scale));
+		SdlHosted::enable(true);
+	}
 	auto args = item(start.get(), "arguments");
 	auto selections = item(start.get(), "displaySelections");
 	auto secrets = item(start.get(), "tlsSecretsFile");
@@ -1114,6 +1141,105 @@ void SdlLauncher::ended(int exitCode, const std::string& detail)
 	else if (exitCode >= 0)
 		outcome = "disconnected";
 	terminal(outcome, exitCode, detail);
+}
+/* Bridge reader thread. Layouts are applied on the SDL main thread by serviceHosted(). */
+bool SdlLauncher::hostedLayout(WINPR_JSON* event)
+{
+	auto read = [&](const char* key, double& value) {
+		const auto found = item(event, key);
+		value = found ? WINPR_JSON_GetNumberValue(found) : 0.0;
+		return found && WINPR_JSON_IsNumber(found) && std::isfinite(value);
+	};
+	double window = 0, width = 0, height = 0, scale = 0;
+	if (!read("windowId", window) || !read("width", width) || !read("height", height) ||
+	    !read("scale", scale) || window < 1 || window > UINT32_MAX || std::floor(window) != window)
+		return false;
+	const SdlHosted::Layout pixels = { static_cast<int>(std::lround(width * scale)),
+		                               static_cast<int>(std::lround(height * scale)),
+		                               static_cast<float>(scale) };
+	if (width < 1 || height < 1 || width > 16384 || height > 16384 || !SdlHosted::valid(pixels))
+		return false;
+	if (!SdlHosted::enabled())
+		return true; // Not a hosted session: nothing to lay out.
+	{
+		std::lock_guard lock(_mutex);
+		/* Only the newest layout of a window matters. */
+		_hostedLayouts.erase(std::remove_if(_hostedLayouts.begin(), _hostedLayouts.end(),
+		                                    [&](const auto& queued) {
+			                                    return queued.window == static_cast<uint32_t>(window);
+		                                    }),
+		                     _hostedLayouts.end());
+		_hostedLayouts.push_back({ static_cast<uint32_t>(window), static_cast<int>(std::lround(width)),
+		                           static_cast<int>(std::lround(height)), static_cast<float>(scale) });
+	}
+	SDL_Event wake = {}; // The main loop may be waiting for events.
+	wake.type = SDL_EVENT_USER_UPDATE;
+	std::ignore = SDL_PushEvent(&wake);
+	return true;
+}
+void SdlLauncher::serviceHosted()
+{
+	if (!SdlHosted::enabled())
+		return;
+	if (SdlHostedSurfaces::instance().dead())
+	{
+		cancel(); // The launcher is gone; same as losing the bridge.
+		return;
+	}
+	std::vector<HostedLayout> layouts;
+	{
+		std::lock_guard lock(_mutex);
+		layouts.swap(_hostedLayouts);
+	}
+	for (const auto& layout : layouts)
+	{
+		auto window = SDL_GetWindowFromID(layout.window);
+		if (!window || !SdlHosted::layout(layout.window))
+			continue; // Not a session window, or already gone.
+		const SdlHosted::Layout pixels = { static_cast<int>(std::lround(layout.width * layout.scale)),
+			                               static_cast<int>(std::lround(layout.height * layout.scale)),
+			                               layout.scale };
+		if (!SdlHosted::setLayout(layout.window, pixels))
+			continue;
+		/* The hidden window follows in points so that code reading its logical size agrees;
+		 * the pixel-size event runs the same resize path as a window the user resized. */
+		std::ignore = SDL_SetWindowSize(window, layout.width, layout.height);
+		SDL_Event resized = {};
+		resized.type = SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED;
+		resized.window.windowID = layout.window;
+		resized.window.data1 = pixels.width;
+		resized.window.data2 = pixels.height;
+		std::ignore = SDL_PushEvent(&resized);
+	}
+	/* Announce windows that appeared or changed, and those that went away. */
+	const auto current = SdlHosted::layouts();
+	for (const auto& [id, layout] : current)
+	{
+		const std::array<int, 3> state = { layout.width, layout.height,
+			                               static_cast<int>(std::lround(layout.scale * 1000)) };
+		auto& announced = _hostedAnnounced[id];
+		if (announced == state)
+			continue;
+		announced = state;
+		auto event = message("hosted_window");
+		number(event.get(), "windowId", id);
+		number(event.get(), "width", layout.width);
+		number(event.get(), "height", layout.height);
+		WINPR_JSON_AddNumberToObject(event.get(), "scale", static_cast<double>(layout.scale));
+		std::ignore = send(std::move(event));
+	}
+	for (auto it = _hostedAnnounced.begin(); it != _hostedAnnounced.end();)
+	{
+		if (current.count(it->first) != 0)
+		{
+			++it;
+			continue;
+		}
+		auto event = message("hosted_window_closed");
+		number(event.get(), "windowId", it->first);
+		std::ignore = send(std::move(event));
+		it = _hostedAnnounced.erase(it);
+	}
 }
 void SdlLauncher::serviceFocus()
 {
