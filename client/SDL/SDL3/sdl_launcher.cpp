@@ -484,6 +484,10 @@ bool SdlLauncher::receive(Json event)
 	}
 	if (type == "layout")
 		return hostedLayout(event.get());
+	if (type == "input")
+		return hostedInput(event.get());
+	if (type == "focus_state")
+		return hostedFocus(event.get());
 	if (type == "focus")
 	{
 		_focus = true;
@@ -1177,15 +1181,130 @@ bool SdlLauncher::hostedLayout(WINPR_JSON* event)
 	std::ignore = SDL_PushEvent(&wake);
 	return true;
 }
+/* Bridge reader thread. Events are built on the SDL main thread by serviceHosted(), where the
+ * window's coordinate space and SDL's modifier state may be touched. */
+bool SdlLauncher::hostedInput(WINPR_JSON* event)
+{
+	auto read = [&](const char* key, bool required, double low, double high, double& value) {
+		const auto found = item(event, key);
+		if (!found)
+			return !required;
+		value = WINPR_JSON_GetNumberValue(found);
+		return WINPR_JSON_IsNumber(found) && std::isfinite(value) && value >= low && value <= high;
+	};
+	auto flag = [&](const char* key, bool& value) {
+		const auto found = item(event, key);
+		value = WINPR_JSON_IsTrue(found);
+		return !found || WINPR_JSON_IsBool(found);
+	};
+	SdlHostedInput::Message message;
+	message.action = str(event, "action");
+	const bool key = message.action == "key", move = message.action == "mouse_move",
+	           button = message.action == "mouse_button", wheel = message.action == "wheel";
+	double window = 0, keyCode = 0, flags = 0, x = 0, y = 0, dx = 0, dy = 0, index = 0, clicks = 1;
+	constexpr double span = 1e6;
+	if (!(key || move || button || wheel) || !read("windowId", true, 1, UINT32_MAX, window) ||
+	    !read("keyCode", key, 0, 0xffff, keyCode) || !read("flags", false, 0, 4294967295.0, flags) ||
+	    !read("x", move || button || wheel, -span, span, x) ||
+	    !read("y", move || button || wheel, -span, span, y) || !read("dx", wheel, -span, span, dx) ||
+	    !read("dy", wheel, -span, span, dy) || !read("button", button, 1, 5, index) ||
+	    !read("clicks", false, 1, 255, clicks) || !flag("down", message.down) ||
+	    !flag("repeat", message.repeat))
+		return false;
+	if (!SdlHosted::enabled())
+		return true; // Not a hosted session: input comes from SDL.
+	message.window = static_cast<SDL_WindowID>(window);
+	message.keyCode = static_cast<int>(keyCode);
+	message.flags = static_cast<uint64_t>(flags);
+	message.x = static_cast<float>(x);
+	message.y = static_cast<float>(y);
+	message.dx = static_cast<float>(dx);
+	message.dy = static_cast<float>(dy);
+	message.button = static_cast<int>(index);
+	message.clicks = static_cast<int>(clicks);
+	{
+		std::lock_guard lock(_mutex);
+		if (_hostedInputs.size() >= 4096)
+			return true; // The main thread is stuck; dropping beats growing without bound.
+		_hostedInputs.push_back(std::move(message));
+	}
+	SDL_Event wake = {};
+	wake.type = SDL_EVENT_USER_UPDATE;
+	std::ignore = SDL_PushEvent(&wake);
+	return true;
+}
+bool SdlLauncher::hostedFocus(WINPR_JSON* event)
+{
+	const auto focused = item(event, "focused");
+	if (!focused || !WINPR_JSON_IsBool(focused))
+		return false;
+	if (!SdlHosted::enabled() || WINPR_JSON_IsTrue(focused))
+		return true;
+	{
+		std::lock_guard lock(_mutex);
+		_hostedRelease = true;
+	}
+	SDL_Event wake = {};
+	wake.type = SDL_EVENT_USER_UPDATE;
+	std::ignore = SDL_PushEvent(&wake);
+	return true;
+}
+void SdlLauncher::releaseHostedInput()
+{
+	for (auto& event : _hostedInput.releaseAll())
+		std::ignore = SDL_PushEvent(&event);
+	SDL_SetModState(SDL_KMOD_NONE);
+}
 void SdlLauncher::serviceHosted()
 {
 	if (!SdlHosted::enabled())
 		return;
 	if (SdlHostedSurfaces::instance().dead())
 	{
+		releaseHostedInput();
 		cancel(); // The launcher is gone; same as losing the bridge.
 		return;
 	}
+	std::vector<SdlHostedInput::Message> inputs;
+	bool release = false;
+	{
+		std::lock_guard lock(_mutex);
+		inputs.swap(_hostedInputs);
+		std::swap(release, _hostedRelease);
+	}
+	for (auto& input : inputs)
+	{
+		auto window = SDL_GetWindowFromID(input.window);
+		auto renderer = window ? SDL_GetRenderer(window) : nullptr;
+		if (!renderer || !SdlHosted::layout(input.window))
+			continue; // Not a session window, or already gone.
+		/* The message is in window pixels. The client converts SDL window coordinates to pixels
+		 * with this renderer, so the exact inverse here lands on the pixel that was meant,
+		 * whatever backing scale the hidden window itself has. */
+		float x = 0, y = 0, ox = 0, oy = 0;
+		if (!SDL_RenderCoordinatesToWindow(renderer, input.x, input.y, &x, &y) ||
+		    !SDL_RenderCoordinatesToWindow(renderer, 0, 0, &ox, &oy))
+			continue;
+		if (input.action == "mouse_move")
+		{
+			float rx = 0, ry = 0;
+			if (SDL_RenderCoordinatesToWindow(renderer, input.dx, input.dy, &rx, &ry))
+			{
+				input.dx = rx - ox;
+				input.dy = ry - oy;
+			}
+		}
+		input.x = x;
+		input.y = y;
+		if (auto event = _hostedInput.event(input))
+		{
+			if (input.action == "key")
+				SDL_SetModState(_hostedInput.mods());
+			std::ignore = SDL_PushEvent(&*event);
+		}
+	}
+	if (release)
+		releaseHostedInput();
 	std::vector<HostedLayout> layouts;
 	{
 		std::lock_guard lock(_mutex);

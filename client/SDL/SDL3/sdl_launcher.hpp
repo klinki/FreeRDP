@@ -11,6 +11,7 @@
 #include <thread>
 #include <vector>
 #include <array>
+#include "sdl_hosted_input.hpp"
 #include <freerdp/freerdp.h>
 #include <winpr/json.h>
 #include "sdl_monitor_selection.hpp"
@@ -82,6 +83,12 @@ class SdlLauncher
 		float scale = 1.0f;
 	};
 	bool hostedLayout(WINPR_JSON* event);
+	bool hostedInput(WINPR_JSON* event);
+	bool hostedFocus(WINPR_JSON* event);
+	void releaseHostedInput(); // SDL main thread only
+	std::vector<SdlHostedInput::Message> _hostedInputs; // guarded by _mutex; pixels until drained
+	bool _hostedRelease = false;                        // guarded by _mutex
+	SdlHostedInput::State _hostedInput;                 // SDL main thread only
 	std::vector<HostedLayout> _hostedLayouts;                   // guarded by _mutex
 	std::map<uint32_t, std::array<int, 3>> _hostedAnnounced;    // SDL main thread only
 	Json message(const char* type);

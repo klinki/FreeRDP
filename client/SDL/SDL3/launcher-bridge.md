@@ -338,10 +338,13 @@ Commands from the launcher:
 - `occlusion`: `windowId`, `visible`. While not visible the client keeps the
   session running but stops drawing that window.
 
-Coordinates are in window pixels with the origin at the top left. Input is
-applied in the order received and passes through the same key, hotkey, mouse and
-overlay handling as SDL input. Messages naming an unknown `windowId` are
-ignored. On bridge EOF held keys and buttons are released before teardown.
+Coordinates are in window pixels with the origin at the top left; `dx` and `dy`
+of `mouse_move` are in pixels too. Input is applied in the order received and
+passes through the same key, hotkey, mouse and overlay handling as SDL input,
+as synthesized SDL events. A modifier flag without a left or right device bit
+counts as the left key. Malformed messages are rejected; messages naming an
+unknown `windowId` or an unknown key code are ignored. Held keys and buttons
+are also released when the launcher's surface port goes away.
 
 `start` may carry `hostedScale`, the backing scale of the launcher's windows,
 used for every window until its first `layout` arrives; without it the client

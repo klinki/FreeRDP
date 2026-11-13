@@ -54,6 +54,7 @@ set(SRCS
     sdl_channels.cpp
     sdl_window.hpp
     sdl_hosted.hpp
+    sdl_hosted_input.hpp
     sdl_fullscreen_state.hpp
     sdl_window.cpp
     sdl_clip.hpp
@@ -318,6 +319,10 @@ if(SDL_LAUNCHER_TEST AND APPLE)
   )
   add_test(NAME TestSDLHostedSurface COMMAND TestSDLHostedSurface)
   set_tests_properties(TestSDLHostedSurface PROPERTIES TIMEOUT 60)
+  add_executable(TestSDLHostedInput test/TestSDLHostedInput.cpp)
+  target_link_libraries(TestSDLHostedInput PRIVATE SDL3::SDL3)
+  add_test(NAME TestSDLHostedInput COMMAND TestSDLHostedInput)
+  set_tests_properties(TestSDLHostedInput PROPERTIES TIMEOUT 30 ENVIRONMENT "SDL_VIDEODRIVER=dummy")
   add_executable(TestSDLReconnect test/TestSDLReconnect.cpp)
   add_test(NAME TestSDLReconnect COMMAND TestSDLReconnect)
   add_executable(TestSDLMouseWheel test/TestSDLMouseWheel.cpp)
