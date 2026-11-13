@@ -187,7 +187,18 @@ bool SdlHostedSurfaces::present(SDL_Window* window, SDL_Renderer* renderer)
 	if (found == _sets.end() || found->second.width == 0)
 		return false;
 	auto& set = found->second;
-	/* Leave the surface and hand the drawing to the GPU before the launcher is told. */
+	/* The launcher's process may show the surface the moment it is told, and nothing ties its
+	 * compositing to this process's drawing commands. Reading one pixel back makes SDL commit
+	 * the commands and wait until the GPU has run them, so a surface is never announced before
+	 * it holds the whole picture. SDL offers no other way to wait. */
+	if (_waitForGpu)
+	{
+		const SDL_Rect pixel = { 0, 0, 1, 1 };
+		auto read = SDL_RenderReadPixels(renderer, &pixel);
+		if (!read)
+			return false;
+		SDL_DestroySurface(read);
+	}
 	if (!SDL_SetRenderTarget(renderer, nullptr) || !SDL_FlushRenderer(renderer))
 		return false;
 	SdlLauncherFrameMessage message = {};

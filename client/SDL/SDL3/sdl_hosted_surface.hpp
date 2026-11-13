@@ -17,6 +17,9 @@ class SdlHostedSurfaces : public SdlHosted::Output
 	bool connected() const { return _port != 0 && !_dead; }
 	/** The launcher's port went away: the session should end. */
 	bool dead() const { return _dead; }
+	/** Whether present() waits for the GPU to finish the picture before announcing it. On by
+	 * default; switching it off is for measuring what the wait prevents and costs. */
+	void setWaitForGpu(bool wait) { _waitForGpu = wait; }
 
 	SDL_Texture* target(SDL_Window* window, SDL_Renderer* renderer) override;
 	bool present(SDL_Window* window, SDL_Renderer* renderer) override;
@@ -41,4 +44,5 @@ class SdlHostedSurfaces : public SdlHosted::Output
 	std::map<SDL_WindowID, uint32_t> _generations; // survive forget(): never reuse a generation
 	uint32_t _port = 0;
 	bool _dead = false;
+	bool _waitForGpu = true;
 };

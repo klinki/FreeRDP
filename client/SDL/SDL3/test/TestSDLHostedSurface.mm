@@ -149,6 +149,80 @@ int main()
 		        "frame after resize is wrong");
 		require(resized && waitForPixel(resized, 0x00, 0xff, 0xff), "resized picture missing");
 
+		/* Announced means complete. Each frame is a heavy draw ending in one flat colour; the
+		 * surface is read the moment the frame message is sent. With the wait the picture must
+		 * always be there. Without it the count shows what the wait prevents on this machine. */
+		{
+			auto heavy = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_TARGET, 2048, 2048);
+			require(heavy != nullptr, SDL_GetError());
+			IOSurfaceRef current[SDL_LAUNCHER_SURFACE_COUNT] = {};
+			require(SdlHosted::setLayout(id, { 2560, 1440, 2.0f }), "large layout refused");
+			for (int pass = 0; pass < 2; pass++)
+			{
+				const bool wait = pass == 1;
+				surfaces.setWaitForGpu(wait);
+				int incomplete = 0;
+				Uint64 presentNs = 0;
+				const int frames = 120;
+				for (int frame = 0; frame < frames; frame++)
+				{
+					const Uint8 shade = static_cast<Uint8>(40 + (frame % 2) * 160 + pass * 20);
+					require(SdlHosted::screenTarget(window, renderer), "target failed");
+					for (int layer = 0; layer < 40; layer++)
+						require(SDL_RenderTexture(renderer, heavy, nullptr, nullptr), SDL_GetError());
+					require(SDL_SetRenderDrawColor(renderer, shade, shade, shade, 0xff) &&
+					            SDL_RenderClear(renderer),
+					        SDL_GetError());
+					for (int layer = 0; layer < 40; layer++)
+					{
+						const SDL_FRect whole = { 0, 0, 2560, 1440 };
+						require(SDL_RenderFillRect(renderer, &whole), SDL_GetError());
+					}
+					const auto before = SDL_GetTicksNS();
+					require(SdlHosted::present(window, renderer), "present failed");
+					presentNs += SDL_GetTicksNS() - before;
+					uint32_t index = UINT32_MAX;
+					while (receive(port, message, 0))
+					{
+						if (message.header.msgh_id == SDL_LAUNCHER_MSG_SURFACE)
+						{
+							if (current[message.surface.index])
+								CFRelease(current[message.surface.index]);
+							current[message.surface.index] = IOSurfaceLookupFromMachPort(message.surface.surface.name);
+							mach_port_deallocate(mach_task_self(), message.surface.surface.name);
+						}
+						else
+							index = message.frame.index;
+					}
+					require(index < SDL_LAUNCHER_SURFACE_COUNT && current[index], "frame message missing in stress run");
+					IOSurfaceLock(current[index], kIOSurfaceLockReadOnly, nullptr);
+					const auto base = static_cast<const uint8_t*>(IOSurfaceGetBaseAddress(current[index]));
+					const auto row = IOSurfaceGetBytesPerRow(current[index]);
+					bool complete = true;
+					for (size_t y : { size_t(0), size_t(720), size_t(1439) })
+						for (size_t x : { size_t(0), size_t(1280), size_t(2559) })
+							complete = complete && base[y * row + x * 4] == shade;
+					IOSurfaceUnlock(current[index], kIOSurfaceLockReadOnly, nullptr);
+					if (!complete)
+						incomplete++;
+				}
+				printf("wait for GPU %s: %d of %d frames announced before they were complete, present %.2f ms average\n",
+				       wait ? "on" : "off", incomplete, frames, static_cast<double>(presentNs) / frames / 1e6);
+				require(!wait || incomplete == 0, "a frame was announced before the GPU finished it");
+			}
+			for (auto surface : current)
+				if (surface)
+					CFRelease(surface);
+			SDL_DestroyTexture(heavy);
+			require(SdlHosted::setLayout(id, { 800, 500, 2.0f }), "layout refused after stress run");
+			require(draw(window, renderer, 0xff, 0xff, 0x00), "frame after stress run failed");
+			while (receive(port, message, 0))
+			{
+				if (message.header.msgh_id == SDL_LAUNCHER_MSG_SURFACE)
+					mach_port_deallocate(mach_task_self(), message.surface.surface.name);
+			}
+		}
+
 		/* A full queue drops frame messages without failing or blocking. */
 		const auto before = SDL_GetTicks();
 		for (int i = 0; i < 40; i++)
@@ -164,7 +238,7 @@ int main()
 		require(SdlHosted::setLayout(id, { 800, 500, 2.0f }), "layout refused after forget");
 		require(draw(window, renderer, 0x00, 0x00, 0x00), "frame after forget failed");
 		require(receive(port, message) && message.header.msgh_id == SDL_LAUNCHER_MSG_SURFACE &&
-		            message.surface.generation == 3,
+		            message.surface.generation == 5,
 		        "generation was reused after forget");
 		mach_port_deallocate(mach_task_self(), message.surface.surface.name);
 		while (receive(port, message, 0))

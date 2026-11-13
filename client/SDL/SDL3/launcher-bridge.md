@@ -297,7 +297,9 @@ Each window has three BGRA surfaces of the window's pixel size, `index` 0 to 2.
 The client sends all three `surface` messages before the first `frame` that
 names their `generation`. Whenever the pixel size changes or the window is
 recreated, the client makes three new surfaces under the next `generation`.
-A `frame` message says that the named surface holds a complete picture; the
+A `frame` message says that the named surface holds a complete picture: the
+client waits for the GPU to finish drawing before it sends one, so the launcher
+may show the surface at once and needs no synchronization of its own. The
 launcher shows it and drops frames whose `generation` it has not received
 surfaces for. The client never draws into the surface it announced last, and
 uses the surfaces in rotation. Sends never block: if the launcher's queue is
