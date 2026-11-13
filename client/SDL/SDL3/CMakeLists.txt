@@ -385,11 +385,10 @@ if(SDL_LAUNCHER_TEST AND APPLE)
   set_tests_properties(TestSDLInputInitialization PROPERTIES TIMEOUT 30)
 endif()
 if(SDL_LAUNCHER_BRIDGE_ENABLED AND SDL_LAUNCHER_TEST)
-  add_executable(
-    TestSDLLauncherTransport test/TestSDLLauncherTransport.cpp sdl_launcher.cpp sdl_launcher_macos.mm
-                             sdl_hosted_surface.mm
-  )
+  # One line: scripts/sheltie/build-engine.sh finds test targets by this pattern.
+  add_executable(TestSDLLauncherTransport test/TestSDLLauncherTransport.cpp sdl_launcher.cpp sdl_launcher_macos.mm sdl_hosted_surface.mm)
   target_link_libraries(TestSDLLauncherTransport PRIVATE winpr freerdp freerdp-client Threads::Threads
-                        SDL3::SDL3 "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit")
+                        SDL3::SDL3 "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit"
+                        "-framework IOSurface" "-framework CoreVideo")
   add_test(NAME TestSDLLauncherTransport COMMAND TestSDLLauncherTransport)
 endif()
