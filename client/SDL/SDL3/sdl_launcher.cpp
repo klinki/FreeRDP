@@ -1331,6 +1331,8 @@ void SdlLauncher::serviceFocus()
 	}
 	if (!_focus.exchange(false))
 		return;
+	if (_hosted)
+		return; // Raising a hidden SDL window would show it; the launcher owns focus.
 	activateAccessorySession();
 	int count = 0;
 	auto windows = SDL_GetWindows(&count);
