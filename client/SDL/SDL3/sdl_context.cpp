@@ -27,6 +27,7 @@
 #include <freerdp/codec/yuv.h>
 
 #include "sdl_context.hpp"
+#include "sdl_hosted.hpp"
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 #include "sdl_launcher.hpp"
 #endif
@@ -1450,7 +1451,7 @@ bool SdlContext::addDisplayWindow(SDL_DisplayID id)
 	if (auto bridge = SdlLauncher::active()) bridge->configureWindowGeometry(w.window());
 #endif
 	w.setMonitor(monitor);
-	SDL_ShowWindow(w.window());
+	std::ignore = SdlHosted::show(w.window());
 	_fullscreenState.addWindow(w.id());
 	_windows.emplace(w.id(), std::move(w));
 	return true;
@@ -2872,10 +2873,9 @@ bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects, bool remoteCo
 	bool firstShow = false;
 	for (auto& window : _windows)
 	{
-		if (SDL_GetWindowFlags(window.second.window()) & SDL_WINDOW_HIDDEN)
+		if (!window.second.revealed())
 		{
-			SDL_ShowWindow(window.second.window());
-			SDL_RaiseWindow(window.second.window());
+			window.second.reveal();
 			firstShow = true;
 		}
 	}

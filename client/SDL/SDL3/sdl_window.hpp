@@ -106,6 +106,11 @@ class SdlWindow
 	[[nodiscard]] bool grabMouse(bool enable);
 	void setBordered(bool bordered);
 	void raise();
+	/** Whether the window has had its first picture. A hosted window stays hidden for good,
+	 * so this cannot be read from the window's flags. */
+	[[nodiscard]] bool revealed() const;
+	/** Marks the first picture: shows and raises the window unless the session is hosted. */
+	void reveal();
 	void resizeable(bool use);
 	enum class FullscreenResult
 	{
@@ -198,6 +203,7 @@ class SdlWindow
 	bool _gdiTextureNeedsFullRedraw = false;
 	int _initialW = 0;
 	int _initialH = 0;
+	bool _hostedRevealed = false;
 	SDL_DisplayID _displayID = 0;
 	Sint32 _offset_x = 0;
 	Sint32 _offset_y = 0;

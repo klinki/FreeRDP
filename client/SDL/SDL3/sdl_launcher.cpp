@@ -2,6 +2,7 @@
  * FreeRDP SDL3 private native launcher bridge.
  * Copyright 2026 FreeRDP contributors. Licensed under Apache-2.0.
  */
+#include "sdl_hosted.hpp"
 #include "sdl_launcher.hpp"
 #include "sdl_context.hpp"
 #include "sdl_utils.hpp"
@@ -1127,8 +1128,8 @@ void SdlLauncher::serviceFocus()
 	auto windows = SDL_GetWindows(&count);
 	for (int i = 0; windows && i < count; i++)
 	{
-		std::ignore = SDL_RestoreWindow(windows[i]);
-		std::ignore = SDL_RaiseWindow(windows[i]);
+		std::ignore = SdlHosted::restore(windows[i]);
+		std::ignore = SdlHosted::raise(windows[i]);
 	}
 	SDL_free(windows);
 }

@@ -71,6 +71,7 @@
 #include "sdl_channels.hpp"
 #include "sdl_freerdp.hpp"
 #include "sdl_context.hpp"
+#include "sdl_hosted.hpp"
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 #include "sdl_launcher.hpp"
 #include <fcntl.h>
@@ -386,7 +387,7 @@ static void sdl_term_handler([[maybe_unused]] int signum, [[maybe_unused]] const
 							 * them on the wrong display; reveal here, after
 							 * placement and fullscreen state are final. */
 							if (window->window())
-								SDL_ShowWindow(window->window());
+								std::ignore = SdlHosted::show(window->window());
 						}
 					}
 					break;
