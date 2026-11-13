@@ -137,6 +137,8 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
 SdlWindow::~SdlWindow()
 {
 	/* Release owned textures before SDL_DestroyRenderer destroys them. */
+	if (_window)
+		SdlHosted::forget(SDL_GetWindowID(_window));
 	_performanceOverlay.reset();
 	_topBar.reset();
 	_stalled.reset();
@@ -147,10 +149,7 @@ SdlWindow::~SdlWindow()
 	if (_renderer)
 		SDL_DestroyRenderer(_renderer);
 	if (_window)
-	{
-		SdlHosted::forget(SDL_GetWindowID(_window));
 		SDL_DestroyWindow(_window);
-	}
 }
 
 SDL_WindowID SdlWindow::id() const
@@ -833,7 +832,7 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 		return false;
 
 	/* Copy accumulated render target to screen and present */
-	if (!SDL_SetRenderTarget(_renderer, nullptr))
+	if (!SdlHosted::screenTarget(_window, _renderer))
 		return false;
 	if (!SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr))
 		return false;
@@ -844,7 +843,7 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 
     const auto liveStart=_liveMetrics.nowNs();
     auto presentTimer = _renderMetrics.beginPresent();
-    const auto result=SDL_RenderPresent(_renderer);
+    const auto result=SdlHosted::present(_window, _renderer);
     if (_liveMetrics.enabled()) {
         if (result) {
             const auto now=_liveMetrics.nowNs();
@@ -925,7 +924,7 @@ bool SdlWindow::renderStalledFrame(int dots, bool showTopBar, bool pinned,
 	 * it stays readable and usable while reconnecting. The render target
 	 * itself is never touched, so the next normal frame paints clean with no
 	 * explicit clear needed. */
-	if (!SDL_SetRenderTarget(_renderer, nullptr))
+	if (!SdlHosted::screenTarget(_window, _renderer))
 		return false;
 	if (_renderTarget)
 	{
@@ -1007,7 +1006,7 @@ bool SdlWindow::updateStalledSurface(int dots, bool showTopBar, bool pinned,
 	/* Stalled overlay presents are counted separately from present_calls so
 	 * that identical-input comparisons of present_calls stay stable. */
 	_renderMetrics.noteStalledPresent();
-	return SDL_RenderPresent(_renderer);
+	return SdlHosted::present(_window, _renderer);
 }
 
 SdlTopBarRect SdlWindow::topBarRect() const
@@ -1226,10 +1225,10 @@ bool SdlWindow::paintResizeFrame(SDL_Surface* surface, SDL_Point off, bool conte
 		}
 	}
 
-	if (!SDL_SetRenderTarget(_renderer, nullptr))
+	if (!SdlHosted::screenTarget(_window, _renderer))
 		return false;
 	std::ignore = SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr);
-	std::ignore = SDL_RenderPresent(_renderer);
+	std::ignore = SdlHosted::present(_window, _renderer);
 	return true;
 }
 

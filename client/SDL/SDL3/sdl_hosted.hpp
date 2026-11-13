@@ -27,6 +27,21 @@ class SdlHosted
 		       layout.height <= 16384 && layout.scale >= 0.5f && layout.scale <= 8.0f;
 	}
 
+	/** Where a hosted window's picture goes instead of the window. */
+	class Output
+	{
+	  public:
+		virtual ~Output() = default;
+		/** The texture to draw the next picture into; nullptr when there is nowhere to draw. */
+		virtual SDL_Texture* target(SDL_Window* window, SDL_Renderer* renderer) = 0;
+		/** The picture drawn into target() is complete. */
+		virtual bool present(SDL_Window* window, SDL_Renderer* renderer) = 0;
+		/** The window is going away; called while its renderer still exists. */
+		virtual void forget(SDL_WindowID id) = 0;
+	};
+	/** Set with enable(), before the first session window is created. Not owned. */
+	static void setOutput(Output* output) { state().output = output; }
+
 	static bool enabled() { return state().enabled.load(); }
 	/** Set once, before the first session window is created. */
 	static void enable(bool on) { state().enabled.store(on); }
@@ -61,8 +76,25 @@ class SdlHosted
 		state().layouts[id] = layout;
 		return true;
 	}
+	/* Presentation. "The screen" of a hosted window is the output's current texture. */
+	static bool screenTarget(SDL_Window* window, SDL_Renderer* renderer)
+	{
+		if (!enabled())
+			return SDL_SetRenderTarget(renderer, nullptr);
+		auto texture = state().output ? state().output->target(window, renderer) : nullptr;
+		return texture && SDL_SetRenderTarget(renderer, texture);
+	}
+	static bool present(SDL_Window* window, SDL_Renderer* renderer)
+	{
+		if (!enabled())
+			return SDL_RenderPresent(renderer);
+		return state().output && state().output->present(window, renderer);
+	}
+
 	static void forget(SDL_WindowID id)
 	{
+		if (state().output)
+			state().output->forget(id);
 		std::lock_guard lock(state().mutex);
 		state().layouts.erase(id);
 	}
@@ -107,6 +139,7 @@ class SdlHosted
 		std::atomic<bool> enabled{ false };
 		std::mutex mutex;
 		std::map<SDL_WindowID, Layout> layouts;
+		Output* output = nullptr; // SDL main thread only
 	};
 	static State& state()
 	{

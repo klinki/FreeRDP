@@ -147,8 +147,27 @@ set(SDL_LAUNCHER_BRIDGE_ENABLED OFF)
 if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON)
   set(SDL_LAUNCHER_BRIDGE_ENABLED ON)
   set(CMAKE_OBJCXX_STANDARD 17)
-  list(APPEND SRCS sdl_launcher.cpp sdl_launcher.hpp sdl_launcher_macos.mm)
-  list(APPEND LIBS "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit")
+  list(
+    APPEND
+    SRCS
+    sdl_launcher.cpp
+    sdl_launcher.hpp
+    sdl_launcher_macos.mm
+    sdl_hosted_surface.mm
+    sdl_hosted_surface.hpp
+    sdl_launcher_surface.h
+  )
+  list(
+    APPEND
+    LIBS
+    "-framework CoreGraphics"
+    "-framework CoreFoundation"
+    "-framework ColorSync"
+    "-framework ImageIO"
+    "-framework AppKit"
+    "-framework IOSurface"
+    "-framework CoreVideo"
+  )
   add_compile_definitions(WITH_SDL_LAUNCHER_BRIDGE)
 endif()
 
@@ -293,6 +312,12 @@ if(SDL_LAUNCHER_TEST AND APPLE)
   target_link_libraries(TestSDLHosted PRIVATE SDL3::SDL3)
   add_test(NAME TestSDLHosted COMMAND TestSDLHosted)
   set_tests_properties(TestSDLHosted PROPERTIES TIMEOUT 30 ENVIRONMENT "SDL_VIDEODRIVER=dummy")
+  add_executable(TestSDLHostedSurface test/TestSDLHostedSurface.mm sdl_hosted_surface.mm)
+  target_link_libraries(
+    TestSDLHostedSurface PRIVATE SDL3::SDL3 "-framework IOSurface" "-framework CoreVideo" "-framework Foundation"
+  )
+  add_test(NAME TestSDLHostedSurface COMMAND TestSDLHostedSurface)
+  set_tests_properties(TestSDLHostedSurface PROPERTIES TIMEOUT 60)
   add_executable(TestSDLReconnect test/TestSDLReconnect.cpp)
   add_test(NAME TestSDLReconnect COMMAND TestSDLReconnect)
   add_executable(TestSDLMouseWheel test/TestSDLMouseWheel.cpp)
