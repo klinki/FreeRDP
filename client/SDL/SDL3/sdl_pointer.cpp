@@ -30,6 +30,11 @@
 
 #include <SDL3/SDL_mouse.h>
 
+#include "sdl_hosted.hpp"
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+#include "sdl_launcher.hpp"
+#endif
+
 struct sdlPointer
 {
 	rdpPointer pointer{};
@@ -144,6 +149,24 @@ bool sdl_Pointer_Set_Process(SdlContext* sdl)
 	auto isw = static_cast<float>(pointer->width);
 	auto ish = static_cast<float>(pointer->height);
 
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (SdlHosted::enabled())
+	{
+		/* No SDL cursor over a hidden window: the launcher shows the server's image. */
+		if (auto bridge = SdlLauncher::active())
+		{
+			const bool usable = ptr->data && gdi->dstFormat == PIXEL_FORMAT_BGRA32 &&
+			                    ptr->size >= 4ull * pointer->width * pointer->height;
+			if (usable)
+				bridge->hostedCursor("image", ptr->data, pointer->width, pointer->height,
+				                     pointer->xPos, pointer->yPos);
+			else
+				bridge->hostedCursor("default");
+		}
+		sdl->setHasCursor(true);
+		return true;
+	}
+#endif
 	auto window = SDL_GetMouseFocus();
 	if (!window)
 		return sdl_Pointer_SetDefault(context);

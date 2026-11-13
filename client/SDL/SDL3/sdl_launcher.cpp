@@ -112,14 +112,17 @@ namespace
 	constexpr size_t maxFrame = 1024 * 1024;
 	constexpr size_t maxThumbnailPNG = 262144;
 	// Only owned, already downsampled BGRA pixels reach the encoding worker.
-	std::string thumbnailPNG(const std::vector<BYTE>& pixels, UINT32 width, UINT32 height)
+	std::string thumbnailPNG(const std::vector<BYTE>& pixels, UINT32 width, UINT32 height,
+	                         bool straightAlpha = false)
 	{
 		std::string result;
 		auto color = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
 		auto provider = CGDataProviderCreateWithData(nullptr, pixels.data(), pixels.size(), nullptr);
 		auto image = color && provider
 		                 ? CGImageCreate(width, height, 8, 32, width * 4, color,
-		                                 kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst,
+		                                 kCGBitmapByteOrder32Little |
+		                                     (straightAlpha ? kCGImageAlphaFirst
+		                                                    : kCGImageAlphaPremultipliedFirst),
 		                                 provider, nullptr, false, kCGRenderingIntentDefault)
 		                 : nullptr;
 		auto data = CFDataCreateMutable(kCFAllocatorDefault, 0);
@@ -1248,6 +1251,46 @@ bool SdlLauncher::hostedFocus(WINPR_JSON* event)
 	wake.type = SDL_EVENT_USER_UPDATE;
 	std::ignore = SDL_PushEvent(&wake);
 	return true;
+}
+/* SDL main thread. A hosted window is hidden, so SDL cannot show a cursor over it: the launcher
+ * does, in its own window. */
+void SdlLauncher::hostedCursor(const char* kind, const BYTE* bgra, UINT32 width, UINT32 height,
+                               UINT32 hotX, UINT32 hotY)
+{
+	if (!SdlHosted::enabled())
+		return;
+	const std::string name = kind;
+	auto event = message("cursor");
+	text(event.get(), "kind", kind);
+	if (name == "image")
+	{
+		/* Remote pixels, straight alpha. Anything unusable falls back to the arrow. */
+		std::string png;
+		if (bgra && width >= 1 && width <= 512 && height >= 1 && height <= 512)
+			png = thumbnailPNG(std::vector<BYTE>(bgra, bgra + 4ull * width * height), width, height,
+			                   true);
+		if (png.empty())
+			return hostedCursor("default");
+		text(event.get(), "pngBase64", png.c_str());
+		number(event.get(), "width", width);
+		number(event.get(), "height", height);
+		number(event.get(), "hotX", std::min(hotX, width - 1));
+		number(event.get(), "hotY", std::min(hotY, height - 1));
+	}
+	else if (name == _hostedCursorKind)
+		return; // The arrow or no cursor, again.
+	_hostedCursorKind = name;
+	std::ignore = send(std::move(event));
+}
+void SdlLauncher::hostedWarp(SDL_WindowID window, float x, float y)
+{
+	if (!SdlHosted::enabled())
+		return;
+	auto event = message("pointer_warp");
+	number(event.get(), "windowId", window);
+	WINPR_JSON_AddNumberToObject(event.get(), "x", static_cast<double>(x));
+	WINPR_JSON_AddNumberToObject(event.get(), "y", static_cast<double>(y));
+	std::ignore = send(std::move(event));
 }
 void SdlLauncher::releaseHostedInput()
 {

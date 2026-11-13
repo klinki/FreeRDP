@@ -1715,6 +1715,22 @@ wLog* SdlContext::getWLog()
 
 bool SdlContext::moveMouseTo(const SDL_FPoint& pos)
 {
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (SdlHosted::enabled())
+	{
+		/* The launcher owns the pointer. Report the place in window pixels, the space its
+		 * input messages use. */
+		auto first = getFirstWindow();
+		auto bridge = SdlLauncher::active();
+		if (!first || !first->renderer() || !bridge)
+			return true;
+		const auto spos = pixelToScreen(first->id(), pos);
+		float x = 0, y = 0;
+		if (SDL_RenderCoordinatesFromWindow(first->renderer(), spos.x, spos.y, &x, &y))
+			bridge->hostedWarp(first->id(), x, y);
+		return true;
+	}
+#endif
 	auto window = SDL_GetMouseFocus();
 	if (!window)
 		return true;
@@ -3236,6 +3252,13 @@ bool SdlContext::restoreCursor()
 	{
 		/* Keep hasCursor() tracking the server cursor: it selects relative mouse mode. */
 		setHasCursor(_cursorType != CURSOR_NULL);
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+		if (auto bridge = SdlLauncher::active(); bridge && SdlHosted::enabled())
+		{
+			bridge->hostedCursor("default");
+			return true;
+		}
+#endif
 		if (!SDL_SetCursor(SDL_GetDefaultCursor()) || !SDL_ShowCursor())
 		{
 			WLog_Print(getWLog(), WLOG_ERROR, "Unable to show the local cursor");
@@ -3243,6 +3266,15 @@ bool SdlContext::restoreCursor()
 		}
 		return true;
 	}
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active();
+	    bridge && SdlHosted::enabled() && _cursorType != CURSOR_IMAGE)
+	{
+		bridge->hostedCursor(_cursorType == CURSOR_NULL ? "hidden" : "default");
+		setHasCursor(_cursorType != CURSOR_NULL);
+		return true;
+	}
+#endif
 	switch (_cursorType)
 	{
 		case CURSOR_NULL:

@@ -54,6 +54,12 @@ class SdlLauncher
 	void serviceFocus(); // SDL main thread only
 	/** Hosted rendering: applies queued layouts, announces windows, notices a lost launcher. */
 	void serviceHosted(); // SDL main thread only
+	/** Hosted rendering: tells the launcher which cursor to show. kind is "default", "hidden" or
+	 * "image" with BGRA pixels in straight alpha. SDL main thread only. */
+	void hostedCursor(const char* kind, const BYTE* bgra = nullptr, UINT32 width = 0,
+	                  UINT32 height = 0, UINT32 hotX = 0, UINT32 hotY = 0);
+	/** Hosted rendering: the server moved the pointer; position in window pixels. */
+	void hostedWarp(SDL_WindowID window, float x, float y); // SDL main thread only
 	uint32_t takeScreenRefreshRequests() { const auto modes = _screenRefresh.exchange(0); return _connected && !_cancelled && !_terminal ? modes : 0; }
 	bool takeScreenRefreshRequest() { return takeScreenRefreshRequests() != 0; }
 	bool requestClose(); // SDL main thread: queues a decision; never waits.
@@ -87,6 +93,7 @@ class SdlLauncher
 	bool hostedFocus(WINPR_JSON* event);
 	void releaseHostedInput(); // SDL main thread only
 	std::vector<SdlHostedInput::Message> _hostedInputs; // guarded by _mutex; pixels until drained
+	std::string _hostedCursorKind;                      // SDL main thread only
 	bool _hostedRelease = false;                        // guarded by _mutex
 	SdlHostedInput::State _hostedInput;                 // SDL main thread only
 	std::vector<HostedLayout> _hostedLayouts;                   // guarded by _mutex

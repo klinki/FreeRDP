@@ -316,8 +316,12 @@ Events from the client:
 The JSON bridge and the surface channel are separate queues: a window's
 surfaces may arrive before or after its `hosted_window` event.
 - `cursor`: `kind` of `default`, `hidden` or `image`; for `image`, `pngBase64`,
-  `width`, `height`, `hotX`, `hotY`.
-- `pointer_warp`: `windowId`, `x`, `y`.
+  `width`, `height`, `hotX`, `hotY`. The image is the server's cursor in remote
+  pixels with straight alpha, at most 512 by 512; the launcher scales it as it
+  scales the picture. A cursor the client cannot encode is reported as
+  `default`. Animated server cursors arrive as one event per frame.
+- `pointer_warp`: `windowId`, `x`, `y` in window pixels: the server moved the
+  pointer. With several windows the position is relative to the first.
 
 Commands from the launcher:
 
