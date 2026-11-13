@@ -164,12 +164,14 @@ SdlWindow::SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect&
 	if (auto bridge = SdlLauncher::active()) bridge->prepareHostedWindow();
 #endif
 	_renderer = SDL_CreateRenderer(_window, nullptr);
-#ifdef WITH_SDL_LAUNCHER_BRIDGE
-	if (auto bridge = SdlLauncher::active()) bridge->sizeHostedWindow(_window, _renderer);
-#endif
 	_topBar = std::make_unique<SdlTopBar>(_renderer, title);
 
 	std::ignore = resizeToScale();
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	/* After resizeToScale(): before it the window still has its pixel size in points, and
+	 * sizing the drawable then asked the server for a desktop twice as large in each direction. */
+	if (auto bridge = SdlLauncher::active()) bridge->sizeHostedWindow(_window, _renderer);
+#endif
 
 	_monitor = query(_window, id, true);
 }
