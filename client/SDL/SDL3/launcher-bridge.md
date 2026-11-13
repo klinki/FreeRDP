@@ -262,3 +262,83 @@ suppressed output stays suppressed. Combined redraw waits for successful resume.
 Requests and stage results log the mode without frame content or credentials.
 No decoder reset, codec change, remote input, or normal-session reconnect is
 performed by these methods. Packet success is not proof of visual recovery.
+
+## Hosted rendering
+
+A client advertising `hosted_render` accepts `start.renderMode: "hosted"`. In
+hosted mode the launcher owns the session windows. The client still creates one
+SDL window per remote monitor, but never shows, raises, focuses or makes any of
+them fullscreen, and takes no keyboard or mouse input from SDL. It draws
+everything it draws today, including the connection bar and the performance and
+reconnect overlays, into shared surfaces that the launcher displays. Without
+`renderMode`, or with `"window"`, behavior is unchanged.
+
+### Surface channel
+
+Frames do not travel on the JSON bridge. The launcher creates a Mach receive
+right, registers a send right to it in registered-port slot 0
+(`mach_ports_register`) while it starts the client, and the client reads it once
+at startup with `mach_ports_lookup`. No bootstrap service name is used, so the
+same code works inside the App Sandbox. If `renderMode` is `"hosted"` and the
+slot holds no valid port, the client reports a terminal `error` and does not
+connect.
+
+The client sends two fixed-layout messages, defined in `sdl_launcher_surface.h`.
+All integers are host byte order.
+
+| Message | `msgh_id` | Carries |
+|---|---|---|
+| surface | 1 | One port descriptor from `IOSurfaceCreateMachPort`, then `windowId`, `generation`, `index`, `width`, `height` (all `uint32`, size in pixels) |
+| frame | 2 | `windowId`, `generation`, `index` (`uint32`), then `sequence` (`uint64`) |
+
+Each window has three BGRA surfaces of the window's pixel size, `index` 0 to 2.
+The client sends all three `surface` messages before the first `frame` that
+names their `generation`. Whenever the pixel size changes or the window is
+recreated, the client makes three new surfaces under the next `generation`.
+A `frame` message says that the named surface holds a complete picture; the
+launcher shows it and drops frames whose `generation` it has not received
+surfaces for. The client never draws into the surface it announced last, and
+uses the surfaces in rotation. Sends never block: if the launcher's queue is
+full the frame message is dropped and the next one supersedes it. A dead port
+ends the session as bridge EOF does.
+
+### JSON messages
+
+Events from the client:
+
+- `hosted_window`: `windowId`, `monitorIndex`, `width`, `height` in pixels and
+  `scale`. Sent when a window is created or recreated (connect, reconnect,
+  monitor layout change), before its first surface.
+- `hosted_window_closed`: `windowId`.
+- `cursor`: `kind` of `default`, `hidden` or `image`; for `image`, `pngBase64`,
+  `width`, `height`, `hotX`, `hotY`.
+- `pointer_warp`: `windowId`, `x`, `y`.
+
+Commands from the launcher:
+
+- `layout`: `windowId`, `width` and `height` in points, `scale`. The client
+  resizes the hidden window and its surfaces to `width × scale` by
+  `height × scale` pixels; the existing display-control path then resizes the
+  remote desktop when dynamic resolution is on. The scale always comes from this
+  message, never from the display the hidden window happens to be on.
+- `input`: `windowId`, `action`, and per action:
+  - `key`: `keyCode` (macOS virtual key code), `down`, `flags` (`NSEvent`
+    modifier flags), optional `repeat`.
+  - `mouse_move`: `x`, `y`, optional `dx`, `dy`.
+  - `mouse_button`: `button` (1 left, 2 middle, 3 right, 4 and 5 extra), `down`,
+    `clicks`, `x`, `y`.
+  - `wheel`: `dx`, `dy` in wheel steps, fractional values allowed, `x`, `y`.
+- `focus_state`: `windowId`, `focused`. On loss of focus the client releases
+  every key and button it holds down.
+- `occlusion`: `windowId`, `visible`. While not visible the client keeps the
+  session running but stops drawing that window.
+
+Coordinates are in window pixels with the origin at the top left. Input is
+applied in the order received and passes through the same key, hotkey, mouse and
+overlay handling as SDL input. Messages naming an unknown `windowId` are
+ignored. On bridge EOF held keys and buttons are released before teardown.
+
+`start` may carry `hostedWindows`, an array of `{monitorIndex, width, height,
+scale}`, giving each window's first size so that the session connects at the
+right resolution. The existing `focus` command, `window_geometry` events and
+fullscreen state reporting do nothing in hosted mode.
