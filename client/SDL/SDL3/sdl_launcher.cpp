@@ -1173,6 +1173,11 @@ bool SdlLauncher::hostedLayout(WINPR_JSON* event)
 	const auto fullscreen = item(event, "fullscreen");
 	if (fullscreen && !WINPR_JSON_IsBool(fullscreen))
 		return false;
+	const auto desktopScale = item(event, "desktopScale");
+	const auto percent = desktopScale ? WINPR_JSON_GetNumberValue(desktopScale) : 0.0;
+	if (desktopScale && (!WINPR_JSON_IsNumber(desktopScale) || !std::isfinite(percent) ||
+	                     percent < 100 || percent > 500 || std::floor(percent) != percent))
+		return false;
 	if (!SdlHosted::enabled())
 		return true; // Not a hosted session: nothing to lay out.
 	{
@@ -1180,18 +1185,21 @@ bool SdlLauncher::hostedLayout(WINPR_JSON* event)
 		/* Only the newest layout of a window matters, but a fullscreen state it replaces
 		 * without restating still has to arrive. */
 		int state = fullscreen ? (WINPR_JSON_IsTrue(fullscreen) ? 1 : 0) : -1;
+		int remoteScale = static_cast<int>(percent);
 		_hostedLayouts.erase(std::remove_if(_hostedLayouts.begin(), _hostedLayouts.end(),
 		                                    [&](const auto& queued) {
 			                                    if (queued.window != static_cast<uint32_t>(window))
 				                                    return false;
 			                                    if (state < 0)
 				                                    state = queued.fullscreen;
+			                                    if (remoteScale == 0)
+				                                    remoteScale = queued.desktopScale;
 			                                    return true;
 		                                    }),
 		                     _hostedLayouts.end());
 		_hostedLayouts.push_back({ static_cast<uint32_t>(window), static_cast<int>(std::lround(width)),
 		                           static_cast<int>(std::lround(height)), static_cast<float>(scale),
-		                           state });
+		                           state, remoteScale });
 	}
 	SDL_Event wake = {}; // The main loop may be waiting for events.
 	wake.type = SDL_EVENT_USER_UPDATE;
@@ -1286,11 +1294,14 @@ bool SdlLauncher::hostedFocus(WINPR_JSON* event)
 	const auto focused = item(event, "focused");
 	if (!focused || !WINPR_JSON_IsBool(focused))
 		return false;
-	if (!SdlHosted::enabled() || WINPR_JSON_IsTrue(focused))
+	if (!SdlHosted::enabled())
 		return true;
 	{
 		std::lock_guard lock(_mutex);
-		_hostedRelease = true;
+		if (WINPR_JSON_IsTrue(focused))
+			_hostedFocused = true;
+		else
+			_hostedRelease = true;
 	}
 	SDL_Event wake = {};
 	wake.type = SDL_EVENT_USER_UPDATE;
@@ -1354,12 +1365,17 @@ void SdlLauncher::serviceHosted()
 		return;
 	}
 	std::vector<SdlHostedInput::Message> inputs;
-	bool release = false;
+	bool release = false, focused = false;
 	{
 		std::lock_guard lock(_mutex);
 		inputs.swap(_hostedInputs);
 		std::swap(release, _hostedRelease);
+		std::swap(focused, _hostedFocused);
 	}
+	/* Before any input of this round: what the user copied on the Mac while away is announced
+	 * to the server before a paste typed right after returning. */
+	if (focused)
+		SdlHostedSurfaces::noteFocusGained();
 	for (auto& input : inputs)
 	{
 		auto window = SDL_GetWindowFromID(input.window);
@@ -1408,6 +1424,17 @@ void SdlLauncher::serviceHosted()
 			                               layout.scale };
 		if (!SdlHosted::setLayout(layout.window, pixels))
 			continue;
+		/* The launcher's window is on a display that wants another remote scale. The monitor
+		 * layout sent for the resize below carries it. */
+		if (layout.desktopScale != 0 && _context && _context->settings)
+		{
+			auto settings = _context->settings;
+			const auto mask = freerdp_settings_get_uint64(settings, FreeRDP_MonitorOverrideFlags);
+			std::ignore = freerdp_settings_set_uint32(settings, FreeRDP_DesktopScaleFactor,
+			                                          static_cast<UINT32>(layout.desktopScale));
+			std::ignore = freerdp_settings_set_uint64(settings, FreeRDP_MonitorOverrideFlags,
+			                                          mask | FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE);
+		}
 		/* The hidden window follows in points so that code reading its logical size agrees;
 		 * the pixel-size event runs the same resize path as a window the user resized. */
 		std::ignore = SDL_SetWindowSize(window, layout.width, layout.height);

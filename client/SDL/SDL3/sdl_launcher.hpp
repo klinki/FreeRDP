@@ -88,6 +88,7 @@ class SdlLauncher
 		int height = 0;
 		float scale = 1.0f;
 		int fullscreen = -1; // -1: not stated
+		int desktopScale = 0; // percent; 0: not stated
 	};
 	bool hostedOcclusion(WINPR_JSON* event);
 	static void hostedRequest(SDL_WindowID window, const char* action); // SDL main thread only
@@ -98,6 +99,7 @@ class SdlLauncher
 	std::vector<SdlHostedInput::Message> _hostedInputs; // guarded by _mutex; pixels until drained
 	std::string _hostedCursorKind;                      // SDL main thread only
 	bool _hostedRelease = false;                        // guarded by _mutex
+	bool _hostedFocused = false;                        // guarded by _mutex; focus was gained
 	SdlHostedInput::State _hostedInput;                 // SDL main thread only
 	std::vector<HostedLayout> _hostedLayouts;                   // guarded by _mutex
 	std::map<uint32_t, std::array<int, 3>> _hostedAnnounced;    // SDL main thread only

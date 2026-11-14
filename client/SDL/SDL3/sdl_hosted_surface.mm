@@ -2,6 +2,7 @@
 #include "sdl_hosted_surface.hpp"
 #include "sdl_launcher_surface.h"
 
+#import <AppKit/AppKit.h>
 #import <CoreVideo/CoreVideo.h>
 #import <Foundation/Foundation.h>
 #import <IOSurface/IOSurface.h>
@@ -15,6 +16,33 @@ void SdlHostedSurfaces::holdActivity()
 	activity = [[[NSProcessInfo processInfo]
 	    beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep
 	                      reason:@"Remote desktop session shown by the launcher"] retain];
+}
+
+void SdlHostedSurfaces::noteFocusGained()
+{
+	@autoreleasepool
+	{
+		int count = 0;
+		auto windows = SDL_GetWindows(&count);
+		for (int i = 0; windows && i < count; i++)
+		{
+			if (!SdlHosted::layout(SDL_GetWindowID(windows[i])))
+				continue; // Not a session window.
+			NSWindow* window = (__bridge NSWindow*)SDL_GetPointerProperty(
+			    SDL_GetWindowProperties(windows[i]), SDL_PROP_WINDOW_COCOA_WINDOW_POINTER, nullptr);
+			id listener = [window delegate];
+			if (![listener respondsToSelector:@selector(windowDidBecomeKey:)])
+				continue;
+			/* SDL's own handler: it compares the pasteboard's change count and queues a
+			 * clipboard update. It may also queue a pointer position measured against the
+			 * hidden window, which means nothing here; the launcher sends the real one. */
+			[listener windowDidBecomeKey:[NSNotification notificationWithName:NSWindowDidBecomeKeyNotification
+			                                                        object:window]];
+			SDL_FlushEvent(SDL_EVENT_MOUSE_MOTION);
+			break; // The clipboard is one for all windows.
+		}
+		SDL_free(windows);
+	}
 }
 
 SdlHostedSurfaces& SdlHostedSurfaces::instance()

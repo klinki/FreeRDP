@@ -12,6 +12,10 @@ class SdlHostedSurfaces : public SdlHosted::Output
 	/** Keeps the process out of App Nap for as long as it lives: a hosted session has no
 	 * visible window of its own, which is what macOS takes for an idle background process. */
 	static void holdActivity();
+	/** The launcher's window got the keyboard. SDL looks for a changed Mac clipboard only when
+	 * one of its own windows becomes key, which a hidden window never does, so that check is
+	 * run here. SDL main thread only. */
+	static void noteFocusGained();
 
 	/** Takes the launcher's port from the registered-port slot. False when there is none. */
 	bool adoptInheritedPort();

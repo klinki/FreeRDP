@@ -315,7 +315,7 @@ if(SDL_LAUNCHER_TEST AND APPLE)
   set_tests_properties(TestSDLHosted PROPERTIES TIMEOUT 30 ENVIRONMENT "SDL_VIDEODRIVER=dummy")
   add_executable(TestSDLHostedSurface test/TestSDLHostedSurface.mm sdl_hosted_surface.mm)
   target_link_libraries(
-    TestSDLHostedSurface PRIVATE SDL3::SDL3 "-framework IOSurface" "-framework CoreVideo" "-framework Foundation"
+    TestSDLHostedSurface PRIVATE SDL3::SDL3 "-framework IOSurface" "-framework CoreVideo" "-framework Foundation" "-framework AppKit"
   )
   add_test(NAME TestSDLHostedSurface COMMAND TestSDLHostedSurface)
   set_tests_properties(TestSDLHostedSurface PROPERTIES TIMEOUT 60)

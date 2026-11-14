@@ -346,7 +346,10 @@ Commands from the launcher:
   Optional `fullscreen` states whether the launcher's window is fullscreen;
   the client treats a change as it treats a window entering or leaving
   fullscreen, which shows or hides the connection bar. A window is taken to
-  be windowed until a `layout` says otherwise.
+  be windowed until a `layout` says otherwise. Optional `desktopScale` (100 to
+  500, percent) replaces the remote desktop scale from then on, for a launcher
+  window that moved to a display wanting another one; the monitor layout sent
+  for this `layout` carries it.
 - `input`: `windowId`, `action`, and per action:
   - `key`: `keyCode` (macOS virtual key code), `down`, `flags` (`NSEvent`
     modifier flags), optional `repeat`.
@@ -355,7 +358,9 @@ Commands from the launcher:
     `clicks`, `x`, `y`.
   - `wheel`: `dx`, `dy` in wheel steps, fractional values allowed, `x`, `y`.
 - `focus_state`: `windowId`, `focused`. On loss of focus the client releases
-  every key and button it holds down.
+  every key and button it holds down. On gaining focus it looks for a changed
+  Mac clipboard and announces it to the server, as its own window does when it
+  becomes key.
 - `occlusion`: `windowId`, `visible`. While not visible the client keeps the
   session running but draws nothing for that window and sends no frames for
   it. When no window is visible it also asks the server to stop sending

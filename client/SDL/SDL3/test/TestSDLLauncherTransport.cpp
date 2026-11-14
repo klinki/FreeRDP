@@ -705,6 +705,8 @@ namespace
 			{ "input", R"(,"windowId":1,"action":"key","keyCode":0,"down":true)" },
 			{ "input", R"(,"windowId":1,"action":"mouse_move","x":1,"y":2)" },
 			{ "focus_state", R"(,"windowId":1,"focused":false)" },
+			{ "focus_state", R"(,"windowId":1,"focused":true)" },
+			{ "layout", R"(,"windowId":1,"width":800,"height":500,"scale":1,"desktopScale":100)" },
 			{ "occlusion", R"(,"windowId":1,"visible":false)" },
 		};
 		const Case malformed[] = {
@@ -712,6 +714,9 @@ namespace
 			{ "layout", R"(,"windowId":0,"width":800,"height":500,"scale":2)" },
 			{ "layout", R"(,"windowId":1,"width":800,"height":500,"scale":20)" },
 			{ "layout", R"(,"windowId":1,"width":800,"height":500,"scale":2,"fullscreen":1)" },
+			{ "layout", R"(,"windowId":1,"width":800,"height":500,"scale":2,"desktopScale":99)" },
+			{ "layout", R"(,"windowId":1,"width":800,"height":500,"scale":2,"desktopScale":150.5)" },
+			{ "layout", R"(,"windowId":1,"width":800,"height":500,"scale":2,"desktopScale":"200")" },
 			{ "input", R"(,"windowId":1,"action":"paste")" },
 			{ "input", R"(,"windowId":1,"action":"key")" },
 			{ "input", R"(,"windowId":1,"action":"mouse_button","x":1,"y":2,"button":9)" },
@@ -831,6 +836,27 @@ namespace
 		eventually([&] { service(); return seen.count(SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) == 1; },
 		           "A replaced layout lost its fullscreen state");
 		require(seen.count(SDL_EVENT_WINDOW_ENTER_FULLSCREEN) == 0, "Fullscreen entered twice");
+
+		/* A remote scale stated with a layout replaces the session's, and survives being
+		 * superseded by a newer layout that does not restate it. */
+		const auto remoteScale = [&] {
+			return freerdp_settings_get_uint32(c.rdp->context->settings, FreeRDP_DesktopScaleFactor);
+		};
+		const auto scaleBefore = remoteScale();
+		c.command("layout", idField + R"(,"width":700,"height":400,"scale":1,"desktopScale":125)");
+		c.command("layout", idField + R"(,"width":710,"height":400,"scale":1)");
+		eventually([&] { service(); return SdlHosted::layout(id)->width == 710; }, "Layout not applied");
+		require(scaleBefore != 125 && remoteScale() == 125, "Remote scale not applied");
+		require((freerdp_settings_get_uint64(c.rdp->context->settings, FreeRDP_MonitorOverrideFlags) &
+		         FREERDP_MONITOR_OVERRIDE_DESKTOP_SCALE) != 0,
+		        "Remote scale not marked as chosen");
+		c.command("layout", idField + R"(,"width":700,"height":400,"scale":2)");
+		eventually([&] { service(); return SdlHosted::layout(id)->width == 1400; }, "Layout not applied");
+		require(remoteScale() == 125, "A layout without a remote scale changed it");
+		/* Gaining focus runs the clipboard check; without a native window there is none to run. */
+		c.command("focus_state", idField + R"(,"focused":true)");
+		c.command("layout", idField + R"(,"width":701,"height":400,"scale":2)");
+		eventually([&] { service(); return SdlHosted::layout(id)->width == 1402; }, "Focus gain broke servicing");
 
 		/* Occlusion: the events a shown window gets, once per change, known windows only. */
 		seen.clear();
