@@ -333,7 +333,8 @@ surfaces may arrive before or after its `hosted_window` event.
   `leave_fullscreen` or `minimize`. The session asks for what only the launcher
   can do to its window: the fullscreen hotkey, the connection bar's buttons and
   a fullscreen start all arrive this way. The launcher may decline; the client
-  changes nothing until a `layout` states the new fullscreen state.
+  changes nothing until a `layout` states the new fullscreen state, and does
+  not ask for the state the window is already in.
 
 Commands from the launcher:
 

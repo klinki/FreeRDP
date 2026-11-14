@@ -871,10 +871,9 @@ namespace
 		};
 		require(SdlHosted::minimize(window), "Minimize request failed");
 		expectRequest("minimize");
-		require(SdlHosted::fullscreen(window, true) && SdlHosted::fullscreen(window, false),
+		require(SdlHosted::fullscreen(window, false) && SdlHosted::fullscreen(window, true),
 		        "Fullscreen request failed");
-		expectRequest("enter_fullscreen");
-		expectRequest("leave_fullscreen");
+		expectRequest("enter_fullscreen"); // Leaving a windowed window asks nothing.
 		require((SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MINIMIZED)) == 0 &&
 		            (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) != 0,
 		        "A request changed the hidden window");

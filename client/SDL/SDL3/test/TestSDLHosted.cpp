@@ -89,13 +89,22 @@ int main()
 		SdlHosted::setRequest([](SDL_WindowID asking, const char* action) {
 			asked += std::to_string(asking) + ":" + action + ";";
 		});
-		require(SdlHosted::minimize(window) && SdlHosted::fullscreen(window, true) &&
-		            SdlHosted::fullscreen(window, false),
+		require(SdlHosted::minimize(window) && SdlHosted::fullscreen(window, false) &&
+		            SdlHosted::fullscreen(window, true),
 		        "request failed");
 		const auto prefix = std::to_string(id);
-		require(asked == prefix + ":minimize;" + prefix + ":enter_fullscreen;" + prefix +
-		                     ":leave_fullscreen;",
-		        "wrong requests");
+		require(asked == prefix + ":minimize;" + prefix + ":enter_fullscreen;", "wrong requests");
+		/* The state is the launcher's to tell; asking for the state it is in asks nothing. */
+		require(!SdlHosted::setFullscreen(4242, true), "an unknown window went fullscreen");
+		require(SdlHosted::setFullscreen(id, true) && !SdlHosted::setFullscreen(id, true) &&
+		            SdlHosted::isFullscreen(id),
+		        "fullscreen state not kept");
+		asked.clear();
+		require(SdlHosted::fullscreen(window, true) && asked.empty(), "asked for the current state");
+		require(SdlHosted::fullscreen(window, false) && asked == prefix + ":leave_fullscreen;",
+		        "leave not asked");
+		require(SdlHosted::setFullscreen(id, false) && !SdlHosted::isFullscreen(id),
+		        "fullscreen state not cleared");
 		SdlHosted::setRequest(nullptr);
 
 		/* Other windows are unaffected; a forgotten window falls back to its own geometry. */

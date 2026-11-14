@@ -102,7 +102,6 @@ class SdlLauncher
 	std::vector<HostedLayout> _hostedLayouts;                   // guarded by _mutex
 	std::map<uint32_t, std::array<int, 3>> _hostedAnnounced;    // SDL main thread only
 	std::vector<std::pair<uint32_t, bool>> _hostedVisibility;   // guarded by _mutex
-	std::map<uint32_t, bool> _hostedFullscreen;                 // SDL main thread only
 	Json message(const char* type);
 	Json request(Json event, const char* responseType);
 	bool send(Json event);

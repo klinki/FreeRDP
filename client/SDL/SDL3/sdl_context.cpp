@@ -3035,7 +3035,9 @@ bool SdlContext::redraw(bool suppress)
 
 	auto gdi = context()->gdi;
 	if (!gdi) return true;
-	_screenOutputSuppressed = suppress;
+	if (_screenOutputSuppressed.exchange(suppress) != suppress)
+		WLog_Print(_log, WLOG_INFO, "Server output %s: %s", suppress ? "paused" : "resumed",
+		           suppress ? "no session window is visible" : "a session window is visible");
 	return gdi_send_suppress_output(gdi, suppress);
 }
 

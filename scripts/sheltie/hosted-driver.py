@@ -44,6 +44,7 @@ def main():
     parser.add_argument("--mode", choices=("hosted", "sdl"), default="hosted")
     parser.add_argument("--scale", type=float, default=2, help="backing scale of the host windows")
     parser.add_argument("--no-port", action="store_true", help="start the engine without a surface port")
+    parser.add_argument("--reconnect", action="store_true", help="let the engine reconnect after a network loss")
     parser.add_argument("--perf", action="store_true", help="enable engine performance samples and log them")
     parser.add_argument("--multimon", type=int, default=0, help="use this many displays (skipping --skip-display)")
     parser.add_argument("--skip-display", default="M27UP", help="display name not to use for --multimon")
@@ -96,7 +97,9 @@ def main():
             target = args.target or f"127.0.0.1:{relay.port}"
             codec = ["/gfx"] if args.target else ["/rfx"]
             client.send("start", arguments=[f"/v:{target}", f"/u:{args.user}", *size, *codec,
-                                             "/timeout:5000", "-multitransport", "-auto-reconnect",
+                                             "/timeout:5000", "-multitransport",
+                                             *(["+auto-reconnect", "/auto-reconnect-max-retries:20"]
+                                               if args.reconnect else ["-auto-reconnect"]),
                                              "/scale-desktop:100", "/scale-device:100",
                                              "+dynamic-resolution"],
                         displaySelections=selections, thumbnailsEnabled=False, performanceSupported=args.perf,

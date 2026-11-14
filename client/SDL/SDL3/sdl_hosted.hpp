@@ -67,8 +67,25 @@ class SdlHosted
 	}
 	static bool fullscreen(SDL_Window* window, bool enter)
 	{
-		return enabled() ? ask(window, enter ? "enter_fullscreen" : "leave_fullscreen")
-		                 : SDL_SetWindowFullscreen(window, enter);
+		if (!enabled())
+			return SDL_SetWindowFullscreen(window, enter);
+		/* Asking for the state the launcher's window already has would only be noise. */
+		return isFullscreen(SDL_GetWindowID(window)) == enter ||
+		       ask(window, enter ? "enter_fullscreen" : "leave_fullscreen");
+	}
+	/** What the launcher last said about its window; windowed until it says otherwise.
+	 * Returns whether the state changed. */
+	static bool setFullscreen(SDL_WindowID id, bool fullscreen)
+	{
+		std::lock_guard lock(state().mutex);
+		if (state().layouts.count(id) == 0)
+			return false;
+		return fullscreen ? state().fullscreen.insert(id).second : state().fullscreen.erase(id) != 0;
+	}
+	static bool isFullscreen(SDL_WindowID id)
+	{
+		std::lock_guard lock(state().mutex);
+		return state().fullscreen.count(id) != 0;
 	}
 	/** Who hears that the session wants a window minimized or made fullscreen: the launcher
 	 * owns the windows, so the client can only ask. Set with enable(). */
@@ -142,6 +159,7 @@ class SdlHosted
 		std::lock_guard lock(state().mutex);
 		state().layouts.erase(id);
 		state().hidden.erase(id);
+		state().fullscreen.erase(id);
 	}
 	static std::map<SDL_WindowID, Layout> layouts()
 	{
@@ -193,6 +211,7 @@ class SdlHosted
 		std::mutex mutex;
 		std::map<SDL_WindowID, Layout> layouts;
 		std::set<SDL_WindowID> hidden; // guarded by mutex; always a subset of layouts
+		std::set<SDL_WindowID> fullscreen; // guarded by mutex; always a subset of layouts
 		Output* output = nullptr;      // SDL main thread only
 		Request request = nullptr;     // set before the first session window is created
 	};
