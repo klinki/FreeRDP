@@ -2,6 +2,7 @@
 #include "../sdl_hosted.hpp"
 #include <cstdio>
 #include <stdexcept>
+#include <string>
 
 static void require(bool value, const char* message)
 {
@@ -74,6 +75,29 @@ int main()
 		require(SdlHosted::pixelSize(window, &w, &h) && w == 1280 && h == 800,
 		        "a refused layout changed the size");
 
+		/* Visibility: only windows with a layout can be hidden; nothing is hidden by default. */
+		require(SdlHosted::visible(id) && !SdlHosted::allHidden(), "hidden by default");
+		SdlHosted::setVisible(4242, false);
+		require(SdlHosted::visible(4242) && !SdlHosted::allHidden(), "an unknown window was hidden");
+		SdlHosted::setVisible(id, false);
+		require(!SdlHosted::visible(window) && SdlHosted::allHidden(), "window not hidden");
+		SdlHosted::setVisible(id, true);
+		require(SdlHosted::visible(window) && !SdlHosted::allHidden(), "window not visible again");
+
+		/* Minimize and fullscreen are asked of the launcher. */
+		static std::string asked;
+		SdlHosted::setRequest([](SDL_WindowID asking, const char* action) {
+			asked += std::to_string(asking) + ":" + action + ";";
+		});
+		require(SdlHosted::minimize(window) && SdlHosted::fullscreen(window, true) &&
+		            SdlHosted::fullscreen(window, false),
+		        "request failed");
+		const auto prefix = std::to_string(id);
+		require(asked == prefix + ":minimize;" + prefix + ":enter_fullscreen;" + prefix +
+		                     ":leave_fullscreen;",
+		        "wrong requests");
+		SdlHosted::setRequest(nullptr);
+
 		/* Other windows are unaffected; a forgotten window falls back to its own geometry. */
 		auto other = SDL_CreateWindow("Sheltie hosted test 2", 320, 240, flags);
 		require(other != nullptr, SDL_GetError());
@@ -81,14 +105,18 @@ int main()
 		require(SdlHosted::pixelSize(other, &ow, &oh) &&
 		            SDL_GetWindowSizeInPixels(other, &osw, &osh) && ow == osw && oh == osh,
 		        "a layout leaked to another window");
+		SdlHosted::setVisible(id, false);
 		SdlHosted::forget(id);
 		require(!SdlHosted::layout(id), "layout survived forget");
+		require(SdlHosted::visible(id) && !SdlHosted::allHidden(), "hidden state survived forget");
 		require(SdlHosted::pixelSize(window, &w, &h) && w == sw && h == sh,
 		        "forgotten window kept the layout size");
 
 		/* Off again: layouts are not consulted. */
 		require(SdlHosted::setLayout(id, { 1600, 1000, 2.0f }), "layout refused");
+		SdlHosted::setVisible(id, false);
 		SdlHosted::enable(false);
+		require(SdlHosted::visible(id) && !SdlHosted::allHidden(), "hidden state used while off");
 		require(SdlHosted::pixelSize(window, &w, &h) && w == sw && h == sh,
 		        "layout used while off");
 

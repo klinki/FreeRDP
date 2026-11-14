@@ -87,7 +87,10 @@ class SdlLauncher
 		int width = 0; // points
 		int height = 0;
 		float scale = 1.0f;
+		int fullscreen = -1; // -1: not stated
 	};
+	bool hostedOcclusion(WINPR_JSON* event);
+	static void hostedRequest(SDL_WindowID window, const char* action); // SDL main thread only
 	bool hostedLayout(WINPR_JSON* event);
 	bool hostedInput(WINPR_JSON* event);
 	bool hostedFocus(WINPR_JSON* event);
@@ -98,6 +101,8 @@ class SdlLauncher
 	SdlHostedInput::State _hostedInput;                 // SDL main thread only
 	std::vector<HostedLayout> _hostedLayouts;                   // guarded by _mutex
 	std::map<uint32_t, std::array<int, 3>> _hostedAnnounced;    // SDL main thread only
+	std::vector<std::pair<uint32_t, bool>> _hostedVisibility;   // guarded by _mutex
+	std::map<uint32_t, bool> _hostedFullscreen;                 // SDL main thread only
 	Json message(const char* type);
 	Json request(Json event, const char* responseType);
 	bool send(Json event);

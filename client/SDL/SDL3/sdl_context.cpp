@@ -1306,6 +1306,10 @@ void SdlContext::updateMonitorDataFromOffsets()
 
 bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& rects, bool remoteContent)
 {
+	/* Hosted and not shown by the launcher: nothing to draw. The window is repainted
+	 * completely when it becomes visible again. */
+	if (!SdlHosted::visible(window.window()))
+		return true;
 	auto size = window.rect();
 	std::unique_lock lock(_critical);
 	if (!isConnected()) return true;
@@ -1668,6 +1672,8 @@ SdlWindow* SdlContext::getWindowForId(SDL_WindowID id)
 
 bool SdlContext::allWindowsHidden() const
 {
+	if (SdlHosted::enabled())
+		return SdlHosted::allHidden();
 	return std::all_of(_windows.begin(), _windows.end(),
 	                   [](const auto& entry)
 	                   {
@@ -2015,6 +2021,12 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 			break;
 		case SDL_EVENT_WINDOW_MOUSE_ENTER:
 			return restoreCursor();
+		case SDL_EVENT_WINDOW_EXPOSED:
+			/* Hosted: the launcher shows the window again after hiding it, and nothing was
+			 * drawn for it in between. */
+			if (SdlHosted::enabled() && !redrawWindows())
+				return false;
+			break;
 		case SDL_EVENT_WINDOW_FOCUS_LOST:
 			window->closeRefreshMenu();
 			std::ignore = redrawWindows();

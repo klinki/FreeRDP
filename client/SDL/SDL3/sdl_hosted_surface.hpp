@@ -9,6 +9,9 @@ class SdlHostedSurfaces : public SdlHosted::Output
 {
   public:
 	static SdlHostedSurfaces& instance();
+	/** Keeps the process out of App Nap for as long as it lives: a hosted session has no
+	 * visible window of its own, which is what macOS takes for an idle background process. */
+	static void holdActivity();
 
 	/** Takes the launcher's port from the registered-port slot. False when there is none. */
 	bool adoptInheritedPort();

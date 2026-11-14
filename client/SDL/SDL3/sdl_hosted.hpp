@@ -8,6 +8,7 @@
 #include <map>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <SDL3/SDL.h>
 
 class SdlHosted
@@ -60,11 +61,19 @@ class SdlHosted
 	static bool show(SDL_Window* window) { return enabled() || SDL_ShowWindow(window); }
 	static bool raise(SDL_Window* window) { return enabled() || SDL_RaiseWindow(window); }
 	static bool restore(SDL_Window* window) { return enabled() || SDL_RestoreWindow(window); }
-	static bool minimize(SDL_Window* window) { return enabled() || SDL_MinimizeWindow(window); }
+	static bool minimize(SDL_Window* window)
+	{
+		return enabled() ? ask(window, "minimize") : SDL_MinimizeWindow(window);
+	}
 	static bool fullscreen(SDL_Window* window, bool enter)
 	{
-		return enabled() || SDL_SetWindowFullscreen(window, enter);
+		return enabled() ? ask(window, enter ? "enter_fullscreen" : "leave_fullscreen")
+		                 : SDL_SetWindowFullscreen(window, enter);
 	}
+	/** Who hears that the session wants a window minimized or made fullscreen: the launcher
+	 * owns the windows, so the client can only ask. Set with enable(). */
+	using Request = void (*)(SDL_WindowID id, const char* action);
+	static void setRequest(Request request) { state().request = request; }
 	static bool grabKeyboard(SDL_Window* window, bool grab)
 	{
 		return enabled() || SDL_SetWindowKeyboardGrab(window, grab);
@@ -84,6 +93,33 @@ class SdlHosted
 		state().layouts[id] = layout;
 		return true;
 	}
+	/* Whether the launcher shows the window at all. Nothing is drawn for a window that is not
+	 * visible; the client repaints it completely when it becomes visible again. */
+	static void setVisible(SDL_WindowID id, bool visible)
+	{
+		std::lock_guard lock(state().mutex);
+		if (visible)
+			state().hidden.erase(id);
+		else if (state().layouts.count(id) != 0)
+			state().hidden.insert(id);
+	}
+	static bool visible(SDL_WindowID id)
+	{
+		if (!enabled())
+			return true;
+		std::lock_guard lock(state().mutex);
+		return state().hidden.count(id) == 0;
+	}
+	static bool visible(SDL_Window* window) { return visible(SDL_GetWindowID(window)); }
+	/** True when hosted and the launcher shows none of the session windows. */
+	static bool allHidden()
+	{
+		if (!enabled())
+			return false;
+		std::lock_guard lock(state().mutex);
+		return !state().layouts.empty() && state().hidden.size() == state().layouts.size();
+	}
+
 	/* Presentation. "The screen" of a hosted window is the output's current texture. */
 	static bool screenTarget(SDL_Window* window, SDL_Renderer* renderer)
 	{
@@ -105,6 +141,7 @@ class SdlHosted
 			state().output->forget(id);
 		std::lock_guard lock(state().mutex);
 		state().layouts.erase(id);
+		state().hidden.erase(id);
 	}
 	static std::map<SDL_WindowID, Layout> layouts()
 	{
@@ -155,8 +192,16 @@ class SdlHosted
 		std::atomic<float> initialScale{ 0.0f };
 		std::mutex mutex;
 		std::map<SDL_WindowID, Layout> layouts;
-		Output* output = nullptr; // SDL main thread only
+		std::set<SDL_WindowID> hidden; // guarded by mutex; always a subset of layouts
+		Output* output = nullptr;      // SDL main thread only
+		Request request = nullptr;     // set before the first session window is created
 	};
+	static bool ask(SDL_Window* window, const char* action)
+	{
+		if (state().request)
+			state().request(SDL_GetWindowID(window), action);
+		return true;
+	}
 	static State& state()
 	{
 		static State instance;

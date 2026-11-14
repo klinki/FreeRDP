@@ -140,7 +140,7 @@ def main():
                             sample[name] = sum(int(x) * 60 ** i for i, x in enumerate(reversed(m.split(":")))) * 60 + float(sec)
                         print(f"t={time.monotonic() - shown:.1f} cpu {json.dumps(dict(wall=time.monotonic(), **sample))}")
                         continue
-                    if kind in ("layout", "input") and first_window:
+                    if kind in ("layout", "input", "occlusion", "focus_state") and first_window:
                         fields = dict(windowId=first_window, **fields) if "windowId" not in fields else fields
                     print(f"t={time.monotonic() - shown:.1f} send {kind} {fields}")
                     client.send(kind, **fields)

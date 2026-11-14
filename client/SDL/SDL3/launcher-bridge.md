@@ -285,6 +285,11 @@ client has started, so that no later child process inherits the port. If
 with outcome `initial_failure` before connecting; the client never falls back to
 showing a window of its own.
 
+The slot is inherited from process to process, so it may already hold a port
+that the launcher's own parent put there. The client cannot tell such a port
+from the launcher's. A launcher that asks for hosted rendering must therefore
+register its own port for that start, and must not ask for it otherwise.
+
 The client sends two fixed-layout messages, defined in `sdl_launcher_surface.h`.
 All integers are host byte order.
 
@@ -324,6 +329,11 @@ surfaces may arrive before or after its `hosted_window` event.
   `default`. Animated server cursors arrive as one event per frame.
 - `pointer_warp`: `windowId`, `x`, `y` in window pixels: the server moved the
   pointer. With several windows the position is relative to the first.
+- `hosted_request`: `windowId`, `action` of `enter_fullscreen`,
+  `leave_fullscreen` or `minimize`. The session asks for what only the launcher
+  can do to its window: the fullscreen hotkey, the connection bar's buttons and
+  a fullscreen start all arrive this way. The launcher may decline; the client
+  changes nothing until a `layout` states the new fullscreen state.
 
 Commands from the launcher:
 
@@ -332,6 +342,10 @@ Commands from the launcher:
   `height × scale` pixels; the existing display-control path then resizes the
   remote desktop when dynamic resolution is on. The scale always comes from this
   message, never from the display the hidden window happens to be on.
+  Optional `fullscreen` states whether the launcher's window is fullscreen;
+  the client treats a change as it treats a window entering or leaving
+  fullscreen, which shows or hides the connection bar. A window is taken to
+  be windowed until a `layout` says otherwise.
 - `input`: `windowId`, `action`, and per action:
   - `key`: `keyCode` (macOS virtual key code), `down`, `flags` (`NSEvent`
     modifier flags), optional `repeat`.
@@ -342,7 +356,11 @@ Commands from the launcher:
 - `focus_state`: `windowId`, `focused`. On loss of focus the client releases
   every key and button it holds down.
 - `occlusion`: `windowId`, `visible`. While not visible the client keeps the
-  session running but stops drawing that window.
+  session running but draws nothing for that window and sends no frames for
+  it. When no window is visible it also asks the server to stop sending
+  screen updates, as it does for a minimized window. A window that becomes
+  visible again is repainted completely, and server output resumes. Windows
+  start visible.
 
 Coordinates are in window pixels with the origin at the top left; `dx` and `dy`
 of `mouse_move` are in pixels too. Input is applied in the order received and
@@ -355,5 +373,11 @@ are also released when the launcher's surface port goes away.
 `start` may carry `hostedScale`, the backing scale of the launcher's windows,
 used for every window until its first `layout` arrives; without it the client
 assumes the scale of the display the hidden window was created on. The first
-size comes from the session arguments, as for a window. The existing `focus` command, `window_geometry` events and
-fullscreen state reporting do nothing in hosted mode.
+size comes from the session arguments, as for a window: fullscreen arguments
+give a window the size of its display and produce an `enter_fullscreen`
+request, nothing more. The existing `focus` command and `window_geometry`
+events do nothing in hosted mode.
+
+A hosted client holds a user-initiated activity (`NSProcessInfo`) from start to
+exit, because a process without a visible window is otherwise a candidate for
+App Nap. It does not prevent the Mac from sleeping when idle.

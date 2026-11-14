@@ -832,6 +832,9 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 	if (!ensureRenderTarget() || !_renderTarget)
 		return false;
 
+	if (!SdlHosted::visible(_window))
+		return true; // Hosted and not shown by the launcher.
+
 	/* Copy accumulated render target to screen and present */
 	if (!SdlHosted::screenTarget(_window, _renderer))
 		return false;
@@ -917,6 +920,8 @@ bool SdlWindow::renderStalledFrame(int dots, bool showTopBar, bool pinned,
 {
 	if (!_renderer)
 		return false;
+	if (!SdlHosted::visible(_window))
+		return true; // Hosted and not shown by the launcher.
 
 	(void)ensureRenderTarget();
 
@@ -1006,6 +1011,8 @@ bool SdlWindow::updateStalledSurface(int dots, bool showTopBar, bool pinned,
 
 	/* Stalled overlay presents are counted separately from present_calls so
 	 * that identical-input comparisons of present_calls stay stable. */
+	if (!SdlHosted::visible(_window))
+		return true;
 	_renderMetrics.noteStalledPresent();
 	return SdlHosted::present(_window, _renderer);
 }
@@ -1226,6 +1233,8 @@ bool SdlWindow::paintResizeFrame(SDL_Surface* surface, SDL_Point off, bool conte
 		}
 	}
 
+	if (!SdlHosted::visible(_window))
+		return true;
 	if (!SdlHosted::screenTarget(_window, _renderer))
 		return false;
 	std::ignore = SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr);
@@ -1247,7 +1256,12 @@ SdlWindow SdlWindow::create(SDL_DisplayID id, const std::string& title, Uint32 f
 		std::ignore = SDL_GetDisplayBounds(id, &rect);
 	}
 
-	SdlWindow window{ id, title, rect, flags };
+	/* Hosted: the launcher decides whether its window is fullscreen and says so with a
+	 * layout. The hidden window only takes the size a fullscreen start asks for. */
+	SdlWindow window{ id, title, rect,
+		              SdlHosted::enabled()
+		                  ? static_cast<Uint32>(flags & ~SDL_WINDOW_FULLSCREEN)
+		                  : flags };
 
 	if ((flags & SDL_WINDOW_FULLSCREEN) != 0)
 	{

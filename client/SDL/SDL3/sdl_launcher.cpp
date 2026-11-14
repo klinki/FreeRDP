@@ -491,6 +491,8 @@ bool SdlLauncher::receive(Json event)
 		return hostedInput(event.get());
 	if (type == "focus_state")
 		return hostedFocus(event.get());
+	if (type == "occlusion")
+		return hostedOcclusion(event.get());
 	if (type == "focus")
 	{
 		_focus = true;
@@ -866,6 +868,8 @@ bool SdlLauncher::prepare(std::vector<std::string>& arguments, std::string& erro
 			return false;
 		}
 		SdlHosted::setOutput(&SdlHostedSurfaces::instance());
+		SdlHosted::setRequest(&SdlLauncher::hostedRequest);
+		SdlHostedSurfaces::holdActivity();
 		SdlHosted::setInitialScale(static_cast<float>(scale));
 		SdlHosted::enable(true);
 	}
@@ -1166,23 +1170,64 @@ bool SdlLauncher::hostedLayout(WINPR_JSON* event)
 		                               static_cast<float>(scale) };
 	if (width < 1 || height < 1 || width > 16384 || height > 16384 || !SdlHosted::valid(pixels))
 		return false;
+	const auto fullscreen = item(event, "fullscreen");
+	if (fullscreen && !WINPR_JSON_IsBool(fullscreen))
+		return false;
 	if (!SdlHosted::enabled())
 		return true; // Not a hosted session: nothing to lay out.
 	{
 		std::lock_guard lock(_mutex);
-		/* Only the newest layout of a window matters. */
+		/* Only the newest layout of a window matters, but a fullscreen state it replaces
+		 * without restating still has to arrive. */
+		int state = fullscreen ? (WINPR_JSON_IsTrue(fullscreen) ? 1 : 0) : -1;
 		_hostedLayouts.erase(std::remove_if(_hostedLayouts.begin(), _hostedLayouts.end(),
 		                                    [&](const auto& queued) {
-			                                    return queued.window == static_cast<uint32_t>(window);
+			                                    if (queued.window != static_cast<uint32_t>(window))
+				                                    return false;
+			                                    if (state < 0)
+				                                    state = queued.fullscreen;
+			                                    return true;
 		                                    }),
 		                     _hostedLayouts.end());
 		_hostedLayouts.push_back({ static_cast<uint32_t>(window), static_cast<int>(std::lround(width)),
-		                           static_cast<int>(std::lround(height)), static_cast<float>(scale) });
+		                           static_cast<int>(std::lround(height)), static_cast<float>(scale),
+		                           state });
 	}
 	SDL_Event wake = {}; // The main loop may be waiting for events.
 	wake.type = SDL_EVENT_USER_UPDATE;
 	std::ignore = SDL_PushEvent(&wake);
 	return true;
+}
+/* Bridge reader thread. Applied on the SDL main thread by serviceHosted(). */
+bool SdlLauncher::hostedOcclusion(WINPR_JSON* event)
+{
+	const auto window = item(event, "windowId");
+	const auto visible = item(event, "visible");
+	const auto id = window ? WINPR_JSON_GetNumberValue(window) : 0.0;
+	if (!window || !WINPR_JSON_IsNumber(window) || !visible || !WINPR_JSON_IsBool(visible) ||
+	    !std::isfinite(id) || id < 1 || id > UINT32_MAX || std::floor(id) != id)
+		return false;
+	if (!SdlHosted::enabled())
+		return true; // Not a hosted session: SDL reports what the window server shows.
+	{
+		std::lock_guard lock(_mutex);
+		_hostedVisibility.emplace_back(static_cast<uint32_t>(id), WINPR_JSON_IsTrue(visible));
+	}
+	SDL_Event wake = {};
+	wake.type = SDL_EVENT_USER_UPDATE;
+	std::ignore = SDL_PushEvent(&wake);
+	return true;
+}
+/* SDL main thread. The session asks for what only the launcher can do to its window. */
+void SdlLauncher::hostedRequest(SDL_WindowID window, const char* action)
+{
+	auto bridge = active();
+	if (!bridge || !SdlHosted::layout(window))
+		return;
+	auto event = bridge->message("hosted_request");
+	number(event.get(), "windowId", window);
+	WINPR_JSON_AddStringToObject(event.get(), "action", action);
+	std::ignore = bridge->send(std::move(event));
 }
 /* Bridge reader thread. Events are built on the SDL main thread by serviceHosted(), where the
  * window's coordinate space and SDL's modifier state may be touched. */
@@ -1372,6 +1417,39 @@ void SdlLauncher::serviceHosted()
 		resized.window.data1 = pixels.width;
 		resized.window.data2 = pixels.height;
 		std::ignore = SDL_PushEvent(&resized);
+		/* The launcher's window entered or left fullscreen. The hidden window never does, so
+		 * the event SDL would have sent for it is made here; the connection bar follows it. */
+		if (layout.fullscreen >= 0)
+		{
+			const bool entered = layout.fullscreen != 0;
+			const auto known = _hostedFullscreen.find(layout.window);
+			if (known == _hostedFullscreen.end() ? entered : known->second != entered)
+			{
+				SDL_Event state = {};
+				state.type = entered ? SDL_EVENT_WINDOW_ENTER_FULLSCREEN
+				                     : SDL_EVENT_WINDOW_LEAVE_FULLSCREEN;
+				state.window.windowID = layout.window;
+				std::ignore = SDL_PushEvent(&state);
+			}
+			_hostedFullscreen[layout.window] = entered;
+		}
+	}
+	std::vector<std::pair<uint32_t, bool>> visibility;
+	{
+		std::lock_guard lock(_mutex);
+		visibility.swap(_hostedVisibility);
+	}
+	for (const auto& [id, visible] : visibility)
+	{
+		if (!SdlHosted::layout(id) || SdlHosted::visible(id) == visible)
+			continue; // Not a session window, or nothing changed.
+		SdlHosted::setVisible(id, visible);
+		/* The same events a shown SDL window gets: hiding the last visible window pauses the
+		 * server's output, showing one resumes it and repaints. */
+		SDL_Event state = {};
+		state.type = visible ? SDL_EVENT_WINDOW_EXPOSED : SDL_EVENT_WINDOW_HIDDEN;
+		state.window.windowID = id;
+		std::ignore = SDL_PushEvent(&state);
 	}
 	/* Announce windows that appeared or changed, and those that went away. */
 	const auto current = SdlHosted::layouts();
@@ -1400,6 +1478,7 @@ void SdlLauncher::serviceHosted()
 		auto event = message("hosted_window_closed");
 		number(event.get(), "windowId", it->first);
 		std::ignore = send(std::move(event));
+		_hostedFullscreen.erase(it->first);
 		it = _hostedAnnounced.erase(it);
 	}
 }

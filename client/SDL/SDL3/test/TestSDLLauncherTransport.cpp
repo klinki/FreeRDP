@@ -1,5 +1,9 @@
 /** Actual private socket protocol regression tests; never contacts an RDP host. */
 #include "../sdl_launcher.hpp"
+#include "../sdl_hosted.hpp"
+#include "../sdl_hosted_surface.hpp"
+#include <mach/mach.h>
+#include <set>
 #include <freerdp/error.h>
 #include <freerdp/client.h>
 #include <freerdp/crypto/crypto.h>
@@ -690,6 +694,205 @@ namespace
 		}
 	}
 
+	/* Hosted rendering messages (launcher-bridge.md, "Hosted rendering"). Leaves the process in
+	 * hosted mode, so it runs last. */
+	void hostedRendering()
+	{
+		using Case = std::pair<const char*, const char*>;
+		const Case valid[] = {
+			{ "layout", R"(,"windowId":1,"width":800,"height":500,"scale":2)" },
+			{ "layout", R"(,"windowId":1,"width":800,"height":500,"scale":2,"fullscreen":true)" },
+			{ "input", R"(,"windowId":1,"action":"key","keyCode":0,"down":true)" },
+			{ "input", R"(,"windowId":1,"action":"mouse_move","x":1,"y":2)" },
+			{ "focus_state", R"(,"windowId":1,"focused":false)" },
+			{ "occlusion", R"(,"windowId":1,"visible":false)" },
+		};
+		const Case malformed[] = {
+			{ "layout", R"(,"windowId":1,"width":800,"height":500)" },
+			{ "layout", R"(,"windowId":0,"width":800,"height":500,"scale":2)" },
+			{ "layout", R"(,"windowId":1,"width":800,"height":500,"scale":20)" },
+			{ "layout", R"(,"windowId":1,"width":800,"height":500,"scale":2,"fullscreen":1)" },
+			{ "input", R"(,"windowId":1,"action":"paste")" },
+			{ "input", R"(,"windowId":1,"action":"key")" },
+			{ "input", R"(,"windowId":1,"action":"mouse_button","x":1,"y":2,"button":9)" },
+			{ "focus_state", R"(,"windowId":1)" },
+			{ "occlusion", R"(,"windowId":1)" },
+			{ "occlusion", R"(,"windowId":1,"visible":"no")" },
+			{ "occlusion", R"(,"windowId":1.5,"visible":true)" },
+			{ "occlusion", R"(,"visible":true)" },
+		};
+		const std::string plain = R"(,"arguments":[],"displaySelections":[])";
+		{ /* A session with its own window accepts the messages and does nothing with them. */
+			Connection c;
+			c.command("start", plain + R"(,"performanceSupported":true)");
+			eventually([&] { return c.bridge->performanceAvailable(); }, "Start not applied");
+			for (const auto& [type, fields] : valid)
+				c.command(type, fields);
+			c.command("performance_control",
+			          R"(,"performanceEnabled":false,"performanceOverlayVisible":false,"performanceGeneration":7)");
+			eventually([&] { return c.bridge->performanceGeneration() == 7; }, "Reader barrier not applied");
+			require(!c.bridge->cancelled(), "A valid hosted message ended a window session");
+		}
+		for (const auto& [type, fields] : malformed)
+		{
+			Connection c;
+			c.command(type, fields);
+			eventually([&] { return c.bridge->cancelled(); }, fields);
+		}
+		for (const auto start : { R"(,"renderMode":5)", R"(,"renderMode":"layer")", R"(,"hostedScale":2)",
+		                          R"(,"renderMode":"window","hostedScale":2)",
+		                          R"(,"renderMode":"hosted","hostedScale":0.1)" })
+		{
+			Connection c;
+			c.command("start", plain + start);
+			std::vector<std::string> arguments;
+			std::string error;
+			require(!c.bridge->prepare(arguments, error) && error == "Invalid start command", start);
+			require(!SdlHosted::enabled(), "An invalid start turned hosted mode on");
+		}
+		{ /* Hosted without the launcher's port fails by name instead of opening a window. The
+			 * slot is inherited, so whatever started this test may have left a port in it. */
+			mach_port_t none = MACH_PORT_NULL;
+			require(mach_ports_register(mach_task_self(), &none, 1) == KERN_SUCCESS,
+			        "Cannot clear the registered ports");
+			Connection c;
+			c.command("start", plain + R"(,"renderMode":"hosted")");
+			std::vector<std::string> arguments;
+			std::string error;
+			require(!c.bridge->prepare(arguments, error) &&
+			            error.find("surface port is missing") != std::string::npos,
+			        "Hosted start without a port was not refused");
+			require(!SdlHosted::enabled(), "Hosted mode is on without a port");
+		}
+
+		/* The launcher's side of the handshake: a port in the registered slot. */
+		mach_port_t port = MACH_PORT_NULL;
+		require(mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &port) == KERN_SUCCESS &&
+		            mach_port_insert_right(mach_task_self(), port, port, MACH_MSG_TYPE_MAKE_SEND) ==
+		                KERN_SUCCESS &&
+		            mach_ports_register(mach_task_self(), &port, 1) == KERN_SUCCESS,
+		        "Cannot register a surface port");
+		Connection c;
+		c.command("start", plain + R"(,"renderMode":"hosted","hostedScale":2)");
+		std::vector<std::string> arguments;
+		std::string error;
+		require(c.bridge->prepare(arguments, error), "Hosted start with a port was refused");
+		require(SdlHosted::enabled() && SdlHostedSurfaces::instance().connected() &&
+		            SdlHosted::initialScale(1.0f) == 2.0f,
+		        "Hosted start did not turn hosted mode on");
+		require(getString(c.next().get(), "type") == "hello", "Missing hello");
+
+		require(SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "dummy") && SDL_Init(SDL_INIT_VIDEO), SDL_GetError());
+		auto window = SDL_CreateWindow("hosted transport", 640, 480, SDL_WINDOW_HIDDEN);
+		auto renderer = window ? SDL_CreateRenderer(window, "software") : nullptr;
+		require(renderer != nullptr, SDL_GetError());
+		const auto id = SDL_GetWindowID(window);
+		const auto idField = ",\"windowId\":" + std::to_string(id);
+		require(SdlHosted::setLayout(id, { 1280, 960, 2.0f }), "Cannot lay out the test window");
+		std::set<Uint32> seen;
+		std::vector<SDL_Event> keys;
+		const auto service = [&] {
+			c.bridge->serviceHosted();
+			SDL_Event event = {};
+			while (SDL_PollEvent(&event))
+			{
+				if (event.type >= SDL_EVENT_WINDOW_FIRST && event.type <= SDL_EVENT_WINDOW_LAST &&
+				    event.window.windowID == id)
+					seen.insert(event.type);
+				if (event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP)
+					keys.push_back(event);
+			}
+		};
+		const auto number = [](WINPR_JSON* json, const char* key) {
+			return WINPR_JSON_GetNumberValue(WINPR_JSON_GetObjectItemCaseSensitive(json, key));
+		};
+		const auto expectWindow = [&](int width, int height) {
+			auto event = c.next();
+			require(getString(event.get(), "type") == "hosted_window" &&
+			            number(event.get(), "windowId") == id && number(event.get(), "width") == width &&
+			            number(event.get(), "height") == height && number(event.get(), "scale") == 2,
+			        "Wrong hosted_window event");
+		};
+		service();
+		expectWindow(1280, 960);
+
+		/* Layout in points becomes pixels; the fullscreen state arrives as the window event. */
+		c.command("layout", idField + R"(,"width":800,"height":500,"scale":2,"fullscreen":true)");
+		eventually([&] { service(); return SdlHosted::layout(id)->width == 1600; }, "Layout not applied");
+		expectWindow(1600, 1000);
+		eventually([&] { service(); return seen.count(SDL_EVENT_WINDOW_ENTER_FULLSCREEN) == 1; },
+		           "Layout did not enter fullscreen");
+		require(seen.count(SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED) == 1, "Layout did not resize");
+		seen.clear();
+		c.command("layout", idField + R"(,"width":800,"height":500,"scale":2)");
+		c.command("layout", idField + R"(,"width":640,"height":400,"scale":2,"fullscreen":false)");
+		c.command("layout", idField + R"(,"width":700,"height":400,"scale":2)");
+		eventually([&] { service(); return SdlHosted::layout(id)->width == 1400; }, "Layouts not applied");
+		eventually([&] { service(); return seen.count(SDL_EVENT_WINDOW_LEAVE_FULLSCREEN) == 1; },
+		           "A replaced layout lost its fullscreen state");
+		require(seen.count(SDL_EVENT_WINDOW_ENTER_FULLSCREEN) == 0, "Fullscreen entered twice");
+
+		/* Occlusion: the events a shown window gets, once per change, known windows only. */
+		seen.clear();
+		c.command("occlusion", R"(,"windowId":999999,"visible":false)");
+		c.command("occlusion", idField + R"(,"visible":false)");
+		c.command("occlusion", idField + R"(,"visible":false)");
+		eventually([&] { service(); return !SdlHosted::visible(id); }, "Occlusion not applied");
+		eventually([&] { service(); return seen.count(SDL_EVENT_WINDOW_HIDDEN) == 1; }, "No hidden event");
+		require(SdlHosted::allHidden() && SdlHosted::visible(999999), "Wrong hidden windows");
+		c.command("occlusion", idField + R"(,"visible":true)");
+		eventually([&] { service(); return SdlHosted::visible(id); }, "Window not visible again");
+		eventually([&] { service(); return seen.count(SDL_EVENT_WINDOW_EXPOSED) == 1; }, "No exposed event");
+		require(!SdlHosted::allHidden(), "Still all hidden");
+
+		/* Input becomes SDL events; losing focus releases what is held. */
+		c.command("input", idField + R"(,"action":"key","keyCode":0,"down":true)");
+		eventually([&] { service(); return keys.size() == 1; }, "Key not delivered");
+		require(keys[0].type == SDL_EVENT_KEY_DOWN && keys[0].key.scancode == SDL_SCANCODE_A &&
+		            keys[0].key.windowID == id,
+		        "Wrong key event");
+		c.command("focus_state", idField + R"(,"focused":false)");
+		eventually([&] { service(); return keys.size() == 2; }, "Held key not released");
+		require(keys[1].type == SDL_EVENT_KEY_UP && keys[1].key.scancode == SDL_SCANCODE_A,
+		        "Wrong release event");
+
+		/* What only the launcher can do to its window is asked for, never done. */
+		const auto pending = [&] {
+			pollfd fd{ c.peer, POLLIN, 0 };
+			return c.buffered.find('\n') != std::string::npos || poll(&fd, 1, 50) > 0;
+		};
+		while (pending())
+			std::ignore = c.next(); // hosted_window events of the layouts above
+		const auto expectRequest = [&](const char* action) {
+			auto event = c.next();
+			require(getString(event.get(), "type") == "hosted_request" &&
+			            number(event.get(), "windowId") == id && getString(event.get(), "action") == action,
+			        action);
+		};
+		require(SdlHosted::minimize(window), "Minimize request failed");
+		expectRequest("minimize");
+		require(SdlHosted::fullscreen(window, true) && SdlHosted::fullscreen(window, false),
+		        "Fullscreen request failed");
+		expectRequest("enter_fullscreen");
+		expectRequest("leave_fullscreen");
+		require((SDL_GetWindowFlags(window) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MINIMIZED)) == 0 &&
+		            (SDL_GetWindowFlags(window) & SDL_WINDOW_HIDDEN) != 0,
+		        "A request changed the hidden window");
+
+		/* A window that goes away is reported, and its state does not outlive it. */
+		c.command("occlusion", idField + R"(,"visible":false)");
+		eventually([&] { service(); return !SdlHosted::visible(id); }, "Occlusion not applied");
+		SdlHosted::forget(id);
+		service();
+		auto closed = c.next();
+		require(getString(closed.get(), "type") == "hosted_window_closed" &&
+		            number(closed.get(), "windowId") == id,
+		        "Missing hosted_window_closed");
+		require(SdlHosted::visible(id) && !SdlHosted::allHidden(), "Visibility outlived the window");
+		SDL_DestroyRenderer(renderer);
+		SDL_DestroyWindow(window);
+		SDL_Quit();
+	}
 }
 int main()
 {
@@ -712,6 +915,7 @@ int main()
 		thumbnailBoundsAndDisable();
 		thumbnailBackpressureTeardown();
 		windowGeometryReporting();
+		hostedRendering();
 	}
 	catch (const std::exception& e)
 	{

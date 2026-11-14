@@ -6,6 +6,17 @@
 #import <Foundation/Foundation.h>
 #import <IOSurface/IOSurface.h>
 
+void SdlHostedSurfaces::holdActivity()
+{
+	static id<NSObject> activity = nil;
+	if (activity)
+		return;
+	/* Not NSActivityIdleSystemSleepDisabled: whether the Mac may sleep is not decided here. */
+	activity = [[[NSProcessInfo processInfo]
+	    beginActivityWithOptions:NSActivityUserInitiatedAllowingIdleSystemSleep
+	                      reason:@"Remote desktop session shown by the launcher"] retain];
+}
+
 SdlHostedSurfaces& SdlHostedSurfaces::instance()
 {
 	static SdlHostedSurfaces surfaces;
