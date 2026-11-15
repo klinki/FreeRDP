@@ -223,7 +223,16 @@ int main()
 			}
 		}
 
-		/* A full queue drops frame messages without failing or blocking. */
+		/* A full queue drops frame messages without failing or blocking, and a dropped
+		 * message leaves no extra reference on the launcher's port behind. */
+		auto sendRefs = [&]() {
+			mach_port_urefs_t refs = 0;
+			require(mach_port_get_refs(mach_task_self(), port, MACH_PORT_RIGHT_SEND, &refs) ==
+			            KERN_SUCCESS,
+			        "cannot count send rights");
+			return refs;
+		};
+		const auto refsBefore = sendRefs();
 		const auto before = SDL_GetTicks();
 		for (int i = 0; i < 40; i++)
 			require(draw(window, renderer, 0x40, 0x40, 0x40), "frame failed with a full queue");
@@ -232,6 +241,7 @@ int main()
 		while (receive(port, message, 0))
 			queued++;
 		require(queued > 0 && queued < 40, "frame messages were neither queued nor dropped");
+		require(sendRefs() == refsBefore, "dropped frame messages leaked port references");
 
 		/* Forgetting a window frees its surfaces; a later frame starts the next generation. */
 		SdlHosted::forget(id);

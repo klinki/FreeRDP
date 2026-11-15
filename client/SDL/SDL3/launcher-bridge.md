@@ -307,8 +307,10 @@ client waits for the GPU to finish drawing before it sends one, so the launcher
 may show the surface at once and needs no synchronization of its own. The
 launcher shows it and drops frames whose `generation` it has not received
 surfaces for. The client never draws into the surface it announced last, and
-uses the surfaces in rotation. Sends never block: if the launcher's queue is
-full the frame message is dropped and the next one supersedes it. A dead port
+uses the surfaces in rotation. Frame sends never block: if the launcher's queue
+is full the frame message is dropped and the next one supersedes it. Surface
+messages wait up to 250 ms; if one still cannot be sent, the frame fails and the
+session ends with a drawing error. A dead port
 ends the session as bridge EOF does.
 
 ### JSON messages
@@ -319,9 +321,6 @@ Events from the client:
   when a window is created or recreated (connect, reconnect, monitor layout
   change) and again whenever its size or scale changes.
 - `hosted_window_closed`: `windowId`.
-
-The JSON bridge and the surface channel are separate queues: a window's
-surfaces may arrive before or after its `hosted_window` event.
 - `cursor`: `kind` of `default`, `hidden` or `image`; for `image`, `pngBase64`,
   `width`, `height`, `hotX`, `hotY`. The image is the server's cursor in remote
   pixels with straight alpha, at most 512 by 512; the launcher scales it as it
@@ -335,6 +334,9 @@ surfaces may arrive before or after its `hosted_window` event.
   a fullscreen start all arrive this way. The launcher may decline; the client
   changes nothing until a `layout` states the new fullscreen state, and does
   not ask for the state the window is already in.
+
+The JSON bridge and the surface channel are separate queues: a window's
+surfaces may arrive before or after its `hosted_window` event.
 
 Commands from the launcher:
 

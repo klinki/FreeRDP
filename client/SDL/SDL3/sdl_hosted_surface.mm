@@ -107,6 +107,11 @@ bool SdlHostedSurfaces::send(void* message, bool wait)
 	             wait ? 250 : 0, MACH_PORT_NULL);
 	if (result == MACH_SEND_INVALID_DEST)
 		_dead = true;
+	/* A send that timed out hands the message's rights back to this process, one more
+	 * reference each on the launcher's port and on a carried surface. Release them, or every
+	 * dropped frame leaks a reference and a dropped surface is never freed. */
+	if (result == MACH_SEND_TIMED_OUT || result == MACH_SEND_INTERRUPTED)
+		mach_msg_destroy(header);
 	return result == KERN_SUCCESS;
 }
 

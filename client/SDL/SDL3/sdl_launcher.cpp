@@ -4,7 +4,6 @@
  */
 #include "sdl_hosted.hpp"
 #include "sdl_hosted_surface.hpp"
-#include "sdl_utils.hpp"
 #include "sdl_launcher.hpp"
 #include "sdl_context.hpp"
 #include "sdl_utils.hpp"
