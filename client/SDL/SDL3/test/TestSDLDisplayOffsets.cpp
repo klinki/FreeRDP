@@ -132,6 +132,17 @@ static bool checkSelection()
 			dump(mixed, ids, o);
 			return false;
 		}
+
+		const auto p = offsets(mixed, ids, primary, { 1, 2 });
+		const auto low = monitor(p, 1);
+		const auto high = monitor(p, 2);
+		if (!expect(sdl_monitor_layout::valid({ low, high }) && (high.x == low.x) &&
+		                (high.y + high.height == low.y),
+		            "the DELL alone with the built-in sits on it, left aligned"))
+		{
+			dump(mixed, ids, p);
+			return false;
+		}
 	}
 
 	/* With the built-in selected the 4K is bottom aligned with the DELL, so it does not overlap the
@@ -154,9 +165,72 @@ static bool checkSelection()
 	return true;
 }
 
+/* Two 2x displays right of a 1x one, both touching it and each other: when the second one
+ * cannot be placed from the 1x display without overlapping the first, the first places it. */
+static bool checkSiblings()
+{
+	const std::vector<Display> siblings{ { "1x", { 0, 0, 1920, 1080 }, 1920, 1080 },
+		                                 { "upper", { 1920, -540, 1920, 1080 }, 3840, 2160 },
+		                                 { "lower", { 1920, 540, 1920, 1080 }, 3840, 2160 } };
+	std::array<SDL_DisplayID, 3> ids{ 1, 2, 3 };
+	do
+	{
+		const std::vector<SDL_DisplayID> order(ids.begin(), ids.end());
+		for (size_t primary = 0; primary < siblings.size(); primary++)
+		{
+			const auto o = offsets(siblings, order, primary);
+			if (!expect(sdl_monitor_layout::valid(
+			                { monitor(o, order[0]), monitor(o, order[1]), monitor(o, order[2]) }),
+			            "displays that touch the same display and each other do not overlap"))
+			{
+				dump(siblings, order, o);
+				return false;
+			}
+		}
+	} while (std::next_permutation(ids.begin(), ids.end()));
+	return true;
+}
+
+/* Displays that do not touch the primary along an edge (here only at a corner) are placed at
+ * their point offset, which equal scales keep exactly. */
+static bool checkUnreached()
+{
+	const std::vector<Display> corner{ { "primary", { 0, 0, 1920, 1080 }, 1920, 1080 },
+		                               { "a", { 1920, 1080, 1920, 1080 }, 1920, 1080 },
+		                               { "b", { 3840, 1080, 1920, 1080 }, 1920, 1080 } };
+	std::array<SDL_DisplayID, 3> ids{ 1, 2, 3 };
+	do
+	{
+		const std::vector<SDL_DisplayID> order(ids.begin(), ids.end());
+		const auto o = offsets(corner, order, 0, { order[1], order[2] });
+		const auto a = monitor(o, order[1]);
+		const auto b = monitor(o, order[2]);
+		if (!expect(sdl_monitor_layout::valid({ a, b }) && (a.x == 1920) && (a.y == 1080) &&
+		                (b.x == 3840) && (b.y == 1080),
+		            "displays not reached from the primary keep their point layout"))
+		{
+			dump(corner, order, o);
+			return false;
+		}
+	} while (std::next_permutation(ids.begin(), ids.end()));
+
+	sdl_display_offsets::Offsets none;
+	sdl_display_offsets::update(none, 1);
+
+	/* A primary that is not in the list: the first display takes its place. */
+	const std::vector<SDL_DisplayID> abc{ 1, 2, 3 };
+	sdl_display_offsets::Offsets missing;
+	for (size_t i = 0; i < corner.size(); i++)
+		missing.emplace(abc[i], std::pair{ corner[i].points,
+		                                   SDL_Rect{ 0, 0, corner[i].width, corner[i].height } });
+	sdl_display_offsets::update(missing, 42);
+	return expect((monitor(missing, 2).x == 1920) && (monitor(missing, 3).x == 3840),
+	              "a missing primary is replaced by the first display");
+}
+
 int main()
 {
-	if (!checkMixed() || !checkSelection())
+	if (!checkMixed() || !checkSelection() || !checkSiblings() || !checkUnreached())
 		return 1;
 
 	/* Same-scale displays side by side and stacked keep their point layout. */

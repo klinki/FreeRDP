@@ -109,18 +109,30 @@ namespace sdl_display_offsets
 		return false;
 	}
 
+	/* Positions of displays that touch a placed display but could not be placed next to it
+	 * without an overlap. */
+	using Pending = std::map<SDL_DisplayID, SDL_Rect>;
+
+	inline bool isPlaced(const std::vector<SDL_DisplayID>& placed, SDL_DisplayID id)
+	{
+		return std::find(placed.begin(), placed.end(), id) != placed.end();
+	}
+
 	/* Places every display that touches id and is not placed yet, and returns them. A display
-	 * keeps the position it got from the first display that placed it. */
+	 * keeps the position it got from the first display that placed it. A display that would
+	 * overlap a placed one is not placed yet, so another display it touches can still place
+	 * it; its first position is kept in pending. */
 	inline std::vector<SDL_DisplayID> neighbours(Offsets& offsets, SDL_DisplayID id,
 	                                             std::vector<SDL_DisplayID>& placed,
-	                                             const std::vector<SDL_DisplayID>& selection)
+	                                             const std::vector<SDL_DisplayID>& selection,
+	                                             Pending& pending)
 	{
 		const auto first = offsets.at(id);
 		std::vector<SDL_DisplayID> result;
 
 		for (auto& entry : offsets)
 		{
-			if (std::find(placed.begin(), placed.end(), entry.first) != placed.end())
+			if (isPlaced(placed, entry.first))
 				continue;
 
 			const auto& e = entry.second.first;
@@ -151,12 +163,16 @@ namespace sdl_display_offsets
 
 			/* Mixed scales can make the point layout impossible to keep exactly: a 2x display
 			 * below a 1x one is wider in pixels and reaches under the display next to it. Keep
-			 * the far edges in line instead when the near ones would overlap a placed display.
-			 * When neither fits, keep the near edges; the layout check reports the overlap. */
-			if (!place(false) && !place(true))
-				std::ignore = place(false);
-			placed.push_back(entry.first);
-			result.push_back(entry.first);
+			 * the far edges in line instead when the near ones would overlap a placed display. */
+			if (place(false) || place(true))
+			{
+				pending.erase(entry.first);
+				placed.push_back(entry.first);
+				result.push_back(entry.first);
+				continue;
+			}
+			std::ignore = place(false);
+			pending.emplace(entry.first, pixel);
 		}
 		return result;
 	}
@@ -164,7 +180,12 @@ namespace sdl_display_offsets
 	/* Places the primary display at its origin, then walks outwards: each display is placed
 	 * next to the first placed display it touches, in pixels of both. All displays take part,
 	 * as one that is not selected can connect selected ones; selection lists the displays sent
-	 * to the server (empty: all). */
+	 * to the server (empty: all).
+	 *
+	 * When the walk runs out, a display that could only be placed with an overlap keeps the
+	 * position it got first, and the layout check reports the overlap. A display that touches
+	 * no placed display at all (only a corner, or nothing) starts a new walk at its point
+	 * offset from the primary, in pixels of the primary, which is exact for equal scales. */
 	inline void update(Offsets& offsets, SDL_DisplayID primary,
 	                   const std::vector<SDL_DisplayID>& selection = {})
 	{
@@ -173,18 +194,51 @@ namespace sdl_display_offsets
 		if (offsets.count(primary) == 0)
 			primary = offsets.begin()->first;
 		/* Align display offsets to the primary display origin. */
-		auto it = offsets.find(primary);
-		it->second.second.x = it->second.first.x;
-		it->second.second.y = it->second.first.y;
-		std::vector<SDL_DisplayID> placed{ primary };
+		const auto origin = offsets.find(primary);
+		origin->second.second.x = origin->second.first.x;
+		origin->second.second.y = origin->second.first.y;
+		const auto reference = origin->second;
 
-		auto next = neighbours(offsets, primary, placed, selection);
-		while (!next.empty())
+		std::vector<SDL_DisplayID> placed{ primary };
+		std::vector<SDL_DisplayID> next{ primary };
+		Pending pending;
+		while (placed.size() < offsets.size())
 		{
-			const auto neighbor = next.front();
-			next.erase(next.begin());
-			auto more = neighbours(offsets, neighbor, placed, selection);
-			next.insert(next.end(), more.begin(), more.end());
+			while (!next.empty())
+			{
+				const auto id = next.front();
+				next.erase(next.begin());
+				auto more = neighbours(offsets, id, placed, selection, pending);
+				next.insert(next.end(), more.begin(), more.end());
+			}
+			if (placed.size() == offsets.size())
+				break;
+
+			SDL_DisplayID start = 0;
+			if (!pending.empty())
+			{
+				start = pending.begin()->first;
+				offsets.at(start).second = pending.begin()->second;
+				pending.erase(pending.begin());
+			}
+			else
+			{
+				for (auto& entry : offsets)
+				{
+					if (isPlaced(placed, entry.first))
+						continue;
+					const auto& e = entry.second.first;
+					auto& pixel = entry.second.second;
+					pixel.x = reference.second.x + scaled(e.x - reference.first.x,
+					                                      reference.first.w, reference.second.w);
+					pixel.y = reference.second.y + scaled(e.y - reference.first.y,
+					                                      reference.first.h, reference.second.h);
+					start = entry.first;
+					break;
+				}
+			}
+			placed.push_back(start);
+			next.push_back(start);
 		}
 	}
 } // namespace sdl_display_offsets
