@@ -116,53 +116,111 @@ static bool checkMixed()
 	return true;
 }
 
-/* Only overlaps between selected displays count. The DELL and the 4K alone keep their top edges
- * in line, as in points; the built-in they would overlap is not sent. */
+/* Only overlaps between selected displays count. Two of the three displays, with every primary
+ * and every assignment of display IDs:
+ * - the DELL and the 4K alone keep their top edges in line, as in points; the built-in they
+ *   would overlap is not sent;
+ * - the DELL alone with the built-in sits on it, left aligned;
+ * - the built-in and the 4K do not touch in points; the DELL connects them, and they must
+ *   still form a valid layout. */
 static bool checkSelection()
 {
-	const std::vector<SDL_DisplayID> ids{ 1, 2, 3 };
-	for (size_t primary = 0; primary < mixed.size(); primary++)
+	std::array<SDL_DisplayID, 3> ids{ 1, 2, 3 };
+	do
 	{
-		const auto o = offsets(mixed, ids, primary, { 2, 3 });
-		const auto dell = monitor(o, 2);
-		const auto uhd = monitor(o, 3);
-		if (!expect(sdl_monitor_layout::valid({ dell, uhd }) && (dell.y == uhd.y),
-		            "the DELL and the 4K alone are top aligned"))
+		const std::vector<SDL_DisplayID> order(ids.begin(), ids.end());
+		const auto builtinId = order[0];
+		const auto dellId = order[1];
+		const auto uhdId = order[2];
+		for (size_t primary = 0; primary < mixed.size(); primary++)
 		{
-			dump(mixed, ids, o);
-			return false;
-		}
+			const auto o = offsets(mixed, order, primary, { dellId, uhdId });
+			const auto dell = monitor(o, dellId);
+			const auto uhd = monitor(o, uhdId);
+			if (!expect(sdl_monitor_layout::valid({ dell, uhd }) && (dell.y == uhd.y),
+			            "the DELL and the 4K alone are top aligned"))
+			{
+				dump(mixed, order, o);
+				return false;
+			}
 
-		const auto p = offsets(mixed, ids, primary, { 1, 2 });
-		const auto low = monitor(p, 1);
-		const auto high = monitor(p, 2);
-		if (!expect(sdl_monitor_layout::valid({ low, high }) && (high.x == low.x) &&
-		                (high.y + high.height == low.y),
-		            "the DELL alone with the built-in sits on it, left aligned"))
-		{
-			dump(mixed, ids, p);
-			return false;
-		}
-	}
+			const auto p = offsets(mixed, order, primary, { builtinId, dellId });
+			const auto low = monitor(p, builtinId);
+			const auto high = monitor(p, dellId);
+			if (!expect(sdl_monitor_layout::valid({ low, high }) && (high.x == low.x) &&
+			                (high.y + high.height == low.y),
+			            "the DELL alone with the built-in sits on it, left aligned"))
+			{
+				dump(mixed, order, p);
+				return false;
+			}
 
-	/* With the built-in selected the 4K is bottom aligned with the DELL, so it does not overlap the
-	 * built-in and touches it. The built-in and the 4K do not touch in points, so this needs the
-	 * built-in or the DELL as primary: from the 4K the built-in is placed under the DELL only. */
-	for (size_t primary = 0; primary < 2; primary++)
-	{
-		const auto o = offsets(mixed, ids, primary, { 1, 3 });
-		const auto builtin = monitor(o, 1);
-		const auto dell = monitor(o, 2);
-		const auto uhd = monitor(o, 3);
-		if (!expect(sdl_monitor_layout::valid({ builtin, uhd }) &&
-		                (uhd.y + uhd.height == dell.y + dell.height),
-		            "with the built-in selected the 4K is bottom aligned with the DELL"))
-		{
-			dump(mixed, ids, o);
-			return false;
+			const auto q = offsets(mixed, order, primary, { builtinId, uhdId });
+			if (!expect(sdl_monitor_layout::valid({ monitor(q, builtinId), monitor(q, uhdId) }),
+			            "the built-in and the 4K form a valid layout through the DELL"))
+			{
+				dump(mixed, order, q);
+				return false;
+			}
 		}
-	}
+	} while (std::next_permutation(ids.begin(), ids.end()));
 	return true;
+}
+
+/* Layouts where placing each display once, from the first display it touches, gives no valid
+ * layout; another neighbour or the other alignment has to be tried. Every primary and every
+ * assignment of display IDs. */
+static bool checkSearch(const char* name, const std::vector<Display>& displays,
+                        const std::vector<size_t>& selection)
+{
+	std::vector<SDL_DisplayID> ids(displays.size());
+	for (size_t i = 0; i < ids.size(); i++)
+		ids[i] = static_cast<SDL_DisplayID>(i + 1);
+	do
+	{
+		std::vector<SDL_DisplayID> sel;
+		for (const auto i : selection)
+			sel.push_back(ids[i]);
+		for (size_t primary = 0; primary < displays.size(); primary++)
+		{
+			const auto o = offsets(displays, ids, primary, sel);
+			std::vector<rdpMonitor> list;
+			for (size_t i = 0; i < displays.size(); i++)
+			{
+				if (selection.empty() ||
+				    (std::find(selection.begin(), selection.end(), i) != selection.end()))
+					list.push_back(monitor(o, ids[i]));
+			}
+			if (!expect(sdl_monitor_layout::valid(list), name))
+			{
+				dump(displays, ids, o);
+				return false;
+			}
+		}
+	} while (std::next_permutation(ids.begin(), ids.end()));
+	return true;
+}
+
+static bool checkSearches()
+{
+	/* A 2x primary with two 1x displays side by side below it, only those two selected: both
+	 * touch the primary, but they must be placed next to each other. */
+	const std::vector<Display> below{ { "2x", { 0, 0, 1920, 1080 }, 3840, 2160 },
+		                              { "a", { -960, 1080, 1920, 1080 }, 1920, 1080 },
+		                              { "b", { 960, 1080, 1920, 1080 }, 1920, 1080 } };
+	/* A 2x display meeting the primary only at a corner. */
+	const std::vector<Display> corner{ { "1x", { 0, 0, 1920, 1080 }, 1920, 1080 },
+		                               { "right", { 1920, 0, 1920, 1080 }, 1920, 1080 },
+		                               { "2x", { -1920, -1080, 1920, 1080 }, 3840, 2160 } };
+	/* A 2x display below the primary has to move left so that a later display fits. */
+	const std::vector<Display> blocked{ { "1x", { 0, 0, 1920, 1080 }, 1920, 1080 },
+		                                { "portrait", { 1920, -840, 1080, 1920 }, 1080, 1920 },
+		                                { "right", { 3000, 540, 1920, 1080 }, 1920, 1080 },
+		                                { "2x", { 0, 1080, 1920, 1080 }, 3840, 2160 } };
+	return checkSearch("two selected displays below an unselected 2x one stay connected", below,
+	                   { 1, 2 }) &&
+	       checkSearch("a 2x display at a corner does not overlap", corner, {}) &&
+	       checkSearch("an earlier display moves so that a later one fits", blocked, {});
 }
 
 /* Two 2x displays right of a 1x one, both touching it and each other: when the second one
@@ -230,7 +288,8 @@ static bool checkUnreached()
 
 int main()
 {
-	if (!checkMixed() || !checkSelection() || !checkSiblings() || !checkUnreached())
+	if (!checkMixed() || !checkSelection() || !checkSearches() || !checkSiblings() ||
+	    !checkUnreached())
 		return 1;
 
 	/* Same-scale displays side by side and stacked keep their point layout. */

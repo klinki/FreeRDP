@@ -1431,6 +1431,18 @@ bool SdlContext::detectDisplays()
 	// change both SDL IDs and backing dimensions; removed displays must vanish.
 	_displays = std::move(current);
 	_fullscreenTopInsets = std::move(insets);
+
+	/* The logical bounds and the primary are read here, on the thread SDL display functions
+	 * must be called from; updateDisplayOffsets() also runs when the selection is set during
+	 * connect. */
+	_displayBounds.clear();
+	for (const auto& entry : _displays)
+	{
+		SDL_Rect bounds{};
+		std::ignore = SDL_GetDisplayBounds(entry.first, &bounds);
+		_displayBounds.emplace(entry.first, bounds);
+	}
+	_primaryDisplay = SDL_GetPrimaryDisplay();
 	updateDisplayOffsets();
 	return true;
 }
@@ -2334,18 +2346,15 @@ bool SdlContext::handleEvent(const SDL_TouchFingerEvent& ev)
 
 void SdlContext::updateDisplayOffsets()
 {
-	/* Update actual display rectangles:
-	 *
-	 * 1. Get logical display bounds
-	 * 2. Use already known pixel width and height
-	 * 3. Iterate over each display and update the x and y offsets by adding all monitor
-	 * widths/heights from the primary
-	 */
+	/* Update actual display rectangles from the logical display bounds and the known pixel
+	 * width and height of each display. */
 	_offsets.clear();
-	for (auto& entry : _displays)
+	for (const auto& entry : _displays)
 	{
 		SDL_Rect bounds{};
-		std::ignore = SDL_GetDisplayBounds(entry.first, &bounds);
+		const auto found = _displayBounds.find(entry.first);
+		if (found != _displayBounds.end())
+			bounds = found->second;
 
 		SDL_Rect pixel{};
 		pixel.w = entry.second.width;
@@ -2355,7 +2364,7 @@ void SdlContext::updateDisplayOffsets()
 
 	if (_offsets.empty())
 		return;
-	sdl_display_offsets::update(_offsets, SDL_GetPrimaryDisplay(), _monitorIds);
+	sdl_display_offsets::update(_offsets, _primaryDisplay, _monitorIds);
 	updateMonitorDataFromOffsets();
 }
 
