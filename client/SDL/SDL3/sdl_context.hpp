@@ -306,9 +306,6 @@ class SdlContext
 
 	void applyMonitorOffset(SDL_WindowID window, float& x, float& y) const;
 
-	[[nodiscard]] std::vector<SDL_DisplayID>
-	updateDisplayOffsetsForNeighbours(SDL_DisplayID id,
-	                                  const std::vector<SDL_DisplayID>& ignore = {});
 	void updateMonitorDataFromOffsets();
 
 	rdpContext* _context = nullptr;
@@ -400,6 +397,8 @@ class SdlContext
 	std::optional<std::pair<UINT32, UINT32>> _sessionCoreScale;
 	std::map<SDL_WindowID, SdlWindow> _windows;
 	std::map<SDL_DisplayID, std::pair<SDL_Rect, SDL_Rect>> _offsets;
+	std::map<SDL_DisplayID, SDL_Rect> _displayBounds;
+	SDL_DisplayID _primaryDisplay = 0;
 	/* Actual per-window fullscreen state, the bar's window, pin and visibility. */
 	SdlFullscreenState _fullscreenState;
 	SDL_FPoint _topBarPointer{ -1.0f, -1.0f };
