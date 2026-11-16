@@ -23,7 +23,8 @@ struct Display
 };
 
 static sdl_display_offsets::Offsets offsets(const std::vector<Display>& displays,
-                                            const std::vector<SDL_DisplayID>& ids, size_t primary)
+                                            const std::vector<SDL_DisplayID>& ids, size_t primary,
+                                            const std::vector<SDL_DisplayID>& selection = {})
 {
 	/* SDL reports bounds relative to the primary display, which starts at (0, 0). */
 	const auto origin = displays[primary].points;
@@ -36,7 +37,7 @@ static sdl_display_offsets::Offsets offsets(const std::vector<Display>& displays
 		SDL_Rect pixel{ 0, 0, displays[i].width, displays[i].height };
 		result.emplace(ids[i], std::pair{ bounds, pixel });
 	}
-	sdl_display_offsets::update(result, ids[primary]);
+	sdl_display_offsets::update(result, ids[primary], selection);
 	return result;
 }
 
@@ -115,9 +116,47 @@ static bool checkMixed()
 	return true;
 }
 
+/* Only overlaps between selected displays count. The DELL and the 4K alone keep their top edges
+ * in line, as in points; the built-in they would overlap is not sent. */
+static bool checkSelection()
+{
+	const std::vector<SDL_DisplayID> ids{ 1, 2, 3 };
+	for (size_t primary = 0; primary < mixed.size(); primary++)
+	{
+		const auto o = offsets(mixed, ids, primary, { 2, 3 });
+		const auto dell = monitor(o, 2);
+		const auto uhd = monitor(o, 3);
+		if (!expect(sdl_monitor_layout::valid({ dell, uhd }) && (dell.y == uhd.y),
+		            "the DELL and the 4K alone are top aligned"))
+		{
+			dump(mixed, ids, o);
+			return false;
+		}
+	}
+
+	/* With the built-in selected the 4K is bottom aligned with the DELL, so it does not overlap the
+	 * built-in and touches it. The built-in and the 4K do not touch in points, so this needs the
+	 * built-in or the DELL as primary: from the 4K the built-in is placed under the DELL only. */
+	for (size_t primary = 0; primary < 2; primary++)
+	{
+		const auto o = offsets(mixed, ids, primary, { 1, 3 });
+		const auto builtin = monitor(o, 1);
+		const auto dell = monitor(o, 2);
+		const auto uhd = monitor(o, 3);
+		if (!expect(sdl_monitor_layout::valid({ builtin, uhd }) &&
+		                (uhd.y + uhd.height == dell.y + dell.height),
+		            "with the built-in selected the 4K is bottom aligned with the DELL"))
+		{
+			dump(mixed, ids, o);
+			return false;
+		}
+	}
+	return true;
+}
+
 int main()
 {
-	if (!checkMixed())
+	if (!checkMixed() || !checkSelection())
 		return 1;
 
 	/* Same-scale displays side by side and stacked keep their point layout. */

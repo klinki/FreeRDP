@@ -83,12 +83,24 @@ namespace sdl_display_offsets
 		return end - ePixel;
 	}
 
-	inline bool overlapsPlaced(const Offsets& offsets, SDL_DisplayID id, const SDL_Rect& pixel,
-	                           const std::vector<SDL_DisplayID>& placed)
+	/* Displays that are sent to the server; an empty list means all of them. */
+	inline bool selected(const std::vector<SDL_DisplayID>& selection, SDL_DisplayID id)
 	{
+		return selection.empty() ||
+		       (std::find(selection.begin(), selection.end(), id) != selection.end());
+	}
+
+	/* Only an overlap between two selected displays matters: the others are not sent to the
+	 * server and only connect the selected ones. */
+	inline bool overlapsPlaced(const Offsets& offsets, SDL_DisplayID id, const SDL_Rect& pixel,
+	                           const std::vector<SDL_DisplayID>& placed,
+	                           const std::vector<SDL_DisplayID>& selection)
+	{
+		if (!selected(selection, id))
+			return false;
 		for (const auto other : placed)
 		{
-			if (other == id)
+			if ((other == id) || !selected(selection, other))
 				continue;
 			const auto& o = offsets.at(other).second;
 			if (spans(pixel.x, pixel.w, o.x, o.w) && spans(pixel.y, pixel.h, o.y, o.h))
@@ -100,7 +112,8 @@ namespace sdl_display_offsets
 	/* Places every display that touches id and is not placed yet, and returns them. A display
 	 * keeps the position it got from the first display that placed it. */
 	inline std::vector<SDL_DisplayID> neighbours(Offsets& offsets, SDL_DisplayID id,
-	                                             std::vector<SDL_DisplayID>& placed)
+	                                             std::vector<SDL_DisplayID>& placed,
+	                                             const std::vector<SDL_DisplayID>& selection)
 	{
 		const auto first = offsets.at(id);
 		std::vector<SDL_DisplayID> result;
@@ -133,7 +146,7 @@ namespace sdl_display_offsets
 					pixel.x = crossPosition(e.x, e.w, pixel.w, f.x, f.w, first.second.w,
 					                        first.second.x, fromEnd);
 				}
-				return !overlapsPlaced(offsets, entry.first, pixel, placed);
+				return !overlapsPlaced(offsets, entry.first, pixel, placed, selection);
 			};
 
 			/* Mixed scales can make the point layout impossible to keep exactly: a 2x display
@@ -149,8 +162,11 @@ namespace sdl_display_offsets
 	}
 
 	/* Places the primary display at its origin, then walks outwards: each display is placed
-	 * next to the first placed display it touches, in pixels of both. */
-	inline void update(Offsets& offsets, SDL_DisplayID primary)
+	 * next to the first placed display it touches, in pixels of both. All displays take part,
+	 * as one that is not selected can connect selected ones; selection lists the displays sent
+	 * to the server (empty: all). */
+	inline void update(Offsets& offsets, SDL_DisplayID primary,
+	                   const std::vector<SDL_DisplayID>& selection = {})
 	{
 		if (offsets.empty())
 			return;
@@ -162,12 +178,12 @@ namespace sdl_display_offsets
 		it->second.second.y = it->second.first.y;
 		std::vector<SDL_DisplayID> placed{ primary };
 
-		auto next = neighbours(offsets, primary, placed);
+		auto next = neighbours(offsets, primary, placed, selection);
 		while (!next.empty())
 		{
 			const auto neighbor = next.front();
 			next.erase(next.begin());
-			auto more = neighbours(offsets, neighbor, placed);
+			auto more = neighbours(offsets, neighbor, placed, selection);
 			next.insert(next.end(), more.begin(), more.end());
 		}
 	}

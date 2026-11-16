@@ -2355,7 +2355,7 @@ void SdlContext::updateDisplayOffsets()
 
 	if (_offsets.empty())
 		return;
-	sdl_display_offsets::update(_offsets, SDL_GetPrimaryDisplay());
+	sdl_display_offsets::update(_offsets, SDL_GetPrimaryDisplay(), _monitorIds);
 	updateMonitorDataFromOffsets();
 }
 
@@ -3209,6 +3209,8 @@ void SdlContext::setMonitorIds(const std::vector<SDL_DisplayID>& ids)
 	{
 		_monitorIds.push_back(id);
 	}
+	/* Only overlaps between the selected displays matter for their pixel origins. */
+	updateDisplayOffsets();
 }
 
 const std::vector<SDL_DisplayID>& SdlContext::monitorIds() const
