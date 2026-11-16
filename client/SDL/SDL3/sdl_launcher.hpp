@@ -53,7 +53,8 @@ class SdlLauncher
 	bool hadConnected() const;
 	void serviceFocus(); // SDL main thread only
 	/** Hosted rendering: applies queued layouts, announces windows, notices a lost launcher. */
-	void serviceHosted(); // SDL main thread only
+	/** primary: the window of the session's primary display (SdlContext::primaryWindowId). */
+	void serviceHosted(uint32_t primary = 0); // SDL main thread only
 	/** Hosted rendering: tells the launcher which cursor to show. kind is "default", "hidden" or
 	 * "image" with BGRA pixels in straight alpha. SDL main thread only. */
 	void hostedCursor(const char* kind, const BYTE* bgra = nullptr, UINT32 width = 0,
@@ -102,7 +103,8 @@ class SdlLauncher
 	bool _hostedFocused = false;                        // guarded by _mutex; focus was gained
 	SdlHostedInput::State _hostedInput;                 // SDL main thread only
 	std::vector<HostedLayout> _hostedLayouts;                   // guarded by _mutex
-	std::map<uint32_t, std::array<int, 3>> _hostedAnnounced;    // SDL main thread only
+	/* Per window: width, height, scale in thousandths, SDL display id, primary. */
+	std::map<uint32_t, std::array<int, 5>> _hostedAnnounced;    // SDL main thread only
 	std::vector<std::pair<uint32_t, bool>> _hostedVisibility;   // guarded by _mutex
 	Json message(const char* type);
 	Json request(Json event, const char* responseType);

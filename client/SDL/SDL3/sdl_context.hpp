@@ -233,6 +233,9 @@ class SdlContext
 	[[nodiscard]] bool credentialsRead() const;
 	void setCredentialsRead();
 
+	/** The window of the session's primary display. SDL main thread only. */
+	[[nodiscard]] SDL_WindowID primaryWindowId() const;
+
   private:
 	friend struct SdlScreenRefreshFixture; // Inject completed pixels in the rendering regression.
 	[[nodiscard]] bool resizeToScale(SdlWindow* window);
@@ -263,7 +266,6 @@ class SdlContext
 	[[nodiscard]] bool handleEvent(const SDL_TouchFingerEvent& ev);
 	[[nodiscard]] bool topBarAllowed() const;
 	void reassignTopBar(SDL_WindowID id, bool replace = false);
-	[[nodiscard]] SDL_WindowID primaryWindowId() const;
 	void resetTopBarPointer();
 	[[nodiscard]] bool observeFullscreen(SDL_WindowID id, bool fullscreen);
 	[[nodiscard]] bool presentFullscreen(SDL_WindowID id, bool fullscreen,

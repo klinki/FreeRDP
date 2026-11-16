@@ -317,9 +317,14 @@ ends the session as bridge EOF does.
 
 Events from the client:
 
-- `hosted_window`: `windowId`, `width`, `height` in pixels and `scale`. Sent
-  when a window is created or recreated (connect, reconnect, monitor layout
-  change) and again whenever its size or scale changes.
+- `hosted_window`: `windowId`, `width`, `height` in pixels and `scale`;
+  `displayUUID`, the Mac display the window belongs to, when the client can
+  identify it; and `primary`, true for the window of the session's primary
+  display (the window that has the connection bar). Sent when a window is
+  created or recreated (connect, reconnect, monitor layout change) and again
+  whenever its size, scale, display or primary state changes. The client
+  decides which displays a session uses and how its monitors are arranged; the
+  launcher shows each window on its display.
 - `hosted_window_closed`: `windowId`.
 - `cursor`: `kind` of `default`, `hidden` or `image`; for `image`, `pngBase64`,
   `width`, `height`, `hotX`, `hotY`. The image is the server's cursor in remote

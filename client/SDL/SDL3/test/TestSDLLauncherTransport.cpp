@@ -796,8 +796,9 @@ namespace
 		require(SdlHosted::setLayout(id, { 1280, 960, 2.0f }), "Cannot lay out the test window");
 		std::set<Uint32> seen;
 		std::vector<SDL_Event> keys;
+		uint32_t primary = id;
 		const auto service = [&] {
-			c.bridge->serviceHosted();
+			c.bridge->serviceHosted(primary);
 			SDL_Event event = {};
 			while (SDL_PollEvent(&event))
 			{
@@ -815,9 +816,18 @@ namespace
 			auto event = c.next();
 			require(getString(event.get(), "type") == "hosted_window" &&
 			            number(event.get(), "windowId") == id && number(event.get(), "width") == width &&
-			            number(event.get(), "height") == height && number(event.get(), "scale") == 2,
+			            number(event.get(), "height") == height && number(event.get(), "scale") == 2 &&
+			            WINPR_JSON_IsTrue(WINPR_JSON_GetObjectItemCaseSensitive(event.get(), "primary")) ==
+			                (primary == id),
 			        "Wrong hosted_window event");
 		};
+		service();
+		expectWindow(1280, 960);
+		/* Another window becoming the primary one is announced, with the same size. */
+		primary = 0;
+		service();
+		expectWindow(1280, 960);
+		primary = id;
 		service();
 		expectWindow(1280, 960);
 

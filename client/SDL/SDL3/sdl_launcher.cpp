@@ -1353,7 +1353,7 @@ void SdlLauncher::releaseHostedInput()
 		std::ignore = SDL_PushEvent(&event);
 	SDL_SetModState(SDL_KMOD_NONE);
 }
-void SdlLauncher::serviceHosted()
+void SdlLauncher::serviceHosted(uint32_t primary)
 {
 	if (!SdlHosted::enabled())
 		return;
@@ -1475,8 +1475,13 @@ void SdlLauncher::serviceHosted()
 	const auto current = SdlHosted::layouts();
 	for (const auto& [id, layout] : current)
 	{
-		const std::array<int, 3> state = { layout.width, layout.height,
-			                               static_cast<int>(std::lround(layout.scale * 1000)) };
+		/* The display the hidden window was placed on is the display the launcher's window
+		 * belongs to: the session's monitor layout is built from it. */
+		const auto window = SDL_GetWindowFromID(id);
+		const auto display = window ? SDL_GetDisplayForWindow(window) : 0;
+		const std::array<int, 5> state = { layout.width, layout.height,
+			                               static_cast<int>(std::lround(layout.scale * 1000)),
+			                               static_cast<int>(display), id == primary ? 1 : 0 };
 		auto& announced = _hostedAnnounced[id];
 		if (announced == state)
 			continue;
@@ -1486,6 +1491,12 @@ void SdlLauncher::serviceHosted()
 		number(event.get(), "width", layout.width);
 		number(event.get(), "height", layout.height);
 		WINPR_JSON_AddNumberToObject(event.get(), "scale", static_cast<double>(layout.scale));
+		for (const auto& [uuid, displayID] : displays(nullptr))
+		{
+			if (displayID == display && !uuid.empty())
+				text(event.get(), "displayUUID", uuid.c_str());
+		}
+		WINPR_JSON_AddBoolToObject(event.get(), "primary", id == primary);
 		std::ignore = send(std::move(event));
 	}
 	for (auto it = _hostedAnnounced.begin(); it != _hostedAnnounced.end();)
