@@ -585,6 +585,7 @@ bool SdlContext::createWindows()
 			// Cache local coordinates; negotiated coordinates are relative to the
 			// selected primary and must not be mixed with newly added displays.
 			window.setMonitor(getDisplay(did));
+			SdlHosted::anchor(window.window(), did);
 			// Until its fullscreen transition completes, report the window as shorter
 			// already, as the connect-time monitor was sent. Otherwise a layout sent
 			// meanwhile differs from it, and Windows reconfigures a second time.
@@ -731,6 +732,14 @@ bool SdlContext::updateWindowList()
 	                                                     list.size());
 }
 
+/* A hosted window never enters fullscreen itself; the launcher's window does. */
+static bool windowFullscreen(const SdlWindow& w)
+{
+	if (SdlHosted::enabled())
+		return SdlHosted::isFullscreen(w.id());
+	return (SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
 bool SdlContext::updateWindow(SDL_WindowID id)
 {
 	/* In fullscreen the monitor kept the size measured with the probe window at startup and was
@@ -745,7 +754,7 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 		// which excludes the space macOS reserves above notched content.
 		if (w.displayIndex() != w.monitor(false).orig_screen)
 			return true;
-		if ((_windows.size() > 1) && !(SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN))
+		if ((_windows.size() > 1) && !windowFullscreen(w))
 			return true; // Retain physical geometry while leaving multimon fullscreen.
 	}
 
@@ -760,7 +769,7 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 	// observes that event, so only the flag and a request to enter count.
 	const auto now = SDL_GetTicks();
 	const bool fullscreen =
-	    ((SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN) != 0) ||
+	    windowFullscreen(w) ||
 	    (_fullscreenState.pending(w.id(), now) && _fullscreenState.target());
 	const auto display = _displays.find(SDL_GetDisplayForWindow(w.window()));
 	if (fullscreen && !freerdp_settings_get_bool(_context->settings, FreeRDP_SpanMonitors) &&
@@ -1455,6 +1464,7 @@ bool SdlContext::addDisplayWindow(SDL_DisplayID id)
 	if (auto bridge = SdlLauncher::active()) bridge->configureWindowGeometry(w.window());
 #endif
 	w.setMonitor(monitor);
+	SdlHosted::anchor(w.window(), id);
 	std::ignore = SdlHosted::show(w.window());
 	_fullscreenState.addWindow(w.id());
 	_windows.emplace(w.id(), std::move(w));
@@ -1726,14 +1736,38 @@ bool SdlContext::moveMouseTo(const SDL_FPoint& pos)
 	{
 		/* The launcher owns the pointer. Report the place in window pixels, the space its
 		 * input messages use. */
-		auto first = getFirstWindow();
 		auto bridge = SdlLauncher::active();
-		if (!first || !first->renderer() || !bridge)
+		if (!bridge)
 			return true;
-		const auto spos = pixelToScreen(first->id(), pos);
+		/* With several monitors, the window whose monitor contains the place gets it, in its
+		 * own pixels; a place outside every monitor goes to the first window. */
+		SdlWindow* target = nullptr;
+		SDL_FPoint local = pos;
+		if (freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon))
+		{
+			for (auto& entry : _windows)
+			{
+				const SDL_FPoint at = { pos.x + static_cast<float>(entry.second.offsetX()),
+					                    pos.y + static_cast<float>(entry.second.offsetY()) };
+				const auto viewport = entry.second.pixelViewport();
+				if ((at.x >= 0.0f) && (at.y >= 0.0f) &&
+				    (at.x < static_cast<float>(viewport.w)) &&
+				    (at.y < static_cast<float>(viewport.h)))
+				{
+					target = &entry.second;
+					local = at;
+					break;
+				}
+			}
+		}
+		if (!target)
+			target = getFirstWindow();
+		if (!target || !target->renderer())
+			return true;
+		const auto spos = pixelToScreen(target->id(), local);
 		float x = 0, y = 0;
-		if (SDL_RenderCoordinatesFromWindow(first->renderer(), spos.x, spos.y, &x, &y))
-			bridge->hostedWarp(first->id(), x, y);
+		if (SDL_RenderCoordinatesFromWindow(target->renderer(), spos.x, spos.y, &x, &y))
+			bridge->hostedWarp(target->id(), x, y);
 		return true;
 	}
 #endif

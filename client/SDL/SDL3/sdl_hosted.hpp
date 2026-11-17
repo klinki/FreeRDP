@@ -9,6 +9,7 @@
 #include <mutex>
 #include <optional>
 #include <set>
+#include <tuple>
 #include <SDL3/SDL.h>
 
 class SdlHosted
@@ -152,6 +153,43 @@ class SdlHosted
 		return state().output && state().output->present(window, renderer);
 	}
 
+	/* With several monitors each hidden window stands for one display and stays at that
+	 * display's origin, whatever size the launcher gives it, so the display SDL finds for it
+	 * is the one it was made for. */
+	static void anchor(SDL_Window* window, SDL_DisplayID display)
+	{
+		if (!enabled() || !window || display == 0)
+			return;
+		{
+			std::lock_guard lock(state().mutex);
+			state().anchors[SDL_GetWindowID(window)] = display;
+		}
+		keepOnDisplay(window);
+	}
+	/** The display a window stands for, or 0 when it follows the launcher's window. */
+	static SDL_DisplayID anchoredDisplay(SDL_WindowID id)
+	{
+		std::lock_guard lock(state().mutex);
+		const auto it = state().anchors.find(id);
+		return it == state().anchors.end() ? 0 : it->second;
+	}
+	static void keepOnDisplay(SDL_Window* window)
+	{
+		if (!enabled() || !window)
+			return;
+		SDL_DisplayID display = 0;
+		{
+			std::lock_guard lock(state().mutex);
+			const auto it = state().anchors.find(SDL_GetWindowID(window));
+			if (it == state().anchors.end())
+				return;
+			display = it->second;
+		}
+		SDL_Rect bounds = {};
+		if (SDL_GetDisplayBounds(display, &bounds))
+			std::ignore = SDL_SetWindowPosition(window, bounds.x, bounds.y);
+	}
+
 	static void forget(SDL_WindowID id)
 	{
 		if (state().output)
@@ -160,6 +198,7 @@ class SdlHosted
 		state().layouts.erase(id);
 		state().hidden.erase(id);
 		state().fullscreen.erase(id);
+		state().anchors.erase(id);
 	}
 	static std::map<SDL_WindowID, Layout> layouts()
 	{
@@ -212,6 +251,7 @@ class SdlHosted
 		std::map<SDL_WindowID, Layout> layouts;
 		std::set<SDL_WindowID> hidden; // guarded by mutex; always a subset of layouts
 		std::set<SDL_WindowID> fullscreen; // guarded by mutex; always a subset of layouts
+		std::map<SDL_WindowID, SDL_DisplayID> anchors; // guarded by mutex
 		Output* output = nullptr;      // SDL main thread only
 		Request request = nullptr;     // set before the first session window is created
 	};

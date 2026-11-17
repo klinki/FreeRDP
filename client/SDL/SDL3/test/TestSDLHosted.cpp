@@ -114,8 +114,27 @@ int main()
 		require(SdlHosted::pixelSize(other, &ow, &oh) &&
 		            SDL_GetWindowSizeInPixels(other, &osw, &osh) && ow == osw && oh == osh,
 		        "a layout leaked to another window");
+		/* A window standing for one display stays at its origin whatever size it is given. */
+		const auto display = SDL_GetPrimaryDisplay();
+		SDL_Rect bounds = {};
+		require(display != 0 && SDL_GetDisplayBounds(display, &bounds), SDL_GetError());
+		require(SdlHosted::anchoredDisplay(id) == 0, "a window was anchored before asking");
+		SdlHosted::keepOnDisplay(window); // Not anchored: left where it is.
+		SdlHosted::anchor(window, display);
+		require(SdlHosted::anchoredDisplay(id) == display, "anchor not recorded");
+		require(SDL_SetWindowPosition(window, bounds.x + 300, bounds.y + 200) &&
+		            SDL_SetWindowSize(window, 900, 700),
+		        SDL_GetError());
+		SdlHosted::keepOnDisplay(window);
+		int px = -1, py = -1;
+		require(SDL_GetWindowPosition(window, &px, &py) && px == bounds.x && py == bounds.y,
+		        "an anchored window left its display's origin");
+		require(SDL_GetDisplayForWindow(window) == display, "an anchored window changed display");
+		require(SdlHosted::anchoredDisplay(SDL_GetWindowID(other)) == 0, "an anchor leaked");
+		require(SDL_SetWindowSize(window, 640, 480), SDL_GetError());
 		SdlHosted::setVisible(id, false);
 		SdlHosted::forget(id);
+		require(SdlHosted::anchoredDisplay(id) == 0, "anchor survived forget");
 		require(!SdlHosted::layout(id), "layout survived forget");
 		require(SdlHosted::visible(id) && !SdlHosted::allHidden(), "hidden state survived forget");
 		require(SdlHosted::pixelSize(window, &w, &h) && w == sw && h == sh,

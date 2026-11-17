@@ -1437,6 +1437,7 @@ void SdlLauncher::serviceHosted(uint32_t primary)
 		/* The hidden window follows in points so that code reading its logical size agrees;
 		 * the pixel-size event runs the same resize path as a window the user resized. */
 		std::ignore = SDL_SetWindowSize(window, layout.width, layout.height);
+		SdlHosted::keepOnDisplay(window);
 		SDL_Event resized = {};
 		resized.type = SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED;
 		resized.window.windowID = layout.window;
@@ -1478,7 +1479,11 @@ void SdlLauncher::serviceHosted(uint32_t primary)
 		/* The display the hidden window was placed on is the display the launcher's window
 		 * belongs to: the session's monitor layout is built from it. */
 		const auto window = SDL_GetWindowFromID(id);
-		const auto display = window ? SDL_GetDisplayForWindow(window) : 0;
+		/* A window standing for one display names that display even while SDL briefly
+		 * places it elsewhere, as when the display goes away before its window does. */
+		auto display = SdlHosted::anchoredDisplay(id);
+		if (display == 0)
+			display = window ? SDL_GetDisplayForWindow(window) : 0;
 		const std::array<int, 5> state = { layout.width, layout.height,
 			                               static_cast<int>(std::lround(layout.scale * 1000)),
 			                               static_cast<int>(display), id == primary ? 1 : 0 };
