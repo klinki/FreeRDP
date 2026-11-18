@@ -10,6 +10,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <array>
+#include "sdl_hosted_input.hpp"
 #include <freerdp/freerdp.h>
 #include <winpr/json.h>
 #include "sdl_monitor_selection.hpp"
@@ -50,6 +52,15 @@ class SdlLauncher
 	bool cancelled() const;
 	bool hadConnected() const;
 	void serviceFocus(); // SDL main thread only
+	/** Hosted rendering: applies queued layouts, announces windows, notices a lost launcher. */
+	/** primary: the window of the session's primary display (SdlContext::primaryWindowId). */
+	void serviceHosted(uint32_t primary = 0); // SDL main thread only
+	/** Hosted rendering: tells the launcher which cursor to show. kind is "default", "hidden" or
+	 * "image" with BGRA pixels in straight alpha. SDL main thread only. */
+	void hostedCursor(const char* kind, const BYTE* bgra = nullptr, UINT32 width = 0,
+	                  UINT32 height = 0, UINT32 hotX = 0, UINT32 hotY = 0);
+	/** Hosted rendering: the server moved the pointer; position in window pixels. */
+	void hostedWarp(SDL_WindowID window, float x, float y); // SDL main thread only
 	uint32_t takeScreenRefreshRequests() { const auto modes = _screenRefresh.exchange(0); return _connected && !_cancelled && !_terminal ? modes : 0; }
 	bool takeScreenRefreshRequest() { return takeScreenRefreshRequests() != 0; }
 	bool requestClose(); // SDL main thread: queues a decision; never waits.
@@ -71,6 +82,30 @@ class SdlLauncher
 	static bool isAuthenticationError(UINT32 error);
 
   private:
+	struct HostedLayout
+	{
+		uint32_t window = 0;
+		int width = 0; // points
+		int height = 0;
+		float scale = 1.0f;
+		int fullscreen = -1; // -1: not stated
+		int desktopScale = 0; // percent; 0: not stated
+	};
+	bool hostedOcclusion(WINPR_JSON* event);
+	static void hostedRequest(SDL_WindowID window, const char* action); // SDL main thread only
+	bool hostedLayout(WINPR_JSON* event);
+	bool hostedInput(WINPR_JSON* event);
+	bool hostedFocus(WINPR_JSON* event);
+	void releaseHostedInput(); // SDL main thread only
+	std::vector<SdlHostedInput::Message> _hostedInputs; // guarded by _mutex; pixels until drained
+	std::string _hostedCursorKind;                      // SDL main thread only
+	bool _hostedRelease = false;                        // guarded by _mutex
+	bool _hostedFocused = false;                        // guarded by _mutex; focus was gained
+	SdlHostedInput::State _hostedInput;                 // SDL main thread only
+	std::vector<HostedLayout> _hostedLayouts;                   // guarded by _mutex
+	/* Per window: width, height, scale in thousandths, SDL display id, primary. */
+	std::map<uint32_t, std::array<int, 5>> _hostedAnnounced;    // SDL main thread only
+	std::vector<std::pair<uint32_t, bool>> _hostedVisibility;   // guarded by _mutex
 	Json message(const char* type);
 	Json request(Json event, const char* responseType);
 	bool send(Json event);
