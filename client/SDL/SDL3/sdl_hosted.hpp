@@ -160,9 +160,16 @@ class SdlHosted
 	{
 		if (!enabled() || !window || display == 0)
 			return;
+		const auto mode = SDL_GetCurrentDisplayMode(display);
 		{
 			std::lock_guard lock(state().mutex);
-			state().anchors[SDL_GetWindowID(window)] = display;
+			const auto id = SDL_GetWindowID(window);
+			state().anchors[id] = display;
+			/* Until the launcher's first layout, the window has its display's backing scale,
+			 * not the one the launcher gave for the session. */
+			const auto it = state().layouts.find(id);
+			if ((it != state().layouts.end()) && mode && (mode->pixel_density > 0.0f))
+				it->second.scale = mode->pixel_density;
 		}
 		keepOnDisplay(window);
 	}

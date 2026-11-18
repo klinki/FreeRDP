@@ -332,7 +332,8 @@ Events from the client:
   scales the picture. A cursor the client cannot encode is reported as
   `default`. Animated server cursors arrive as one event per frame.
 - `pointer_warp`: `windowId`, `x`, `y` in window pixels: the server moved the
-  pointer. With several windows the position is relative to the first.
+  pointer. With several windows it names the window whose monitor contains
+  the place, with the position relative to that window.
 - `hosted_request`: `windowId`, `action` of `enter_fullscreen`,
   `leave_fullscreen` or `minimize`. The session asks for what only the launcher
   can do to its window: the fullscreen hotkey, the connection bar's buttons and
@@ -342,6 +343,22 @@ Events from the client:
 
 The JSON bridge and the surface channel are separate queues: a window's
 surfaces may arrive before or after its `hosted_window` event.
+
+### Several monitors
+
+A client advertising `hosted_multimon` also accepts hosted rendering for a
+multi-monitor session. It chooses the displays and arranges the monitors as for
+its own windows, and makes one hidden window per display. Each such window
+stays at its display's origin whatever size `layout` gives it, starts with its
+display's backing scale until the first `layout`, and its `hosted_window` always
+names that display. The monitor sent to the server keeps the display's size
+while the launcher's window is not fullscreen, as for the client's own windows,
+and takes the `layout` size while it is fullscreen; a launcher that shows a
+window out of fullscreen should therefore give it the display's size and scale
+the picture to its window. The session's fullscreen toggle and the connection
+bar's minimize send one `hosted_request` per window. A display that goes away
+closes its window with `hosted_window_closed`; a selected display that returns
+gets a new window and `hosted_window`.
 
 Commands from the launcher:
 
