@@ -581,6 +581,16 @@ namespace
 			        "Malformed input did not unblock certificate decision");
 		}
 	}
+	void focusKeepsMaximizedWindows()
+	{
+		require(SdlLauncher::focusRestoresWindow(SDL_WINDOW_MINIMIZED) &&
+		            SdlLauncher::focusRestoresWindow(SDL_WINDOW_MINIMIZED | SDL_WINDOW_RESIZABLE),
+		        "Focus did not restore a minimized window");
+		require(!SdlLauncher::focusRestoresWindow(SDL_WINDOW_MAXIMIZED | SDL_WINDOW_RESIZABLE) &&
+		            !SdlLauncher::focusRestoresWindow(SDL_WINDOW_FULLSCREEN) &&
+		            !SdlLauncher::focusRestoresWindow(SDL_WINDOW_RESIZABLE),
+		        "Focus restored a maximized, fullscreen or normal window");
+	}
 	void lifecycle()
 	{
 		Connection c;
@@ -701,6 +711,7 @@ int main()
 		promptAndStaleResponse();
 		concurrentPromptsAndCertificate();
 		malformedAndVersion();
+		focusKeepsMaximizedWindows();
 		lifecycle();
 		terminalDistinctions();
 		reconnectPolicyExclusions();

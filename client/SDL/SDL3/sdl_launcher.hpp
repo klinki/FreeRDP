@@ -50,6 +50,11 @@ class SdlLauncher
 	bool cancelled() const;
 	bool hadConnected() const;
 	void serviceFocus(); // SDL main thread only
+	// SDL_RestoreWindow also un-maximizes, so focus only restores minimized windows.
+	static bool focusRestoresWindow(SDL_WindowFlags flags)
+	{
+		return (flags & SDL_WINDOW_MINIMIZED) != 0;
+	}
 	uint32_t takeScreenRefreshRequests() { const auto modes = _screenRefresh.exchange(0); return _connected && !_cancelled && !_terminal ? modes : 0; }
 	bool takeScreenRefreshRequest() { return takeScreenRefreshRequests() != 0; }
 	bool requestClose(); // SDL main thread: queues a decision; never waits.
