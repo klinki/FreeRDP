@@ -262,3 +262,152 @@ suppressed output stays suppressed. Combined redraw waits for successful resume.
 Requests and stage results log the mode without frame content or credentials.
 No decoder reset, codec change, remote input, or normal-session reconnect is
 performed by these methods. Packet success is not proof of visual recovery.
+
+## Hosted rendering
+
+A client advertising `hosted_render` accepts `start.renderMode: "hosted"`. In
+hosted mode the launcher owns the session windows. The client still creates one
+SDL window per remote monitor, but never shows, raises, focuses or makes any of
+them fullscreen, and takes no keyboard or mouse input from SDL. It draws
+everything it draws today, including the connection bar and the performance and
+reconnect overlays, into shared surfaces that the launcher displays. Without
+`renderMode`, or with `"window"`, behavior is unchanged.
+
+### Surface channel
+
+Frames do not travel on the JSON bridge. The launcher creates a Mach receive
+right, registers a send right to it in registered-port slot 0
+(`mach_ports_register`) while it starts the client, and the client reads it once
+at startup with `mach_ports_lookup`. No bootstrap service name is used, so the
+same code works inside the App Sandbox. The launcher clears the slot once the
+client has started, so that no later child process inherits the port. If
+`renderMode` is `"hosted"` and the slot holds no send right, the session ends
+with outcome `initial_failure` before connecting; the client never falls back to
+showing a window of its own.
+
+The slot is inherited from process to process, so it may already hold a port
+that the launcher's own parent put there. The client cannot tell such a port
+from the launcher's. A launcher that asks for hosted rendering must therefore
+register its own port for that start, and must not ask for it otherwise.
+
+The client sends two fixed-layout messages, defined in `sdl_launcher_surface.h`.
+All integers are host byte order.
+
+| Message | `msgh_id` | Carries |
+|---|---|---|
+| surface | 1 | One port descriptor from `IOSurfaceCreateMachPort`, then `windowId`, `generation`, `index`, `width`, `height` (all `uint32`, size in pixels) |
+| frame | 2 | `windowId`, `generation`, `index` (`uint32`), then `sequence` (`uint64`) |
+
+Each window has three BGRA surfaces of the window's pixel size, `index` 0 to 2.
+The client sends all three `surface` messages before the first `frame` that
+names their `generation`. Whenever the pixel size changes or the window is
+recreated, the client makes three new surfaces under the next `generation`.
+A `frame` message says that the named surface holds a complete picture: the
+client waits for the GPU to finish drawing before it sends one, so the launcher
+may show the surface at once and needs no synchronization of its own. The
+launcher shows it and drops frames whose `generation` it has not received
+surfaces for. The client never draws into the surface it announced last, and
+uses the surfaces in rotation. Frame sends never block: if the launcher's queue
+is full the frame message is dropped and the next one supersedes it. Surface
+messages wait up to 250 ms; if one still cannot be sent, the frame fails and the
+session ends with a drawing error. A dead port
+ends the session as bridge EOF does.
+
+### JSON messages
+
+Events from the client:
+
+- `hosted_window`: `windowId`, `width`, `height` in pixels and `scale`;
+  `displayUUID`, the Mac display the window belongs to, when the client can
+  identify it; and `primary`, true for the window of the session's primary
+  display (the window that has the connection bar). Sent when a window is
+  created or recreated (connect, reconnect, monitor layout change) and again
+  whenever its size, scale, display or primary state changes. The client
+  decides which displays a session uses and how its monitors are arranged; the
+  launcher shows each window on its display.
+- `hosted_window_closed`: `windowId`.
+- `cursor`: `kind` of `default`, `hidden` or `image`; for `image`, `pngBase64`,
+  `width`, `height`, `hotX`, `hotY`. The image is the server's cursor in remote
+  pixels with straight alpha, at most 512 by 512; the launcher scales it as it
+  scales the picture. A cursor the client cannot encode is reported as
+  `default`. Animated server cursors arrive as one event per frame.
+- `pointer_warp`: `windowId`, `x`, `y` in window pixels: the server moved the
+  pointer. With several windows it names the window whose monitor contains
+  the place, with the position relative to that window.
+- `hosted_request`: `windowId`, `action` of `enter_fullscreen`,
+  `leave_fullscreen` or `minimize`. The session asks for what only the launcher
+  can do to its window: the fullscreen hotkey, the connection bar's buttons and
+  a fullscreen start all arrive this way. The launcher may decline; the client
+  changes nothing until a `layout` states the new fullscreen state, and does
+  not ask for the state the window is already in.
+
+The JSON bridge and the surface channel are separate queues: a window's
+surfaces may arrive before or after its `hosted_window` event.
+
+### Several monitors
+
+A client advertising `hosted_multimon` also accepts hosted rendering for a
+multi-monitor session. It chooses the displays and arranges the monitors as for
+its own windows, and makes one hidden window per display. Each such window
+stays at its display's origin whatever size `layout` gives it, starts with its
+display's backing scale until the first `layout`, and its `hosted_window` always
+names that display. The monitor sent to the server keeps the display's size
+while the launcher's window is not fullscreen, as for the client's own windows,
+and takes the `layout` size while it is fullscreen; a launcher that shows a
+window out of fullscreen should therefore give it the display's size and scale
+the picture to its window. The session's fullscreen toggle and the connection
+bar's minimize send one `hosted_request` per window. A display that goes away
+closes its window with `hosted_window_closed`; a selected display that returns
+gets a new window and `hosted_window`.
+
+Commands from the launcher:
+
+- `layout`: `windowId`, `width` and `height` in points, `scale`. The client
+  resizes the hidden window and its surfaces to `width × scale` by
+  `height × scale` pixels; the existing display-control path then resizes the
+  remote desktop when dynamic resolution is on. The scale always comes from this
+  message, never from the display the hidden window happens to be on.
+  Optional `fullscreen` states whether the launcher's window is fullscreen;
+  the client treats a change as it treats a window entering or leaving
+  fullscreen, which shows or hides the connection bar. A window is taken to
+  be windowed until a `layout` says otherwise. Optional `desktopScale` (100 to
+  500, percent) replaces the remote desktop scale from then on, for a launcher
+  window that moved to a display wanting another one; the monitor layout sent
+  for this `layout` carries it.
+- `input`: `windowId`, `action`, and per action:
+  - `key`: `keyCode` (macOS virtual key code), `down`, `flags` (`NSEvent`
+    modifier flags), optional `repeat`.
+  - `mouse_move`: `x`, `y`, optional `dx`, `dy`.
+  - `mouse_button`: `button` (1 left, 2 middle, 3 right, 4 and 5 extra), `down`,
+    `clicks`, `x`, `y`.
+  - `wheel`: `dx`, `dy` in wheel steps, fractional values allowed, `x`, `y`.
+- `focus_state`: `windowId`, `focused`. On loss of focus the client releases
+  every key and button it holds down. On gaining focus it looks for a changed
+  Mac clipboard and announces it to the server, as its own window does when it
+  becomes key.
+- `occlusion`: `windowId`, `visible`. While not visible the client keeps the
+  session running but draws nothing for that window and sends no frames for
+  it. When no window is visible it also asks the server to stop sending
+  screen updates, as it does for a minimized window. A window that becomes
+  visible again is repainted completely, and server output resumes. Windows
+  start visible.
+
+Coordinates are in window pixels with the origin at the top left; `dx` and `dy`
+of `mouse_move` are in pixels too. Input is applied in the order received and
+passes through the same key, hotkey, mouse and overlay handling as SDL input,
+as synthesized SDL events. A modifier flag without a left or right device bit
+counts as the left key. Malformed messages are rejected; messages naming an
+unknown `windowId` or an unknown key code are ignored. Held keys and buttons
+are also released when the launcher's surface port goes away.
+
+`start` may carry `hostedScale`, the backing scale of the launcher's windows,
+used for every window until its first `layout` arrives; without it the client
+assumes the scale of the display the hidden window was created on. The first
+size comes from the session arguments, as for a window: fullscreen arguments
+give a window the size of its display and produce an `enter_fullscreen`
+request, nothing more. The existing `focus` command and `window_geometry`
+events do nothing in hosted mode.
+
+A hosted client holds a user-initiated activity (`NSProcessInfo`) from start to
+exit, because a process without a visible window is otherwise a candidate for
+App Nap. It does not prevent the Mac from sleeping when idle.

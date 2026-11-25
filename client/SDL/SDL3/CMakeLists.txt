@@ -54,6 +54,8 @@ set(SRCS
     sdl_channels.hpp
     sdl_channels.cpp
     sdl_window.hpp
+    sdl_hosted.hpp
+    sdl_hosted_input.hpp
     sdl_fullscreen_state.hpp
     sdl_window.cpp
     sdl_clip.hpp
@@ -147,8 +149,27 @@ set(SDL_LAUNCHER_BRIDGE_ENABLED OFF)
 if(WITH_LAUNCHER_BRIDGE AND APPLE AND WITH_WINPR_JSON)
   set(SDL_LAUNCHER_BRIDGE_ENABLED ON)
   set(CMAKE_OBJCXX_STANDARD 17)
-  list(APPEND SRCS sdl_launcher.cpp sdl_launcher.hpp sdl_launcher_macos.mm)
-  list(APPEND LIBS "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit")
+  list(
+    APPEND
+    SRCS
+    sdl_launcher.cpp
+    sdl_launcher.hpp
+    sdl_launcher_macos.mm
+    sdl_hosted_surface.mm
+    sdl_hosted_surface.hpp
+    sdl_launcher_surface.h
+  )
+  list(
+    APPEND
+    LIBS
+    "-framework CoreGraphics"
+    "-framework CoreFoundation"
+    "-framework ColorSync"
+    "-framework ImageIO"
+    "-framework AppKit"
+    "-framework IOSurface"
+    "-framework CoreVideo"
+  )
   add_compile_definitions(WITH_SDL_LAUNCHER_BRIDGE)
 endif()
 
@@ -225,7 +246,7 @@ if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
   add_executable(TestSDLRenderWindow test/TestSDLRenderWindow.cpp sdl_window.cpp sdl_utils.cpp)
   # sdl_window.cpp reports window state through the bridge when it is compiled in.
   if(SDL_LAUNCHER_BRIDGE_ENABLED)
-    target_sources(TestSDLRenderWindow PRIVATE sdl_launcher.cpp sdl_launcher_macos.mm)
+    target_sources(TestSDLRenderWindow PRIVATE sdl_launcher.cpp sdl_launcher_macos.mm sdl_hosted_surface.mm)
   endif()
   target_link_libraries(TestSDLRenderWindow PRIVATE ${LIBS})
   set_target_properties(TestSDLRenderWindow PROPERTIES RUNTIME_OUTPUT_DIRECTORY
@@ -296,6 +317,20 @@ if(SDL_LAUNCHER_TEST AND APPLE)
   target_link_libraries(TestSDLWindowGeometry PRIVATE SDL3::SDL3)
   add_test(NAME TestSDLWindowGeometry COMMAND TestSDLWindowGeometry)
   set_tests_properties(TestSDLWindowGeometry PROPERTIES TIMEOUT 30 ENVIRONMENT "SDL_VIDEODRIVER=dummy")
+  add_executable(TestSDLHosted test/TestSDLHosted.cpp)
+  target_link_libraries(TestSDLHosted PRIVATE SDL3::SDL3)
+  add_test(NAME TestSDLHosted COMMAND TestSDLHosted)
+  set_tests_properties(TestSDLHosted PROPERTIES TIMEOUT 30 ENVIRONMENT "SDL_VIDEODRIVER=dummy")
+  add_executable(TestSDLHostedSurface test/TestSDLHostedSurface.mm sdl_hosted_surface.mm)
+  target_link_libraries(
+    TestSDLHostedSurface PRIVATE SDL3::SDL3 "-framework IOSurface" "-framework CoreVideo" "-framework Foundation" "-framework AppKit"
+  )
+  add_test(NAME TestSDLHostedSurface COMMAND TestSDLHostedSurface)
+  set_tests_properties(TestSDLHostedSurface PROPERTIES TIMEOUT 60)
+  add_executable(TestSDLHostedInput test/TestSDLHostedInput.cpp)
+  target_link_libraries(TestSDLHostedInput PRIVATE SDL3::SDL3)
+  add_test(NAME TestSDLHostedInput COMMAND TestSDLHostedInput)
+  set_tests_properties(TestSDLHostedInput PROPERTIES TIMEOUT 30 ENVIRONMENT "SDL_VIDEODRIVER=dummy")
   add_executable(TestSDLReconnect test/TestSDLReconnect.cpp)
   add_test(NAME TestSDLReconnect COMMAND TestSDLReconnect)
   add_executable(TestSDLMouseWheel test/TestSDLMouseWheel.cpp)
@@ -358,8 +393,10 @@ if(SDL_LAUNCHER_TEST AND APPLE)
   set_tests_properties(TestSDLInputInitialization PROPERTIES TIMEOUT 30)
 endif()
 if(SDL_LAUNCHER_BRIDGE_ENABLED AND SDL_LAUNCHER_TEST)
-  add_executable(TestSDLLauncherTransport test/TestSDLLauncherTransport.cpp sdl_launcher.cpp sdl_launcher_macos.mm)
+  # One line: scripts/sheltie/build-engine.sh finds test targets by this pattern.
+  add_executable(TestSDLLauncherTransport test/TestSDLLauncherTransport.cpp sdl_launcher.cpp sdl_launcher_macos.mm sdl_hosted_surface.mm)
   target_link_libraries(TestSDLLauncherTransport PRIVATE winpr freerdp freerdp-client Threads::Threads
-                        SDL3::SDL3 "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit")
+                        SDL3::SDL3 "-framework CoreGraphics" "-framework CoreFoundation" "-framework ColorSync" "-framework ImageIO" "-framework AppKit"
+                        "-framework IOSurface" "-framework CoreVideo")
   add_test(NAME TestSDLLauncherTransport COMMAND TestSDLLauncherTransport)
 endif()

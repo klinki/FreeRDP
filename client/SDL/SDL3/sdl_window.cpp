@@ -24,6 +24,7 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include "sdl_window.hpp"
+#include "sdl_hosted.hpp"
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 #include "sdl_launcher.hpp"
 #endif
@@ -99,6 +100,12 @@ SdlWindow::SdlWindow(SDL_DisplayID id, const std::string& title, const SDL_Rect&
 	SDL_SetHint(SDL_HINT_APP_NAME, "");
 	std::ignore = SDL_SyncWindow(_window);
 
+	/* Hosted: the requested size is in pixels. The scale is the one the launcher gave at
+	 * start, or this display's; the launcher's first layout replaces both. */
+	if (_window)
+		std::ignore = SdlHosted::setLayout(SDL_GetWindowID(_window),
+		                                   { rect.w, rect.h, SdlHosted::initialScale(pd) });
+
 	_renderer = SDL_CreateRenderer(_window, nullptr);
 	_topBar = std::make_unique<SdlTopBar>(_renderer, title);
 
@@ -113,7 +120,7 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
       _gdiTextureH(other._gdiTextureH),
       _renderTargetNeedsFullRedraw(other._renderTargetNeedsFullRedraw),
       _gdiTextureNeedsFullRedraw(other._gdiTextureNeedsFullRedraw), _initialW(other._initialW),
-      _initialH(other._initialH), _displayID(other._displayID), _offset_x(other._offset_x),
+      _initialH(other._initialH), _hostedRevealed(other._hostedRevealed), _displayID(other._displayID), _offset_x(other._offset_x),
       _offset_y(other._offset_y),
       _renderMetrics(std::move(other._renderMetrics)), _liveMetrics(std::move(other._liveMetrics)),
       _livePresents(other._livePresents), _performanceOverlay(std::move(other._performanceOverlay)), _monitor(other._monitor),
@@ -131,6 +138,8 @@ SdlWindow::SdlWindow(SdlWindow&& other) noexcept
 SdlWindow::~SdlWindow()
 {
 	/* Release owned textures before SDL_DestroyRenderer destroys them. */
+	if (_window)
+		SdlHosted::forget(SDL_GetWindowID(_window));
 	_performanceOverlay.reset();
 	_topBar.reset();
 	_stalled.reset();
@@ -231,7 +240,7 @@ SDL_Point SdlWindow::displaySize() const
 
 float SdlWindow::scale() const
 {
-	return SDL_GetWindowDisplayScale(_window);
+	return SdlHosted::displayScale(_window);
 }
 
 SDL_DisplayOrientation SdlWindow::orientation() const
@@ -244,7 +253,7 @@ bool SdlWindow::grabKeyboard(bool enable)
 {
 	if (!_window)
 		return false;
-	SDL_SetWindowKeyboardGrab(_window, enable);
+	std::ignore = SdlHosted::grabKeyboard(_window, enable);
 	return true;
 }
 
@@ -252,7 +261,7 @@ bool SdlWindow::grabMouse(bool enable)
 {
 	if (!_window)
 		return false;
-	SDL_SetWindowMouseGrab(_window, enable);
+	std::ignore = SdlHosted::grabMouse(_window, enable);
 	return true;
 }
 
@@ -265,8 +274,22 @@ void SdlWindow::setBordered(bool bordered)
 
 void SdlWindow::raise()
 {
-	SDL_RaiseWindow(_window);
+	std::ignore = SdlHosted::raise(_window);
 	std::ignore = SDL_SyncWindow(_window);
+}
+
+bool SdlWindow::revealed() const
+{
+	if (SdlHosted::enabled())
+		return _hostedRevealed;
+	return (SDL_GetWindowFlags(_window) & SDL_WINDOW_HIDDEN) == 0;
+}
+
+void SdlWindow::reveal()
+{
+	_hostedRevealed = true;
+	std::ignore = SdlHosted::show(_window);
+	std::ignore = SdlHosted::raise(_window);
 }
 
 void SdlWindow::resizeable(bool use)
@@ -287,7 +310,7 @@ SdlWindow::FullscreenResult SdlWindow::fullscreen(bool enter, bool forceOriginal
 		std::ignore = SDL_GetDisplayBounds(_displayID, &rect);
 		std::ignore = SDL_SetWindowPosition(_window, rect.x, rect.y);
 	}
-	if (!SDL_SetWindowFullscreen(_window, enter))
+	if (!SdlHosted::fullscreen(_window, enter))
 		return FullscreenResult::Failed;
 	/* Native transitions (macOS Spaces) are asynchronous; SDL_SyncWindow
 	 * gives up after a timeout while the transition may still complete. The
@@ -299,7 +322,7 @@ SdlWindow::FullscreenResult SdlWindow::fullscreen(bool enter, bool forceOriginal
 
 void SdlWindow::minimize()
 {
-	SDL_MinimizeWindow(_window);
+	std::ignore = SdlHosted::minimize(_window);
 	std::ignore = SDL_SyncWindow(_window);
 }
 
@@ -310,7 +333,7 @@ bool SdlWindow::resizeToScale()
 	if ((SDL_GetWindowFlags(_window) & SDL_WINDOW_FULLSCREEN) != 0)
 		return true;
 
-	float pd = SDL_GetWindowPixelDensity(_window);
+	float pd = SdlHosted::pixelDensity(_window);
 	if (pd <= 0.0f)
 		pd = 1.0f;
 
@@ -340,7 +363,7 @@ bool SdlWindow::ensureRenderTarget()
 
 	int w = 0;
 	int h = 0;
-	if (!SDL_GetWindowSizeInPixels(_window, &w, &h))
+	if (!SdlHosted::pixelSize(_window, &w, &h))
 		return false;
 	if (w <= 0 || h <= 0)
 		return false;
@@ -588,7 +611,7 @@ rdpMonitor SdlWindow::query(SDL_Window* window, SDL_DisplayID id, bool forceAsPr
 {
 	if (!window)
 		return {};
-	return makeMonitor(id, rect(window, forceAsPrimary), SDL_GetWindowDisplayScale(window),
+	return makeMonitor(id, rect(window, forceAsPrimary), SdlHosted::displayScale(window),
 	                   forceAsPrimary);
 }
 
@@ -624,7 +647,7 @@ SDL_Rect SdlWindow::rect(SDL_Window* window, bool forceAsPrimary)
 			return {};
 	}
 
-	if (!SDL_GetWindowSizeInPixels(window, &rect.w, &rect.h))
+	if (!SdlHosted::pixelSize(window, &rect.w, &rect.h))
 		return {};
 
 	const auto flags = SDL_GetWindowFlags(window);
@@ -681,8 +704,8 @@ SdlWindow::HighDPIMode SdlWindow::isHighDPIWindowsMode(SDL_Window* window)
 		return MODE_INVALID;
 
 	const auto cs = SDL_GetDisplayContentScale(id);
-	const auto ds = SDL_GetWindowDisplayScale(window);
-	const auto pd = SDL_GetWindowPixelDensity(window);
+	const auto ds = SdlHosted::displayScale(window);
+	const auto pd = SdlHosted::pixelDensity(window);
 
 	/* mac os x style, but no HighDPI display */
 	if ((cs == 1.0f) && (ds == 1.0f) && (pd == 1.0f))
@@ -809,19 +832,22 @@ bool SdlWindow::updateSurface(bool showTopBar, bool pinned, const SDL_FPoint& po
 	if (!ensureRenderTarget() || !_renderTarget)
 		return false;
 
+	if (!SdlHosted::visible(_window))
+		return true; // Hosted and not shown by the launcher.
+
 	/* Copy accumulated render target to screen and present */
-	if (!SDL_SetRenderTarget(_renderer, nullptr))
+	if (!SdlHosted::screenTarget(_window, _renderer))
 		return false;
 	if (!SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr))
 		return false;
 
-    if(_performanceOverlay) _performanceOverlay->draw(pixelViewport(),SDL_GetWindowPixelDensity(_window));
+    if(_performanceOverlay) _performanceOverlay->draw(pixelViewport(),SdlHosted::pixelDensity(_window));
 	if (showTopBar && !drawTopBar(pinned, pointer))
 		return false;
 
     const auto liveStart=_liveMetrics.nowNs();
     auto presentTimer = _renderMetrics.beginPresent();
-    const auto result=SDL_RenderPresent(_renderer);
+    const auto result=SdlHosted::present(_window, _renderer);
     if (_liveMetrics.enabled()) {
         if (result) {
             const auto now=_liveMetrics.nowNs();
@@ -894,6 +920,8 @@ bool SdlWindow::renderStalledFrame(int dots, bool showTopBar, bool pinned,
 {
 	if (!_renderer)
 		return false;
+	if (!SdlHosted::visible(_window))
+		return true; // Hosted and not shown by the launcher.
 
 	(void)ensureRenderTarget();
 
@@ -902,7 +930,7 @@ bool SdlWindow::renderStalledFrame(int dots, bool showTopBar, bool pinned,
 	 * it stays readable and usable while reconnecting. The render target
 	 * itself is never touched, so the next normal frame paints clean with no
 	 * explicit clear needed. */
-	if (!SDL_SetRenderTarget(_renderer, nullptr))
+	if (!SdlHosted::screenTarget(_window, _renderer))
 		return false;
 	if (_renderTarget)
 	{
@@ -917,7 +945,7 @@ bool SdlWindow::renderStalledFrame(int dots, bool showTopBar, bool pinned,
 			return false;
 	}
 	if (_performanceOverlay)
-		_performanceOverlay->draw(pixelViewport(), SDL_GetWindowPixelDensity(_window));
+		_performanceOverlay->draw(pixelViewport(), SdlHosted::pixelDensity(_window));
 
 	const auto viewport = pixelViewport();
 	if (viewport.w <= 0 || viewport.h <= 0)
@@ -983,8 +1011,10 @@ bool SdlWindow::updateStalledSurface(int dots, bool showTopBar, bool pinned,
 
 	/* Stalled overlay presents are counted separately from present_calls so
 	 * that identical-input comparisons of present_calls stay stable. */
+	if (!SdlHosted::visible(_window))
+		return true;
 	_renderMetrics.noteStalledPresent();
-	return SDL_RenderPresent(_renderer);
+	return SdlHosted::present(_window, _renderer);
 }
 
 SdlTopBarRect SdlWindow::topBarRect() const
@@ -1026,7 +1056,7 @@ static SDL_Rect windowViewport(SDL_Window* window)
 	int width = 0;
 	int height = 0;
 	if (window)
-		SDL_GetWindowSizeInPixels(window, &width, &height);
+		SdlHosted::pixelSize(window, &width, &height);
 	return { 0, 0, width, height };
 }
 
@@ -1035,7 +1065,7 @@ SDL_Rect SdlWindow::pixelViewport() const
 	int width = 0;
 	int height = 0;
 	if (_window)
-		SDL_GetWindowSizeInPixels(_window, &width, &height);
+		SdlHosted::pixelSize(_window, &width, &height);
 	return { 0, 0, width, height };
 }
 
@@ -1148,7 +1178,7 @@ bool SdlWindow::paintResizeFrame(SDL_Surface* surface, SDL_Point off, bool conte
 
 	int ww = 0;
 	int wh = 0;
-	SDL_GetWindowSizeInPixels(_window, &ww, &wh);
+	SdlHosted::pixelSize(_window, &ww, &wh);
 	/* The visible frame; the ring outside it (the resize band) stays fully transparent. */
 	const SDL_FRect frame = { static_cast<float>(inset.x), static_cast<float>(inset.y),
 		                      static_cast<float>(ww - inset.x - inset.w),
@@ -1203,10 +1233,12 @@ bool SdlWindow::paintResizeFrame(SDL_Surface* surface, SDL_Point off, bool conte
 		}
 	}
 
-	if (!SDL_SetRenderTarget(_renderer, nullptr))
+	if (!SdlHosted::visible(_window))
+		return true;
+	if (!SdlHosted::screenTarget(_window, _renderer))
 		return false;
 	std::ignore = SDL_RenderTexture(_renderer, _renderTarget, nullptr, nullptr);
-	std::ignore = SDL_RenderPresent(_renderer);
+	std::ignore = SdlHosted::present(_window, _renderer);
 	return true;
 }
 
@@ -1224,7 +1256,12 @@ SdlWindow SdlWindow::create(SDL_DisplayID id, const std::string& title, Uint32 f
 		std::ignore = SDL_GetDisplayBounds(id, &rect);
 	}
 
-	SdlWindow window{ id, title, rect, flags };
+	/* Hosted: the launcher decides whether its window is fullscreen and says so with a
+	 * layout. The hidden window only takes the size a fullscreen start asks for. */
+	SdlWindow window{ id, title, rect,
+		              SdlHosted::enabled()
+		                  ? static_cast<Uint32>(flags & ~SDL_WINDOW_FULLSCREEN)
+		                  : flags };
 
 	if ((flags & SDL_WINDOW_FULLSCREEN) != 0)
 	{

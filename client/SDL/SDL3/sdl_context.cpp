@@ -27,6 +27,7 @@
 #include <freerdp/codec/yuv.h>
 
 #include "sdl_context.hpp"
+#include "sdl_hosted.hpp"
 #ifdef WITH_SDL_LAUNCHER_BRIDGE
 #include "sdl_launcher.hpp"
 #endif
@@ -585,6 +586,7 @@ bool SdlContext::createWindows()
 			// Cache local coordinates; negotiated coordinates are relative to the
 			// selected primary and must not be mixed with newly added displays.
 			window.setMonitor(getDisplay(did));
+			SdlHosted::anchor(window.window(), did);
 			// Until its fullscreen transition completes, report the window as shorter
 			// already, as the connect-time monitor was sent. Otherwise a layout sent
 			// meanwhile differs from it, and Windows reconfigures a second time.
@@ -731,6 +733,14 @@ bool SdlContext::updateWindowList()
 	                                                     list.size());
 }
 
+/* A hosted window never enters fullscreen itself; the launcher's window does. */
+static bool windowFullscreen(const SdlWindow& w)
+{
+	if (SdlHosted::enabled())
+		return SdlHosted::isFullscreen(w.id());
+	return (SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
 bool SdlContext::updateWindow(SDL_WindowID id)
 {
 	/* In fullscreen the monitor kept the size measured with the probe window at startup and was
@@ -745,7 +755,7 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 		// which excludes the space macOS reserves above notched content.
 		if (w.displayIndex() != w.monitor(false).orig_screen)
 			return true;
-		if ((_windows.size() > 1) && !(SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN))
+		if ((_windows.size() > 1) && !windowFullscreen(w))
 			return true; // Retain physical geometry while leaving multimon fullscreen.
 	}
 
@@ -760,7 +770,7 @@ bool SdlContext::updateWindow(SDL_WindowID id)
 	// observes that event, so only the flag and a request to enter count.
 	const auto now = SDL_GetTicks();
 	const bool fullscreen =
-	    ((SDL_GetWindowFlags(w.window()) & SDL_WINDOW_FULLSCREEN) != 0) ||
+	    windowFullscreen(w) ||
 	    (_fullscreenState.pending(w.id(), now) && _fullscreenState.target());
 	const auto display = _displays.find(SDL_GetDisplayForWindow(w.window()));
 	if (fullscreen && !freerdp_settings_get_bool(_context->settings, FreeRDP_SpanMonitors) &&
@@ -1225,6 +1235,10 @@ void SdlContext::updateMonitorDataFromOffsets()
 
 bool SdlContext::drawToWindow(SdlWindow& window, const std::vector<SDL_Rect>& rects, bool remoteContent)
 {
+	/* Hosted and not shown by the launcher: nothing to draw. The window is repainted
+	 * completely when it becomes visible again. */
+	if (!SdlHosted::visible(window.window()))
+		return true;
 	auto size = window.rect();
 	std::unique_lock lock(_critical);
 	if (!isConnected()) return true;
@@ -1370,7 +1384,8 @@ bool SdlContext::addDisplayWindow(SDL_DisplayID id)
 	if (auto bridge = SdlLauncher::active()) bridge->configureWindowGeometry(w.window());
 #endif
 	w.setMonitor(monitor);
-	SDL_ShowWindow(w.window());
+	SdlHosted::anchor(w.window(), id);
+	std::ignore = SdlHosted::show(w.window());
 	_fullscreenState.addWindow(w.id());
 	_windows.emplace(w.id(), std::move(w));
 	return true;
@@ -1599,6 +1614,8 @@ SdlWindow* SdlContext::getWindowForId(SDL_WindowID id)
 
 bool SdlContext::allWindowsHidden() const
 {
+	if (SdlHosted::enabled())
+		return SdlHosted::allHidden();
 	return std::all_of(_windows.begin(), _windows.end(),
 	                   [](const auto& entry)
 	                   {
@@ -1646,6 +1663,46 @@ wLog* SdlContext::getWLog()
 
 bool SdlContext::moveMouseTo(const SDL_FPoint& pos)
 {
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (SdlHosted::enabled())
+	{
+		/* The launcher owns the pointer. Report the place in window pixels, the space its
+		 * input messages use. */
+		auto bridge = SdlLauncher::active();
+		if (!bridge)
+			return true;
+		/* With several monitors, the window whose monitor contains the place gets it, in its
+		 * own pixels; a place outside every monitor goes to the first window. */
+		SdlWindow* target = nullptr;
+		SDL_FPoint local = pos;
+		if (freerdp_settings_get_bool(context()->settings, FreeRDP_UseMultimon))
+		{
+			for (auto& entry : _windows)
+			{
+				const SDL_FPoint at = { pos.x + static_cast<float>(entry.second.offsetX()),
+					                    pos.y + static_cast<float>(entry.second.offsetY()) };
+				const auto viewport = entry.second.pixelViewport();
+				if ((at.x >= 0.0f) && (at.y >= 0.0f) &&
+				    (at.x < static_cast<float>(viewport.w)) &&
+				    (at.y < static_cast<float>(viewport.h)))
+				{
+					target = &entry.second;
+					local = at;
+					break;
+				}
+			}
+		}
+		if (!target)
+			target = getFirstWindow();
+		if (!target || !target->renderer())
+			return true;
+		const auto spos = pixelToScreen(target->id(), local);
+		float x = 0, y = 0;
+		if (SDL_RenderCoordinatesFromWindow(target->renderer(), spos.x, spos.y, &x, &y))
+			bridge->hostedWarp(target->id(), x, y);
+		return true;
+	}
+#endif
 	auto window = SDL_GetMouseFocus();
 	if (!window)
 		return true;
@@ -1930,6 +1987,12 @@ bool SdlContext::handleEvent(const SDL_WindowEvent& ev)
 			break;
 		case SDL_EVENT_WINDOW_MOUSE_ENTER:
 			return restoreCursor();
+		case SDL_EVENT_WINDOW_EXPOSED:
+			/* Hosted: the launcher shows the window again after hiding it, and nothing was
+			 * drawn for it in between. */
+			if (SdlHosted::enabled() && !redrawWindows())
+				return false;
+			break;
 		case SDL_EVENT_WINDOW_FOCUS_LOST:
 			window->closeRefreshMenu();
 			std::ignore = redrawWindows();
@@ -2775,10 +2838,9 @@ bool SdlContext::drawToWindows(const std::vector<SDL_Rect>& rects, bool remoteCo
 	bool firstShow = false;
 	for (auto& window : _windows)
 	{
-		if (SDL_GetWindowFlags(window.second.window()) & SDL_WINDOW_HIDDEN)
+		if (!window.second.revealed())
 		{
-			SDL_ShowWindow(window.second.window());
-			SDL_RaiseWindow(window.second.window());
+			window.second.reveal();
 			firstShow = true;
 		}
 	}
@@ -2910,7 +2972,9 @@ bool SdlContext::redraw(bool suppress)
 
 	auto gdi = context()->gdi;
 	if (!gdi) return true;
-	_screenOutputSuppressed = suppress;
+	if (_screenOutputSuppressed.exchange(suppress) != suppress)
+		WLog_Print(_log, WLOG_INFO, "Server output %s: %s", suppress ? "paused" : "resumed",
+		           suppress ? "no session window is visible" : "a session window is visible");
 	return gdi_send_suppress_output(gdi, suppress);
 }
 
@@ -3139,6 +3203,13 @@ bool SdlContext::restoreCursor()
 	{
 		/* Keep hasCursor() tracking the server cursor: it selects relative mouse mode. */
 		setHasCursor(_cursorType != CURSOR_NULL);
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+		if (auto bridge = SdlLauncher::active(); bridge && SdlHosted::enabled())
+		{
+			bridge->hostedCursor("default");
+			return true;
+		}
+#endif
 		if (!SDL_SetCursor(SDL_GetDefaultCursor()) || !SDL_ShowCursor())
 		{
 			WLog_Print(getWLog(), WLOG_ERROR, "Unable to show the local cursor");
@@ -3146,6 +3217,15 @@ bool SdlContext::restoreCursor()
 		}
 		return true;
 	}
+#ifdef WITH_SDL_LAUNCHER_BRIDGE
+	if (auto bridge = SdlLauncher::active();
+	    bridge && SdlHosted::enabled() && _cursorType != CURSOR_IMAGE)
+	{
+		bridge->hostedCursor(_cursorType == CURSOR_NULL ? "hidden" : "default");
+		setHasCursor(_cursorType != CURSOR_NULL);
+		return true;
+	}
+#endif
 	switch (_cursorType)
 	{
 		case CURSOR_NULL:
