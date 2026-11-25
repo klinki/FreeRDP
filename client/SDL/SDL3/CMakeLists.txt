@@ -42,6 +42,7 @@ set(SRCS
     sdl_pointer.hpp
     sdl_disp.cpp
     sdl_disp.hpp
+    sdl_display_offsets.hpp
     sdl_monitor.cpp
     sdl_monitor.hpp
     sdl_monitor_layout.hpp
@@ -270,6 +271,13 @@ if(BUILD_TESTING_INTERNAL OR BUILD_TESTING)
                         "${TESTING_OUTPUT_DIRECTORY}")
   add_test(NAME TestSDLMonitorLayout COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLMonitorLayout)
   set_property(TARGET TestSDLMonitorLayout PROPERTY FOLDER "FreeRDP/Client/Test")
+
+  add_executable(TestSDLDisplayOffsets test/TestSDLDisplayOffsets.cpp)
+  target_link_libraries(TestSDLDisplayOffsets PRIVATE freerdp SDL3::Headers)
+  set_target_properties(TestSDLDisplayOffsets PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                        "${TESTING_OUTPUT_DIRECTORY}")
+  add_test(NAME TestSDLDisplayOffsets COMMAND ${TESTING_OUTPUT_DIRECTORY}/TestSDLDisplayOffsets)
+  set_property(TARGET TestSDLDisplayOffsets PROPERTY FOLDER "FreeRDP/Client/Test")
 
   add_executable(TestSDLMonitorScale test/TestSDLMonitorScale.cpp sdl_monitor_scale.cpp)
   target_link_libraries(TestSDLMonitorScale PRIVATE SDL3::Headers)
