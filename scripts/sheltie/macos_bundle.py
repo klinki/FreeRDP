@@ -31,6 +31,9 @@ activate = 1
 """
 
 
+# Loads an installed keg's own recipe; Homebrew 7 no longer takes formula paths on the command line.
+BREW_RECIPE = Path(__file__).with_name("brew_recipe.rb")
+
 def run(*args, **kwargs):
     return subprocess.check_output([str(arg) for arg in args], text=True, **kwargs).strip()
 
@@ -299,7 +302,7 @@ def retain_downloads(cache, destination, info):
         if not path.is_file() or path.is_symlink():
             continue
         relative = path.relative_to(cache)
-        if "api" in relative.parts or ".git" in relative.parts or path.name.endswith(".jws.json"):
+        if {"api", "bootsnap", "tool-selection", ".git"} & set(relative.parts) or path.name.endswith(".jws.json"):
             continue
         if any(path.is_relative_to(repository) for repository in repositories):
             continue
@@ -338,7 +341,7 @@ def collect_sources(runtime, source, output):
         for formula, installed_version in sorted(formula_versions.items()):
             installed = cellar / formula / installed_version
             recipe = installed / ".brew" / f"{formula}.rb"
-            info = json.loads(run("brew", "info", "--json=v2", "--formula", recipe))["formulae"][0]
+            info = json.loads(run("brew", "ruby", BREW_RECIPE, "info", recipe))["formulae"][0]
             stable = info["versions"]["stable"]
             expected = stable + (f"_{info['revision']}" if info["revision"] else "")
             if installed_version != expected:
@@ -350,8 +353,7 @@ def collect_sources(runtime, source, output):
             (folder / "metadata.json").write_text(json.dumps(info, indent=2) + "\n")
             cache = output.parent.parent / "runtime-source-cache" / formula / installed_version
             environment = dict(os.environ, HOMEBREW_CACHE=str(cache), HOMEBREW_NO_AUTO_UPDATE="1")
-            subprocess.run(["brew", "fetch", "--build-from-source", "--formula", str(recipe)],
-                           env=environment, check=True)
+            subprocess.run(["brew", "ruby", str(BREW_RECIPE), "fetch", str(recipe)], env=environment, check=True)
             retain_downloads(cache, folder, info)
             archives = [path for path in folder.rglob("*") if path.is_file() and not path.is_symlink()]
             if not archives:
