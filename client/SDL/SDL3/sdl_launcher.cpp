@@ -1127,7 +1127,8 @@ void SdlLauncher::serviceFocus()
 	auto windows = SDL_GetWindows(&count);
 	for (int i = 0; windows && i < count; i++)
 	{
-		std::ignore = SDL_RestoreWindow(windows[i]);
+		if (focusRestoresWindow(SDL_GetWindowFlags(windows[i])))
+			std::ignore = SDL_RestoreWindow(windows[i]);
 		std::ignore = SDL_RaiseWindow(windows[i]);
 	}
 	SDL_free(windows);
